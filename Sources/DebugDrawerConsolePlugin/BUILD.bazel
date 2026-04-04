@@ -1,0 +1,12 @@
+load("@rules_swift//swift:swift.bzl", "swift_library")
+
+swift_library(
+    name = "DebugDrawerConsolePlugin",
+    srcs = glob(["*.swift"]),
+    module_name = "DebugDrawerConsolePlugin",
+    deps = [
+        "//Sources/DebugDrawer",
+        "@swiftpkg_oslogclient//:OSLogClient",
+    ],
+    visibility = ["//visibility:public"],
+)

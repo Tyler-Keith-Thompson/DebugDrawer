@@ -1,0 +1,7 @@
+build --macos_minimum_os=15.0
+build --host_macos_minimum_os=15.0
+build:debug --compilation_mode=dbg
+build:release --compilation_mode=opt
+build --disk_cache=~/.cache/bazel-debugdrawer
+build --ui_event_filters=-info
+test --spawn_strategy=local

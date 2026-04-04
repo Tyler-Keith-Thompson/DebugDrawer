@@ -1,0 +1,15 @@
+{
+  "originHash" : "992b42284ef2a472ef217f0d84bb34ca3824fb705f44b3927528753d85f3ef3b",
+  "pins" : [
+    {
+      "identity" : "oslogclient",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/CheekyGhost-Labs/OSLogClient",
+      "state" : {
+        "revision" : "6d023a438c1c1026e3627c499ed39e5bfa533aa3",
+        "version" : "2.0.0"
+      }
+    }
+  ],
+  "version" : 3
+}

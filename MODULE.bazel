@@ -1,0 +1,41 @@
+module(
+    name = "debug-drawer",
+    version = "0.1.0",
+)
+
+# ── Platforms ────────────────────────────────────────────────────────
+bazel_dep(name = "platforms", version = "1.0.0")
+
+# ── Swift / Apple ────────────────────────────────────────────────────
+bazel_dep(name = "apple_support", version = "2.2.0", repo_name = "build_bazel_apple_support")
+bazel_dep(name = "rules_cc", version = "0.2.17")
+bazel_dep(name = "rules_swift", version = "3.5.0")
+bazel_dep(name = "rules_apple", version = "4.5.1")
+
+# ── Swift Package Manager dependencies ──────────────────────────────
+bazel_dep(name = "rules_swift_package_manager", version = "1.13.0")
+
+swift_deps = use_extension(
+    "@rules_swift_package_manager//:extensions.bzl",
+    "swift_deps",
+)
+swift_deps.from_package(
+    declare_swift_deps_info = True,
+    resolved = "//:Package.resolved",
+    swift = "//:Package.swift",
+)
+use_repo(
+    swift_deps,
+    "swift_deps_info",
+    "swift_package",
+    "swiftpkg_oslogclient",
+)
+
+# ── Apple CC toolchain ───────────────────────────────────────────────
+apple_cc_configure = use_extension(
+    "@build_bazel_apple_support//crosstool:setup.bzl",
+    "apple_cc_configure_extension",
+)
+use_repo(apple_cc_configure, "local_config_apple_cc")
+
+register_toolchains("@local_config_apple_cc//:all")

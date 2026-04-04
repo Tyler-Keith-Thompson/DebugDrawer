@@ -1,0 +1,9 @@
+load("@rules_swift//swift:swift.bzl", "swift_library")
+
+swift_library(
+    name = "DebugDrawerKeychainPlugin",
+    srcs = glob(["*.swift"]),
+    module_name = "DebugDrawerKeychainPlugin",
+    deps = ["//Sources/DebugDrawer"],
+    visibility = ["//visibility:public"],
+)
