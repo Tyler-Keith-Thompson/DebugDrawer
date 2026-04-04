@@ -173,27 +173,6 @@ just clean       # Clean Bazel artifacts
 
 Requires Bazel 9.0.1, macOS 15.0+, Swift 6.
 
-## Architecture
-
-```
-Sources/
-├── DebugDrawer/                      # Core (zero deps)
-├── DebugDrawerConsolePlugin/         # + OSLogClient
-├── DebugDrawerViewInspectorPlugin/
-├── DebugDrawerAccessibilityPlugin/
-├── DebugDrawerAppInfoPlugin/
-├── DebugDrawerUserDefaultsPlugin/
-├── DebugDrawerPerformancePlugin/
-├── DebugDrawerNetworkPlugin/
-├── DebugDrawerKeychainPlugin/
-├── DebugDrawerScreenshotPlugin/
-├── DebugDrawerFileBrowserPlugin/
-├── DebugDrawerDiskIOPlugin/
-└── DebugDrawerEnergyPlugin/          # + IOKit
-```
-
-Each plugin depends only on `DebugDrawer` core. No plugin depends on another plugin. Consumers pick exactly what they need with zero transitive conflicts.
-
 ## License
 
 MIT
