@@ -14,11 +14,11 @@
         public let source: Source
         public let level: Level
 
-        public enum Source: String {
+        public enum Source: String, Sendable {
             case stdout, stderr, oslog
         }
 
-        public enum Level: Comparable {
+        public enum Level: Comparable, Sendable {
             case debug, info, notice, error, fault
 
             var color: Color {

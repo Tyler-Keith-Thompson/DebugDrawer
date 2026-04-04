@@ -1,7 +1,7 @@
 #if DEBUG
     import AppKit
     import DebugDrawer
-    import ScreenCaptureKit
+    @preconcurrency import ScreenCaptureKit
     import SwiftUI
 
     // MARK: - Plugin
@@ -112,19 +112,23 @@
         }
 
         private func captureWindow(_ window: NSWindow) async throws -> NSImage {
+            let windowID = CGWindowID(window.windowNumber)
+            let windowFrame = window.frame
+            let scale = window.screen?.backingScaleFactor ?? 2
+
             let content = try await SCShareableContent.current
-            guard let scWindow = content.windows.first(where: { $0.windowID == CGWindowID(window.windowNumber) }) else {
+            guard let scWindow = content.windows.first(where: { $0.windowID == windowID }) else {
                 throw ScreenshotError.windowNotFound
             }
 
             let filter = SCContentFilter(desktopIndependentWindow: scWindow)
             let config = SCStreamConfiguration()
-            config.width = Int(window.frame.width * (window.screen?.backingScaleFactor ?? 2))
-            config.height = Int(window.frame.height * (window.screen?.backingScaleFactor ?? 2))
+            config.width = Int(windowFrame.width * scale)
+            config.height = Int(windowFrame.height * scale)
             config.showsCursor = false
 
             let cgImage = try await SCScreenshotManager.captureImage(contentFilter: filter, configuration: config)
-            return NSImage(cgImage: cgImage, size: window.frame.size)
+            return NSImage(cgImage: cgImage, size: windowFrame.size)
         }
 
         private func saveToDesktop(_ image: NSImage) throws -> String {

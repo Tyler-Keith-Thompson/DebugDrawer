@@ -187,7 +187,7 @@
         let subviewCount: Int
         let children: [ViewNode]
 
-        static func build(from view: NSView, maxDepth: Int = 12) -> ViewNode {
+        @MainActor static func build(from view: NSView, maxDepth: Int = 12) -> ViewNode {
             let children: [ViewNode]
             if maxDepth > 0 {
                 children = view.subviews.map { build(from: $0, maxDepth: maxDepth - 1) }
@@ -584,6 +584,7 @@
 
     // MARK: - Click indicator
 
+    @MainActor
     final class ClickIndicatorMonitor {
         static let shared = ClickIndicatorMonitor()
 
