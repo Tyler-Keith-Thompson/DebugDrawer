@@ -1,0 +1,16 @@
+load("@rules_swift//swift:swift.bzl", "swift_test")
+
+swift_test(
+    name = "DebugDrawerNetworkPluginTests",
+    size = "small",
+    srcs = glob(["*.swift"]),
+    data = glob(["__Snapshots__/**"], allow_empty = True),
+    copts = ["-DMOCKING"],
+    deps = [
+        "//Sources/DebugDrawer",
+        "//Sources/DebugDrawerNetworkPlugin",
+        "@swiftpkg_viewinspector//:ViewInspector",
+        "@swiftpkg_swift_snapshot_testing//:SnapshotTesting",
+        "@swiftpkg_mockable//:Mockable",
+    ],
+)

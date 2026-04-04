@@ -665,14 +665,18 @@
           "REPO_MAPPING:rules_swift_package_manager+,bazel_skylib bazel_skylib+",
           "REPO_MAPPING:rules_swift_package_manager+,bazel_tools bazel_tools",
           "REPO_MAPPING:rules_swift_package_manager+,cgrindel_bazel_starlib cgrindel_bazel_starlib+",
-          "FILE:@@//Package.resolved 82c6ba869966d0553f8c9cfa3d13026e1e6cd41e7e62e2477bf2fc3829e3bd70"
+          "FILE:@@//Package.resolved 91a5eca8cbf58429f51467ee0004f855e0eea4cf15185bcc70057db0156772a1"
         ],
         "generatedRepoSpecs": {
           "swift_deps_info": {
             "repoRuleId": "@@rules_swift_package_manager+//swiftpkg/internal:swift_deps_info.bzl%swift_deps_info",
             "attributes": {
               "direct_dep_pkg_infos": {
-                "@swiftpkg_oslogclient//:pkg_info.json": "oslogclient"
+                "@swiftpkg_oslogclient//:pkg_info.json": "oslogclient",
+                "@swiftpkg_viewinspector//:pkg_info.json": "viewinspector",
+                "@swiftpkg_swift_snapshot_testing//:pkg_info.json": "swift-snapshot-testing",
+                "@swiftpkg_dependencyinjection//:pkg_info.json": "dependencyinjection",
+                "@swiftpkg_mockable//:pkg_info.json": "mockable"
               }
             }
           },
@@ -695,11 +699,132 @@
               "cached_json_directory": "",
               "replace_scm_with_registry": false
             }
+          },
+          "swiftpkg_viewinspector": {
+            "repoRuleId": "@@rules_swift_package_manager+//swiftpkg/internal:swift_package.bzl%swift_package",
+            "attributes": {
+              "bazel_package_name": "swiftpkg_viewinspector",
+              "commit": "e9a06346499a3a889165647e3f23f8a7b2609a1c",
+              "remote": "https://github.com/nalexn/ViewInspector",
+              "version": "0.10.3",
+              "env": {},
+              "env_inherit": [],
+              "cached_json_directory": "",
+              "replace_scm_with_registry": false
+            }
+          },
+          "swiftpkg_swift_snapshot_testing": {
+            "repoRuleId": "@@rules_swift_package_manager+//swiftpkg/internal:swift_package.bzl%swift_package",
+            "attributes": {
+              "bazel_package_name": "swiftpkg_swift_snapshot_testing",
+              "commit": "ad5e3190cc63dc288f28546f9c6827efc1e9d495",
+              "remote": "https://github.com/pointfreeco/swift-snapshot-testing",
+              "version": "1.19.2",
+              "env": {},
+              "env_inherit": [],
+              "cached_json_directory": "",
+              "replace_scm_with_registry": false
+            }
+          },
+          "swiftpkg_dependencyinjection": {
+            "repoRuleId": "@@rules_swift_package_manager+//swiftpkg/internal:swift_package.bzl%swift_package",
+            "attributes": {
+              "bazel_package_name": "swiftpkg_dependencyinjection",
+              "commit": "04ee9e3ec123a50956862cf3398d3b8129ab60fe",
+              "remote": "https://github.com/Tyler-Keith-Thompson/DependencyInjection",
+              "version": "1.0.12",
+              "env": {},
+              "env_inherit": [],
+              "cached_json_directory": "",
+              "replace_scm_with_registry": false
+            }
+          },
+          "swiftpkg_mockable": {
+            "repoRuleId": "@@rules_swift_package_manager+//swiftpkg/internal:swift_package.bzl%swift_package",
+            "attributes": {
+              "bazel_package_name": "swiftpkg_mockable",
+              "commit": "bd20509c34ca3205003677747ad8dcb70d18b7ca",
+              "remote": "https://github.com/Kolos65/Mockable",
+              "version": "0.6.2",
+              "env": {},
+              "env_inherit": [],
+              "cached_json_directory": "",
+              "replace_scm_with_registry": false
+            }
+          },
+          "swiftpkg_swift_atomics": {
+            "repoRuleId": "@@rules_swift_package_manager+//swiftpkg/internal:swift_package.bzl%swift_package",
+            "attributes": {
+              "bazel_package_name": "swiftpkg_swift_atomics",
+              "commit": "b601256eab081c0f92f059e12818ac1d4f178ff7",
+              "remote": "https://github.com/apple/swift-atomics.git",
+              "version": "1.3.0",
+              "env": {},
+              "env_inherit": [],
+              "cached_json_directory": "",
+              "replace_scm_with_registry": false
+            }
+          },
+          "swiftpkg_swift_custom_dump": {
+            "repoRuleId": "@@rules_swift_package_manager+//swiftpkg/internal:swift_package.bzl%swift_package",
+            "attributes": {
+              "bazel_package_name": "swiftpkg_swift_custom_dump",
+              "commit": "06c57924455064182d6b217f06ebc05d00cb2990",
+              "remote": "https://github.com/pointfreeco/swift-custom-dump",
+              "version": "1.5.0",
+              "env": {},
+              "env_inherit": [],
+              "cached_json_directory": "",
+              "replace_scm_with_registry": false
+            }
+          },
+          "swiftpkg_swift_service_context": {
+            "repoRuleId": "@@rules_swift_package_manager+//swiftpkg/internal:swift_package.bzl%swift_package",
+            "attributes": {
+              "bazel_package_name": "swiftpkg_swift_service_context",
+              "commit": "d0997351b0c7779017f88e7a93bc30a1878d7f29",
+              "remote": "https://github.com/apple/swift-service-context",
+              "version": "1.3.0",
+              "env": {},
+              "env_inherit": [],
+              "cached_json_directory": "",
+              "replace_scm_with_registry": false
+            }
+          },
+          "swiftpkg_swift_syntax": {
+            "repoRuleId": "@@rules_swift_package_manager+//swiftpkg/internal:swift_package.bzl%swift_package",
+            "attributes": {
+              "bazel_package_name": "swiftpkg_swift_syntax",
+              "commit": "4799286537280063c85a32f09884cfbca301b1a1",
+              "remote": "https://github.com/swiftlang/swift-syntax",
+              "version": "602.0.0",
+              "env": {},
+              "env_inherit": [],
+              "cached_json_directory": "",
+              "replace_scm_with_registry": false
+            }
+          },
+          "swiftpkg_xctest_dynamic_overlay": {
+            "repoRuleId": "@@rules_swift_package_manager+//swiftpkg/internal:swift_package.bzl%swift_package",
+            "attributes": {
+              "bazel_package_name": "swiftpkg_xctest_dynamic_overlay",
+              "commit": "dfd70507def84cb5fb821278448a262c6ff2bbad",
+              "remote": "https://github.com/pointfreeco/xctest-dynamic-overlay",
+              "version": "1.9.0",
+              "env": {},
+              "env_inherit": [],
+              "cached_json_directory": "",
+              "replace_scm_with_registry": false
+            }
           }
         },
         "moduleExtensionMetadata": {
           "explicitRootModuleDirectDeps": [
             "swiftpkg_oslogclient",
+            "swiftpkg_viewinspector",
+            "swiftpkg_swift_snapshot_testing",
+            "swiftpkg_dependencyinjection",
+            "swiftpkg_mockable",
             "swift_deps_info",
             "swift_package"
           ],

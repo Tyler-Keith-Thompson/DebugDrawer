@@ -1,0 +1,14 @@
+load("@rules_swift//swift:swift.bzl", "swift_test")
+
+swift_test(
+    name = "DebugDrawerScreenshotPluginTests",
+    size = "small",
+    srcs = glob(["*.swift"]),
+    copts = ["-DMOCKING"],
+    deps = [
+        "//Sources/DebugDrawer",
+        "//Sources/DebugDrawerScreenshotPlugin",
+        "@swiftpkg_mockable//:Mockable",
+    ],
+
+)
