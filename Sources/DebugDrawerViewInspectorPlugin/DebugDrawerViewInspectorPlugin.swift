@@ -4,6 +4,8 @@
     import DebugDrawer
     import SwiftUI
 
+    #if os(macOS)
+
     // MARK: - Controller
 
     @MainActor
@@ -671,4 +673,6 @@
             registerGlobal(ViewInspectorPlugin())
         }
     }
+
+    #endif // os(macOS)
 #endif

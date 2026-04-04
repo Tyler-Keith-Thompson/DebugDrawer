@@ -3,6 +3,8 @@
     import SceneKit
     import SwiftUI
 
+    #if os(macOS)
+
     // MARK: - 3D View Debugger
 
     struct ViewDebugger3DView: NSViewRepresentable {
@@ -393,4 +395,6 @@
             }
         }
     }
+
+    #endif // os(macOS)
 #endif

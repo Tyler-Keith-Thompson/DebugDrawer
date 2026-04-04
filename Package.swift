@@ -3,7 +3,7 @@ import PackageDescription
 
 let package = Package(
     name: "DebugDrawer",
-    platforms: [.macOS(.v15)],
+    platforms: [.macOS(.v15), .iOS(.v17)],
     products: [
         .library(name: "DebugDrawer", targets: ["DebugDrawer"]),
         .library(name: "DebugDrawerConsolePlugin", targets: ["DebugDrawerConsolePlugin"]),
@@ -66,7 +66,7 @@ let package = Package(
         .target(name: "DebugDrawerEnergyPlugin",
                 dependencies: ["DebugDrawer"],
                 path: "Sources/DebugDrawerEnergyPlugin",
-                linkerSettings: [.linkedFramework("IOKit")]),
+                linkerSettings: [.linkedFramework("IOKit", .when(platforms: [.macOS]))]),
 
         // ── Test targets (per plugin) ───────────────────────────────
         .testTarget(name: "DebugDrawerTests",
@@ -116,6 +116,6 @@ let package = Package(
         .testTarget(name: "DebugDrawerEnergyPluginTests",
                     dependencies: ["DebugDrawerEnergyPlugin", "DebugDrawer"],
                     path: "Tests/DebugDrawerEnergyPluginTests",
-                    linkerSettings: [.linkedFramework("IOKit")]),
+                    linkerSettings: [.linkedFramework("IOKit", .when(platforms: [.macOS]))]),
     ]
 )

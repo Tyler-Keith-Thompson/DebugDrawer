@@ -1,6 +1,8 @@
 #if DEBUG
-    import AppKit
     import SwiftUI
+
+    #if os(macOS)
+    import AppKit
 
     // MARK: - Audit issue model
 
@@ -536,5 +538,7 @@
             NSPasteboard.general.setString(lines.joined(separator: "\n"), forType: .string)
         }
     }
+
+    #endif // os(macOS)
 
 #endif

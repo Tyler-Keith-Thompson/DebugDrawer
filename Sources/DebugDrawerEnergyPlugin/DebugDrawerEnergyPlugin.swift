@@ -2,7 +2,11 @@
     import Combine
     import DebugDrawer
     import Foundation
-    import IOKit.ps
+    #if os(macOS)
+        import IOKit.ps
+    #elseif os(iOS)
+        import UIKit
+    #endif
     import SwiftUI
 
     // MARK: - Energy monitor
@@ -50,26 +54,37 @@
         }
 
         private func sample() {
-            // Battery info via IOKit
-            let snapshot = IOPSCopyPowerSourcesInfo().takeRetainedValue()
-            let sources = IOPSCopyPowerSourcesList(snapshot).takeRetainedValue() as [CFTypeRef]
+            // Battery info
+            #if os(macOS)
+                let snapshot = IOPSCopyPowerSourcesInfo().takeRetainedValue()
+                let sources = IOPSCopyPowerSourcesList(snapshot).takeRetainedValue() as [CFTypeRef]
 
-            if let source = sources.first,
-               let desc = IOPSGetPowerSourceDescription(snapshot, source).takeUnretainedValue() as? [String: Any]
-            {
-                batteryLevel = desc[kIOPSCurrentCapacityKey] as? Int ?? -1
-                isCharging = (desc[kIOPSIsChargingKey] as? Bool) ?? false
-                powerSource = (desc[kIOPSPowerSourceStateKey] as? String) ?? "Unknown"
+                if let source = sources.first,
+                   let desc = IOPSGetPowerSourceDescription(snapshot, source).takeUnretainedValue() as? [String: Any]
+                {
+                    batteryLevel = desc[kIOPSCurrentCapacityKey] as? Int ?? -1
+                    isCharging = (desc[kIOPSIsChargingKey] as? Bool) ?? false
+                    powerSource = (desc[kIOPSPowerSourceStateKey] as? String) ?? "Unknown"
+                } else {
+                    batteryLevel = -1
+                    powerSource = "AC Power"
+                }
+            #elseif os(iOS)
+                UIDevice.current.isBatteryMonitoringEnabled = true
+                let level = UIDevice.current.batteryLevel
+                batteryLevel = level >= 0 ? Int(level * 100) : -1
+                let state = UIDevice.current.batteryState
+                isCharging = state == .charging || state == .full
+                powerSource = isCharging ? "AC Power" : "Battery"
+            #endif
 
+            if batteryLevel >= 0 {
                 batteryHistory.append(BatterySnapshot(
                     timestamp: Date(), level: batteryLevel, isCharging: isCharging
                 ))
                 if batteryHistory.count > historySize {
                     batteryHistory.removeFirst()
                 }
-            } else {
-                batteryLevel = -1
-                powerSource = "AC Power"
             }
 
             // Thermal state

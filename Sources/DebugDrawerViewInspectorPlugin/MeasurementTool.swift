@@ -2,6 +2,8 @@
     import AppKit
     import SwiftUI
 
+    #if os(macOS)
+
     // MARK: - Controller
 
     @MainActor
@@ -398,4 +400,6 @@
             }
         }
     }
+
+    #endif // os(macOS)
 #endif

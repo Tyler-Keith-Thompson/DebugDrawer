@@ -4,6 +4,8 @@
     @preconcurrency import ScreenCaptureKit
     import SwiftUI
 
+    #if os(macOS)
+
     // MARK: - Plugin
 
     public struct ScreenshotPlugin: DebugDrawerPlugin {
@@ -180,4 +182,6 @@
             registerGlobal(ScreenshotPlugin())
         }
     }
+
+    #endif // os(macOS)
 #endif

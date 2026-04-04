@@ -9,17 +9,28 @@ build:
 test:
     bazel test --config={{BAZEL_CONFIG}} //...
 
-[doc('Build and run example app')]
-run:
+[doc('Build and run macOS example app')]
+run target="macOS":
     #!/usr/bin/env bash
     set -euo pipefail
-    RUN_DIR="/tmp/debugdrawer-example"
-    rm -rf "$RUN_DIR"
-    mkdir -p "$RUN_DIR"
-    bazel build //Example:ExampleApp --config={{BAZEL_CONFIG}}
-    APP_ZIP=$(bazel cquery //Example:ExampleApp --config={{BAZEL_CONFIG}} --output=files 2>/dev/null | grep '\.zip$')
-    unzip -qo "$APP_ZIP" -d "$RUN_DIR"
-    open "$RUN_DIR/DebugDrawerExample.app"
+    case "{{target}}" in
+        macOS|macos)
+            RUN_DIR="/tmp/debugdrawer-example"
+            rm -rf "$RUN_DIR"
+            mkdir -p "$RUN_DIR"
+            bazel build //Example:ExampleApp_macOS --config={{BAZEL_CONFIG}}
+            APP_ZIP=$(bazel cquery //Example:ExampleApp_macOS --config={{BAZEL_CONFIG}} --output=files 2>/dev/null | grep '\.zip$')
+            unzip -qo "$APP_ZIP" -d "$RUN_DIR"
+            open "$RUN_DIR/DebugDrawerExample.app"
+            ;;
+        iOS|ios)
+            bazel run //Example:ExampleApp_iOS --config={{BAZEL_CONFIG}}
+            ;;
+        *)
+            echo "Unknown target: {{target}}. Use 'macOS' or 'iOS'"
+            exit 1
+            ;;
+    esac
 
 [doc('Clean build artifacts')]
 clean:

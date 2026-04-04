@@ -222,12 +222,13 @@
             .padding(.vertical, 2)
             .contextMenu {
                 Button("Copy Path") {
-                    NSPasteboard.general.clearContents()
-                    NSPasteboard.general.setString(node.path, forType: .string)
+                    debugDrawerCopyToClipboard(node.path)
                 }
-                Button("Reveal in Finder") {
-                    NSWorkspace.shared.selectFile(node.path, inFileViewerRootedAtPath: "")
-                }
+                #if os(macOS)
+                    Button("Reveal in Finder") {
+                        NSWorkspace.shared.selectFile(node.path, inFileViewerRootedAtPath: "")
+                    }
+                #endif
             }
         }
 

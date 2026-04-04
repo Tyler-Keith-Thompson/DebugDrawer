@@ -1,5 +1,7 @@
 #if DEBUG
-    import AppKit
+    #if os(macOS)
+        import AppKit
+    #endif
     import Combine
     import DebugDrawer
     import SwiftUI
@@ -66,7 +68,11 @@
                 Group {
                     infoRow("Bundle ID", bundle.bundleIdentifier ?? "—")
                     infoRow("Version", "\(bundle.infoDictionary?["CFBundleShortVersionString"] as? String ?? "—") (\(bundle.infoDictionary?["CFBundleVersion"] as? String ?? "—"))")
+                    #if os(macOS)
                     infoRow("macOS", ProcessInfo.processInfo.operatingSystemVersionString)
+                #elseif os(iOS)
+                    infoRow("iOS", ProcessInfo.processInfo.operatingSystemVersionString)
+                #endif
                 }
 
                 Divider()
@@ -135,13 +141,12 @@
                 "Bundle: \(bundle.bundleIdentifier ?? "—")",
                 "Version: \(bundle.infoDictionary?["CFBundleShortVersionString"] as? String ?? "—")",
                 "Build: \(bundle.infoDictionary?["CFBundleVersion"] as? String ?? "—")",
-                "macOS: \(ProcessInfo.processInfo.operatingSystemVersionString)",
+                "OS: \(ProcessInfo.processInfo.operatingSystemVersionString)",
                 "Memory: \(String(format: "%.1f MB", metrics.memoryMB))",
                 "PID: \(ProcessInfo.processInfo.processIdentifier)",
             ].joined(separator: "\n")
 
-            NSPasteboard.general.clearContents()
-            NSPasteboard.general.setString(info, forType: .string)
+            debugDrawerCopyToClipboard(info)
         }
     }
 

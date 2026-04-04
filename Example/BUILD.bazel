@@ -1,34 +1,60 @@
+load("@rules_apple//apple:ios.bzl", "ios_application")
 load("@rules_apple//apple:macos.bzl", "macos_application")
 load("@rules_swift//swift:swift.bzl", "swift_library")
 
+# ── All plugin deps (shared between macOS and iOS) ───────────────────
+_SHARED_DEPS = [
+    "//Sources/DebugDrawer",
+    "//Sources/DebugDrawerAccessibilityPlugin",
+    "//Sources/DebugDrawerAppInfoPlugin",
+    "//Sources/DebugDrawerConsolePlugin",
+    "//Sources/DebugDrawerDiskIOPlugin",
+    "//Sources/DebugDrawerEnergyPlugin",
+    "//Sources/DebugDrawerFileBrowserPlugin",
+    "//Sources/DebugDrawerKeychainPlugin",
+    "//Sources/DebugDrawerNetworkPlugin",
+    "//Sources/DebugDrawerPerformancePlugin",
+    "//Sources/DebugDrawerUserDefaultsPlugin",
+]
+
+# ── macOS ────────────────────────────────────────────────────────────
+
 swift_library(
-    name = "ExampleAppLib",
-    srcs = glob(["*.swift"]),
+    name = "ExampleAppLib_macOS",
+    srcs = glob(["macOS/*.swift"]),
     module_name = "ExampleApp",
-    deps = [
-        "//Sources/DebugDrawer",
-        "//Sources/DebugDrawerAccessibilityPlugin",
-        "//Sources/DebugDrawerAppInfoPlugin",
-        "//Sources/DebugDrawerConsolePlugin",
-        "//Sources/DebugDrawerDiskIOPlugin",
-        "//Sources/DebugDrawerEnergyPlugin",
-        "//Sources/DebugDrawerFileBrowserPlugin",
-        "//Sources/DebugDrawerKeychainPlugin",
-        "//Sources/DebugDrawerNetworkPlugin",
-        "//Sources/DebugDrawerPerformancePlugin",
+    deps = _SHARED_DEPS + [
         "//Sources/DebugDrawerScreenshotPlugin",
-        "//Sources/DebugDrawerUserDefaultsPlugin",
         "//Sources/DebugDrawerViewInspectorPlugin",
     ],
 )
 
 macos_application(
-    name = "ExampleApp",
+    name = "ExampleApp_macOS",
     bundle_id = "com.debugdrawer.example",
     bundle_name = "DebugDrawerExample",
-    infoplists = ["Info.plist"],
+    infoplists = ["macOS/Info.plist"],
     minimum_os_version = "15.0",
-    entitlements = "ExampleApp.entitlements",
-    deps = [":ExampleAppLib"],
+    entitlements = "macOS/ExampleApp.entitlements",
+    deps = [":ExampleAppLib_macOS"],
     linkopts = ["-framework", "IOKit"],
+)
+
+# ── iOS ──────────────────────────────────────────────────────────────
+
+swift_library(
+    name = "ExampleAppLib_iOS",
+    srcs = glob(["iOS/*.swift"]),
+    module_name = "ExampleApp",
+    deps = _SHARED_DEPS,
+)
+
+ios_application(
+    name = "ExampleApp_iOS",
+    bundle_id = "com.debugdrawer.example.ios",
+    bundle_name = "DebugDrawerExample",
+    families = ["iphone", "ipad"],
+    infoplists = ["iOS/Info.plist"],
+    minimum_os_version = "17.0",
+    deps = [":ExampleAppLib_iOS"],
 )

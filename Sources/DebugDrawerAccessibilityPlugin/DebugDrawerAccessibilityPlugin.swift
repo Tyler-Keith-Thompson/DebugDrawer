@@ -1,5 +1,4 @@
 #if DEBUG
-    import AppKit
     import DebugDrawer
     import SwiftUI
 
@@ -164,14 +163,16 @@
                     }
                 }
 
-                Divider()
+                #if os(macOS)
+                    Divider()
 
-                // Auditor
-                DisclosureGroup("Accessibility Audit", isExpanded: $showAuditor) {
-                    A11yAuditorView()
-                        .padding(.top, 4)
-                }
-                .font(.caption.weight(.medium))
+                    // Auditor
+                    DisclosureGroup("Accessibility Audit", isExpanded: $showAuditor) {
+                        A11yAuditorView()
+                            .padding(.top, 4)
+                    }
+                    .font(.caption.weight(.medium))
+                #endif
             }
         }
 

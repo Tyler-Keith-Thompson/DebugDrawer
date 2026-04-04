@@ -194,8 +194,7 @@
                         HStack {
                             Button("Copy Value") {
                                 if let data = entry.data, let str = String(data: data, encoding: .utf8) {
-                                    NSPasteboard.general.clearContents()
-                                    NSPasteboard.general.setString(str, forType: .string)
+                                    debugDrawerCopyToClipboard(str)
                                 }
                             }
                             .controlSize(.small)

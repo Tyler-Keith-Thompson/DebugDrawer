@@ -3,6 +3,8 @@
     import ObjectiveC
     import SwiftUI
 
+    #if os(macOS)
+
     // MARK: - Render tracker
 
     @MainActor
@@ -257,4 +259,6 @@
             modifier(RenderTrackingModifier(label))
         }
     }
+
+    #endif // os(macOS)
 #endif

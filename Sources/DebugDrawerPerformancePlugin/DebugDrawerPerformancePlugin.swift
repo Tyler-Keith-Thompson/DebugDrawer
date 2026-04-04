@@ -1,5 +1,9 @@
 #if DEBUG
-    import AppKit
+    #if os(macOS)
+        import AppKit
+    #elseif os(iOS)
+        import UIKit
+    #endif
     import Combine
     import DebugDrawer
     import QuartzCore
@@ -17,7 +21,11 @@
         @Published var fpsHistory: [Int] = []
         @Published var isMonitoring = false
 
-        private var displayLink: CVDisplayLink?
+        #if os(macOS)
+            private var displayLink: CVDisplayLink?
+        #elseif os(iOS)
+            private var displayLink: CADisplayLink?
+        #endif
         private var frameCount = 0
         private var lastFPSTime: CFTimeInterval = 0
         private var cancellable: AnyCancellable?
@@ -34,21 +42,28 @@
                 .autoconnect()
                 .sink { [weak self] _ in self?.sample() }
 
-            // FPS via CVDisplayLink
-            var link: CVDisplayLink?
-            CVDisplayLinkCreateWithActiveCGDisplays(&link)
-            guard let link else { return }
-            displayLink = link
+            #if os(macOS)
+                // FPS via CVDisplayLink
+                var link: CVDisplayLink?
+                CVDisplayLinkCreateWithActiveCGDisplays(&link)
+                guard let link else { return }
+                displayLink = link
 
-            let callback: CVDisplayLinkOutputCallback = { _, _, _, _, _, userInfo -> CVReturn in
-                let monitor = Unmanaged<PerformanceMonitor>.fromOpaque(userInfo!).takeUnretainedValue()
-                monitor.frameCount += 1
-                return kCVReturnSuccess
-            }
+                let callback: CVDisplayLinkOutputCallback = { _, _, _, _, _, userInfo -> CVReturn in
+                    let monitor = Unmanaged<PerformanceMonitor>.fromOpaque(userInfo!).takeUnretainedValue()
+                    monitor.frameCount += 1
+                    return kCVReturnSuccess
+                }
 
-            let selfPtr = Unmanaged.passUnretained(self).toOpaque()
-            CVDisplayLinkSetOutputCallback(link, callback, selfPtr)
-            CVDisplayLinkStart(link)
+                let selfPtr = Unmanaged.passUnretained(self).toOpaque()
+                CVDisplayLinkSetOutputCallback(link, callback, selfPtr)
+                CVDisplayLinkStart(link)
+            #elseif os(iOS)
+                // FPS via CADisplayLink
+                let link = CADisplayLink(target: self, selector: #selector(displayLinkFired))
+                link.add(to: .main, forMode: .common)
+                displayLink = link
+            #endif
             lastFPSTime = CACurrentMediaTime()
         }
 
@@ -57,11 +72,22 @@
             isMonitoring = false
             cancellable?.cancel()
             cancellable = nil
-            if let link = displayLink {
-                CVDisplayLinkStop(link)
+            #if os(macOS)
+                if let link = displayLink {
+                    CVDisplayLinkStop(link)
+                    displayLink = nil
+                }
+            #elseif os(iOS)
+                displayLink?.invalidate()
                 displayLink = nil
-            }
+            #endif
         }
+
+        #if os(iOS)
+            @objc private func displayLinkFired() {
+                frameCount += 1
+            }
+        #endif
 
         private func sample() {
             // FPS
