@@ -1,10 +1,13 @@
 #if DEBUG
-    import AppKit
     import DebugDrawer
-    @preconcurrency import ScreenCaptureKit
     import SwiftUI
 
     #if os(macOS)
+    import AppKit
+    @preconcurrency import ScreenCaptureKit
+    #elseif os(iOS)
+    import UIKit
+    #endif
 
     // MARK: - Plugin
 
@@ -31,6 +34,7 @@
                     .controlSize(.small)
 
                 HStack {
+                    #if os(macOS)
                     Button("To Desktop") {
                         capture(to: .desktop)
                     }
@@ -44,6 +48,14 @@
                     .buttonStyle(.bordered)
                     .controlSize(.small)
                     .disabled(isCapturing)
+                    #elseif os(iOS)
+                    Button("Capture") {
+                        capture(to: .clipboard)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.small)
+                    .disabled(isCapturing)
+                    #endif
                 }
 
                 if isCapturing {
@@ -87,6 +99,7 @@
             }
         }
 
+        #if os(macOS)
         private func performCapture(destination: Destination) async {
             guard let window = NSApp?.keyWindow else {
                 isCapturing = false
@@ -159,6 +172,36 @@
             pb.clearContents()
             pb.writeObjects([image])
         }
+        #elseif os(iOS)
+        private func performCapture(destination: Destination) async {
+            guard let windowScene = UIApplication.shared.connectedScenes
+                .compactMap({ $0 as? UIWindowScene })
+                .first(where: { $0.activationState == .foregroundActive }),
+                let window = windowScene.windows.first(where: { $0.isKeyWindow }),
+                let rootView = window.rootViewController?.view
+            else {
+                isCapturing = false
+                return
+            }
+
+            let renderer = UIGraphicsImageRenderer(bounds: rootView.bounds)
+            let image = renderer.image { _ in
+                rootView.drawHierarchy(in: rootView.bounds, afterScreenUpdates: true)
+            }
+
+            switch destination {
+            case .desktop:
+                // No desktop on iOS — fall through to clipboard
+                UIPasteboard.general.image = image
+                lastPath = "Copied to clipboard"
+            case .clipboard:
+                UIPasteboard.general.image = image
+                lastPath = "Copied to clipboard"
+            }
+
+            isCapturing = false
+        }
+        #endif
 
         enum ScreenshotError: LocalizedError {
             case windowNotFound
@@ -183,5 +226,4 @@
         }
     }
 
-    #endif // os(macOS)
 #endif

@@ -2,6 +2,42 @@
     import DebugDrawer
     import SwiftUI
 
+    // MARK: - View helper
+
+    private extension View {
+        @ViewBuilder
+        func applyIf<V>(_ value: V?, transform: (Self, V) -> some View) -> some View {
+            if let value {
+                transform(self, value)
+            } else {
+                self
+            }
+        }
+    }
+
+    // MARK: - Conditional environment modifier
+
+    /// Applies an environment override only when the value is non-nil.
+    /// When nil, passes through without modifying the environment.
+    /// Uses `_makeImmutable` pattern to keep view tree stable.
+    private struct ConditionalEnvironment<V>: ViewModifier {
+        let keyPath: WritableKeyPath<EnvironmentValues, V>
+        let value: V?
+
+        init(_ keyPath: WritableKeyPath<EnvironmentValues, V>, value: V?) {
+            self.keyPath = keyPath
+            self.value = value
+        }
+
+        func body(content: Content) -> some View {
+            if let value {
+                content.environment(keyPath, value)
+            } else {
+                content
+            }
+        }
+    }
+
     // MARK: - Override state
 
     @MainActor
@@ -44,11 +80,16 @@
         public init() {}
 
         public func body(content: Content) -> some View {
-            content
-                .environment(\.dynamicTypeSize, overrides.dynamicTypeSize ?? .large)
-                .environment(\.layoutDirection, overrides.layoutDirection ?? .leftToRight)
-                .environment(\.locale, overrides.locale ?? .current)
+            // Each override is only applied when non-nil.
+            // We use a single Group to keep the view tree shape stable
+            // (no @ViewBuilder branching that would cause SwiftUI to
+            // destroy and recreate the content).
+            let modified = content
+                .modifier(ConditionalEnvironment(\.dynamicTypeSize, value: overrides.dynamicTypeSize))
+                .modifier(ConditionalEnvironment(\.layoutDirection, value: overrides.layoutDirection))
+                .modifier(ConditionalEnvironment(\.locale, value: overrides.locale))
                 .preferredColorScheme(overrides.colorScheme)
+            return modified
         }
     }
 
@@ -126,13 +167,24 @@
 
                 // Layout direction
                 section("Layout Direction") {
-                    Picker(selection: layoutBinding) {
-                        Text("System").tag(0)
-                        Text("LTR").tag(1)
-                        Text("RTL").tag(2)
-                    } label: { EmptyView() }
-                        .pickerStyle(.segmented)
+                    #if os(macOS)
+                        Picker(selection: layoutBinding) {
+                            Text("System").tag(0)
+                            Text("LTR").tag(1)
+                            Text("RTL").tag(2)
+                        } label: { EmptyView() }
+                            .pickerStyle(.segmented)
+                            .controlSize(.small)
+                    #else
+                        // iOS has a SwiftUI bug where setting .leftToRight explicitly
+                        // after .rightToLeft causes a 180-degree flip. Use a toggle instead.
+                        Toggle("Right-to-Left", isOn: Binding(
+                            get: { overrides.layoutDirection == .rightToLeft },
+                            set: { overrides.layoutDirection = $0 ? .rightToLeft : nil }
+                        ))
+                        .toggleStyle(.switch)
                         .controlSize(.small)
+                    #endif
                 }
 
                 // Locale
@@ -163,16 +215,14 @@
                     }
                 }
 
-                #if os(macOS)
-                    Divider()
+                Divider()
 
-                    // Auditor
-                    DisclosureGroup("Accessibility Audit", isExpanded: $showAuditor) {
-                        A11yAuditorView()
-                            .padding(.top, 4)
-                    }
-                    .font(.caption.weight(.medium))
-                #endif
+                // Auditor
+                DisclosureGroup("Accessibility Audit", isExpanded: $showAuditor) {
+                    A11yAuditorView()
+                        .padding(.top, 4)
+                }
+                .font(.caption.weight(.medium))
             }
         }
 
@@ -198,6 +248,9 @@
                 }
                 if overrides.layoutDirection == .rightToLeft {
                     badge("RTL")
+                }
+                if overrides.layoutDirection == .leftToRight {
+                    badge("LTR")
                 }
                 if let loc = overrides.locale {
                     badge(loc.identifier)
@@ -240,6 +293,7 @@
                 }
             )
         }
+
 
         private var layoutBinding: Binding<Int> {
             Binding(

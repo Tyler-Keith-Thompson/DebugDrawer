@@ -35,6 +35,11 @@ use_repo(
     "swiftpkg_mockable",
 )
 
+# ── Xcode project generation ─────────────────────────────────────────
+# Requires GNU rsync (brew install rsync) on macOS Sequoia 15.4+
+# See: https://github.com/MobileNativeFoundation/rules_xcodeproj/issues/3181
+bazel_dep(name = "rules_xcodeproj", version = "4.0.0")
+
 # ── Apple CC toolchain ───────────────────────────────────────────────
 apple_cc_configure = use_extension(
     "@build_bazel_apple_support//crosstool:setup.bzl",

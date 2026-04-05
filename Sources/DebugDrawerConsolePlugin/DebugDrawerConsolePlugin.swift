@@ -142,9 +142,14 @@
         public func install() {
             guard !installed else { return }
             installed = true
-            originalStdoutFd = dup(STDOUT_FILENO)
-            redirectStream(source: .stdout, fd: STDOUT_FILENO)
-            redirectStream(source: .stderr, fd: STDERR_FILENO)
+
+            // Only redirect stdout/stderr on macOS.
+            // On iOS, dup2 on stdout breaks Xcode's debugger attachment.
+            #if os(macOS)
+                originalStdoutFd = dup(STDOUT_FILENO)
+                redirectStream(source: .stdout, fd: STDOUT_FILENO)
+                redirectStream(source: .stderr, fd: STDERR_FILENO)
+            #endif
 
             Task {
                 do {
@@ -488,9 +493,11 @@
                     context.coordinator.renderedLineCount = newCount
                 }
 
-                if isFollowing {
+                if isFollowing, storage.length > 0 {
+                    context.coordinator.isProgrammaticScroll = true
                     let range = NSRange(location: storage.length - 1, length: 1)
                     textView.scrollRangeToVisible(range)
+                    context.coordinator.isProgrammaticScroll = false
                 }
             }
 
@@ -551,6 +558,7 @@
 
             final class Coordinator: NSObject, UITextViewDelegate {
                 var renderedLineCount = 0
+                var isProgrammaticScroll = false
                 var isFollowing: Binding<Bool>
                 weak var textView: UITextView?
 
@@ -559,6 +567,7 @@
                 }
 
                 func scrollViewDidScroll(_ scrollView: UIScrollView) {
+                    guard !isProgrammaticScroll else { return }
                     let contentHeight = scrollView.contentSize.height
                     let scrollOffset = scrollView.contentOffset.y + scrollView.bounds.height
                     let atBottom = contentHeight - scrollOffset < 20

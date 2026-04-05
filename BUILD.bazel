@@ -1,1 +1,11 @@
-# Root BUILD file — needed for Bazel
+load("@rules_xcodeproj//xcodeproj:defs.bzl", "top_level_target", "xcodeproj")
+
+xcodeproj(
+    name = "xcodeproj",
+    project_name = "DebugDrawer",
+    top_level_targets = [
+        top_level_target("//Example:ExampleApp_macOS", target_environments = ["device"]),
+        top_level_target("//Example:ExampleApp_iOS", target_environments = ["simulator"]),
+        top_level_target("//Tests/DebugDrawerTests:DebugDrawerTests", target_environments = ["simulator"]),
+    ],
+)

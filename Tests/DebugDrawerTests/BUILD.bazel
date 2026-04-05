@@ -5,4 +5,5 @@ swift_test(
     size = "small",
     srcs = glob(["*.swift"]),
     deps = ["//Sources/DebugDrawer"],
+    visibility = ["//visibility:public"],
 )

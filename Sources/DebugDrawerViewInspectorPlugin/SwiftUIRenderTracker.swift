@@ -1,9 +1,12 @@
 #if DEBUG
-    import AppKit
     import ObjectiveC
     import SwiftUI
 
     #if os(macOS)
+    import AppKit
+    #elseif os(iOS)
+    import UIKit
+    #endif
 
     // MARK: - Render tracker
 
@@ -52,6 +55,7 @@
             guard !swizzled else { return }
             swizzled = true
 
+            #if os(macOS)
             // Swizzle layout — called when needsLayout is set
             swizzleMethod(
                 cls: NSView.self,
@@ -72,6 +76,21 @@
                 original: #selector(setter: NSView.needsDisplay),
                 swizzled: #selector(NSView.dd_swizzledSetNeedsDisplay(_:))
             )
+            #elseif os(iOS)
+            // Swizzle layoutSubviews — called when setNeedsLayout triggers
+            swizzleMethod(
+                cls: UIView.self,
+                original: #selector(UIView.layoutSubviews),
+                swizzled: #selector(UIView.dd_swizzledLayoutSubviews)
+            )
+
+            // Swizzle setNeedsDisplay — set when SwiftUI invalidates a view
+            swizzleMethod(
+                cls: UIView.self,
+                original: #selector(UIView.setNeedsDisplay as (UIView) -> () -> Void),
+                swizzled: #selector(UIView.dd_swizzledSetNeedsDisplay)
+            )
+            #endif
         }
 
         private func swizzleMethod(cls: AnyClass, original: Selector, swizzled: Selector) {
@@ -83,6 +102,8 @@
     }
 
     // MARK: - Swizzled methods
+
+    #if os(macOS)
 
     extension NSView {
         /// Patterns that identify SwiftUI hosting/infrastructure views on macOS.
@@ -106,21 +127,15 @@
             let fullName = String(describing: type(of: self))
 
             // Try to extract meaningful name from generic parameters
-            // e.g., "NSHostingView<ModifiedContent<ContentView, ...>>" → "ContentView"
-            // Look for the first non-framework type name
             let patterns = [
-                // Match "ContentView" from "NSHostingView<ModifiedContent<ContentView, ..."
                 "(?<=<)[A-Z][A-Za-z]+(?=View[,>])",
-                // Match any CamelCase name between < and ,
                 "(?<=<)[A-Z][A-Za-z]{2,}(?=[,>])",
-                // Match last CamelCase word before >
                 "([A-Z][a-z]+)+(?=>)",
             ]
 
             for pattern in patterns {
                 if let range = fullName.range(of: pattern, options: .regularExpression) {
                     let match = String(fullName[range])
-                    // Skip framework-internal names
                     if !match.hasPrefix("Modified") && !match.hasPrefix("_") &&
                         !match.hasPrefix("Environment") && !match.hasPrefix("Optional") &&
                         match != "SheetContent"
@@ -239,6 +254,146 @@
         }
     }
 
+    #elseif os(iOS)
+
+    extension UIView {
+        /// Patterns that identify SwiftUI hosting/infrastructure views on iOS.
+        private static let swiftUIPatterns = [
+            "UIHostingView",
+            "_UIHostingView",
+            "PlatformViewHost",
+            "PlatformViewRepresentable",
+            "SwiftUI",
+            "_SwiftUI",
+            "DisplayList",
+            "ViewGraph",
+            "HostingView",
+        ]
+
+        fileprivate var isSwiftUIView: Bool {
+            let name = String(describing: type(of: self))
+            return Self.swiftUIPatterns.contains(where: { name.contains($0) })
+        }
+
+        fileprivate func extractViewTypeName() -> String {
+            let fullName = String(describing: type(of: self))
+
+            let patterns = [
+                "(?<=<)[A-Z][A-Za-z]+(?=View[,>])",
+                "(?<=<)[A-Z][A-Za-z]{2,}(?=[,>])",
+                "([A-Z][a-z]+)+(?=>)",
+            ]
+
+            for pattern in patterns {
+                if let range = fullName.range(of: pattern, options: .regularExpression) {
+                    let match = String(fullName[range])
+                    if !match.hasPrefix("Modified") && !match.hasPrefix("_") &&
+                        !match.hasPrefix("Environment") && !match.hasPrefix("Optional") &&
+                        match != "SheetContent"
+                    {
+                        return match
+                    }
+                }
+            }
+
+            return fullName.components(separatedBy: ".").last ?? fullName
+        }
+
+        // Associated object keys for throttling
+        private static var lastFlashTimeKey: UInt8 = 0
+        private static var currentOverlayKey: UInt8 = 0
+        private static var currentBadgeKey: UInt8 = 0
+
+        private var lastFlashTime: CFAbsoluteTime {
+            get { (objc_getAssociatedObject(self, &Self.lastFlashTimeKey) as? NSNumber)?.doubleValue ?? 0 }
+            set { objc_setAssociatedObject(self, &Self.lastFlashTimeKey, NSNumber(value: newValue), .OBJC_ASSOCIATION_RETAIN_NONATOMIC) }
+        }
+
+        private var currentOverlay: UIView? {
+            get { objc_getAssociatedObject(self, &Self.currentOverlayKey) as? UIView }
+            set { objc_setAssociatedObject(self, &Self.currentOverlayKey, newValue, .OBJC_ASSOCIATION_ASSIGN) }
+        }
+
+        private var currentBadge: UILabel? {
+            get { objc_getAssociatedObject(self, &Self.currentBadgeKey) as? UILabel }
+            set { objc_setAssociatedObject(self, &Self.currentBadgeKey, newValue, .OBJC_ASSOCIATION_ASSIGN) }
+        }
+
+        private func notifyRenderIfNeeded() {
+            guard RenderTracker.shared.isEnabled, isSwiftUIView else { return }
+
+            let viewType = extractViewTypeName()
+            RenderTracker.shared.recordRender(viewType)
+
+            guard RenderTracker.shared.showOverlays else { return }
+
+            let now = CFAbsoluteTimeGetCurrent()
+            guard now - lastFlashTime > 0.5 else {
+                if let badge = currentBadge {
+                    let count = RenderTracker.shared.renderCounts[viewType] ?? 0
+                    badge.text = "\(count)"
+                    badge.backgroundColor = count <= 5 ? .systemGreen : count <= 20 ? .systemOrange : .systemRed
+                    badge.sizeToFit()
+                }
+                return
+            }
+            lastFlashTime = now
+
+            showRenderFlash()
+        }
+
+        @objc func dd_swizzledLayoutSubviews() {
+            dd_swizzledLayoutSubviews()
+            notifyRenderIfNeeded()
+        }
+
+        @objc func dd_swizzledSetNeedsDisplay() {
+            dd_swizzledSetNeedsDisplay()
+            notifyRenderIfNeeded()
+        }
+
+        private func showRenderFlash() {
+            currentOverlay?.removeFromSuperview()
+
+            let overlay = UIView(frame: bounds)
+            overlay.layer.borderWidth = 2
+            overlay.layer.borderColor = UIColor.systemOrange.withAlphaComponent(0.7).cgColor
+            overlay.layer.cornerRadius = 2
+            overlay.isUserInteractionEnabled = false
+            addSubview(overlay)
+            currentOverlay = overlay
+
+            let viewType = extractViewTypeName()
+            let count = RenderTracker.shared.renderCounts[viewType] ?? 0
+
+            let badge = UILabel()
+            badge.text = "\(count)"
+            badge.font = .monospacedSystemFont(ofSize: 8, weight: .bold)
+            badge.textColor = .white
+            badge.backgroundColor = count <= 5 ? .systemGreen : count <= 20 ? .systemOrange : .systemRed
+            badge.textAlignment = .center
+            badge.sizeToFit()
+            badge.frame.origin = CGPoint(
+                x: bounds.width - badge.frame.width - 2,
+                y: 2
+            )
+            overlay.addSubview(badge)
+            currentBadge = badge
+
+            UIView.animate(withDuration: 0.8, delay: 0, options: .curveEaseOut) {
+                overlay.alpha = 0
+            } completion: { [weak self, weak overlay] _ in
+                overlay?.removeFromSuperview()
+                if self?.currentOverlay === overlay {
+                    self?.currentOverlay = nil
+                    self?.currentBadge = nil
+                }
+            }
+        }
+    }
+
+    #endif
+
     // MARK: - Explicit opt-in modifier
 
     public struct RenderTrackingModifier: ViewModifier {
@@ -260,5 +415,4 @@
         }
     }
 
-    #endif // os(macOS)
 #endif

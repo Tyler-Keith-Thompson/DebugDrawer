@@ -38,6 +38,7 @@ macos_application(
     entitlements = "macOS/ExampleApp.entitlements",
     deps = [":ExampleAppLib_macOS"],
     linkopts = ["-framework", "IOKit"],
+    visibility = ["//visibility:public"],
 )
 
 # ── iOS ──────────────────────────────────────────────────────────────
@@ -57,4 +58,5 @@ ios_application(
     infoplists = ["iOS/Info.plist"],
     minimum_os_version = "17.0",
     deps = [":ExampleAppLib_iOS"],
+    visibility = ["//visibility:public"],
 )

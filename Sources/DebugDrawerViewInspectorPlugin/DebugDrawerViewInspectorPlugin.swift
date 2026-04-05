@@ -1,12 +1,17 @@
 #if DEBUG
-    import AppKit
     import Combine
     import DebugDrawer
     import SwiftUI
 
     #if os(macOS)
+    import AppKit
+    #elseif os(iOS)
+    import UIKit
+    #endif
 
     // MARK: - Controller
+
+    #if os(macOS)
 
     @MainActor
     public final class ViewBorderController: ObservableObject {
@@ -107,6 +112,88 @@
         }
     }
 
+    #elseif os(iOS)
+
+    @MainActor
+    public final class ViewBorderController: ObservableObject {
+        public static let shared = ViewBorderController()
+
+        @Published public var isBordersEnabled = false {
+            didSet { isBordersEnabled ? applyBorders() : removeBorders() }
+        }
+
+        @Published public var isGridEnabled = false
+        @Published public var gridSpacing: CGFloat = 8
+        @Published public var gridColor: GridColor = .blue
+        @Published public var gridOpacity: Double = 0.15
+
+        @Published public var isClickIndicatorEnabled = false {
+            didSet { isClickIndicatorEnabled ? ClickIndicatorMonitor.shared.start() : ClickIndicatorMonitor.shared.stop() }
+        }
+
+        @Published public var animationSpeed: Double = 1.0 {
+            didSet {
+                guard let window = Self.keyWindow else { return }
+                window.layer.speed = animationSpeed == 1.0 ? 1.0 : Float(1.0 / animationSpeed)
+            }
+        }
+
+        public enum GridColor: String, CaseIterable {
+            case blue, red, green, white, gray
+
+            var color: Color {
+                switch self {
+                case .blue: .blue
+                case .red: .red
+                case .green: .green
+                case .white: .white
+                case .gray: .gray
+                }
+            }
+        }
+
+        private var taggedViews: [UIView] = []
+
+        private init() {}
+
+        static var keyWindow: UIWindow? {
+            UIApplication.shared.connectedScenes
+                .compactMap { $0 as? UIWindowScene }
+                .first(where: { $0.activationState == .foregroundActive })?
+                .windows.first(where: { $0.isKeyWindow })
+        }
+
+        private func applyBorders() {
+            guard let window = Self.keyWindow else { return }
+            removeBorders()
+            addBorders(to: window, depth: 0)
+        }
+
+        private func addBorders(to view: UIView, depth: Int) {
+            view.layer.borderWidth = 1
+            view.layer.borderColor = Self.colorForDepth(depth).cgColor
+            taggedViews.append(view)
+            for sub in view.subviews {
+                addBorders(to: sub, depth: depth + 1)
+            }
+        }
+
+        private func removeBorders() {
+            for view in taggedViews {
+                view.layer.borderWidth = 0
+                view.layer.borderColor = nil
+            }
+            taggedViews.removeAll()
+        }
+
+        private static func colorForDepth(_ depth: Int) -> UIColor {
+            let hue = CGFloat(depth % 12) / 12.0
+            return UIColor(hue: hue, saturation: 0.8, brightness: 0.9, alpha: 0.6)
+        }
+    }
+
+    #endif
+
     // MARK: - Grid overlay
 
     struct GridOverlayView: View {
@@ -161,7 +248,7 @@
                 )
 
                 // Dimension labels at top-right
-                let dimText = "\(Int(size.width))×\(Int(size.height))"
+                let dimText = "\(Int(size.width))x\(Int(size.height))"
                 context.draw(
                     Text(dimText).font(.system(size: 9, design: .monospaced)).foregroundColor(color.opacity(0.4)),
                     at: CGPoint(x: size.width - 40, y: 12)
@@ -173,6 +260,8 @@
     }
 
     // MARK: - View hierarchy model
+
+    #if os(macOS)
 
     struct ViewNode: Identifiable {
         let id = UUID()
@@ -230,6 +319,64 @@
         }
     }
 
+    #elseif os(iOS)
+
+    struct ViewNode: Identifiable {
+        let id = UUID()
+        let className: String
+        let frame: CGRect
+        let accessibilityLabel: String?
+        let accessibilityRole: String?
+        let isHidden: Bool
+        let alpha: CGFloat
+        let hasClipping: Bool
+        let cornerRadius: CGFloat
+        let backgroundColor: String?
+        let constraintCount: Int
+        let subviewCount: Int
+        let children: [ViewNode]
+
+        @MainActor static func build(from view: UIView, maxDepth: Int = 12) -> ViewNode {
+            let children: [ViewNode]
+            if maxDepth > 0 {
+                children = view.subviews.map { build(from: $0, maxDepth: maxDepth - 1) }
+            } else {
+                children = []
+            }
+
+            let bgColor: String? = if let bg = view.layer.backgroundColor, bg.alpha > 0.01 {
+                UIColor(cgColor: bg).hexString
+            } else {
+                nil
+            }
+
+            return ViewNode(
+                className: String(describing: type(of: view)),
+                frame: view.frame,
+                accessibilityLabel: view.accessibilityLabel,
+                accessibilityRole: nil, // UIKit uses accessibilityTraits instead of roles
+                isHidden: view.isHidden,
+                alpha: view.alpha,
+                hasClipping: view.layer.masksToBounds,
+                cornerRadius: view.layer.cornerRadius,
+                backgroundColor: bgColor,
+                constraintCount: view.constraints.count,
+                subviewCount: view.subviews.count,
+                children: children
+            )
+        }
+    }
+
+    private extension UIColor {
+        var hexString: String? {
+            var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+            getRed(&r, green: &g, blue: &b, alpha: &a)
+            return String(format: "#%02X%02X%02X", Int(r * 255), Int(g * 255), Int(b * 255))
+        }
+    }
+
+    #endif
+
     // MARK: - Plugin
 
     public struct ViewInspectorPlugin: DebugDrawerPlugin {
@@ -250,7 +397,9 @@
         @State private var hierarchy: ViewNode?
         @State private var isHierarchyExpanded = false
         @State private var searchText = ""
+        #if os(macOS)
         @State private var debugger3DRequest: ViewDebugger3DRequest?
+        #endif
 
         var body: some View {
             VStack(alignment: .leading, spacing: 8) {
@@ -397,9 +546,11 @@
                     .clipShape(RoundedRectangle(cornerRadius: 4))
                 }
             }
+            #if os(macOS)
             .sheet(item: $debugger3DRequest) { request in
                 ViewDebugger3DCombinedSheet(targetView: request.targetView)
             }
+            #endif
         }
 
         private func toolButton(_ label: String, icon: String, mode: InspectorToolController.Mode) -> some View {
@@ -421,10 +572,12 @@
             .buttonStyle(.plain)
         }
 
+        #if os(macOS)
         private func open3DDebugger() {
             guard let view = NSApp?.keyWindow?.contentView else { return }
             debugger3DRequest = ViewDebugger3DRequest(targetView: view)
         }
+        #endif
 
         private func renderCountColor(_ count: Int) -> Color {
             if count <= 3 { return .green }
@@ -433,9 +586,17 @@
         }
 
         private func snapshotHierarchy() {
+            #if os(macOS)
             guard let contentView = NSApp?.keyWindow?.contentView else { return }
             hierarchy = ViewNode.build(from: contentView)
             isHierarchyExpanded = true
+            #elseif os(iOS)
+            guard let window = ViewBorderController.keyWindow,
+                  let rootView = window.rootViewController?.view
+            else { return }
+            hierarchy = ViewNode.build(from: rootView)
+            isHierarchyExpanded = true
+            #endif
         }
 
         private func matchesFilter(_ node: ViewNode) -> Bool {
@@ -472,7 +633,7 @@
                         }
 
                         if node.alpha < 1.0 {
-                            Text("α\(node.alpha, specifier: "%.1f")")
+                            Text("a\(node.alpha, specifier: "%.1f")")
                                 .font(.system(size: 8, design: .monospaced))
                                 .foregroundStyle(.orange)
                         }
@@ -485,7 +646,7 @@
                     }
 
                     HStack(spacing: 6) {
-                        Text("\(Int(node.frame.width))×\(Int(node.frame.height))")
+                        Text("\(Int(node.frame.width))x\(Int(node.frame.height))")
                             .font(.system(size: 9, design: .monospaced))
                             .foregroundStyle(.tertiary)
 
@@ -497,9 +658,15 @@
 
                         if let bg = node.backgroundColor {
                             HStack(spacing: 2) {
+                                #if os(macOS)
                                 Circle()
                                     .fill(Color(nsColor: NSColor(hex: bg)))
                                     .frame(width: 6, height: 6)
+                                #elseif os(iOS)
+                                Circle()
+                                    .fill(Color(uiColor: UIColor(hex: bg)))
+                                    .frame(width: 6, height: 6)
+                                #endif
                                 Text(bg)
                                     .font(.system(size: 8, design: .monospaced))
                                     .foregroundStyle(.tertiary)
@@ -522,7 +689,7 @@
                         }
 
                         if node.constraintCount > 0 {
-                            Text("⚓\(node.constraintCount)")
+                            Text("c\(node.constraintCount)")
                                 .font(.system(size: 8, design: .monospaced))
                                 .foregroundStyle(.tertiary)
                         }
@@ -540,8 +707,9 @@
         }
     }
 
-    // MARK: - NSColor hex init (for bg color display)
+    // MARK: - Hex color init (for bg color display)
 
+    #if os(macOS)
     private extension NSColor {
         convenience init(hex: String) {
             var h = hex
@@ -556,6 +724,22 @@
             self.init(red: r, green: g, blue: b, alpha: 1)
         }
     }
+    #elseif os(iOS)
+    private extension UIColor {
+        convenience init(hex: String) {
+            var h = hex
+            if h.hasPrefix("#") { h = String(h.dropFirst()) }
+            guard h.count == 6, let val = UInt64(h, radix: 16) else {
+                self.init(white: 0, alpha: 1)
+                return
+            }
+            let r = CGFloat((val >> 16) & 0xFF) / 255.0
+            let g = CGFloat((val >> 8) & 0xFF) / 255.0
+            let b = CGFloat(val & 0xFF) / 255.0
+            self.init(red: r, green: g, blue: b, alpha: 1)
+        }
+    }
+    #endif
 
     // MARK: - Grid modifier
 
@@ -585,6 +769,8 @@
     }
 
     // MARK: - Click indicator
+
+    #if os(macOS)
 
     @MainActor
     final class ClickIndicatorMonitor {
@@ -666,6 +852,70 @@
         }
     }
 
+    #elseif os(iOS)
+
+    @MainActor
+    final class ClickIndicatorMonitor {
+        static let shared = ClickIndicatorMonitor()
+
+        private var overlayView: TouchRippleOverlayView?
+
+        func start() {
+            guard overlayView == nil else { return }
+            guard let window = ViewBorderController.keyWindow else { return }
+
+            let overlay = TouchRippleOverlayView(frame: window.bounds)
+            overlay.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+            overlay.isUserInteractionEnabled = false
+            window.addSubview(overlay)
+            overlayView = overlay
+
+            // Use a gesture recognizer on the window to detect taps
+            let tap = UITapGestureRecognizer(target: overlay, action: #selector(TouchRippleOverlayView.handleTap(_:)))
+            tap.cancelsTouchesInView = false
+            window.addGestureRecognizer(tap)
+            overlay.tapRecognizer = tap
+        }
+
+        func stop() {
+            if let overlay = overlayView {
+                if let tap = overlay.tapRecognizer {
+                    overlay.window?.removeGestureRecognizer(tap)
+                }
+                overlay.removeFromSuperview()
+                overlayView = nil
+            }
+        }
+    }
+
+    final class TouchRippleOverlayView: UIView {
+        var tapRecognizer: UITapGestureRecognizer?
+
+        @objc func handleTap(_ gesture: UITapGestureRecognizer) {
+            let point = gesture.location(in: self)
+            showRipple(at: point)
+        }
+
+        private func showRipple(at point: CGPoint) {
+            let size: CGFloat = 30
+            let ripple = UIView(frame: CGRect(x: point.x - size / 2, y: point.y - size / 2, width: size, height: size))
+            ripple.layer.cornerRadius = size / 2
+            ripple.layer.backgroundColor = UIColor.systemBlue.withAlphaComponent(0.4).cgColor
+            ripple.layer.borderWidth = 2
+            ripple.layer.borderColor = UIColor.systemBlue.withAlphaComponent(0.6).cgColor
+            addSubview(ripple)
+
+            UIView.animate(withDuration: 0.4, delay: 0, options: .curveEaseOut) {
+                ripple.alpha = 0
+                ripple.frame = ripple.frame.insetBy(dx: -10, dy: -10)
+            } completion: { _ in
+                ripple.removeFromSuperview()
+            }
+        }
+    }
+
+    #endif
+
     // MARK: - Convenience installer
 
     public extension DebugDrawer {
@@ -674,5 +924,4 @@
         }
     }
 
-    #endif // os(macOS)
 #endif

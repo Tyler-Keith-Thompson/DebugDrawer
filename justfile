@@ -32,6 +32,27 @@ run target="macOS":
             ;;
     esac
 
+[doc('Generate Xcode project (pass --no-open to skip opening)')]
+generate *args:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    OPEN=true
+    for arg in {{args}}; do
+        case "$arg" in
+            --no-open) OPEN=false ;;
+            *) echo "Unknown arg: $arg"; exit 1 ;;
+        esac
+    done
+    echo "Generating Xcode project..."
+    bazel run //:xcodeproj
+    chmod -R u+w DebugDrawer.xcodeproj
+    if [ "$OPEN" = true ]; then
+        echo "Opening DebugDrawer.xcodeproj..."
+        open DebugDrawer.xcodeproj
+    else
+        echo "Done. Open DebugDrawer.xcodeproj"
+    fi
+
 [doc('Clean build artifacts')]
 clean:
     bazel clean
