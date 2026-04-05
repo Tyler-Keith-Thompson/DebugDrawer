@@ -87,10 +87,8 @@
         }
     }
 
-    // Force early initialization by referencing the tracker at file scope.
-    private let _launchTimeEarlyInit: Void = {
-        _ = LaunchTimeTracker.shared
-    }()
+    // LaunchTimeTracker.shared is initialized lazily on first access.
+    // The install() method triggers this.
 
     // MARK: - Plugin
 
@@ -98,10 +96,7 @@
         public var title = "Launch Time"
         public var icon = "timer"
 
-        public init() {
-            // Ensure early init ran
-            _ = _launchTimeEarlyInit
-        }
+        public init() {}
 
         public var body: some View {
             LaunchTimePluginView()

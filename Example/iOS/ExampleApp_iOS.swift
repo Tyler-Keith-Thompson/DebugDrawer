@@ -48,6 +48,11 @@ struct DebugDrawerExampleiOSApp: App {
                 .debugAccessibilityOverrides()
                 .debugGrid()
                 .debugDrawer()
+                .background {
+                    Button("") { DebugDrawer.shared.toggle() }
+                        .keyboardShortcut("d", modifiers: .control)
+                        .hidden()
+                }
         }
     }
 }

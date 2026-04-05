@@ -64,11 +64,14 @@ deploy bump="patch":
         exit 1
     fi
 
-    # Run all tests (Bazel + SPM)
+    # Tests run in debug (all code is #if DEBUG, release strips it)
     echo "Running Bazel tests..."
-    bazel test --config=release //...
+    bazel test --config=debug //Tests/...
     echo "Running SPM tests..."
     swift test
+    # Verify release builds clean
+    echo "Verifying release build..."
+    bazel build --config=release //Sources/...
 
     # Get current version
     CURRENT=$(git describe --tags --abbrev=0 --match 'v*' 2>/dev/null || echo "")

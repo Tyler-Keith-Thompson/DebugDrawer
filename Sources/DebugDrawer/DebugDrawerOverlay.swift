@@ -181,11 +181,6 @@
                         .background(DebugDrawerTagView())
                 }
                 .animation(.easeInOut(duration: 0.25), value: drawer.isOpen)
-                .background {
-                    Button("") { drawer.toggle() }
-                        .keyboardShortcut("d", modifiers: .control)
-                        .hidden()
-                }
         }
     }
 

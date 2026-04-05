@@ -114,7 +114,6 @@
         }
 
         private func isDrawerMarker(_ view: NSView) -> Bool {
-            if view.accessibilityIdentifier() == debugDrawerOverlayIdentifier { return true }
             let name = String(describing: type(of: view))
             return name.contains("DebugDrawer") || name.contains("DebugGrid")
         }
