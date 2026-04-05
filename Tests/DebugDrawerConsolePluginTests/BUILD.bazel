@@ -9,8 +9,6 @@ swift_test(
     deps = [
         "//Sources/DebugDrawer",
         "//Sources/DebugDrawerConsolePlugin",
-        "@swiftpkg_viewinspector//:ViewInspector",
-        "@swiftpkg_swift_snapshot_testing//:SnapshotTesting",
         "@swiftpkg_mockable//:Mockable",
     ],
 )

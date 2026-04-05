@@ -668,7 +668,7 @@
           "REPO_MAPPING:rules_swift_package_manager+,bazel_skylib bazel_skylib+",
           "REPO_MAPPING:rules_swift_package_manager+,bazel_tools bazel_tools",
           "REPO_MAPPING:rules_swift_package_manager+,cgrindel_bazel_starlib cgrindel_bazel_starlib+",
-          "FILE:@@//Package.resolved 91a5eca8cbf58429f51467ee0004f855e0eea4cf15185bcc70057db0156772a1"
+          "FILE:@@//Package.resolved bd4e28f53d2efe016817b9740e3a76109293f49766ca8c1db8a87fb57d95cda1"
         ],
         "generatedRepoSpecs": {
           "swift_deps_info": {
@@ -676,8 +676,6 @@
             "attributes": {
               "direct_dep_pkg_infos": {
                 "@swiftpkg_oslogclient//:pkg_info.json": "oslogclient",
-                "@swiftpkg_viewinspector//:pkg_info.json": "viewinspector",
-                "@swiftpkg_swift_snapshot_testing//:pkg_info.json": "swift-snapshot-testing",
                 "@swiftpkg_dependencyinjection//:pkg_info.json": "dependencyinjection",
                 "@swiftpkg_mockable//:pkg_info.json": "mockable"
               }
@@ -697,32 +695,6 @@
               "commit": "6d023a438c1c1026e3627c499ed39e5bfa533aa3",
               "remote": "https://github.com/CheekyGhost-Labs/OSLogClient",
               "version": "2.0.0",
-              "env": {},
-              "env_inherit": [],
-              "cached_json_directory": "",
-              "replace_scm_with_registry": false
-            }
-          },
-          "swiftpkg_viewinspector": {
-            "repoRuleId": "@@rules_swift_package_manager+//swiftpkg/internal:swift_package.bzl%swift_package",
-            "attributes": {
-              "bazel_package_name": "swiftpkg_viewinspector",
-              "commit": "e9a06346499a3a889165647e3f23f8a7b2609a1c",
-              "remote": "https://github.com/nalexn/ViewInspector",
-              "version": "0.10.3",
-              "env": {},
-              "env_inherit": [],
-              "cached_json_directory": "",
-              "replace_scm_with_registry": false
-            }
-          },
-          "swiftpkg_swift_snapshot_testing": {
-            "repoRuleId": "@@rules_swift_package_manager+//swiftpkg/internal:swift_package.bzl%swift_package",
-            "attributes": {
-              "bazel_package_name": "swiftpkg_swift_snapshot_testing",
-              "commit": "ad5e3190cc63dc288f28546f9c6827efc1e9d495",
-              "remote": "https://github.com/pointfreeco/swift-snapshot-testing",
-              "version": "1.19.2",
               "env": {},
               "env_inherit": [],
               "cached_json_directory": "",
@@ -762,19 +734,6 @@
               "commit": "b601256eab081c0f92f059e12818ac1d4f178ff7",
               "remote": "https://github.com/apple/swift-atomics.git",
               "version": "1.3.0",
-              "env": {},
-              "env_inherit": [],
-              "cached_json_directory": "",
-              "replace_scm_with_registry": false
-            }
-          },
-          "swiftpkg_swift_custom_dump": {
-            "repoRuleId": "@@rules_swift_package_manager+//swiftpkg/internal:swift_package.bzl%swift_package",
-            "attributes": {
-              "bazel_package_name": "swiftpkg_swift_custom_dump",
-              "commit": "06c57924455064182d6b217f06ebc05d00cb2990",
-              "remote": "https://github.com/pointfreeco/swift-custom-dump",
-              "version": "1.5.0",
               "env": {},
               "env_inherit": [],
               "cached_json_directory": "",
@@ -824,8 +783,6 @@
         "moduleExtensionMetadata": {
           "explicitRootModuleDirectDeps": [
             "swiftpkg_oslogclient",
-            "swiftpkg_viewinspector",
-            "swiftpkg_swift_snapshot_testing",
             "swiftpkg_dependencyinjection",
             "swiftpkg_mockable",
             "swift_deps_info",

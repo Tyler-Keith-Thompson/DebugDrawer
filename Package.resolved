@@ -1,5 +1,5 @@
 {
-  "originHash" : "6b0486ae24c92129fe59722fa96f6c34f82c8cd7129b5e4196d16aa4b61f8921",
+  "originHash" : "54e7ca4b9b40ea43e1d5a271aa770cee748238f3402007a4ce7aea1847a8286a",
   "pins" : [
     {
       "identity" : "dependencyinjection",
@@ -38,15 +38,6 @@
       }
     },
     {
-      "identity" : "swift-custom-dump",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/pointfreeco/swift-custom-dump",
-      "state" : {
-        "revision" : "06c57924455064182d6b217f06ebc05d00cb2990",
-        "version" : "1.5.0"
-      }
-    },
-    {
       "identity" : "swift-service-context",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-service-context",
@@ -56,30 +47,12 @@
       }
     },
     {
-      "identity" : "swift-snapshot-testing",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/pointfreeco/swift-snapshot-testing",
-      "state" : {
-        "revision" : "ad5e3190cc63dc288f28546f9c6827efc1e9d495",
-        "version" : "1.19.2"
-      }
-    },
-    {
       "identity" : "swift-syntax",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/swiftlang/swift-syntax",
       "state" : {
         "revision" : "4799286537280063c85a32f09884cfbca301b1a1",
         "version" : "602.0.0"
-      }
-    },
-    {
-      "identity" : "viewinspector",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/nalexn/ViewInspector",
-      "state" : {
-        "revision" : "e9a06346499a3a889165647e3f23f8a7b2609a1c",
-        "version" : "0.10.3"
       }
     },
     {

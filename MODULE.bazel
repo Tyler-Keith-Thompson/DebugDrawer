@@ -29,8 +29,6 @@ use_repo(
     "swift_deps_info",
     "swift_package",
     "swiftpkg_oslogclient",
-    "swiftpkg_viewinspector",
-    "swiftpkg_swift_snapshot_testing",
     "swiftpkg_dependencyinjection",
     "swiftpkg_mockable",
 )
