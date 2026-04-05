@@ -53,6 +53,70 @@ generate *args:
         echo "Done. Open DebugDrawer.xcodeproj"
     fi
 
+[doc('Deploy a new release: test, tag, push')]
+deploy bump="patch":
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    # Ensure clean working tree
+    if [ -n "$(git status --porcelain)" ]; then
+        echo "Error: working tree is dirty. Commit or stash changes first."
+        exit 1
+    fi
+
+    # Run all tests (Bazel + SPM)
+    echo "Running Bazel tests..."
+    bazel test --config=release //...
+    echo "Running SPM tests..."
+    swift test
+
+    # Get current version
+    CURRENT=$(git describe --tags --abbrev=0 --match 'v*' 2>/dev/null || echo "")
+    if [ -z "$CURRENT" ]; then
+        # No tags yet — first release
+        NEW_VERSION="v0.0.1"
+        echo ""
+        echo "No existing version tags found. First release."
+        echo "    New: ${NEW_VERSION}"
+    else
+        CURRENT="${CURRENT#v}"
+        IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT"
+
+        case "{{bump}}" in
+            major) MAJOR=$((MAJOR + 1)); MINOR=0; PATCH=0 ;;
+            minor) MINOR=$((MINOR + 1)); PATCH=0 ;;
+            patch) PATCH=$((PATCH + 1)) ;;
+            *) echo "Unknown bump: {{bump}}. Use major, minor, or patch."; exit 1 ;;
+        esac
+
+        NEW_VERSION="v${MAJOR}.${MINOR}.${PATCH}"
+        echo ""
+        echo "Current: v${CURRENT}"
+        echo "    New: ${NEW_VERSION}"
+    fi
+    echo ""
+    read -p "Tag and push ${NEW_VERSION}? [y/N] " -n 1 -r
+    echo ""
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        echo "Aborted."
+        exit 1
+    fi
+
+    git tag -a "${NEW_VERSION}" -m "Release ${NEW_VERSION}"
+    git push origin main --tags
+
+    # Create GitHub release
+    echo "Creating GitHub release..."
+    gh release create "${NEW_VERSION}" \
+        --title "${NEW_VERSION}" \
+        --generate-notes
+
+    VERSION_NUM="${NEW_VERSION#v}"
+    echo ""
+    echo "Released ${NEW_VERSION}"
+    echo "GitHub: $(gh repo view --json url -q .url)/releases/tag/${NEW_VERSION}"
+    echo "SPM:    .package(url: \"...\", from: \"${VERSION_NUM}\")"
+
 [doc('Clean build artifacts')]
 clean:
     bazel clean
