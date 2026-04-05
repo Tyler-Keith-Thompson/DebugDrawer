@@ -7,6 +7,10 @@
     ///
     /// **Global plugins** live for the app's lifetime — register them once at startup.
     /// **Local plugins** are tied to a view's lifecycle — use the `.debugLocalPlugin()` modifier.
+    /// Accessibility identifier used on the drawer overlay.
+    /// Auditors and other tools should skip views inside this subtree.
+    public let debugDrawerOverlayIdentifier = "com.debugdrawer.overlay"
+
     @MainActor
     public final class DebugDrawer: ObservableObject {
         public static let shared = DebugDrawer()

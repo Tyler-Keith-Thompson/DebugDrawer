@@ -14,7 +14,9 @@ _SHARED_DEPS = [
     "//Sources/DebugDrawerKeychainPlugin",
     "//Sources/DebugDrawerNetworkPlugin",
     "//Sources/DebugDrawerPerformancePlugin",
+    "//Sources/DebugDrawerScreenshotPlugin",
     "//Sources/DebugDrawerUserDefaultsPlugin",
+    "//Sources/DebugDrawerViewInspectorPlugin",
 ]
 
 # ── macOS ────────────────────────────────────────────────────────────
@@ -23,10 +25,7 @@ swift_library(
     name = "ExampleAppLib_macOS",
     srcs = glob(["macOS/*.swift"]),
     module_name = "ExampleApp",
-    deps = _SHARED_DEPS + [
-        "//Sources/DebugDrawerScreenshotPlugin",
-        "//Sources/DebugDrawerViewInspectorPlugin",
-    ],
+    deps = _SHARED_DEPS,
 )
 
 macos_application(

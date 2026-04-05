@@ -855,54 +855,54 @@
     #elseif os(iOS)
 
     @MainActor
+    /// Touch indicator via UIWindow.sendEvent swizzle — never intercepts touches.
+    /// Matches DebugSwift's approach: observe touches, don't consume them.
     final class ClickIndicatorMonitor {
         static let shared = ClickIndicatorMonitor()
 
-        private var overlayView: TouchRippleOverlayView?
+        private var swizzled = false
 
         func start() {
-            guard overlayView == nil else { return }
-            guard let window = ViewBorderController.keyWindow else { return }
+            guard !swizzled else { return }
+            swizzled = true
 
-            let overlay = TouchRippleOverlayView(frame: window.bounds)
-            overlay.autoresizingMask = [.flexibleWidth, .flexibleHeight]
-            overlay.isUserInteractionEnabled = false
-            window.addSubview(overlay)
-            overlayView = overlay
-
-            // Use a gesture recognizer on the window to detect taps
-            let tap = UITapGestureRecognizer(target: overlay, action: #selector(TouchRippleOverlayView.handleTap(_:)))
-            tap.cancelsTouchesInView = false
-            window.addGestureRecognizer(tap)
-            overlay.tapRecognizer = tap
+            let original = #selector(UIWindow.sendEvent(_:))
+            let swizzled = #selector(UIWindow.dd_sendEvent(_:))
+            guard let originalMethod = class_getInstanceMethod(UIWindow.self, original),
+                  let swizzledMethod = class_getInstanceMethod(UIWindow.self, swizzled)
+            else { return }
+            method_exchangeImplementations(originalMethod, swizzledMethod)
         }
 
         func stop() {
-            if let overlay = overlayView {
-                if let tap = overlay.tapRecognizer {
-                    overlay.window?.removeGestureRecognizer(tap)
-                }
-                overlay.removeFromSuperview()
-                overlayView = nil
-            }
+            // Swizzle is permanent — we check the enabled flag in the swizzled method
         }
     }
 
-    final class TouchRippleOverlayView: UIView {
-        var tapRecognizer: UITapGestureRecognizer?
+    extension UIWindow {
+        @objc func dd_sendEvent(_ event: UIEvent) {
+            // Call original
+            dd_sendEvent(event)
 
-        @objc func handleTap(_ gesture: UITapGestureRecognizer) {
-            let point = gesture.location(in: self)
-            showRipple(at: point)
+            // Only show indicators when enabled
+            guard ViewBorderController.shared.isClickIndicatorEnabled else { return }
+
+            guard let touches = event.allTouches else { return }
+            for touch in touches where touch.phase == .began {
+                let point = touch.location(in: self)
+                showTouchRipple(at: point)
+            }
         }
 
-        private func showRipple(at point: CGPoint) {
+        private func showTouchRipple(at point: CGPoint) {
             let size: CGFloat = 30
             let ripple = UIView(frame: CGRect(x: point.x - size / 2, y: point.y - size / 2, width: size, height: size))
             ripple.layer.cornerRadius = size / 2
             ripple.layer.backgroundColor = UIColor.systemBlue.withAlphaComponent(0.4).cgColor
             ripple.layer.borderWidth = 2
             ripple.layer.borderColor = UIColor.systemBlue.withAlphaComponent(0.6).cgColor
+            ripple.layer.zPosition = .greatestFiniteMagnitude
+            ripple.isUserInteractionEnabled = false
             addSubview(ripple)
 
             UIView.animate(withDuration: 0.4, delay: 0, options: .curveEaseOut) {

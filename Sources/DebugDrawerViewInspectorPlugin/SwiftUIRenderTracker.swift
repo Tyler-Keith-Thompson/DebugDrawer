@@ -21,21 +21,47 @@
         }
 
         @Published public var showOverlays = true
+
+        /// Published snapshot — updated periodically, NOT on every render.
         @Published public private(set) var renderCounts: [String: Int] = [:]
         @Published public private(set) var lastRenderTimes: [String: Date] = [:]
+
+        /// Non-published backing storage — written from the swizzle path
+        /// without triggering SwiftUI observation (which would cause recursion).
+        var _counts: [String: Int] = [:]
+        var _times: [String: Date] = [:]
+        private var _flushScheduled = false
 
         var activeOverlays: Set<String> = []
         private var swizzled = false
 
         private init() {}
 
+        /// Called from the swizzle — writes to non-published backing storage
+        /// and schedules a batched flush to the published properties.
         public func recordRender(_ id: String) {
             guard isEnabled else { return }
-            renderCounts[id, default: 0] += 1
-            lastRenderTimes[id] = Date()
+            _counts[id, default: 0] += 1
+            _times[id] = Date()
+
+            if !_flushScheduled {
+                _flushScheduled = true
+                // Flush on next run loop — after the layout pass completes.
+                DispatchQueue.main.async { [weak self] in
+                    self?.flushToPublished()
+                }
+            }
+        }
+
+        private func flushToPublished() {
+            _flushScheduled = false
+            renderCounts = _counts
+            lastRenderTimes = _times
         }
 
         public func reset() {
+            _counts.removeAll()
+            _times.removeAll()
             renderCounts.removeAll()
             lastRenderTimes.removeAll()
         }
@@ -77,18 +103,12 @@
                 swizzled: #selector(NSView.dd_swizzledSetNeedsDisplay(_:))
             )
             #elseif os(iOS)
-            // Swizzle layoutSubviews — called when setNeedsLayout triggers
+            // Only swizzle layoutSubviews — setNeedsDisplay fires too often on iOS
+            // and causes performance issues. This matches DebugSwift's approach.
             swizzleMethod(
                 cls: UIView.self,
                 original: #selector(UIView.layoutSubviews),
                 swizzled: #selector(UIView.dd_swizzledLayoutSubviews)
-            )
-
-            // Swizzle setNeedsDisplay — set when SwiftUI invalidates a view
-            swizzleMethod(
-                cls: UIView.self,
-                original: #selector(UIView.setNeedsDisplay as (UIView) -> () -> Void),
-                swizzled: #selector(UIView.dd_swizzledSetNeedsDisplay)
             )
             #endif
         }
@@ -123,10 +143,18 @@
             return Self.swiftUIPatterns.contains(where: { name.contains($0) })
         }
 
-        fileprivate func extractViewTypeName() -> String {
+        /// Names that are SwiftUI infrastructure, not user views.
+        private static let ignoredNames: Set<String> = [
+            "AnyView", "ModifiedContent", "Optional", "SheetContent",
+            "EnvironmentKeyWritingModifier", "DisplayList", "ViewGraph",
+            "NSHostingView", "_NSHostingView", "PlatformViewHost",
+            "PlatformViewRepresentable", "ViewHost", "HostingView",
+            "any", "Body", "Never", "Content", "Some",
+        ]
+
+        fileprivate func extractViewTypeName() -> String? {
             let fullName = String(describing: type(of: self))
 
-            // Try to extract meaningful name from generic parameters
             let patterns = [
                 "(?<=<)[A-Z][A-Za-z]+(?=View[,>])",
                 "(?<=<)[A-Z][A-Za-z]{2,}(?=[,>])",
@@ -136,16 +164,16 @@
             for pattern in patterns {
                 if let range = fullName.range(of: pattern, options: .regularExpression) {
                     let match = String(fullName[range])
-                    if !match.hasPrefix("Modified") && !match.hasPrefix("_") &&
-                        !match.hasPrefix("Environment") && !match.hasPrefix("Optional") &&
-                        match != "SheetContent"
+                    if !match.hasPrefix("Modified"), !match.hasPrefix("_"),
+                       !match.hasPrefix("Environment"),
+                       !Self.ignoredNames.contains(match)
                     {
                         return match
                     }
                 }
             }
 
-            return fullName.components(separatedBy: ".").last ?? fullName
+            return nil
         }
 
         // Associated object keys for throttling
@@ -171,7 +199,7 @@
         private func notifyRenderIfNeeded() {
             guard RenderTracker.shared.isEnabled, isSwiftUIView else { return }
 
-            let viewType = extractViewTypeName()
+            guard let viewType = extractViewTypeName() else { return }
             RenderTracker.shared.recordRender(viewType)
 
             guard RenderTracker.shared.showOverlays else { return }
@@ -222,7 +250,7 @@
             addSubview(overlay)
             currentOverlay = overlay
 
-            let viewType = extractViewTypeName()
+            let viewType = extractViewTypeName() ?? "Unknown"
             let count = RenderTracker.shared.renderCounts[viewType] ?? 0
 
             let badge = NSTextField(labelWithString: "\(count)")
@@ -256,139 +284,96 @@
 
     #elseif os(iOS)
 
+    // DebugSwift-style render tracking for iOS.
+    // Uses NSStringFromClass for Obj-C names, instance-based tracking with
+    // ObjectIdentifier, activeOverlays Set for recursion guard, and overlays
+    // added to the window (not the view).
+
     extension UIView {
-        /// Patterns that identify SwiftUI hosting/infrastructure views on iOS.
-        private static let swiftUIPatterns = [
-            "UIHostingView",
-            "_UIHostingView",
-            "PlatformViewHost",
-            "PlatformViewRepresentable",
-            "SwiftUI",
-            "_SwiftUI",
-            "DisplayList",
-            "ViewGraph",
-            "HostingView",
-        ]
-
-        fileprivate var isSwiftUIView: Bool {
-            let name = String(describing: type(of: self))
-            return Self.swiftUIPatterns.contains(where: { name.contains($0) })
+        /// Matches DebugSwift's isSwiftUIHostingView — uses Obj-C class names.
+        fileprivate var isSwiftUIHostingView: Bool {
+            let className = NSStringFromClass(type(of: self))
+            return className.contains("UIHosting") ||
+                className.contains("SwiftUI") ||
+                className.contains("_UIHosting") ||
+                className.contains("_SwiftUI") ||
+                className.hasPrefix("SwiftUI.") ||
+                className.contains("ViewHost") ||
+                className.contains("PlatformView") ||
+                className.contains("DisplayList") ||
+                className.contains("ViewGraph")
         }
 
-        fileprivate func extractViewTypeName() -> String {
-            let fullName = String(describing: type(of: self))
-
-            let patterns = [
-                "(?<=<)[A-Z][A-Za-z]+(?=View[,>])",
-                "(?<=<)[A-Z][A-Za-z]{2,}(?=[,>])",
-                "([A-Z][a-z]+)+(?=>)",
-            ]
-
-            for pattern in patterns {
-                if let range = fullName.range(of: pattern, options: .regularExpression) {
-                    let match = String(fullName[range])
-                    if !match.hasPrefix("Modified") && !match.hasPrefix("_") &&
-                        !match.hasPrefix("Environment") && !match.hasPrefix("Optional") &&
-                        match != "SheetContent"
-                    {
-                        return match
-                    }
-                }
+        /// Matches DebugSwift's detectSwiftUIViewType.
+        fileprivate func detectSwiftUIViewType() -> String {
+            let className = NSStringFromClass(type(of: self))
+            if className.contains("UIHostingView") { return "UIHostingView" }
+            if className.contains("UIHostingController") { return "UIHostingController" }
+            if className.contains("PlatformView") { return "PlatformView" }
+            if className.contains("ViewHost") { return "ViewHost" }
+            if className.contains("SwiftUI") {
+                let components = className.components(separatedBy: ".")
+                return components.last?.replacingOccurrences(of: "Host", with: "") ?? "SwiftUIView"
             }
-
-            return fullName.components(separatedBy: ".").last ?? fullName
-        }
-
-        // Associated object keys for throttling
-        private static var lastFlashTimeKey: UInt8 = 0
-        private static var currentOverlayKey: UInt8 = 0
-        private static var currentBadgeKey: UInt8 = 0
-
-        private var lastFlashTime: CFAbsoluteTime {
-            get { (objc_getAssociatedObject(self, &Self.lastFlashTimeKey) as? NSNumber)?.doubleValue ?? 0 }
-            set { objc_setAssociatedObject(self, &Self.lastFlashTimeKey, NSNumber(value: newValue), .OBJC_ASSOCIATION_RETAIN_NONATOMIC) }
-        }
-
-        private var currentOverlay: UIView? {
-            get { objc_getAssociatedObject(self, &Self.currentOverlayKey) as? UIView }
-            set { objc_setAssociatedObject(self, &Self.currentOverlayKey, newValue, .OBJC_ASSOCIATION_ASSIGN) }
-        }
-
-        private var currentBadge: UILabel? {
-            get { objc_getAssociatedObject(self, &Self.currentBadgeKey) as? UILabel }
-            set { objc_setAssociatedObject(self, &Self.currentBadgeKey, newValue, .OBJC_ASSOCIATION_ASSIGN) }
-        }
-
-        private func notifyRenderIfNeeded() {
-            guard RenderTracker.shared.isEnabled, isSwiftUIView else { return }
-
-            let viewType = extractViewTypeName()
-            RenderTracker.shared.recordRender(viewType)
-
-            guard RenderTracker.shared.showOverlays else { return }
-
-            let now = CFAbsoluteTimeGetCurrent()
-            guard now - lastFlashTime > 0.5 else {
-                if let badge = currentBadge {
-                    let count = RenderTracker.shared.renderCounts[viewType] ?? 0
-                    badge.text = "\(count)"
-                    badge.backgroundColor = count <= 5 ? .systemGreen : count <= 20 ? .systemOrange : .systemRed
-                    badge.sizeToFit()
-                }
-                return
-            }
-            lastFlashTime = now
-
-            showRenderFlash()
+            return className
         }
 
         @objc func dd_swizzledLayoutSubviews() {
-            dd_swizzledLayoutSubviews()
-            notifyRenderIfNeeded()
+            dd_swizzledLayoutSubviews() // calls original
+            guard RenderTracker.shared.isEnabled, isSwiftUIHostingView else { return }
+
+            let viewType = detectSwiftUIViewType()
+            let identifier = "\(viewType)_\(ObjectIdentifier(self))"
+
+            // DebugSwift's recursion guard — skip if overlay is active for this instance
+            guard !RenderTracker.shared.activeOverlays.contains(identifier) else { return }
+
+            RenderTracker.shared.recordRender(viewType)
+
+            guard RenderTracker.shared.showOverlays, self.window != nil else { return }
+            showRenderOverlay(viewType: viewType, identifier: identifier)
         }
 
-        @objc func dd_swizzledSetNeedsDisplay() {
-            dd_swizzledSetNeedsDisplay()
-            notifyRenderIfNeeded()
-        }
+        private func showRenderOverlay(viewType: String, identifier: String) {
+            guard let window = self.window else { return }
 
-        private func showRenderFlash() {
-            currentOverlay?.removeFromSuperview()
+            // Mark active to prevent recursion
+            RenderTracker.shared.activeOverlays.insert(identifier)
 
-            let overlay = UIView(frame: bounds)
-            overlay.layer.borderWidth = 2
-            overlay.layer.borderColor = UIColor.systemOrange.withAlphaComponent(0.7).cgColor
-            overlay.layer.cornerRadius = 2
+            let viewFrame = convert(bounds, to: window)
+            let overlay = UIView(frame: viewFrame)
+            overlay.backgroundColor = .clear
+            overlay.layer.borderColor = UIColor.systemOrange.cgColor
+            overlay.layer.borderWidth = 1.0
+            overlay.layer.cornerRadius = layer.cornerRadius
             overlay.isUserInteractionEnabled = false
-            addSubview(overlay)
-            currentOverlay = overlay
+            window.addSubview(overlay)
 
-            let viewType = extractViewTypeName()
-            let count = RenderTracker.shared.renderCounts[viewType] ?? 0
-
+            // Render count badge
+            let count = RenderTracker.shared._counts[viewType] ?? 0
             let badge = UILabel()
-            badge.text = "\(count)"
+            badge.tag = 999
+            badge.text = " \(count) "
             badge.font = .monospacedSystemFont(ofSize: 8, weight: .bold)
             badge.textColor = .white
             badge.backgroundColor = count <= 5 ? .systemGreen : count <= 20 ? .systemOrange : .systemRed
+            badge.layer.cornerRadius = 3
+            badge.clipsToBounds = true
             badge.textAlignment = .center
             badge.sizeToFit()
             badge.frame.origin = CGPoint(
-                x: bounds.width - badge.frame.width - 2,
-                y: 2
+                x: viewFrame.width - badge.frame.width - 5,
+                y: 5
             )
             overlay.addSubview(badge)
-            currentBadge = badge
 
-            UIView.animate(withDuration: 0.8, delay: 0, options: .curveEaseOut) {
+            // Fade out and clean up — matches DebugSwift's transient overlay
+            UIView.animate(withDuration: 1.0, animations: {
                 overlay.alpha = 0
-            } completion: { [weak self, weak overlay] _ in
-                overlay?.removeFromSuperview()
-                if self?.currentOverlay === overlay {
-                    self?.currentOverlay = nil
-                    self?.currentBadge = nil
-                }
-            }
+            }, completion: { _ in
+                overlay.removeFromSuperview()
+                RenderTracker.shared.activeOverlays.remove(identifier)
+            })
         }
     }
 

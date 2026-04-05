@@ -177,6 +177,7 @@
             content
                 .overlay(alignment: .trailing) {
                     DebugDrawerOverlay(drawer: drawer)
+                        .accessibilityIdentifier("com.debugdrawer.overlay")
                 }
                 .animation(.easeInOut(duration: 0.25), value: drawer.isOpen)
                 .background {

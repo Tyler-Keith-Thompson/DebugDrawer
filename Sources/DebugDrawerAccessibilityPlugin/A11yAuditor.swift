@@ -1,4 +1,5 @@
 #if DEBUG
+    import DebugDrawer
     import SwiftUI
 
     #if os(macOS)
@@ -89,6 +90,24 @@
         }
     }
 
+    // MARK: - Debug drawer detection
+
+    /// Check if a view is a debug drawer root. Checked once per view
+    /// during the recursive walk — if true, the entire subtree is skipped.
+    #if os(macOS)
+        private func isDebugDrawerRoot(_ view: NSView) -> Bool {
+            if view.accessibilityIdentifier() == debugDrawerOverlayIdentifier { return true }
+            let className = String(describing: type(of: view))
+            return className.contains("DebugDrawer") || className.contains("DebugGrid")
+        }
+    #elseif os(iOS)
+        private func isDebugDrawerRoot(_ view: UIView) -> Bool {
+            if view.accessibilityIdentifier == debugDrawerOverlayIdentifier { return true }
+            let className = String(describing: type(of: view))
+            return className.contains("DebugDrawer") || className.contains("DebugGrid")
+        }
+    #endif
+
     // MARK: - Auditor
 
     #if os(macOS)
@@ -107,6 +126,8 @@
         private func auditRecursive(view: NSView, issues: inout [A11yIssue], depth: Int) {
             guard !view.isHidden, view.alphaValue > 0.01 else { return }
             guard depth < 30 else { return }
+            // Skip the debug drawer and all its subviews
+            if isDebugDrawerRoot(view) { return }
 
             let className = String(describing: type(of: view))
 
@@ -322,6 +343,8 @@
         private func auditRecursive(view: UIView, issues: inout [A11yIssue], depth: Int) {
             guard !view.isHidden, view.alpha > 0.01 else { return }
             guard depth < 30 else { return }
+            // Skip the debug drawer and all its subviews
+            if isDebugDrawerRoot(view) { return }
 
             let className = String(describing: type(of: view))
 

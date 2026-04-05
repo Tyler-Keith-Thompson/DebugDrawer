@@ -8,7 +8,9 @@ import DebugDrawerFileBrowserPlugin
 import DebugDrawerKeychainPlugin
 import DebugDrawerNetworkPlugin
 import DebugDrawerPerformancePlugin
+import DebugDrawerScreenshotPlugin
 import DebugDrawerUserDefaultsPlugin
+import DebugDrawerViewInspectorPlugin
 import SwiftUI
 
 @main
@@ -18,9 +20,11 @@ struct DebugDrawerExampleiOSApp: App {
             DebugDrawer.shared.installConsole()
             DebugDrawer.shared.installNetwork()
             DebugDrawer.shared.installDiskIO()
+            DebugDrawer.shared.installViewInspector()
             DebugDrawer.shared.installAccessibility()
             DebugDrawer.shared.installPerformance()
             DebugDrawer.shared.installEnergy()
+            DebugDrawer.shared.installScreenshot()
             DebugDrawer.shared.installAppInfo()
             DebugDrawer.shared.installUserDefaults()
             DebugDrawer.shared.installKeychain()
@@ -32,6 +36,7 @@ struct DebugDrawerExampleiOSApp: App {
         WindowGroup {
             ExampleContentView_iOS()
                 .debugAccessibilityOverrides()
+                .debugGrid()
                 .debugDrawer()
         }
     }
