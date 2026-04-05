@@ -251,8 +251,37 @@
         @ObservedObject private var store = NetworkStore.shared
         @State private var selectedId: UUID?
 
+        private var statsSummary: (total: Int, successRate: String, avgTime: String) {
+            let all = store.entries
+            let total = all.count
+            guard total > 0 else { return (0, "—", "—") }
+
+            let completed = all.filter { $0.isComplete }
+            let successes = completed.filter { ($0.statusCode ?? 0) >= 200 && ($0.statusCode ?? 0) < 300 }
+            let rate = completed.isEmpty ? "—" : String(format: "%.0f%%", Double(successes.count) / Double(completed.count) * 100)
+
+            let durations = completed.compactMap(\.duration)
+            let avg = durations.isEmpty ? "—" : {
+                let mean = durations.reduce(0, +) / Double(durations.count)
+                return mean < 1 ? String(format: "%.0fms", mean * 1000) : String(format: "%.2fs", mean)
+            }()
+
+            return (total, rate, avg)
+        }
+
         var body: some View {
             VStack(alignment: .leading, spacing: 6) {
+                // Stats summary
+                if !store.entries.isEmpty {
+                    let stats = statsSummary
+                    HStack(spacing: 12) {
+                        statBadge("\(stats.total)", "Total")
+                        statBadge(stats.successRate, "Success")
+                        statBadge(stats.avgTime, "Avg Time")
+                    }
+                    .padding(.vertical, 2)
+                }
+
                 // Toolbar
                 HStack(spacing: 6) {
                     Text("\(store.filteredEntries.count)")
@@ -354,12 +383,43 @@
                     .textSelection(.enabled)
                     .foregroundStyle(.secondary)
 
-                // Timing + size
+                // Timing + size + actions
                 HStack(spacing: 12) {
                     detailBadge("Time", entry.durationLabel)
                     detailBadge("Size", entry.responseSizeLabel)
                     if let code = entry.statusCode {
                         detailBadge("Status", "\(code)")
+                    }
+
+                    Spacer()
+
+                    Button("Copy cURL") {
+                        debugDrawerCopyToClipboard(buildCurl(for: entry))
+                    }
+                    .font(.system(size: 9))
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.secondary)
+                }
+
+                // URL query parameters
+                if let urlObj = URL(string: entry.url),
+                   let components = URLComponents(url: urlObj, resolvingAgainstBaseURL: false),
+                   let queryItems = components.queryItems, !queryItems.isEmpty
+                {
+                    collapsibleSection("Query Parameters") {
+                        VStack(alignment: .leading, spacing: 1) {
+                            ForEach(queryItems, id: \.name) { item in
+                                HStack(alignment: .top, spacing: 4) {
+                                    Text(item.name + ":")
+                                        .font(.system(size: 9, weight: .medium, design: .monospaced))
+                                        .foregroundStyle(.secondary)
+                                    Text(item.value ?? "")
+                                        .font(.system(size: 9, design: .monospaced))
+                                        .textSelection(.enabled)
+                                }
+                            }
+                        }
+                        .padding(4)
                     }
                 }
 
@@ -456,6 +516,38 @@
             case "DELETE": .red
             default: .secondary
             }
+        }
+
+        private func statBadge(_ value: String, _ label: String) -> some View {
+            VStack(spacing: 1) {
+                Text(value)
+                    .font(.system(size: 10, weight: .medium, design: .monospaced))
+                Text(label)
+                    .font(.system(size: 7))
+                    .foregroundStyle(.tertiary)
+            }
+        }
+
+        private func buildCurl(for entry: NetworkEntry) -> String {
+            var parts = ["curl"]
+
+            if entry.method != "GET" {
+                parts.append("-X \(entry.method)")
+            }
+
+            parts.append("'\(entry.url)'")
+
+            for (key, value) in entry.requestHeaders.sorted(by: { $0.key < $1.key }) {
+                let escaped = value.replacingOccurrences(of: "'", with: "'\\''")
+                parts.append("-H '\(key): \(escaped)'")
+            }
+
+            if let body = entry.requestBody, let bodyStr = String(data: body, encoding: .utf8), !bodyStr.isEmpty {
+                let escaped = bodyStr.replacingOccurrences(of: "'", with: "'\\''")
+                parts.append("-d '\(escaped)'")
+            }
+
+            return parts.joined(separator: " \\\n  ")
         }
     }
 

@@ -94,17 +94,62 @@
 
     /// Check if a view is a debug drawer root. Checked once per view
     /// during the recursive walk — if true, the entire subtree is skipped.
+    /// Build a set of ObjectIdentifiers for all views in the debug drawer subtree.
+    /// We find drawer root views, then collect ALL their descendants into the skip set.
     #if os(macOS)
-        private func isDebugDrawerRoot(_ view: NSView) -> Bool {
+        private func buildDrawerSkipSet(from root: NSView) -> Set<ObjectIdentifier> {
+            var skipSet = Set<ObjectIdentifier>()
+            findAndCollectDrawerViews(root, skipSet: &skipSet)
+            return skipSet
+        }
+
+        private func findAndCollectDrawerViews(_ view: NSView, skipSet: inout Set<ObjectIdentifier>) {
+            if isDrawerMarker(view) {
+                collectAllDescendants(view, into: &skipSet)
+                return
+            }
+            for sub in view.subviews {
+                findAndCollectDrawerViews(sub, skipSet: &skipSet)
+            }
+        }
+
+        private func isDrawerMarker(_ view: NSView) -> Bool {
             if view.accessibilityIdentifier() == debugDrawerOverlayIdentifier { return true }
-            let className = String(describing: type(of: view))
-            return className.contains("DebugDrawer") || className.contains("DebugGrid")
+            let name = String(describing: type(of: view))
+            return name.contains("DebugDrawer") || name.contains("DebugGrid")
+        }
+
+        private func collectAllDescendants(_ view: NSView, into set: inout Set<ObjectIdentifier>) {
+            set.insert(ObjectIdentifier(view))
+            for sub in view.subviews { collectAllDescendants(sub, into: &set) }
         }
     #elseif os(iOS)
-        private func isDebugDrawerRoot(_ view: UIView) -> Bool {
+        private func buildDrawerSkipSet(from root: UIView) -> Set<ObjectIdentifier> {
+            var skipSet = Set<ObjectIdentifier>()
+            findAndCollectDrawerViews(root, skipSet: &skipSet)
+            return skipSet
+        }
+
+        private func findAndCollectDrawerViews(_ view: UIView, skipSet: inout Set<ObjectIdentifier>) {
+            if isDrawerMarker(view) {
+                collectAllDescendants(view, into: &skipSet)
+                return
+            }
+            for sub in view.subviews {
+                findAndCollectDrawerViews(sub, skipSet: &skipSet)
+            }
+        }
+
+        private func isDrawerMarker(_ view: UIView) -> Bool {
+            if view.tag == debugDrawerViewTag { return true }
             if view.accessibilityIdentifier == debugDrawerOverlayIdentifier { return true }
-            let className = String(describing: type(of: view))
-            return className.contains("DebugDrawer") || className.contains("DebugGrid")
+            let name = String(describing: type(of: view))
+            return name.contains("DebugDrawer") || name.contains("DebugGrid")
+        }
+
+        private func collectAllDescendants(_ view: UIView, into set: inout Set<ObjectIdentifier>) {
+            set.insert(ObjectIdentifier(view))
+            for sub in view.subviews { collectAllDescendants(sub, into: &set) }
         }
     #endif
 
@@ -118,16 +163,16 @@
         private let minHitTargetSize: CGFloat = 44
 
         func audit(view: NSView) -> [A11yIssue] {
+            let skipSet = buildDrawerSkipSet(from: view)
             var issues: [A11yIssue] = []
-            auditRecursive(view: view, issues: &issues, depth: 0)
+            auditRecursive(view: view, issues: &issues, depth: 0, skipSet: skipSet)
             return issues.sorted { $0.severity < $1.severity }
         }
 
-        private func auditRecursive(view: NSView, issues: inout [A11yIssue], depth: Int) {
+        private func auditRecursive(view: NSView, issues: inout [A11yIssue], depth: Int, skipSet: Set<ObjectIdentifier>) {
             guard !view.isHidden, view.alphaValue > 0.01 else { return }
             guard depth < 30 else { return }
-            // Skip the debug drawer and all its subviews
-            if isDebugDrawerRoot(view) { return }
+            guard !skipSet.contains(ObjectIdentifier(view)) else { return }
 
             let className = String(describing: type(of: view))
 
@@ -148,7 +193,7 @@
 
             // Recurse
             for subview in view.subviews {
-                auditRecursive(view: subview, issues: &issues, depth: depth + 1)
+                auditRecursive(view: subview, issues: &issues, depth: depth + 1, skipSet: skipSet)
             }
         }
 
@@ -335,16 +380,16 @@
         private let minHitTargetSize: CGFloat = 44
 
         func audit(view: UIView) -> [A11yIssue] {
+            let skipSet = buildDrawerSkipSet(from: view)
             var issues: [A11yIssue] = []
-            auditRecursive(view: view, issues: &issues, depth: 0)
+            auditRecursive(view: view, issues: &issues, depth: 0, skipSet: skipSet)
             return issues.sorted { $0.severity < $1.severity }
         }
 
-        private func auditRecursive(view: UIView, issues: inout [A11yIssue], depth: Int) {
+        private func auditRecursive(view: UIView, issues: inout [A11yIssue], depth: Int, skipSet: Set<ObjectIdentifier>) {
             guard !view.isHidden, view.alpha > 0.01 else { return }
             guard depth < 30 else { return }
-            // Skip the debug drawer and all its subviews
-            if isDebugDrawerRoot(view) { return }
+            guard !skipSet.contains(ObjectIdentifier(view)) else { return }
 
             let className = String(describing: type(of: view))
 
@@ -355,7 +400,7 @@
             checkHeadingHierarchy(view: view, className: className, issues: &issues)
 
             for subview in view.subviews {
-                auditRecursive(view: subview, issues: &issues, depth: depth + 1)
+                auditRecursive(view: subview, issues: &issues, depth: depth + 1, skipSet: skipSet)
             }
         }
 

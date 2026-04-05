@@ -11,6 +11,11 @@ import DebugDrawerPerformancePlugin
 import DebugDrawerScreenshotPlugin
 import DebugDrawerUserDefaultsPlugin
 import DebugDrawerViewInspectorPlugin
+import DebugDrawerLocationPlugin
+import DebugDrawerLoadedLibrariesPlugin
+import DebugDrawerDeepLinkPlugin
+import DebugDrawerCookiesPlugin
+import DebugDrawerLaunchTimePlugin
 import SwiftUI
 
 @main
@@ -29,6 +34,11 @@ struct DebugDrawerExampleiOSApp: App {
             DebugDrawer.shared.installUserDefaults()
             DebugDrawer.shared.installKeychain()
             DebugDrawer.shared.installFileBrowser()
+            DebugDrawer.shared.installLocation()
+            DebugDrawer.shared.installLoadedLibraries()
+            DebugDrawer.shared.installDeepLink()
+            DebugDrawer.shared.installCookies()
+            DebugDrawer.shared.installLaunchTime()
         #endif
     }
 

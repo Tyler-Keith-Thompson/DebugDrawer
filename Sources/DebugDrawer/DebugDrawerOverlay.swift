@@ -177,7 +177,8 @@
             content
                 .overlay(alignment: .trailing) {
                     DebugDrawerOverlay(drawer: drawer)
-                        .accessibilityIdentifier("com.debugdrawer.overlay")
+                        .accessibilityIdentifier(debugDrawerOverlayIdentifier)
+                        .background(DebugDrawerTagView())
                 }
                 .animation(.easeInOut(duration: 0.25), value: drawer.isOpen)
                 .background {
@@ -187,6 +188,35 @@
                 }
         }
     }
+
+    // MARK: - Platform view tagger
+
+    /// Tags the nearest platform view with a known tag so the a11y auditor
+    /// can skip the debug drawer subtree without relying on class names.
+    public let debugDrawerViewTag = 0xDDB6 // "DDB" = DebugDrawerBoundary
+
+    #if os(macOS)
+        struct DebugDrawerTagView: NSViewRepresentable {
+            func makeNSView(context _: Context) -> NSView {
+                let v = NSView()
+                v.setAccessibilityIdentifier(debugDrawerOverlayIdentifier)
+                return v
+            }
+
+            func updateNSView(_: NSView, context _: Context) {}
+        }
+    #elseif os(iOS)
+        struct DebugDrawerTagView: UIViewRepresentable {
+            func makeUIView(context _: Context) -> UIView {
+                let v = UIView()
+                v.tag = debugDrawerViewTag
+                v.accessibilityIdentifier = debugDrawerOverlayIdentifier
+                return v
+            }
+
+            func updateUIView(_: UIView, context _: Context) {}
+        }
+    #endif
 
     // MARK: - Local plugin modifier
 

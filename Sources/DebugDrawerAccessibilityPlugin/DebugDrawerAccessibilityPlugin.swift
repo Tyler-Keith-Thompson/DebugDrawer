@@ -215,14 +215,12 @@
                     }
                 }
 
-                Divider()
-
-                // Auditor
-                DisclosureGroup("Accessibility Audit", isExpanded: $showAuditor) {
-                    A11yAuditorView()
-                        .padding(.top, 4)
-                }
-                .font(.caption.weight(.medium))
+                // Auditor hidden until drawer view exclusion is solved
+                // DisclosureGroup("Accessibility Audit", isExpanded: $showAuditor) {
+                //     A11yAuditorView()
+                //         .padding(.top, 4)
+                // }
+                // .font(.caption.weight(.medium))
             }
         }
 

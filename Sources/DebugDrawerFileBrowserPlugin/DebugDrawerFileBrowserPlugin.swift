@@ -1,4 +1,9 @@
 #if DEBUG
+    #if os(macOS)
+        import AppKit
+    #elseif os(iOS)
+        import UIKit
+    #endif
     import DebugDrawer
     import SwiftUI
 
@@ -75,6 +80,8 @@
         @State private var roots: [ScannedRoot] = []
         @State private var isScanning = false
         @State private var scanProgress = ""
+        @State private var fileToDelete: String?
+        @State private var showDeleteAlert = false
 
         private static let scanQueue = DispatchQueue(label: "com.debugdrawer.filescan", qos: .utility)
 
@@ -132,6 +139,55 @@
                     .clipShape(RoundedRectangle(cornerRadius: 4))
                 }
             }
+            .alert("Delete File", isPresented: $showDeleteAlert) {
+                Button("Cancel", role: .cancel) { fileToDelete = nil }
+                Button("Delete", role: .destructive) {
+                    if let path = fileToDelete {
+                        deleteFile(at: path)
+                    }
+                    fileToDelete = nil
+                }
+            } message: {
+                Text("Are you sure you want to delete this file? This cannot be undone.")
+            }
+        }
+
+        private func deleteFile(at path: String) {
+            do {
+                try FileManager.default.removeItem(atPath: path)
+                // Refresh to reflect the deletion
+                scan()
+            } catch {
+                // Silently fail — the file may already be gone
+            }
+        }
+
+        private func shareFile(at path: String) {
+            let fileURL = URL(fileURLWithPath: path)
+            #if os(macOS)
+                guard let window = NSApp.keyWindow else { return }
+                let picker = NSSharingServicePicker(items: [fileURL])
+                // Show anchored to the window's content view center
+                if let contentView = window.contentView {
+                    let rect = CGRect(x: contentView.bounds.midX, y: contentView.bounds.midY, width: 1, height: 1)
+                    picker.show(relativeTo: rect, of: contentView, preferredEdge: .minY)
+                }
+            #elseif os(iOS)
+                let activityVC = UIActivityViewController(activityItems: [fileURL], applicationActivities: nil)
+                guard let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+                      let rootVC = scene.windows.first?.rootViewController
+                else { return }
+                // Find the topmost presented controller
+                var presenter = rootVC
+                while let presented = presenter.presentedViewController {
+                    presenter = presented
+                }
+                if let popover = activityVC.popoverPresentationController {
+                    popover.sourceView = presenter.view
+                    popover.sourceRect = CGRect(x: presenter.view.bounds.midX, y: presenter.view.bounds.midY, width: 0, height: 0)
+                }
+                presenter.present(activityVC, animated: true)
+            #endif
         }
 
         private func scan() {
@@ -217,12 +273,40 @@
                     Text(node.sizeLabel)
                         .font(.system(size: 8, design: .monospaced))
                         .foregroundStyle(.tertiary)
+
+                    Button(role: .destructive) {
+                        fileToDelete = node.path
+                        showDeleteAlert = true
+                    } label: {
+                        Image(systemName: "trash")
+                            .font(.system(size: 9))
+                            .foregroundStyle(.red.opacity(0.6))
+                    }
+                    .buttonStyle(.plain)
+
+                    Button {
+                        shareFile(at: node.path)
+                    } label: {
+                        Image(systemName: "square.and.arrow.up")
+                            .font(.system(size: 9))
+                            .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
                 }
             }
             .padding(.vertical, 2)
             .contextMenu {
                 Button("Copy Path") {
                     debugDrawerCopyToClipboard(node.path)
+                }
+                if !node.isDirectory {
+                    Button("Share...") {
+                        shareFile(at: node.path)
+                    }
+                    Button("Delete", role: .destructive) {
+                        fileToDelete = node.path
+                        showDeleteAlert = true
+                    }
                 }
                 #if os(macOS)
                     Button("Reveal in Finder") {

@@ -397,9 +397,7 @@
         @State private var hierarchy: ViewNode?
         @State private var isHierarchyExpanded = false
         @State private var searchText = ""
-        #if os(macOS)
         @State private var debugger3DRequest: ViewDebugger3DRequest?
-        #endif
 
         var body: some View {
             VStack(alignment: .leading, spacing: 8) {
@@ -546,11 +544,9 @@
                     .clipShape(RoundedRectangle(cornerRadius: 4))
                 }
             }
-            #if os(macOS)
             .sheet(item: $debugger3DRequest) { request in
                 ViewDebugger3DCombinedSheet(targetView: request.targetView)
             }
-            #endif
         }
 
         private func toolButton(_ label: String, icon: String, mode: InspectorToolController.Mode) -> some View {
@@ -576,6 +572,16 @@
         private func open3DDebugger() {
             guard let view = NSApp?.keyWindow?.contentView else { return }
             debugger3DRequest = ViewDebugger3DRequest(targetView: view)
+        }
+        #elseif os(iOS)
+        private func open3DDebugger() {
+            guard let windowScene = UIApplication.shared.connectedScenes
+                .compactMap({ $0 as? UIWindowScene })
+                .first(where: { $0.activationState == .foregroundActive }),
+                let window = windowScene.windows.first(where: { $0.isKeyWindow }),
+                let rootView = window.rootViewController?.view
+            else { return }
+            debugger3DRequest = ViewDebugger3DRequest(targetView: rootView)
         }
         #endif
 

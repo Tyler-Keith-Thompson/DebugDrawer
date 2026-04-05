@@ -229,18 +229,32 @@
     struct ConsolePluginView: View {
         @ObservedObject private var store = ConsoleLogStore.shared
         @State private var isFollowing = true
+        @State private var searchText = ""
+
+        private var visibleLines: [LogLine] {
+            let filtered = store.filteredLines
+            guard !searchText.isEmpty else { return filtered }
+            let q = searchText.lowercased()
+            return filtered.filter { $0.text.lowercased().contains(q) }
+        }
 
         var body: some View {
             VStack(alignment: .leading, spacing: 6) {
+                // Search field
+                TextField("Search logs...", text: $searchText)
+                    .textFieldStyle(.roundedBorder)
+                    .controlSize(.small)
+
                 // Toolbar — filter picker is in its own view to avoid
                 // re-creating the NSSegmentedControl on every log batch.
                 ConsoleToolbarView(
-                    lineCount: store.filteredLines.count,
-                    isFollowing: $isFollowing
+                    lineCount: visibleLines.count,
+                    isFollowing: $isFollowing,
+                    visibleLines: visibleLines
                 )
 
                 ConsoleTextView(
-                    lines: store.filteredLines,
+                    lines: visibleLines,
                     isFollowing: $isFollowing
                 )
                 .frame(minHeight: 120, maxHeight: 300)
@@ -255,7 +269,14 @@
     struct ConsoleToolbarView: View {
         let lineCount: Int
         @Binding var isFollowing: Bool
+        let visibleLines: [LogLine]
         @ObservedObject private var store = ConsoleLogStore.shared
+
+        private static let copyDateFormatter: DateFormatter = {
+            let f = DateFormatter()
+            f.dateFormat = "HH:mm:ss.SSS"
+            return f
+        }()
 
         var body: some View {
             HStack(spacing: 8) {
@@ -273,6 +294,18 @@
                 Spacer()
 
                 ConsoleFilterPicker(filterLevel: $store.filterLevel)
+
+                Button("Copy All") {
+                    let text = visibleLines.map { line in
+                        let ts = Self.copyDateFormatter.string(from: line.timestamp)
+                        let badge = line.level.label.map { $0 + " " } ?? ""
+                        return "\(ts) \(badge)\(line.text)"
+                    }.joined(separator: "\n")
+                    debugDrawerCopyToClipboard(text)
+                }
+                .font(.caption)
+                .buttonStyle(.plain)
+                .foregroundStyle(.secondary)
 
                 Button("Clear") { store.clear() }
                     .font(.caption)

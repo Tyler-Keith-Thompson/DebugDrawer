@@ -1,9 +1,12 @@
 #if DEBUG
     #if os(macOS)
         import AppKit
+    #elseif os(iOS)
+        import UIKit
     #endif
     import Combine
     import DebugDrawer
+    import Network
     import SwiftUI
 
     // MARK: - App metrics
@@ -15,20 +18,49 @@
         @Published var memoryMB: Double = 0
         @Published var cpuUsage: Double = 0
         @Published var uptime: TimeInterval = 0
+        @Published var networkStatus: String = "Unknown"
+
+        /// The system uptime at the moment the process was launched.
+        let launchSystemUptime: TimeInterval = ProcessInfo.processInfo.systemUptime
 
         private let startTime = ProcessInfo.processInfo.systemUptime
         private var cancellable: AnyCancellable?
+        private let pathMonitor = NWPathMonitor()
 
         private init() {
             cancellable = Timer.publish(every: 2, on: .main, in: .common)
                 .autoconnect()
                 .sink { [weak self] _ in self?.refresh() }
             refresh()
+            startNetworkMonitoring()
         }
 
         func refresh() {
             memoryMB = Self.currentMemoryMB()
             uptime = ProcessInfo.processInfo.systemUptime - startTime
+        }
+
+        private func startNetworkMonitoring() {
+            pathMonitor.pathUpdateHandler = { [weak self] path in
+                let status: String
+                if path.status == .satisfied {
+                    if path.usesInterfaceType(.wifi) {
+                        status = "WiFi"
+                    } else if path.usesInterfaceType(.cellular) {
+                        status = "Cellular"
+                    } else if path.usesInterfaceType(.wiredEthernet) {
+                        status = "Ethernet"
+                    } else {
+                        status = "Online"
+                    }
+                } else {
+                    status = "Offline"
+                }
+                Task { @MainActor [weak self] in
+                    self?.networkStatus = status
+                }
+            }
+            pathMonitor.start(queue: DispatchQueue(label: "com.debugdrawer.network-monitor"))
         }
 
         private static func currentMemoryMB() -> Double {
@@ -94,6 +126,9 @@
                     infoRow("Debug", "Yes")
                     infoRow("Active CPU", "\(ProcessInfo.processInfo.activeProcessorCount)")
                     infoRow("Physical Mem", String(format: "%.0f GB", Double(ProcessInfo.processInfo.physicalMemory) / (1024 * 1024 * 1024)))
+                    infoRow("Screen", screenResolution)
+                    infoRow("Network", metrics.networkStatus)
+                    infoRow("Launch Time", String(format: "%.2fs after boot", metrics.launchSystemUptime))
                 }
 
                 Divider()
@@ -134,6 +169,22 @@
 
         private var isSandboxed: Bool {
             ProcessInfo.processInfo.environment["APP_SANDBOX_CONTAINER_ID"] != nil
+        }
+
+        private var screenResolution: String {
+            #if os(macOS)
+                guard let screen = NSScreen.main else { return "—" }
+                let size = screen.frame.size
+                let scale = screen.backingScaleFactor
+                return "\(Int(size.width))×\(Int(size.height)) @\(Int(scale))x"
+            #elseif os(iOS)
+                let screen = UIScreen.main
+                let size = screen.bounds.size
+                let scale = screen.scale
+                return "\(Int(size.width))×\(Int(size.height)) @\(Int(scale))x"
+            #else
+                return "—"
+            #endif
         }
 
         private func copyToClipboard() {

@@ -12,6 +12,11 @@ import DebugDrawerPerformancePlugin
 import DebugDrawerScreenshotPlugin
 import DebugDrawerUserDefaultsPlugin
 import DebugDrawerViewInspectorPlugin
+import DebugDrawerLocationPlugin
+import DebugDrawerLoadedLibrariesPlugin
+import DebugDrawerDeepLinkPlugin
+import DebugDrawerCookiesPlugin
+import DebugDrawerLaunchTimePlugin
 import SwiftUI
 
 @main
@@ -39,6 +44,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             DebugDrawer.shared.installUserDefaults()
             DebugDrawer.shared.installKeychain()
             DebugDrawer.shared.installFileBrowser()
+            DebugDrawer.shared.installLocation()
+            DebugDrawer.shared.installLoadedLibraries()
+            DebugDrawer.shared.installDeepLink()
+            DebugDrawer.shared.installCookies()
+            DebugDrawer.shared.installLaunchTime()
         #endif
 
         setupMenuBar()

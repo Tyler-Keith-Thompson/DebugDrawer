@@ -173,8 +173,8 @@
             guard w > 1, h > 1 else { return }
 
             if let image = snapshot.snapshotImage,
-               image.size.width > 0, image.size.height > 0,
-               image.size.width <= 8192, image.size.height <= 8192
+               image.size.width >= 2, image.size.height >= 2,
+               image.size.width <= 4096, image.size.height <= 4096
             {
                 let x = Float(snapshot.frame.origin.x) * scaleFactor
                 let y = Float(rootSize.height) - Float(snapshot.frame.origin.y) * scaleFactor - h
@@ -548,8 +548,8 @@
             guard w > 1, h > 1 else { return }
 
             if let image = snapshot.snapshotImage,
-               image.size.width > 0, image.size.height > 0,
-               image.size.width <= 8192, image.size.height <= 8192
+               image.size.width >= 2, image.size.height >= 2,
+               image.size.width <= 4096, image.size.height <= 4096
             {
                 let x = Float(snapshot.frame.origin.x) * scaleFactor
                 let y = Float(rootSize.height) - Float(snapshot.frame.origin.y) * scaleFactor - h
@@ -559,14 +559,25 @@
                 node.position = SCNVector3(x + w / 2, y + h / 2, z)
                 node.name = snapshot.className
 
-                let plane = SCNPlane(width: CGFloat(w), height: CGFloat(h))
+                // DebugSwift approach: SCNShape + UIGraphicsImageRenderer normalization
+                // to ensure Metal-compatible pixel format
+                let shapeSize = CGSize(width: CGFloat(w), height: CGFloat(h))
+                let path = UIBezierPath(rect: CGRect(origin: .zero, size: shapeSize))
+                let shape = SCNShape(path: path, extrusionDepth: 0)
                 let material = SCNMaterial()
                 material.isDoubleSided = true
                 material.lightingModel = .constant
-                material.diffuse.contents = image
-                material.blendMode = .alpha
-                plane.materials = [material]
-                node.addChildNode(SCNNode(geometry: plane))
+
+                let format = UIGraphicsImageRendererFormat()
+                format.scale = 1.0
+                let normRenderer = UIGraphicsImageRenderer(size: image.size, format: format)
+                let normalizedImage = normRenderer.image { _ in
+                    image.draw(in: CGRect(origin: .zero, size: image.size))
+                }
+                material.diffuse.contents = normalizedImage
+
+                shape.materials = [material]
+                node.addChildNode(SCNNode(geometry: shape))
                 parent.addChildNode(node)
             }
 
@@ -682,13 +693,17 @@
         @MainActor
         private static func captureImage(of view: UIView) -> UIImage? {
             let bounds = view.bounds
-            guard bounds.width > 0, bounds.height > 0 else { return nil }
+            // Minimum 2pt to avoid zero/sub-pixel textures that crash Metal
+            guard bounds.width >= 2, bounds.height >= 2 else { return nil }
             guard bounds.width <= 4096, bounds.height <= 4096 else { return nil }
 
             let renderer = UIGraphicsImageRenderer(bounds: bounds)
-            return renderer.image { _ in
+            let image = renderer.image { _ in
                 view.drawHierarchy(in: bounds, afterScreenUpdates: false)
             }
+            // Verify the resulting image has valid backing data
+            guard image.cgImage != nil else { return nil }
+            return image
         }
     }
 
@@ -733,14 +748,10 @@
             .onAppear {
                 DispatchQueue.main.async {
                     let captured = ViewSnapshot.capture(from: targetView)
-                    status = "Processing layers..."
-
-                    DispatchQueue.global(qos: .userInitiated).async {
-                        let processed = ViewSnapshot.preProcessDiffs(captured, parentImage: nil)
-                        DispatchQueue.main.async {
-                            snapshot = processed
-                        }
-                    }
+                    // Skip diff processing on iOS — the CGContext pixel format
+                    // from diffImage produces textures Metal can't validate.
+                    // Use raw snapshots directly.
+                    snapshot = captured
                 }
             }
         }
