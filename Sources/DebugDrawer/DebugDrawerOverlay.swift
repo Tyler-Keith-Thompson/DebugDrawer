@@ -13,24 +13,28 @@
         private let defaultsPrefix = "com.debugdrawer.collapsed."
 
         var body: some View {
-            HStack(spacing: 0) {
-                Spacer()
+            GeometryReader { geometry in
+                HStack(spacing: 0) {
+                    Spacer()
 
-                if drawer.isOpen {
-                    VStack(spacing: 0) {
-                        header
-                        Divider()
-                        content
+                    if drawer.isOpen {
+                        VStack(spacing: 0) {
+                            header
+                            Divider()
+                            content
+                        }
+                        .frame(width: drawerWidth)
+                        .background(.ultraThickMaterial)
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                        .shadow(color: .black.opacity(0.25), radius: 12, x: -4)
+                        .padding(.top, max(8, geometry.safeAreaInsets.top))
+                        .padding(.bottom, max(8, geometry.safeAreaInsets.bottom))
+                        .padding(.trailing, 8)
+                        .transition(.move(edge: .trailing).combined(with: .opacity))
                     }
-                    .frame(width: drawerWidth)
-                    .background(.ultraThickMaterial)
-                    .clipShape(RoundedRectangle(cornerRadius: 10))
-                    .shadow(color: .black.opacity(0.25), radius: 12, x: -4)
-                    .padding(.vertical, 8)
-                    .padding(.trailing, 8)
-                    .transition(.move(edge: .trailing).combined(with: .opacity))
                 }
             }
+            .ignoresSafeArea()
             .onAppear { loadCollapsedState() }
         }
 

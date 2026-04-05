@@ -116,7 +116,10 @@
         public func install() {
             guard !installed else { return }
             installed = true
+            // Register for URLSession.shared
             URLProtocol.registerClass(DebugNetworkProtocol.self)
+            // Swizzle URLSessionConfiguration so custom sessions also get intercepted
+            URLSessionConfiguration.swizzleProtocolClasses()
         }
 
         func recordStart(_ entry: NetworkEntry) {
@@ -548,6 +551,32 @@
             }
 
             return parts.joined(separator: " \\\n  ")
+        }
+    }
+
+    // MARK: - URLSessionConfiguration swizzle
+
+    extension URLSessionConfiguration {
+        /// Swizzle the `protocolClasses` getter so every new `URLSessionConfiguration`
+        /// (`.default`, `.ephemeral`, custom) automatically includes our interceptor.
+        /// This is the same technique FLEX/Netfox use — `URLProtocol.registerClass`
+        /// alone only covers `URLSession.shared`.
+        static func swizzleProtocolClasses() {
+            guard let original = class_getInstanceMethod(self, #selector(getter: protocolClasses)),
+                  let swizzled = class_getInstanceMethod(self, #selector(getter: swizzled_protocolClasses))
+            else { return }
+            method_exchangeImplementations(original, swizzled)
+        }
+
+        @objc private var swizzled_protocolClasses: [AnyClass]? {
+            // After swizzle, calling swizzled_protocolClasses actually calls the original getter
+            guard var classes = self.swizzled_protocolClasses else {
+                return [DebugNetworkProtocol.self]
+            }
+            if !classes.contains(where: { $0 == DebugNetworkProtocol.self }) {
+                classes.insert(DebugNetworkProtocol.self, at: 0)
+            }
+            return classes
         }
     }
 
