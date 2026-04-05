@@ -98,13 +98,6 @@ deploy bump="patch":
         echo "    New: ${NEW_VERSION}"
     fi
     echo ""
-    read -p "Tag and push ${NEW_VERSION}? [y/N] " -n 1 -r
-    echo ""
-    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-        echo "Aborted."
-        exit 1
-    fi
-
     git tag -a "${NEW_VERSION}" -m "Release ${NEW_VERSION}"
     git push origin main --tags
 

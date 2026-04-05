@@ -169,6 +169,21 @@
             URLProtocol.setProperty(true, forKey: Self.handledKey, in: mutable)
 
             let url = request.url?.absoluteString ?? ""
+            // httpBody is often nil — URLSession moves it to httpBodyStream internally
+            var body = request.httpBody
+            if body == nil, let stream = request.httpBodyStream {
+                stream.open()
+                var data = Data()
+                let bufferSize = 4096
+                let buffer = UnsafeMutablePointer<UInt8>.allocate(capacity: bufferSize)
+                defer { buffer.deallocate(); stream.close() }
+                while stream.hasBytesAvailable {
+                    let read = stream.read(buffer, maxLength: bufferSize)
+                    guard read > 0 else { break }
+                    data.append(buffer, count: read)
+                }
+                if !data.isEmpty { body = data }
+            }
             let entry = NetworkEntry(
                 timestamp: Date(),
                 method: request.httpMethod ?? "GET",
@@ -176,7 +191,7 @@
                 host: request.url?.host ?? "",
                 path: request.url?.path ?? "/",
                 requestHeaders: request.allHTTPHeaderFields ?? [:],
-                requestBody: request.httpBody,
+                requestBody: body,
                 isComplete: false
             )
             entryId = entry.id
