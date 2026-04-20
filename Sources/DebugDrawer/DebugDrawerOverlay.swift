@@ -183,6 +183,7 @@
                     DebugDrawerOverlay(drawer: drawer)
                         .accessibilityIdentifier(debugDrawerOverlayIdentifier)
                         .background(DebugDrawerTagView())
+                        .allowsHitTesting(drawer.isOpen)
                 }
                 .animation(.easeInOut(duration: 0.25), value: drawer.isOpen)
         }
