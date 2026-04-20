@@ -357,4 +357,10 @@
             registerGlobal(AccessibilityPlugin())
         }
     }
+#else
+    import SwiftUI
+
+    public extension View {
+        func debugAccessibilityOverrides() -> some View { self }
+    }
 #endif

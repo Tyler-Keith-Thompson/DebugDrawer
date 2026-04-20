@@ -930,4 +930,10 @@
         }
     }
 
+#else
+    import SwiftUI
+
+    public extension View {
+        func debugGrid() -> some View { self }
+    }
 #endif

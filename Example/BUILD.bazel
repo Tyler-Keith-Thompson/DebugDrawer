@@ -29,7 +29,7 @@ _SHARED_DEPS = [
 swift_library(
     name = "ExampleAppLib_macOS",
     srcs = glob(["macOS/*.swift"]),
-    module_name = "ExampleApp",
+    module_name = "ExampleApp_macOS",
     deps = _SHARED_DEPS,
 )
 
@@ -50,7 +50,7 @@ macos_application(
 swift_library(
     name = "ExampleAppLib_iOS",
     srcs = glob(["iOS/*.swift"]),
-    module_name = "ExampleApp",
+    module_name = "ExampleApp_iOS",
     deps = _SHARED_DEPS,
 )
 
