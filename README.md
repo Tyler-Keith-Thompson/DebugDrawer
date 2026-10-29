@@ -260,7 +260,7 @@ ContentView()
 
 Uses [just](https://github.com/casey/just) as a task runner. Run `just --list` to see available commands.
 
-Requires Bazel 9.0.1, macOS 15.0+ / iOS 17.0+, Swift 6.
+Requires Bazel 9.3.1, macOS 15.0+ / iOS 17.0+, Swift 6.
 
 ## License
 
