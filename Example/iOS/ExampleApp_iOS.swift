@@ -94,6 +94,19 @@ struct ExampleContentView_iOS: View {
                 }
             }
             .navigationTitle("DebugDrawer Example")
+            .toolbar {
+                // The drawer exists in debug builds only. A device without a keyboard has no
+                // Ctrl+D, so the example opens it from here.
+                #if DEBUG
+                    ToolbarItem(placement: .primaryAction) {
+                        Button {
+                            DebugDrawer.shared.toggle()
+                        } label: {
+                            Label("Debug Drawer", systemImage: "ladybug")
+                        }
+                    }
+                #endif
+            }
         }
     }
 }
