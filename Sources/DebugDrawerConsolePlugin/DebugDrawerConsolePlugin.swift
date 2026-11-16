@@ -252,7 +252,9 @@
                 ConsoleToolbarView(
                     lineCount: visibleLines.count,
                     isFollowing: $isFollowing,
-                    visibleLines: visibleLines
+                    filterLevel: $store.filterLevel,
+                    copyAll: { debugDrawerCopyToClipboard(Self.copiedText(of: visibleLines)) },
+                    clear: { store.clear() }
                 )
 
                 ConsoleTextView(
@@ -263,6 +265,21 @@
                 .clipShape(RoundedRectangle(cornerRadius: 4))
             }
         }
+
+        private static let copyDateFormatter: DateFormatter = {
+            let formatter = DateFormatter()
+            formatter.dateFormat = "HH:mm:ss.SSS"
+            return formatter
+        }()
+
+        /// The lines as Copy All copies them: time, level badge and text, one per line.
+        private static func copiedText(of lines: [LogLine]) -> String {
+            lines.map { line in
+                let ts = copyDateFormatter.string(from: line.timestamp)
+                let badge = line.level.label.map { $0 + " " } ?? ""
+                return "\(ts) \(badge)\(line.text)"
+            }.joined(separator: "\n")
+        }
     }
 
     /// Extracted toolbar so the segmented picker doesn't get rebuilt on every log update.
@@ -271,16 +288,32 @@
     struct ConsoleToolbarView: View {
         let lineCount: Int
         @Binding var isFollowing: Bool
-        let visibleLines: [LogLine]
-        @ObservedObject private var store = ConsoleLogStore.shared
-
-        private static let copyDateFormatter: DateFormatter = {
-            let formatter = DateFormatter()
-            formatter.dateFormat = "HH:mm:ss.SSS"
-            return formatter
-        }()
+        @Binding var filterLevel: LogLine.Level
+        let copyAll: () -> Void
+        let clear: () -> Void
+        @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
         var body: some View {
+            // At accessibility sizes one row can't hold the count and every control, and squeezing
+            // it breaks words, so the count takes its own line and the controls wrap below it.
+            if dynamicTypeSize.isAccessibilitySize {
+                VStack(alignment: .leading, spacing: 6) {
+                    summary
+                    ViewThatFits(in: .horizontal) {
+                        HStack(spacing: 12) { controls }
+                        VStack(alignment: .leading, spacing: 6) { controls }
+                    }
+                }
+            } else {
+                HStack(spacing: 8) {
+                    summary
+                    Spacer()
+                    controls
+                }
+            }
+        }
+
+        private var summary: some View {
             HStack(spacing: 8) {
                 Text("\(lineCount) lines")
                     .font(.caption)
@@ -292,28 +325,21 @@
                         .buttonStyle(.plain)
                         .foregroundStyle(Color.accentColor)
                 }
+            }
+        }
 
-                Spacer()
+        @ViewBuilder private var controls: some View {
+            ConsoleFilterPicker(filterLevel: $filterLevel)
 
-                ConsoleFilterPicker(filterLevel: $store.filterLevel)
-
-                Button("Copy All") {
-                    let text = visibleLines.map { line in
-                        let ts = Self.copyDateFormatter.string(from: line.timestamp)
-                        let badge = line.level.label.map { $0 + " " } ?? ""
-                        return "\(ts) \(badge)\(line.text)"
-                    }.joined(separator: "\n")
-                    debugDrawerCopyToClipboard(text)
-                }
+            Button("Copy All", action: copyAll)
                 .font(.caption)
                 .buttonStyle(.plain)
                 .foregroundStyle(.secondary)
 
-                Button("Clear") { store.clear() }
-                    .font(.caption)
-                    .buttonStyle(.plain)
-                    .foregroundStyle(.secondary)
-            }
+            Button("Clear", action: clear)
+                .font(.caption)
+                .buttonStyle(.plain)
+                .foregroundStyle(.secondary)
         }
     }
 

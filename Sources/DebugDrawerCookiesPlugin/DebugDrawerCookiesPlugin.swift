@@ -33,23 +33,7 @@
 
         var body: some View {
             VStack(alignment: .leading, spacing: 6) {
-                // Header
-                HStack {
-                    Text("\(cookies.count) cookies")
-                        .font(.system(.caption2, design: .monospaced))
-                        .foregroundStyle(.secondary)
-                    Spacer()
-                    Button("Refresh") { loadCookies() }
-                        .buttonStyle(.bordered)
-                        .controlSize(.mini)
-                    Button("Delete All") { deleteAll() }
-                        .buttonStyle(.bordered)
-                        .controlSize(.mini)
-                        .tint(.red)
-                    Button("Copy") { copyReport() }
-                        .buttonStyle(.bordered)
-                        .controlSize(.mini)
-                }
+                CookiesToolbar(count: cookies.count, refresh: loadCookies, deleteAll: deleteAll, copy: copyReport)
 
                 // Search
                 TextField("Filter by name or domain...", text: $searchText)

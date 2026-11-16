@@ -20,28 +20,7 @@
                     .padding(.vertical, 2)
                 }
 
-                // Toolbar
-                HStack(spacing: 6) {
-                    Text("\(store.filteredEntries.count)")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-
-                    Picker("Status", selection: $store.filterStatus) {
-                        ForEach(NetworkStore.StatusFilter.allCases, id: \.self) { filter in
-                            Text(filter.rawValue).tag(filter)
-                        }
-                    }
-                    .pickerStyle(.segmented)
-                    .labelsHidden()
-                    .controlSize(.mini)
-                    .accessibilityLabel("Status")
-                    .accessibilityElement(children: .contain)
-
-                    Button("Clear") { store.clear() }
-                        .font(.caption)
-                        .buttonStyle(.plain)
-                        .foregroundStyle(.secondary)
-                }
+                NetworkToolbar(count: store.filteredEntries.count, filterStatus: $store.filterStatus) { store.clear() }
 
                 TextField("Filter URL...", text: $store.filterText)
                     .textFieldStyle(.roundedBorder)
