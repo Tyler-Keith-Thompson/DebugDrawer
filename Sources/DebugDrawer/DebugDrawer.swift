@@ -117,10 +117,10 @@
         // MARK: - HUD
 
         /// Which plugins are pinned to the floating HUD, and where it sits. Saved in `UserDefaults`.
-        @Published public private(set) var hudLayout = HUDLayout(from: .standard)
+        @Published public internal(set) var hudLayout = HUDLayout(from: .standard)
 
         /// Whether the HUD is hidden for a moment, as while ``performWhileHidden(drawer:_:)`` runs.
-        @Published public private(set) var isHUDHidden = false
+        @Published public internal(set) var isHUDHidden = false
 
         /// Pins the plugin's readout to the HUD, or removes it if it is pinned, and saves the change.
         public func toggleHUD(forPlugin id: String) {

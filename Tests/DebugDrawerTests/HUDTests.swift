@@ -78,28 +78,25 @@
             #expect(readout.hud != nil)
         }
 
+        // Synchronous, so registering, checking and unregistering happen in one main-actor turn and
+        // suites that check the shared drawer's registry never see these plugins. Pins are set in
+        // memory, not toggled, so a pin saved by another run can't invert the result.
         @Test("The HUD lists registered pinned plugins that offer a HUD, in pin order, and nothing else")
         func theHUDListsPinnedReadouts() {
             let sut = DebugDrawer.shared
+            let previous = sut.hudLayout
             sut.registerGlobal(ReadoutPlugin())
             sut.registerGlobal(ReadoutPlugin(id: "SecondReadout", title: "Second"))
             sut.registerGlobal(PlainPlugin())
-            sut.toggleHUD(forPlugin: "SecondReadout")
-            sut.toggleHUD(forPlugin: "PlainPlugin")
-            sut.toggleHUD(forPlugin: "Unregistered")
-            sut.toggleHUD(forPlugin: "ReadoutPlugin")
-            defer {
-                for id in ["SecondReadout", "PlainPlugin", "Unregistered", "ReadoutPlugin"] {
-                    sut.toggleHUD(forPlugin: id)
-                }
-                for id in ["ReadoutPlugin", "SecondReadout", "PlainPlugin"] {
-                    sut.unregisterGlobal(id: id)
-                }
-            }
+            sut.hudLayout.pinned = ["SecondReadout", "PlainPlugin", "Unregistered", "ReadoutPlugin"]
             let expected = ["SecondReadout", "ReadoutPlugin"]
 
             let actual = sut.hudPlugins.map(\.id)
 
+            sut.hudLayout = previous
+            for id in ["ReadoutPlugin", "SecondReadout", "PlainPlugin"] {
+                sut.unregisterGlobal(id: id)
+            }
             #expect(actual == expected)
         }
 
@@ -118,15 +115,13 @@
             #expect(HUDLayout(from: .standard).origin == expected)
         }
 
-        @Test("Running an action while hidden hides the HUD during it and shows it after, even with the drawer kept")
+        @Test("Running an action while hidden hides the HUD during it, even with the drawer kept")
         func theHUDIsHiddenWhileAnActionRuns() async {
             let sut = DebugDrawer.shared
-            sut.registerGlobal(ReadoutPlugin())
-            sut.toggleHUD(forPlugin: "ReadoutPlugin")
-            defer {
-                sut.toggleHUD(forPlugin: "ReadoutPlugin")
-                sut.unregisterGlobal(id: "ReadoutPlugin")
-            }
+            let previous = sut.hudLayout
+            // A pin in memory is all hiding needs; no plugin is registered across the await.
+            sut.hudLayout.pinned = ["ReadoutPlugin"]
+            defer { sut.hudLayout = previous }
 
             let hiddenDuringAction = await withCheckedContinuation { continuation in
                 sut.performWhileHidden(drawer: false) {
@@ -137,24 +132,22 @@
             #expect(hiddenDuringAction)
         }
 
-        @Test("While an action runs hidden, the app's drawer modifier draws the HUD fully transparent, so a capture leaves it out")
-        func theModifierDrawsNoHUDWhileHidden() async throws {
+        // Synchronous for the same reason as the HUD list test.
+        @Test("While the HUD is hidden, the app's drawer modifier draws it fully transparent, so a capture leaves it out")
+        func theModifierDrawsNoHUDWhileHidden() {
             let sut = DebugDrawer.shared
+            let previous = sut.hudLayout
             sut.registerGlobal(ReadoutPlugin())
-            sut.toggleHUD(forPlugin: "ReadoutPlugin")
-            defer {
-                sut.toggleHUD(forPlugin: "ReadoutPlugin")
-                sut.unregisterGlobal(id: "ReadoutPlugin")
-            }
+            sut.hudLayout.pinned = ["ReadoutPlugin"]
             let app = Text("App").debugDrawer()
-            let shownOpacity = try app.inspect().find(DrawerHUDView.self).opacity()
 
-            let hiddenOpacity = await withCheckedContinuation { continuation in
-                sut.performWhileHidden(drawer: false) {
-                    continuation.resume(returning: try? app.inspect().find(DrawerHUDView.self).opacity())
-                }
-            }
+            let shownOpacity = try? app.inspect().find(DrawerHUDView.self).opacity()
+            sut.isHUDHidden = true
+            let hiddenOpacity = try? app.inspect().find(DrawerHUDView.self).opacity()
 
+            sut.isHUDHidden = false
+            sut.hudLayout = previous
+            sut.unregisterGlobal(id: "ReadoutPlugin")
             #expect(shownOpacity == 1)
             #expect(hiddenOpacity == 0)
         }
