@@ -5,6 +5,7 @@
     #if os(macOS)
     import AppKit
     @preconcurrency import ScreenCaptureKit
+    import UniformTypeIdentifiers
     #elseif os(iOS)
     import UIKit
     #endif
@@ -26,6 +27,11 @@
         @State private var lastPath: String?
         @State private var isCapturing = false
         @State private var hideDrawer = true
+        #if os(macOS)
+        /// A capture the Desktop refused (a sandboxed host), waiting for the user to pick where it goes.
+        @State private var refusedCapture: PNGDocument?
+        @State private var refusedFilename = ""
+        #endif
 
         var body: some View {
             VStack(alignment: .leading, spacing: 8) {
@@ -80,6 +86,19 @@
                     }
                 }
             }
+            #if os(macOS)
+            .fileExporter(
+                isPresented: Binding(get: { refusedCapture != nil }, set: { if !$0 { refusedCapture = nil } }),
+                document: refusedCapture,
+                contentType: .png,
+                defaultFilename: refusedFilename
+            ) { result in
+                switch result {
+                case let .success(url): lastPath = url.path
+                case let .failure(error): lastPath = "Error: \(error.localizedDescription)"
+                }
+            }
+            #endif
         }
 
         private enum Destination { case desktop, clipboard }
@@ -111,9 +130,18 @@
 
                 switch destination {
                 case .desktop:
-                    let path = try saveToDesktop(image)
-                    lastPath = path
-                    NSSound.beep()
+                    let (png, filename) = try pngFile(image)
+                    guard let desktop = FileManager.default.urls(for: .desktopDirectory, in: .userDomainMask).first else {
+                        throw ScreenshotError.noDesktop
+                    }
+                    switch try ScreenshotFile.save(png, as: filename, in: desktop) {
+                    case let .saved(url):
+                        lastPath = url.path
+                        NSSound.beep()
+                    case .needsLocation:
+                        refusedFilename = filename
+                        refusedCapture = PNGDocument(data: png)
+                    }
 
                 case .clipboard:
                     copyToClipboard(image)
@@ -146,7 +174,8 @@
             return NSImage(cgImage: cgImage, size: windowFrame.size)
         }
 
-        private func saveToDesktop(_ image: NSImage) throws -> String {
+        /// The capture as PNG data, with a timestamped filename.
+        private func pngFile(_ image: NSImage) throws -> (Data, String) {
             guard let tiff = image.tiffRepresentation,
                   let bitmap = NSBitmapImageRep(data: tiff),
                   let pngData = bitmap.representation(using: .png, properties: [:])
@@ -156,15 +185,7 @@
 
             let timestamp = ISO8601DateFormatter().string(from: Date())
                 .replacingOccurrences(of: ":", with: "-")
-            let filename = "MergeWard-Debug-\(timestamp).png"
-
-            guard let desktopURL = FileManager.default.urls(for: .desktopDirectory, in: .userDomainMask).first else {
-                throw ScreenshotError.noDesktop
-            }
-
-            let fileURL = desktopURL.appendingPathComponent(filename)
-            try pngData.write(to: fileURL)
-            return fileURL.path
+            return (pngData, "MergeWard-Debug-\(timestamp).png")
         }
 
         private func copyToClipboard(_ image: NSImage) {
@@ -217,6 +238,24 @@
             }
         }
     }
+
+    #if os(macOS)
+    /// PNG data as a document, for `.fileExporter`.
+    struct PNGDocument: FileDocument {
+        static let readableContentTypes: [UTType] = [.png]
+        let data: Data
+
+        init(data: Data) { self.data = data }
+
+        init(configuration: ReadConfiguration) throws {
+            data = configuration.file.regularFileContents ?? Data()
+        }
+
+        func fileWrapper(configuration _: WriteConfiguration) throws -> FileWrapper {
+            FileWrapper(regularFileWithContents: data)
+        }
+    }
+    #endif
 
     // MARK: - Convenience installer
 
