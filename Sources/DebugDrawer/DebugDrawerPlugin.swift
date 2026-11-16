@@ -34,6 +34,9 @@ public protocol DebugDrawerPlugin: Identifiable {
     /// (e.g., a file path that changes as the user navigates).
     var contentIdentifier: String { get }
 
+    /// The group the plugin is listed under in the drawer. Defaults to `General`, listed last.
+    var category: String { get }
+
     /// Actions the drawer's search field offers, run when the user picks one. Defaults to none.
     var actions: [DebugDrawerAction] { get }
 }
@@ -49,11 +52,19 @@ public extension DebugDrawerPlugin {
         id
     }
 
+    /// `General`: the group for plugins that name no category.
+    var category: String {
+        defaultPluginCategory
+    }
+
     /// No actions: the search field finds the plugin by its title only.
     var actions: [DebugDrawerAction] {
         []
     }
 }
+
+/// The category of a plugin that names none.
+let defaultPluginCategory = "General"
 
 #if DEBUG
 
@@ -64,6 +75,7 @@ public extension DebugDrawerPlugin {
         public let id: String
         public let title: String
         public let icon: String
+        public let category: String
         public let actions: [DebugDrawerAction]
         private let _body: @MainActor () -> AnyView
 
@@ -71,6 +83,7 @@ public extension DebugDrawerPlugin {
             id = plugin.id
             title = plugin.title
             icon = plugin.icon
+            category = plugin.category
             actions = plugin.actions
             _body = { AnyView(plugin.body) }
         }

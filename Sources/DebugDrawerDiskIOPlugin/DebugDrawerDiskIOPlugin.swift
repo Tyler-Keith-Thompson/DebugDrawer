@@ -229,6 +229,7 @@
 
     public struct DiskIOPlugin: DebugDrawerPlugin {
         public var title = "Disk I/O"
+        public var category = "Storage"
         public var icon = "externaldrive"
 
         public init() {}

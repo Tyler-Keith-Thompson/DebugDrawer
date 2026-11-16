@@ -13,6 +13,10 @@
         /// The result Return runs, moved by the arrow keys.
         @State private var highlighted = 0
         @FocusState private var searchFocused: Bool
+        /// Pins, order and the last-used plugin, loaded once and saved on every change.
+        @State private var layout = DrawerLayout()
+        /// The plugin at the top of the list: set to scroll there, and kept current as the user scrolls.
+        @State private var scrolledID: String?
 
         private let drawerWidth: CGFloat = 340
         private let defaultsPrefix = "com.debugdrawer.collapsed."
@@ -23,16 +27,14 @@
                     Spacer()
 
                     if drawer.isOpen {
-                        ScrollViewReader { proxy in
-                            VStack(spacing: 0) {
-                                header
-                                searchField(proxy)
-                                if !query.isEmpty {
-                                    searchResults(proxy)
-                                }
-                                Divider()
-                                content
+                        VStack(spacing: 0) {
+                            header
+                            searchField
+                            if !query.isEmpty {
+                                searchResults
                             }
+                            Divider()
+                            content
                         }
                         // Cmd-K exists only inside the open drawer, so it never opens it (N2).
                         .background {
@@ -65,6 +67,17 @@
                     collapsedSections.insert(plugin.id)
                 }
             }
+            layout = DrawerLayout(from: .standard)
+            // The list isn't on screen yet; it opens at this plugin.
+            scrolledID = layout.lastUsed
+        }
+
+        /// Changes the layout and saves it.
+        private func updateLayout(_ change: (inout DrawerLayout) -> Void) {
+            withAnimation(.easeInOut(duration: 0.2)) {
+                change(&layout)
+            }
+            layout.save(to: .standard)
         }
 
         // MARK: - Header
@@ -88,13 +101,13 @@
 
         // MARK: - Search
 
-        private func searchField(_ proxy: ScrollViewProxy) -> some View {
+        private var searchField: some View {
             TextField("Search plugins and actions", text: $query)
                 .textFieldStyle(.roundedBorder)
                 .controlSize(.small)
                 .focused($searchFocused)
                 .onChange(of: query) { highlighted = 0 }
-                .onSubmit { chooseHighlighted(proxy) }
+                .onSubmit { chooseHighlighted() }
                 .onKeyPress(.downArrow) { moveHighlight(by: 1) }
                 .onKeyPress(.upArrow) { moveHighlight(by: -1) }
                 .onKeyPress(.escape) {
@@ -106,7 +119,7 @@
                 .padding(.bottom, 8)
         }
 
-        private func searchResults(_ proxy: ScrollViewProxy) -> some View {
+        private var searchResults: some View {
             let found = DrawerSearchResult.matches(query, in: allPlugins)
             return VStack(spacing: 0) {
                 if found.isEmpty {
@@ -119,7 +132,7 @@
                 }
                 // Offsets, not ids: two actions of one plugin may share a title.
                 ForEach(Array(found.enumerated()), id: \.offset) { index, result in
-                    Button { choose(result, proxy) } label: {
+                    Button { choose(result) } label: {
                         resultRow(result, isHighlighted: index == highlighted)
                     }
                     .buttonStyle(.plain)
@@ -157,21 +170,21 @@
             return .handled
         }
 
-        private func chooseHighlighted(_ proxy: ScrollViewProxy) {
+        private func chooseHighlighted() {
             let found = DrawerSearchResult.matches(query, in: allPlugins)
             guard found.indices.contains(highlighted) else { return }
-            choose(found[highlighted], proxy)
+            choose(found[highlighted])
         }
 
         /// Jumps to and expands a plugin, or runs an action, and clears the search.
-        private func choose(_ result: DrawerSearchResult, _ proxy: ScrollViewProxy) {
+        private func choose(_ result: DrawerSearchResult) {
             query = ""
             searchFocused = false
             switch result {
             case let .plugin(plugin):
                 expand(plugin)
                 withAnimation(.easeInOut(duration: 0.2)) {
-                    proxy.scrollTo(plugin.id, anchor: .top)
+                    scrolledID = plugin.id
                 }
             case let .action(action, _):
                 action.perform()
@@ -190,19 +203,26 @@
                         if !drawer.localPlugins.isEmpty {
                             sectionHeader("Local")
                             ForEach(drawer.localPlugins) { plugin in
-                                pluginSection(plugin)
+                                pluginSection(plugin, isGlobal: false)
                             }
                         }
 
-                        // Global plugins
-                        if !drawer.globalPlugins.isEmpty {
-                            sectionHeader("Global")
-                            ForEach(drawer.globalPlugins) { plugin in
-                                pluginSection(plugin)
+                        // Global plugins: pinned first, then by category
+                        ForEach(layout.sections(for: drawer.globalPlugins)) { section in
+                            sectionHeader(section.title)
+                            ForEach(section.plugins) { plugin in
+                                pluginSection(plugin, isGlobal: true)
                             }
                         }
                     }
+                    .scrollTargetLayout()
                 }
+            }
+            .scrollPosition(id: $scrolledID, anchor: .top)
+            .onChange(of: scrolledID) {
+                guard let scrolledID, scrolledID != layout.lastUsed else { return }
+                layout.lastUsed = scrolledID
+                layout.save(to: .standard)
             }
         }
 
@@ -242,6 +262,7 @@
         }
 
         private func toggleExpanded(_ plugin: AnyDebugDrawerPlugin) {
+            updateLayout { $0.lastUsed = plugin.id }
             withAnimation(.easeInOut(duration: 0.2)) {
                 let key = defaultsPrefix + plugin.id
                 if collapsedSections.contains(plugin.id) {
@@ -254,8 +275,11 @@
             }
         }
 
-        private func pluginSection(_ plugin: AnyDebugDrawerPlugin) -> some View {
+        /// A plugin's header and, when expanded, its body. Global plugins can be pinned and moved
+        /// from the header's context menu.
+        private func pluginSection(_ plugin: AnyDebugDrawerPlugin, isGlobal: Bool) -> some View {
             let expanded = isExpanded(plugin)
+            let pinned = layout.pinned.contains(plugin.id)
 
             return VStack(spacing: 0) {
                 Button(action: { toggleExpanded(plugin) }) {
@@ -265,6 +289,12 @@
                             .foregroundStyle(.secondary)
                         Text(plugin.title)
                             .font(.subheadline.weight(.medium))
+                        if pinned {
+                            Image(systemName: "pin.fill")
+                                .font(.caption2)
+                                .foregroundStyle(.tertiary)
+                                .accessibilityLabel("Pinned")
+                        }
                         Spacer()
                         Image(systemName: "chevron.right")
                             .font(.caption2.weight(.semibold))
@@ -276,6 +306,19 @@
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .contextMenu {
+                    if isGlobal {
+                        Button(pinned ? "Unpin" : "Pin", systemImage: pinned ? "pin.slash" : "pin") {
+                            updateLayout { $0.togglePin(plugin.id) }
+                        }
+                        Button("Move Up", systemImage: "arrow.up") {
+                            updateLayout { $0.move(plugin.id, by: -1, among: drawer.globalPlugins) }
+                        }
+                        Button("Move Down", systemImage: "arrow.down") {
+                            updateLayout { $0.move(plugin.id, by: 1, among: drawer.globalPlugins) }
+                        }
+                    }
+                }
 
                 if expanded {
                     plugin.body

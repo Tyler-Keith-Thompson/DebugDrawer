@@ -14,6 +14,7 @@
 
     public struct ScreenshotPlugin: DebugDrawerPlugin {
         public var title = "Screenshot"
+        public var category = "Interface"
         public var icon = "camera"
 
         public init() {}

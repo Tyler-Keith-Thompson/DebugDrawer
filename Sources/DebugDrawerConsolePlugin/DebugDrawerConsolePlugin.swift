@@ -215,6 +215,7 @@
 
     public struct ConsolePlugin: DebugDrawerPlugin {
         public var title = "Console"
+        public var category = "Logs & Network"
         public var icon = "terminal"
 
         public init() {}

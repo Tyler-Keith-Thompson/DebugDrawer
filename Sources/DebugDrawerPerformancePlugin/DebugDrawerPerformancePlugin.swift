@@ -138,6 +138,7 @@
 
     public struct PerformancePlugin: DebugDrawerPlugin {
         public var title = "Performance"
+        public var category = "Performance"
         public var icon = "gauge.with.dots.needle.33percent"
 
         public init() {}

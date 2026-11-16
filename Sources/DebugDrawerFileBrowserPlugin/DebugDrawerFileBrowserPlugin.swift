@@ -67,6 +67,7 @@
 
     public struct FileBrowserPlugin: DebugDrawerPlugin {
         public var title = "File Browser"
+        public var category = "Storage"
         public var icon = "folder"
 
         public init() {}

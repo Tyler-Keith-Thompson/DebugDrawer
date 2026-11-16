@@ -230,6 +230,7 @@
 
     public struct EnergyPlugin: DebugDrawerPlugin {
         public var title = "Energy"
+        public var category = "Performance"
         public var icon = "bolt.fill"
 
         public init() {}

@@ -102,6 +102,7 @@
 
     public struct LaunchTimePlugin: DebugDrawerPlugin {
         public var title = "Launch Time"
+        public var category = "Performance"
         public var icon = "timer"
 
         public init() {}

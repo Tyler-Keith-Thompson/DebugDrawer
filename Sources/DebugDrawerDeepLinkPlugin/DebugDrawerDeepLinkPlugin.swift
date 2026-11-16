@@ -11,6 +11,7 @@
 
     public struct DeepLinkPlugin: DebugDrawerPlugin {
         public var title = "Deep Link Tester"
+        public var category = "App"
         public var icon = "link"
 
         public init() {}

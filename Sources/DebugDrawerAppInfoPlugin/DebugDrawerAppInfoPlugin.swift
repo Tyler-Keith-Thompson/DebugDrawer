@@ -112,6 +112,7 @@
 
     public struct AppInfoPlugin: DebugDrawerPlugin {
         public var title = "App Info"
+        public var category = "App"
         public var icon = "info.circle"
 
         public init() {}

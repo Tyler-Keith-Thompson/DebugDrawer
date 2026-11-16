@@ -90,6 +90,7 @@
 
     public struct KeychainPlugin: DebugDrawerPlugin {
         public var title = "Keychain"
+        public var category = "Storage"
         public var icon = "key"
 
         public init() {}

@@ -165,6 +165,7 @@
 
     public struct LocationPlugin: DebugDrawerPlugin {
         public var title = "Location Simulator"
+        public var category = "App"
         public var icon = "location.circle"
 
         public init() {}

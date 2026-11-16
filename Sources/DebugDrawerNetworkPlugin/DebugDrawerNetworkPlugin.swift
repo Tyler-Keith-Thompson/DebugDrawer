@@ -270,6 +270,7 @@
 
     public struct NetworkPlugin: DebugDrawerPlugin {
         public var title = "Network"
+        public var category = "Logs & Network"
         public var icon = "network"
 
         public init() {}

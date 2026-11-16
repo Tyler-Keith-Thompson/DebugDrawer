@@ -6,6 +6,7 @@
 
     public struct CookiesPlugin: DebugDrawerPlugin {
         public var title = "HTTP Cookies"
+        public var category = "Logs & Network"
         public var icon = "doc.plaintext"
 
         public init() {}

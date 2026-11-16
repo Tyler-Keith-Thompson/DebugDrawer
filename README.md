@@ -62,6 +62,13 @@ DebugDrawer.shared.toggle()
 in `#if DEBUG`. The `DebugDrawerPlugin` protocol exists in every configuration, so conformances
 compile in release, and `.debugDrawer()` and `.debugLocalPlugin()` do nothing there.
 
+### Grouping, pinning and ordering
+
+The drawer lists global plugins by `category`, a string a plugin may declare; one that declares
+none is in `General`, listed last. Right-click a plugin's header (long-press on iOS) to pin it to
+the top or move it up or down its group. The drawer remembers pins, order and the plugin last used,
+and opens at that plugin after a relaunch.
+
 ### Searching plugins and actions
 
 The open drawer has a search field that finds plugins by title and runs the actions they declare.

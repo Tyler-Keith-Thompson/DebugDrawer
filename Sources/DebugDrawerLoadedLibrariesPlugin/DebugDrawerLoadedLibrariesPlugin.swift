@@ -107,6 +107,7 @@
 
     public struct LoadedLibrariesPlugin: DebugDrawerPlugin {
         public var title = "Loaded Libraries"
+        public var category = "App"
         public var icon = "books.vertical"
 
         public init() {}

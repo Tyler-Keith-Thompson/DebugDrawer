@@ -105,6 +105,7 @@
 
     public struct UserDefaultsPlugin: DebugDrawerPlugin {
         public var title = "UserDefaults"
+        public var category = "Storage"
         public var icon = "cylinder.split.1x2"
 
         public init() {}

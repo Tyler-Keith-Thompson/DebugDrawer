@@ -382,6 +382,7 @@
 
     public struct ViewInspectorPlugin: DebugDrawerPlugin {
         public var title = "View Inspector"
+        public var category = "Interface"
         public var icon = "rectangle.dashed"
 
         public init() {}

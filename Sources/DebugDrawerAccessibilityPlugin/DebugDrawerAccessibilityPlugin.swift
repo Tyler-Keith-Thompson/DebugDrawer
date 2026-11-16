@@ -117,6 +117,7 @@
 
     public struct AccessibilityPlugin: DebugDrawerPlugin {
         public var title = "Accessibility"
+        public var category = "Interface"
         public var icon = "accessibility"
 
         public init() {}
