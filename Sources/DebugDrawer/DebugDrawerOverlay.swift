@@ -22,39 +22,44 @@
         private let drawerWidth: CGFloat = 340
 
         var body: some View {
+            // The reader respects the safe area so its proxy reports the window's insets; the panel
+            // inside it ignores the safe area and pads by them, so it reaches the window's edges
+            // without sliding under the status bar.
             GeometryReader { geometry in
-                HStack(spacing: 0) {
-                    Spacer()
+                panelRow
+                    .padding(.drawerPanel(safeArea: geometry.safeAreaInsets))
+                    .ignoresSafeArea()
+            }
+            .onAppear { loadCollapsedState() }
+        }
 
-                    if drawer.isOpen {
-                        VStack(spacing: 0) {
-                            header
-                            searchField
-                            if !query.isEmpty {
-                                searchResults
-                            }
-                            Divider()
-                            content
+        private var panelRow: some View {
+            HStack(spacing: 0) {
+                Spacer()
+
+                if drawer.isOpen {
+                    VStack(spacing: 0) {
+                        header
+                        searchField
+                        if !query.isEmpty {
+                            searchResults
                         }
-                        // Cmd-K exists only inside the open drawer, so it never opens it (N2).
-                        .background {
-                            Button("Search Plugins") { searchFocused = true }
-                                .keyboardShortcut("k", modifiers: .command)
-                                .hidden()
-                        }
-                        .frame(width: drawerWidth)
-                        .background(.ultraThickMaterial)
-                        .clipShape(RoundedRectangle(cornerRadius: 10))
-                        .shadow(color: .black.opacity(0.25), radius: 12, x: -4)
-                        .padding(.top, max(8, geometry.safeAreaInsets.top))
-                        .padding(.bottom, max(8, geometry.safeAreaInsets.bottom))
-                        .padding(.trailing, 8)
-                        .transition(.move(edge: .trailing).combined(with: .opacity))
+                        Divider()
+                        content
                     }
+                    // Cmd-K exists only inside the open drawer, so it never opens it (N2).
+                    .background {
+                        Button("Search Plugins") { searchFocused = true }
+                            .keyboardShortcut("k", modifiers: .command)
+                            .hidden()
+                    }
+                    .frame(width: drawerWidth)
+                    .background(.ultraThickMaterial)
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                    .shadow(color: .black.opacity(0.25), radius: 12, x: -4)
+                    .transition(.move(edge: .trailing).combined(with: .opacity))
                 }
             }
-            .ignoresSafeArea()
-            .onAppear { loadCollapsedState() }
         }
 
         private var allPlugins: [AnyDebugDrawerPlugin] {
@@ -89,18 +94,11 @@
                     .font(.headline)
                     .accessibilityAddTraits(.isHeader)
                 Spacer()
-                Button {
-                    drawer.toggle()
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .foregroundStyle(.secondary)
-                        .accessibilityHidden(true)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Close the debug drawer")
+                DrawerCloseButton { drawer.toggle() }
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 10)
+            // The close button's 44 pt target supplies the header's height and trailing margin.
+            .padding(.leading, 14)
+            .padding(.trailing, 2)
         }
 
         // MARK: - Search
