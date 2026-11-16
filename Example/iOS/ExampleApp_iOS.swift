@@ -22,6 +22,7 @@ import DebugDrawerCrashReportsPlugin
 import DebugDrawerHangDetectorPlugin
 import DebugDrawerLeakDetectorPlugin
 import DebugDrawerMetricKitPlugin
+import DebugDrawerPermissionsPlugin
 import SwiftUI
 
 /// Demonstrates Send Report without a server: "sends" each report by copying it into the app's
@@ -66,6 +67,9 @@ struct DebugDrawerExampleiOSApp: App {
         if ProcessInfo.processInfo.arguments.contains(ExampleMetricKit.launchArgument) {
             ExampleMetricKit.addSamples()
         }
+        // Compiles in release too, where it does nothing and references no permission framework.
+        // The Info.plist declares a few usage descriptions, so the plugin has rows to show.
+        PrivacyPermissions.install()
         #if DEBUG
             DebugDrawer.shared.installConsole()
             DebugDrawer.shared.installNetwork()

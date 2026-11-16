@@ -14,5 +14,15 @@
     <string>APPL</string>
     <key>UILaunchScreen</key>
     <dict/>
+    <key>NSCameraUsageDescription</key>
+    <string>The example asks for the camera to show the Permissions plugin's Request button.</string>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>The example asks for the microphone to show the Permissions plugin's Request button.</string>
+    <key>NSPhotoLibraryUsageDescription</key>
+    <string>The example asks for the photo library to show the Permissions plugin's Request button.</string>
+    <key>NSLocationWhenInUseUsageDescription</key>
+    <string>The example asks for your location to show the Permissions plugin's Request button.</string>
+    <key>NSContactsUsageDescription</key>
+    <string>The example asks for contacts to show the Permissions plugin's Request button.</string>
 </dict>
 </plist>

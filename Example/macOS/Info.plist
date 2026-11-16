@@ -16,5 +16,13 @@
     <string>15.0</string>
     <key>NSPrincipalClass</key>
     <string>NSApplication</string>
+    <key>NSCameraUsageDescription</key>
+    <string>The example asks for the camera to show the Permissions plugin's Request button.</string>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>The example asks for the microphone to show the Permissions plugin's Request button.</string>
+    <key>NSLocationWhenInUseUsageDescription</key>
+    <string>The example asks for your location to show the Permissions plugin's Request button.</string>
+    <key>NSContactsUsageDescription</key>
+    <string>The example asks for contacts to show the Permissions plugin's Request button.</string>
 </dict>
 </plist>

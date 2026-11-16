@@ -291,7 +291,8 @@ DebugDrawer.shared.installLaunchTime()
 
 Each call needs its plugin's module imported (`import DebugDrawerConsolePlugin`, and so on).
 Tweaks takes the settings it shows and Feature Flags the adapter it reads, and Crash Reports,
-Hangs, Leaks and MetricKit install outside `#if DEBUG`, so each has a section of its own, next.
+Hangs, Leaks, MetricKit and Permissions install outside `#if DEBUG`, so each has a section of its
+own, next.
 
 ### Tweaks: the app's own debug settings
 
@@ -575,6 +576,55 @@ each new one. Opening one shows its JSON, indented with sorted keys and selectab
 and Export, which shares it as a `.json` file, and marks it seen. Mark All Seen clears the badge,
 and each payload can be deleted, or all of them. A bug report carries every payload as a JSON file.
 
+### Permissions: why the camera doesn't work
+
+The Permissions plugin lists every privacy permission the app's Info.plist declares a usage
+description for, with the status the system reports for it now:
+
+```swift
+import DebugDrawerPermissionsPlugin
+
+// At startup:
+PrivacyPermissions.install()
+```
+
+`PrivacyPermissions` exists in every configuration, so the call needs no `#if DEBUG`: in release
+it does nothing, and the plugin references none of the frameworks that report a status. In debug
+builds each permission shows its name, its status (Allowed, While Using, Limited, Denied,
+Restricted, Not Asked and so on, each with its own symbol and color), and the usage descriptions
+that declare it with their keys:
+
+| Permission | Keys | Platforms |
+|---|---|---|
+| Camera | `NSCameraUsageDescription` | iOS, macOS |
+| Microphone | `NSMicrophoneUsageDescription` | iOS, macOS |
+| Photos | `NSPhotoLibraryUsageDescription` | iOS, macOS |
+| Photos (Add Only) | `NSPhotoLibraryAddUsageDescription` | iOS, macOS |
+| Location | `NSLocationWhenInUseUsageDescription`, `NSLocationAlwaysAndWhenInUseUsageDescription`, `NSLocationAlwaysUsageDescription`, `NSLocationUsageDescription` | iOS, macOS |
+| Contacts | `NSContactsUsageDescription` | iOS, macOS |
+| Calendars | `NSCalendarsFullAccessUsageDescription`, `NSCalendarsWriteOnlyAccessUsageDescription`, `NSCalendarsUsageDescription` | iOS, macOS |
+| Reminders | `NSRemindersFullAccessUsageDescription`, `NSRemindersUsageDescription` | iOS, macOS |
+| Notifications | none needed | iOS, macOS |
+| Tracking | `NSUserTrackingUsageDescription` | iOS, macOS |
+| Motion & Fitness | `NSMotionUsageDescription` | iOS |
+| Speech Recognition | `NSSpeechRecognitionUsageDescription` | iOS, macOS |
+| Bluetooth | `NSBluetoothAlwaysUsageDescription`, `NSBluetoothPeripheralUsageDescription` | iOS, macOS |
+| Local Network | `NSLocalNetworkUsageDescription` (no status API: listed as declared) | iOS, macOS |
+| Media & Apple Music | `NSAppleMusicUsageDescription` | iOS |
+
+Notifications need no usage description, so every app may ask for them, and they are always
+listed. Any other `NS…UsageDescription` key (Face ID, HealthKit) is listed too, marked as not
+checked, and a key declared on a platform without the permission is marked as not on it.
+
+A status is read again each time the app becomes active, as it does on coming back from Settings
+or from a system prompt, when Location reports a change, and after a request; nothing polls.
+While the user hasn't decided, Request shows the system's prompt; a request that needs a key the
+Info.plist lacks (Calendars and Reminders with only the legacy key, Location without the
+when-in-use key) names the key instead. Open Settings opens the app's page in Settings on iOS
+(its notification settings for Notifications), and the permission's pane under Privacy & Security
+in System Settings on macOS. A bug report carries `permissions.txt`: each permission, its status
+and its keys.
+
 ### Opening the drawer
 
 The drawer doesn't decide how it opens. Call `DebugDrawer.shared.toggle()` from whatever trigger
@@ -689,6 +739,7 @@ ContentView()
 | `DebugDrawerHangDetectorPlugin` | Main-thread hangs over a threshold the drawer can change, each with its duration and the stack it was stuck on, a toast and a badge; MetricKit hang diagnostics too |
 | `DebugDrawerLeakDetectorPlugin` | View controllers still alive a run-loop turn after their screen was dismissed, and opted-in classes with more live instances than allowed, by class with a count, a toast and a badge |
 | `DebugDrawerMetricKitPlugin` | MetricKit's metric and diagnostic payloads, kept across launches and listed by date with a summary, each open as formatted JSON to copy or export; a toast and a badge for new ones |
+| `DebugDrawerPermissionsPlugin` | Every privacy permission the app declares in its Info.plist, with its live status, a button that asks when it is undecided and one that opens Settings |
 
 ## Development
 
