@@ -669,7 +669,7 @@
           "REPO_MAPPING:rules_swift_package_manager+,bazel_skylib bazel_skylib+",
           "REPO_MAPPING:rules_swift_package_manager+,bazel_tools bazel_tools",
           "REPO_MAPPING:rules_swift_package_manager+,cgrindel_bazel_starlib cgrindel_bazel_starlib+",
-          "FILE:@@//Package.resolved bd4e28f53d2efe016817b9740e3a76109293f49766ca8c1db8a87fb57d95cda1"
+          "FILE:@@//Package.resolved b51c0dd12beec3eade459e201ca3f4e03218f7e89914ffb18e7a35f09d98423a"
         ],
         "generatedRepoSpecs": {
           "swift_deps_info": {
@@ -678,7 +678,8 @@
               "direct_dep_pkg_infos": {
                 "@swiftpkg_oslogclient//:pkg_info.json": "oslogclient",
                 "@swiftpkg_dependencyinjection//:pkg_info.json": "dependencyinjection",
-                "@swiftpkg_mockable//:pkg_info.json": "mockable"
+                "@swiftpkg_mockable//:pkg_info.json": "mockable",
+                "@swiftpkg_viewinspector//:pkg_info.json": "viewinspector"
               }
             }
           },
@@ -722,6 +723,19 @@
               "commit": "bd20509c34ca3205003677747ad8dcb70d18b7ca",
               "remote": "https://github.com/Kolos65/Mockable",
               "version": "0.6.2",
+              "env": {},
+              "env_inherit": [],
+              "cached_json_directory": "",
+              "replace_scm_with_registry": false
+            }
+          },
+          "swiftpkg_viewinspector": {
+            "repoRuleId": "@@rules_swift_package_manager+//swiftpkg/internal:swift_package.bzl%swift_package",
+            "attributes": {
+              "bazel_package_name": "swiftpkg_viewinspector",
+              "commit": "2dacb6e514be19379c605a5a11564d0f3fea89d9",
+              "remote": "https://github.com/nalexn/ViewInspector",
+              "version": "0.10.5",
               "env": {},
               "env_inherit": [],
               "cached_json_directory": "",
@@ -786,6 +800,7 @@
             "swiftpkg_oslogclient",
             "swiftpkg_dependencyinjection",
             "swiftpkg_mockable",
+            "swiftpkg_viewinspector",
             "swift_deps_info",
             "swift_package"
           ],

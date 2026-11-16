@@ -21,6 +21,8 @@
         public var duration: TimeInterval?
         public var error: String?
         public var isComplete: Bool
+        /// Timing of the request's last transaction, from `URLSessionTaskMetrics`.
+        public var metrics: NetworkTimingMetrics?
 
         public var statusColor: Color {
             guard let code = statusCode else { return .secondary }
@@ -139,6 +141,11 @@
             entries[idx].isComplete = true
         }
 
+        func recordMetrics(id: UUID, metrics: NetworkTimingMetrics) {
+            guard let idx = entries.firstIndex(where: { $0.id == id }) else { return }
+            entries[idx].metrics = metrics
+        }
+
         public func clear() {
             entries.removeAll()
         }
@@ -221,6 +228,13 @@
         func urlSession(_: URLSession, dataTask _: URLSessionDataTask, didReceive data: Data) {
             responseData.append(data)
             client?.urlProtocol(self, didLoad: data)
+        }
+
+        func urlSession(_: URLSession, task _: URLSessionTask, didFinishCollecting metrics: URLSessionTaskMetrics) {
+            guard let id = entryId, let timing = NetworkTimingMetrics(metrics) else { return }
+            Task { @MainActor in
+                NetworkStore.shared.recordMetrics(id: id, metrics: timing)
+            }
         }
 
         func urlSession(_: URLSession, task _: URLSessionTask, didCompleteWithError error: Error?) {
@@ -438,6 +452,12 @@
                             }
                         }
                         .padding(4)
+                    }
+                }
+
+                if let metrics = entry.metrics {
+                    collapsibleSection("Timing") {
+                        NetworkTimingView(metrics: metrics)
                     }
                 }
 

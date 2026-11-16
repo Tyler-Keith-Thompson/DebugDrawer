@@ -10,5 +10,6 @@ swift_test(
         "//Sources/DebugDrawer",
         "//Sources/DebugDrawerNetworkPlugin",
         "@swiftpkg_mockable//:Mockable",
+        "@swiftpkg_viewinspector//:ViewInspector",
     ],
 )

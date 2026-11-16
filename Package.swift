@@ -29,6 +29,7 @@ let package = Package(
         // Test dependencies
         .package(url: "https://github.com/Tyler-Keith-Thompson/DependencyInjection", from: "1.0.12"),
         .package(url: "https://github.com/Kolos65/Mockable", from: "0.3.0"),
+        .package(url: "https://github.com/nalexn/ViewInspector", from: "0.10.0"),
     ],
     targets: [
         // ── Library targets ─────────────────────────────────────────
@@ -113,7 +114,7 @@ let package = Package(
                     path: "Tests/DebugDrawerPerformancePluginTests"),
         .testTarget(name: "DebugDrawerNetworkPluginTests",
                     dependencies: ["DebugDrawerNetworkPlugin", "DebugDrawer",
-],
+                                   .product(name: "ViewInspector", package: "ViewInspector")],
                     path: "Tests/DebugDrawerNetworkPluginTests"),
         .testTarget(name: "DebugDrawerKeychainPluginTests",
                     dependencies: ["DebugDrawerKeychainPlugin", "DebugDrawer"],
