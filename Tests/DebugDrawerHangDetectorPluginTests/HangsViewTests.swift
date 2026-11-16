@@ -1,5 +1,6 @@
 // ViewInspector is linked on Apple platforms only, and the views are tested on the Mac.
 #if os(macOS)
+    @testable import DebugDrawer
     @testable import DebugDrawerHangDetectorPlugin
     import Foundation
     import SwiftUI
@@ -84,7 +85,7 @@
             #expect(opened == [event.id])
         }
 
-        @Test("An open hang shows its stack and a button that copies the hang")
+        @Test("An open hang shows each frame of its stack, symbol and image, and a button that copies the hang")
         func expandedShowsFrames() throws {
             let event = HangEvent(
                 id: UUID(), date: Date(timeIntervalSince1970: 1_763_290_000), duration: .milliseconds(612),
@@ -94,9 +95,13 @@
                 events: [event], threshold: .constant(.milliseconds(250)), expanded: .constant(event.id),
                 onOpen: { _ in }, onMarkAllSeen: {}, onClear: {}
             )
-            let expected = "0 Example 0x1 block + 4\n1 Example 0x2 main + 8"
+            let expected = ["block", "main", "Example"]
 
-            let actual = try sut.inspect().find(text: expected).string()
+            let actual = try [
+                sut.inspect().find(text: "block").string(),
+                sut.inspect().find(text: "main").string(),
+                sut.inspect().find(text: "Example").string()
+            ]
 
             #expect(actual == expected)
             #expect(try sut.inspect().find(button: "Copy Report").labelView().text().string() == "Copy Report")
@@ -132,7 +137,7 @@
             #expect(throws: (any Error).self) { try sut.inspect().find(text: "0 Example 0x1") }
         }
 
-        @Test("An unopened hang is tagged New; an opened one isn't")
+        @Test("An unopened hang has an unread dot; an opened one hasn't")
         func newTag() throws {
             let unseen = HangEvent(
                 id: UUID(), date: Date(timeIntervalSince1970: 2), duration: .milliseconds(300), frames: [], source: .detected, isSeen: false
@@ -145,7 +150,7 @@
                 onOpen: { _ in }, onMarkAllSeen: {}, onClear: {}
             )
 
-            let actual = try sut.inspect().findAll(ViewType.Text.self, where: { try $0.string() == "New" })
+            let actual = try sut.inspect().findAll(DebugDrawerUnreadDot.self)
 
             #expect(actual.count == 1)
             #expect(try actual.first?.accessibilityLabel().string() == "New hang")
@@ -161,7 +166,7 @@
                 onOpen: { _ in }, onMarkAllSeen: {}, onClear: {}
             )
 
-            let actual = try sut.inspect().find(text: "612 ms").accessibilityLabel().string()
+            let actual = try sut.inspect().find(button: "612 ms").accessibilityLabel().string()
 
             #expect(actual == "Hung for 612 ms")
         }
@@ -241,6 +246,51 @@
 
             #expect(store.threshold == .milliseconds(500))
             #expect(thresholds == [.milliseconds(500)])
+        }
+
+        @Test("Frames in the app's executable are its own code, and the first of them is selected")
+        func ownCode() throws {
+            let event = HangEvent(
+                id: UUID(), date: Date(timeIntervalSince1970: 1), duration: .milliseconds(612),
+                frames: [
+                    "0 libsystem_kernel.dylib 0x00000001842b5f30 __semwait_signal + 8",
+                    "1 Example 0x0000000100004a1c $s7Example5blockyyF + 48",
+                    "2 Example 0x0000000100004b00 main + 8"
+                ],
+                source: .detected, isSeen: true
+            )
+            let sut = HangsView(
+                events: [event], threshold: .constant(.milliseconds(250)), expanded: .constant(event.id), ownImage: "Example",
+                onOpen: { _ in }, onMarkAllSeen: {}, onClear: {}
+            )
+            let expectedOwn = [false, true, true]
+            let expectedSelected = [false, true, false]
+            let expectedSymbols = ["__semwait_signal", "$s7Example5blockyyF", "main"]
+
+            let rows = try sut.inspect().findAll(DebugDrawerStackFrameRow.self).map { try $0.actualView() }
+
+            #expect(rows.map(\.isOwnCode) == expectedOwn)
+            #expect(rows.map(\.isSelected) == expectedSelected)
+            #expect(rows.map(\.symbol) == expectedSymbols)
+        }
+
+        @Test("The header counts the hangs with a warning glyph, following the store, and shows nothing without one")
+        func headerAccessory() throws {
+            let store = HangStore(threshold: .milliseconds(250))
+            let sut = HangDetectorPlugin(store: store, ownImage: "Example")
+            let expected = "2 warnings"
+
+            #expect(throws: (any Error).self) { try sut.headerAccessory.inspect().find(DebugDrawerIssueCount.self) }
+            for milliseconds in [300, 400] {
+                store.add(HangEvent(
+                    id: UUID(), date: Date(timeIntervalSince1970: 1), duration: .milliseconds(milliseconds),
+                    frames: [], source: .detected, isSeen: false
+                ))
+            }
+            let actual = try sut.headerAccessory.inspect().find(DebugDrawerIssueCount.self).actualView()
+
+            #expect(actual.severity == .warning)
+            #expect(actual.spokenLabel == expected)
         }
     }
 #endif

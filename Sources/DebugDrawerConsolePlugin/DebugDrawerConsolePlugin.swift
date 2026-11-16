@@ -21,13 +21,13 @@
         public enum Level: Comparable, Sendable {
             case debug, info, notice, error, fault
 
-            var color: Color {
+            /// The issue glyph a line of this level carries: an error for an error or a fault, none
+            /// otherwise. os_log has no warning level (`Logger.warning` logs at the error level),
+            /// so no level draws the warning glyph.
+            var severity: DebugDrawerIssueGlyph.Severity? {
                 switch self {
-                case .debug: .secondary
-                case .info: .primary
-                case .notice: .primary
-                case .error: .red
-                case .fault: .red
+                case .error, .fault: .error
+                case .debug, .info, .notice: nil
                 }
             }
 
@@ -223,6 +223,35 @@
         public var body: some View {
             ConsolePluginView()
         }
+
+        /// How many lines the console holds.
+        public var headerAccessory: some View {
+            ConsoleHeaderAccessoryView()
+        }
+    }
+
+    /// The Console plugin's header accessory, read from the shared store as the plugin's body
+    /// reads it.
+    struct ConsoleHeaderAccessoryView: View {
+        @ObservedObject private var store = ConsoleLogStore.shared
+
+        var body: some View {
+            ConsoleHeaderSummary(lineCount: store.lines.count)
+        }
+    }
+
+    /// How many lines the console holds ("1,204 lines").
+    struct ConsoleHeaderSummary: View {
+        let lineCount: Int
+
+        /// The count as the header shows it.
+        var text: String {
+            lineCount == 1 ? "1 line" : "\(lineCount.formatted()) lines"
+        }
+
+        var body: some View {
+            Text(text)
+        }
     }
 
     // MARK: - Console view (proper SwiftUI View so @ObservedObject works)
@@ -240,91 +269,58 @@
         }
 
         var body: some View {
-            VStack(alignment: .leading, spacing: 6) {
-                // Search field
+            VStack(alignment: .leading, spacing: 0) {
                 TextField("Search logs...", text: $searchText)
-                    .textFieldStyle(.roundedBorder)
-                    .controlSize(.small)
+                    .debugDrawerTextFieldStyle()
                     .accessibilityLabel("Search logs")
 
                 // Toolbar — filter picker is in its own view to avoid
                 // re-creating the NSSegmentedControl on every log batch.
                 ConsoleToolbarView(
-                    lineCount: visibleLines.count,
                     isFollowing: $isFollowing,
                     filterLevel: $store.filterLevel,
                     copyAll: { debugDrawerCopyToClipboard(visibleLines.copiedText) },
                     clear: { store.clear() }
                 )
 
-                ConsoleTextView(
-                    lines: visibleLines,
-                    isFollowing: $isFollowing
-                )
-                .frame(minHeight: 120, maxHeight: 300)
-                .clipShape(RoundedRectangle(cornerRadius: 4))
+                DebugDrawerCodeBlock {
+                    ConsoleTextView(
+                        lines: visibleLines,
+                        isFollowing: $isFollowing
+                    )
+                    .frame(minHeight: 120, maxHeight: 300)
+                }
             }
         }
     }
 
     /// Extracted toolbar so the segmented picker doesn't get rebuilt on every log update.
-    /// Only `lineCount` and `isFollowing` change frequently — the picker binding
-    /// (`filterLevel`) is stable and won't cause the NSSegmentedControl to be recreated.
+    /// Only `isFollowing` changes frequently — the picker binding (`filterLevel`) is stable and
+    /// won't cause the NSSegmentedControl to be recreated. The line count is the header's
+    /// accessory, so the toolbar doesn't repeat it.
     struct ConsoleToolbarView: View {
-        let lineCount: Int
         @Binding var isFollowing: Bool
         @Binding var filterLevel: LogLine.Level
         let copyAll: () -> Void
         let clear: () -> Void
-        @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
         var body: some View {
-            // At accessibility sizes one row can't hold the count and every control, and squeezing
-            // it breaks words, so the count takes its own line and the controls wrap below it.
-            if dynamicTypeSize.isAccessibilitySize {
-                VStack(alignment: .leading, spacing: 6) {
-                    summary
-                    ViewThatFits(in: .horizontal) {
-                        HStack(spacing: 12) { controls }
-                        VStack(alignment: .leading, spacing: 6) { controls }
-                    }
-                }
-            } else {
-                HStack(spacing: 8) {
-                    summary
-                    Spacer()
-                    controls
-                }
-            }
-        }
-
-        private var summary: some View {
-            HStack(spacing: 8) {
-                Text("\(lineCount) lines")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+            // The action row wraps what doesn't fit one line, and stacks at accessibility sizes.
+            DebugDrawerActionRow {
+                ConsoleFilterPicker(filterLevel: $filterLevel)
 
                 if !isFollowing {
                     Button("Resume") { isFollowing = true }
-                        .font(.caption)
-                        .buttonStyle(.plain)
-                        .foregroundStyle(Color.accentColor)
+                        .debugDrawerButtonStyle(.borderless)
+                        .accessibilityHint("Scrolls to the newest line and follows new ones")
                 }
+
+                Button("Copy All", action: copyAll)
+            } trailing: {
+                Button("Clear", role: .destructive, action: clear)
+                    .debugDrawerButtonStyle(.destructive)
+                    .accessibilityLabel("Clear the console")
             }
-        }
-
-        @ViewBuilder private var controls: some View {
-            ConsoleFilterPicker(filterLevel: $filterLevel)
-
-            Button("Copy All", action: copyAll)
-                .font(.caption)
-                .buttonStyle(.plain)
-                .foregroundStyle(.secondary)
-
-            Button("Clear", action: clear)
-                .font(.caption)
-                .buttonStyle(.plain)
-                .foregroundStyle(.secondary)
         }
     }
 
@@ -343,8 +339,7 @@
             .labelsHidden()
             .accessibilityLabel("Lowest level shown")
             .accessibilityElement(children: .contain)
-            .frame(width: 160)
-            .controlSize(.mini)
+            .fixedSize()
         }
     }
 

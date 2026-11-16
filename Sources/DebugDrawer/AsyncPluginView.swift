@@ -38,8 +38,8 @@
                         ProgressView()
                             .controlSize(.small)
                         Text("Loading...")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .debugDrawerFont(.secondary)
+                            .debugDrawerForegroundStyle(.secondary)
                     }
                     .frame(maxWidth: .infinity, alignment: .center)
                     .padding(.vertical, 8)
@@ -87,15 +87,14 @@
                         ProgressView()
                             .controlSize(.small)
                         Text("Loading...")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .debugDrawerFont(.secondary)
+                            .debugDrawerForegroundStyle(.secondary)
                     }
                     .frame(maxWidth: .infinity, alignment: .center)
                     .padding(.vertical, 8)
                 } else {
                     Button(loadLabel) { load() }
-                        .buttonStyle(.bordered)
-                        .controlSize(.small)
+                        .debugDrawerButtonStyle(.secondary)
                         .frame(maxWidth: .infinity, alignment: .center)
                         .padding(.vertical, 4)
                 }

@@ -1,4 +1,5 @@
 #if DEBUG
+    import DebugDrawer
     import SwiftUI
 
     /// The tweaks in their sections, then a button that resets every tweak to its default.
@@ -11,18 +12,14 @@
         let onResetAll: () -> Void
 
         var body: some View {
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: 0) {
                 if sections.allSatisfy(\.rows.isEmpty) {
                     Text("No tweaks declared")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .debugDrawerFont(.secondary)
+                        .debugDrawerForegroundStyle(.secondary)
                 } else {
                     ForEach(sections) { section in
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(section.title)
-                                .font(.caption.weight(.semibold))
-                                .foregroundStyle(.secondary)
-                                .accessibilityAddTraits(.isHeader)
+                        DebugDrawerSection(section.title) {
                             ForEach(section.rows) { row in
                                 TweakRow(
                                     row: row,
@@ -31,14 +28,16 @@
                                 )
                             }
                         }
-                        Divider()
                     }
 
-                    Button("Reset All", action: onResetAll)
-                        .buttonStyle(.bordered)
-                        .controlSize(.small)
-                        .disabled(!sections.contains { $0.rows.contains(where: \.isModified) })
-                        .accessibilityHint("Resets every tweak to its default")
+                    DebugDrawerActionRow {
+                        EmptyView()
+                    } trailing: {
+                        Button("Reset All", role: .destructive, action: onResetAll)
+                            .debugDrawerButtonStyle(.destructive)
+                            .disabled(!sections.contains { $0.rows.contains(where: \.isModified) })
+                            .accessibilityHint("Resets every tweak to its default")
+                    }
                 }
             }
         }

@@ -61,7 +61,7 @@
             }
         }
 
-        /// How far the status lets the app go, which picks its symbol and color.
+        /// How far the status lets the app go, which picks its tone.
         var grant: Grant {
             switch self {
             case .authorized, .authorizedAlways, .authorizedWhenInUse: .granted
@@ -74,17 +74,6 @@
 
         enum Grant {
             case granted, partial, refused, undecided, unknown
-
-            /// An SF Symbol, distinct per grant, so the status reads without its color.
-            var symbol: String {
-                switch self {
-                case .granted: "checkmark.circle.fill"
-                case .partial: "circle.lefthalf.filled"
-                case .refused: "xmark.circle.fill"
-                case .undecided: "questionmark.circle"
-                case .unknown: "minus.circle"
-                }
-            }
         }
     }
 #endif

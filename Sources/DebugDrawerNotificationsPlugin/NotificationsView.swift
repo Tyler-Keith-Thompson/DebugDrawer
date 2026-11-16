@@ -15,7 +15,8 @@
         let actions: NotificationsActions
 
         var body: some View {
-            VStack(alignment: .leading, spacing: 14) {
+            // Sections pad themselves, so they stack with no spacing.
+            VStack(alignment: .leading, spacing: 0) {
                 DeviceTokenSection(registration: registration, redaction: redaction)
                 switch center {
                 case .loading:
@@ -23,9 +24,10 @@
                         ProgressView()
                             .controlSize(.small)
                         Text("Reading the notification center…")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .debugDrawerFont(.secondary)
+                            .debugDrawerForegroundStyle(.secondary)
                     }
+                    .padding(.top, 8)
                     .accessibilityElement(children: .combine)
                 case let .loaded(snapshot):
                     AuthorizationSection(

@@ -17,7 +17,7 @@
             Button(action: toggle) {
                 PluginHeaderLabel(plugin: plugin, isExpanded: isExpanded, isPinned: isPinned, badge: badge)
             }
-            .buttonStyle(.plain)
+            .debugDrawerButtonStyle(.plain)
             #if os(tvOS)
                 // The focused header grows and lifts on a platter; the space keeps it off the
                 // rows above and below.

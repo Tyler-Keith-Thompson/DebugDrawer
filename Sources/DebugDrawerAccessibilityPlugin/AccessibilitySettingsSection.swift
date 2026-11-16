@@ -1,4 +1,5 @@
 #if DEBUG
+    import DebugDrawer
     import SwiftUI
 
     // MARK: - System accessibility settings
@@ -16,10 +17,9 @@
 
         let system: SystemValues
         @ObservedObject var overrides = AccessibilityOverrides.shared
-        @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
         var body: some View {
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 0) {
                 row("Reduce Motion", system: system.reduceMotion, override: $overrides.reduceMotion)
                 row("Increase Contrast", system: system.increaseContrast, override: $overrides.increaseContrast)
                 row("Bold Text", system: system.boldText, override: $overrides.boldText)
@@ -31,23 +31,11 @@
             }
         }
 
-        // At accessibility text sizes the name and the picker don't fit side by side, so the
-        // picker sits below the name.
+        // DebugDrawerRow moves the picker below the name at accessibility text sizes.
         private func row(_ title: String, system: Bool, override: Binding<Bool?>) -> some View {
-            let layout = dynamicTypeSize.isAccessibilitySize
-                ? AnyLayout(VStackLayout(alignment: .leading, spacing: 4))
-                : AnyLayout(HStackLayout(spacing: 6))
-            return layout {
-                VStack(alignment: .leading, spacing: 0) {
-                    Text(title)
-                        .font(.caption2)
-                    Text("System: \(system ? "On" : "Off")")
-                        .font(.system(.caption2, design: .monospaced))
-                        .foregroundStyle(.secondary)
-                }
-                if !dynamicTypeSize.isAccessibilitySize {
-                    Spacer()
-                }
+            DebugDrawerRow(title) {
+                Text("System: \(system ? "On" : "Off")")
+            } accessory: {
                 Picker(title, selection: Binding(
                     get: { override.wrappedValue.map { $0 ? 1 : 2 } ?? 0 },
                     set: { override.wrappedValue = $0 == 0 ? nil : $0 == 1 }
@@ -57,8 +45,6 @@
                     Text("Off").tag(2)
                 }
                 .pickerStyle(.segmented)
-                .labelsHidden()
-                .controlSize(.mini)
                 .fixedSize()
                 .accessibilityLabel(title)
                 .accessibilityElement(children: .contain)

@@ -25,8 +25,8 @@
                 let list = FeatureFlagList(rows, query: query, overriddenOnly: isOverriddenOnly)
                 if list == .noFlags {
                     Text("The provider lists no flags")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .debugDrawerFont(.secondary)
+                        .debugDrawerForegroundStyle(.secondary)
                 } else {
                     filters
                     // The field stays while nothing matches, so the search can be changed.
@@ -38,13 +38,12 @@
                                     onOverride: { onOverride(row.id, $0) },
                                     onClear: { onClear(row.id) }
                                 )
-                                Divider()
                             }
                         } else {
                             Text(isOverriddenOnly && query.isEmpty ? "No flag is overridden" : "No flag matches")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                                .padding(6)
+                                .debugDrawerFont(.secondary)
+                                .debugDrawerForegroundStyle(.secondary)
+                                .debugDrawerRowPadding()
                         }
                     }
                 }
@@ -58,26 +57,26 @@
                 Toggle("Overridden only", isOn: $isOverriddenOnly)
                     .toggleStyle(.switch)
                     .controlSize(.small)
-                    .font(.caption)
+                    .debugDrawerFont(.body)
                 if !dynamicTypeSize.isAccessibilitySize {
                     Spacer()
                 }
                 Text(overrideCount == 1 ? "1 override" : "\(overrideCount) overrides")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
+                    .debugDrawerFont(.value)
+                    .debugDrawerForegroundStyle(.secondary)
             }
         }
 
         private var buttons: some View {
-            stacked {
+            DebugDrawerActionRow {
                 Button("Refresh", action: onRefresh)
                     .accessibilityHint("Reads the flags and their live values again")
-                Button("Reset All", action: onClearAll)
+            } trailing: {
+                Button("Reset All", role: .destructive, action: onClearAll)
+                    .debugDrawerButtonStyle(.destructive)
                     .disabled(overrideCount == 0)
                     .accessibilityHint("Clears every override, so each flag reads its live value")
             }
-            .buttonStyle(.bordered)
-            .controlSize(.small)
         }
 
         /// Side by side, or one above the other at accessibility text sizes, where side by side

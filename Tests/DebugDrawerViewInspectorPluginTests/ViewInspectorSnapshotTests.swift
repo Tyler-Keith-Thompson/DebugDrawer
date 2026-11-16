@@ -14,7 +14,7 @@
     @MainActor
     @Suite(.timeLimit(.minutes(1)))
     struct ViewInspectorSnapshotTests {
-        @Test("The render counts list each view type, colored green, orange or red by count", arguments: [ColorScheme.light, .dark])
+        @Test("The render counts list each view type with an OK, warning or error glyph by count", arguments: [ColorScheme.light, .dark])
         func renderCounts(colorScheme: ColorScheme) throws {
             let rendered = Date(timeIntervalSinceReferenceDate: 800_000_000)
             let entries = [

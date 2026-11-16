@@ -2,91 +2,52 @@
     import DebugDrawer
     import SwiftUI
 
-    /// One permission: its name and status, the usage descriptions that declare it, what the
-    /// status means where it needs saying, and its buttons.
+    /// One permission as an issue row: its glyph and name with its status ("Camera — Denied"), the
+    /// key of the usage description that declares it, its text, what the status means where it
+    /// needs saying, and its buttons.
     struct PermissionRow: View {
         let row: PermissionRowState
         let onRequest: () -> Void
         let onOpenSettings: () -> Void
-        @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-        @ScaledMetric(relativeTo: .caption) private var iconWidth: CGFloat = 18
 
         var body: some View {
-            VStack(alignment: .leading, spacing: 6) {
-                HStack(alignment: .firstTextBaseline, spacing: 6) {
-                    Image(systemName: row.permission.kind.icon)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .frame(width: iconWidth)
-                        .accessibilityHidden(true)
-                    VStack(alignment: .leading, spacing: 2) {
-                        titleLine
-                        details
-                    }
-                }
-                .accessibilityElement(children: .combine)
-                buttons
-                    .padding(.leading, iconWidth + 6)
-            }
-            .padding(.vertical, 2)
-        }
-
-        /// The name and the status: side by side, or one above the other at accessibility text
-        /// sizes.
-        private var titleLine: some View {
-            let layout = dynamicTypeSize.isAccessibilitySize
-                ? AnyLayout(VStackLayout(alignment: .leading, spacing: 2))
-                : AnyLayout(HStackLayout(alignment: .firstTextBaseline, spacing: 6))
-            return layout {
-                Text(row.permission.kind.title)
-                    .font(.caption.weight(.semibold))
-                if !dynamicTypeSize.isAccessibilitySize {
-                    Spacer(minLength: 4)
-                }
-                PermissionStatusLabel(status: row.status)
+            DebugDrawerIssueRow(
+                row.permission.kind.title,
+                status: row.status.title,
+                severity: row.status.grant.severity,
+                subline: row.permission.usageDescriptions.first?.key
+            ) {
+                details
             }
         }
 
         @ViewBuilder private var details: some View {
             if row.permission.usageDescriptions.isEmpty {
                 Text("Needs no usage description.")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
             }
-            ForEach(row.permission.usageDescriptions, id: \.key) { description in
-                VStack(alignment: .leading, spacing: 0) {
-                    Text(description.text)
-                        .font(.caption)
-                    Text(description.key)
-                        .font(.system(.caption2, design: .monospaced))
-                        .foregroundStyle(.secondary)
+            ForEach(Array(row.permission.usageDescriptions.enumerated()), id: \.element.key) { index, description in
+                // The first key is the row's subline; any others follow their own text.
+                if index > 0 {
+                    DebugDrawerCodeText(description.key)
                 }
-                .fixedSize(horizontal: false, vertical: true)
+                Text(description.text)
             }
             if let explanation = row.status.explanation {
                 Text(explanation)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
             }
             if case let .needsKey(key) = row.request {
-                Text("Asking needs \(key) in the Info.plist.")
-                    .font(.caption2)
-                    .foregroundStyle(.orange)
-                    .fixedSize(horizontal: false, vertical: true)
+                Label {
+                    Text("Asking needs \(key) in the Info.plist.")
+                } icon: {
+                    DebugDrawerIssueGlyph(.warning)
+                        .accessibilityHidden(true)
+                }
             }
-        }
-
-        /// Request, while it can be asked for, and Open Settings: side by side, or one above the
-        /// other at accessibility text sizes.
-        private var buttons: some View {
-            let layout = dynamicTypeSize.isAccessibilitySize
-                ? AnyLayout(VStackLayout(alignment: .leading, spacing: 6))
-                : AnyLayout(HStackLayout())
-            return layout {
+            DebugDrawerActionRow {
                 switch row.request {
                 case .available:
                     Button("Request", action: onRequest)
+                        .debugDrawerButtonStyle(.primary)
                         .accessibilityLabel("Request \(row.permission.kind.title) access")
                         .accessibilityHint("Shows the system's prompt")
                 case .inProgress:
@@ -94,7 +55,6 @@
                         ProgressView()
                             .controlSize(.small)
                         Text("Asking…")
-                            .font(.caption)
                     }
                     .accessibilityElement(children: .combine)
                     .accessibilityLabel("Asking for \(row.permission.kind.title) access")
@@ -102,10 +62,33 @@
                     EmptyView()
                 }
                 Button("Open Settings", action: onOpenSettings)
+                    .debugDrawerButtonStyle(row.request.isOffered ? .borderless : .secondary)
                     .accessibilityLabel("Open Settings for \(row.permission.kind.title)")
             }
-            .buttonStyle(.bordered)
-            .controlSize(.small)
+        }
+    }
+
+    extension PermissionRequest {
+        /// Whether the row offers Request (or is asking): Open Settings then steps back to a
+        /// borderless link beside the primary button, so a column of undecided rows isn't a wall
+        /// of push buttons.
+        fileprivate var isOffered: Bool {
+            switch self {
+            case .available, .inProgress: true
+            case .needsKey, .unavailable: false
+            }
+        }
+    }
+
+    extension PermissionStatus.Grant {
+        /// The issue glyph for how far a status lets the app go.
+        fileprivate var severity: DebugDrawerIssueGlyph.Severity {
+            switch self {
+            case .granted: .ok
+            case .partial: .warning
+            case .refused: .error
+            case .undecided, .unknown: .neutral
+            }
         }
     }
 #endif

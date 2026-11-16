@@ -103,9 +103,12 @@
                 XCTAssertTrue(texts.contains(label), "missing \(label) in \(texts)")
             }
             XCTAssertTrue(texts.contains("139.0ms"), "TTFB duration missing in \(texts)")
-            XCTAssertTrue(texts.contains("Protocol: h2"))
-            XCTAssertTrue(texts.contains("Reused connection: Yes"))
-            XCTAssertTrue(texts.contains("Cache hit: No"))
+            XCTAssertTrue(texts.contains("Protocol"))
+            XCTAssertTrue(texts.contains("h2"))
+            XCTAssertTrue(texts.contains("Reused"))
+            XCTAssertTrue(texts.contains("Yes"))
+            XCTAssertTrue(texts.contains("Cache hit"))
+            XCTAssertTrue(texts.contains("No"))
         }
 
         func testDetailOmitsPhasesWithNilIntervals() throws {
@@ -125,8 +128,8 @@
             XCTAssertTrue(texts.contains("Request"))
             XCTAssertTrue(texts.contains("TTFB"))
             XCTAssertTrue(texts.contains("Response"))
-            XCTAssertTrue(texts.contains("Protocol: —"))
-            XCTAssertTrue(texts.contains("Cache hit: Yes"))
+            XCTAssertTrue(texts.contains("—"))
+            XCTAssertTrue(texts.contains("Yes"))
         }
 
         private func texts(in view: NetworkTimingView) throws -> [String] {

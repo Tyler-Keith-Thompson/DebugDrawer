@@ -31,7 +31,6 @@
         func chrome() throws {
             let sut = VStack(spacing: 0) {
                 DrawerHeader(isReportInProgress: false, createReport: {}, close: {})
-                DrawerSectionHeader(title: "Pinned")
                 PluginSectionHeader(
                     plugin: AnyDebugDrawerPlugin(SnapshotLibrariesPlugin()),
                     isExpanded: true,
@@ -40,7 +39,6 @@
                     isMovable: true,
                     toggle: {}
                 )
-                DrawerSectionHeader(title: "Diagnostics")
                 PluginSectionHeader(
                     plugin: AnyDebugDrawerPlugin(SnapshotOverridesPlugin()),
                     isExpanded: false,
@@ -65,6 +63,9 @@
             // Hosted in a window that is never shown and drawn from its layer, so the buttons draw
             // as they do in the drawer; its height is what the chrome asks for at this width.
             let controller = UIHostingController(rootView: sut)
+            // No safe area: the window's status bar inset would lay the view out shorter than it
+            // measured, overlapping its rows.
+            controller.safeAreaRegions = []
             let fitted = controller.sizeThatFits(in: CGSize(width: 340, height: CGFloat.greatestFiniteMagnitude))
             let size = CGSize(width: 340, height: fitted.height.rounded(.up))
             let scene = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first

@@ -12,53 +12,34 @@
         @Environment(\.locale) private var locale
         @Environment(\.timeZone) private var timeZone
         /// The tallest `userInfo` gets before it scrolls: a payload runs to 4 KB.
-        @ScaledMetric(relativeTo: .caption2) private var userInfoHeight: CGFloat = 160
+        @ScaledMetric(relativeTo: .body) private var userInfoHeight: CGFloat = 160
 
         var body: some View {
-            VStack(alignment: .leading, spacing: 4) {
-                HStack(alignment: .firstTextBaseline, spacing: 6) {
-                    content
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .accessibilityElement(children: .combine)
-                    Button(action: onRemove) {
-                        Label("Remove", systemImage: "trash")
-                            .labelStyle(.iconOnly)
-                    }
-                    .buttonStyle(.borderless)
-                    .controlSize(.small)
-                    .accessibilityLabel("Remove \(notification.displayName)")
-                }
+            DebugDrawerRow(notification.displayName, systemImage: notification.deliveredAt == nil ? "clock" : "bell") {
+                content
                 if !notification.userInfo.text.isEmpty {
                     userInfo
                 }
+            } accessory: {
+                Button(role: .destructive, action: onRemove) {
+                    Label("Remove", systemImage: "trash")
+                        .labelStyle(.iconOnly)
+                }
+                .debugDrawerButtonStyle(.borderless)
+                .accessibilityLabel("Remove \(notification.displayName)")
             }
-            .padding(.vertical, 2)
         }
 
-        private var content: some View {
-            VStack(alignment: .leading, spacing: 2) {
-                if !notification.title.isEmpty {
-                    Text(notification.title)
-                        .font(.caption.weight(.semibold))
-                }
-                if !notification.subtitle.isEmpty {
-                    Text(notification.subtitle)
-                        .font(.caption)
-                }
-                if !notification.body.isEmpty {
-                    Text(notification.body)
-                        .font(.caption)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                Text(notification.id)
-                    .font(.system(.caption2, design: .monospaced))
-                    .foregroundStyle(.secondary)
-                    .textSelection(.enabled)
-                Text(details)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+        /// The subtitle, the body when the title names the row, the identifier and the details.
+        @ViewBuilder private var content: some View {
+            if !notification.subtitle.isEmpty {
+                Text(notification.subtitle)
             }
+            if !notification.title.isEmpty, !notification.body.isEmpty {
+                Text(notification.body)
+            }
+            DebugDrawerCodeText(notification.id)
+            Text(details)
         }
 
         /// When it was delivered, or what delivers it; then its category, thread and badge.
@@ -78,16 +59,15 @@
         }
 
         private var userInfo: some View {
-            ScrollView([.horizontal, .vertical]) {
-                RedactedText(notification.userInfo.text, redacted: notification.redactedUserInfo(redaction))
-                    .font(.system(.caption2, design: .monospaced))
-                    .fixedSize()
-                    .padding(6)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+            DebugDrawerCodeBlock {
+                ScrollView([.horizontal, .vertical]) {
+                    RedactedText(notification.userInfo.text, redacted: notification.redactedUserInfo(redaction))
+                        .fixedSize()
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .frame(maxHeight: userInfoHeight)
+                .fixedSize(horizontal: false, vertical: true)
             }
-            .frame(maxHeight: userInfoHeight)
-            .fixedSize(horizontal: false, vertical: true)
-            .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 4))
         }
     }
 #endif

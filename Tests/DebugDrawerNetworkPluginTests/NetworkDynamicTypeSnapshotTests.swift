@@ -82,7 +82,7 @@
             assertSnapshot(of: actual, as: .image(perceptualPrecision: 0.98), named: "accessibility3")
         }
 
-        @Test("The timing waterfall stays readable at a large accessibility text size")
+        @Test("The timing gauges stay readable at a large accessibility text size")
         func timing() throws {
             let metrics = NetworkTimingMetrics(
                 phases: [

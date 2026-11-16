@@ -26,36 +26,31 @@
     struct ViewInspectorPluginView: View {
         @ObservedObject private var controller = ViewBorderController.shared
         @ObservedObject private var renderTracker = RenderTracker.shared
-        @ObservedObject private var inspectorTool = InspectorToolController.shared
         @State private var hierarchy: ViewNode?
         @State private var isHierarchyExpanded = false
         @State private var searchText = ""
         @State private var debugger3DRequest: ViewDebugger3DRequest?
 
         var body: some View {
-            VStack(alignment: .leading, spacing: 8) {
-                // --- Visual overlays ---
-                Toggle("View Borders", isOn: $controller.isBordersEnabled)
-                    .toggleStyle(.switch)
-                    .controlSize(.small)
-
-                Toggle("Alignment Grid", isOn: $controller.isGridEnabled)
-                    .toggleStyle(.switch)
-                    .controlSize(.small)
+            DebugDrawerSection("Overlays") {
+                DebugDrawerRow("View Borders", isOn: $controller.isBordersEnabled)
+                DebugDrawerRow("Alignment Grid", isOn: $controller.isGridEnabled)
 
                 if controller.isGridEnabled {
-                    HStack(spacing: 6) {
-                        Text("\(Int(controller.gridSpacing))pt")
-                            .font(.system(.caption2, design: .monospaced))
-                            .foregroundStyle(.secondary)
-                            .frame(width: 28)
+                    DebugDrawerRow("Grid Spacing") {
                         Slider(value: $controller.gridSpacing, in: 4 ... 32, step: 4)
-                            .controlSize(.small)
                             .accessibilityLabel("Grid spacing")
                             .accessibilityValue("\(Int(controller.gridSpacing)) points")
+                    } accessory: {
+                        Text("\(Int(controller.gridSpacing)) pt")
+                            .debugDrawerFont(.value)
+                            .accessibilityHidden(true)
+                    }
 
+                    DebugDrawerRow("Grid Color") {
                         Picker("Grid color", selection: $controller.gridColor) {
                             ForEach(ViewBorderController.GridColor.allCases, id: \.self) { gridColor in
+                                // Each segment shows the grid's own color, the choice it makes.
                                 Circle()
                                     .fill(gridColor.color)
                                     .frame(width: 8, height: 8)
@@ -64,84 +59,55 @@
                             }
                         }
                         .pickerStyle(.segmented)
-                        .labelsHidden()
-                        .frame(width: 100)
-                        .controlSize(.mini)
+                        .fixedSize()
                         .accessibilityLabel("Grid color")
                         .accessibilityElement(children: .contain)
                     }
 
-                    HStack {
-                        Text("Opacity")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                    DebugDrawerRow("Grid Opacity") {
                         Slider(value: $controller.gridOpacity, in: 0.05 ... 0.5)
-                            .controlSize(.small)
                             .accessibilityLabel("Grid opacity")
+                    } accessory: {
+                        Text(controller.gridOpacity, format: .percent.precision(.fractionLength(0)))
+                            .debugDrawerFont(.value)
+                            .accessibilityHidden(true)
                     }
                 }
 
-                Toggle("Click Indicators", isOn: $controller.isClickIndicatorEnabled)
-                    .toggleStyle(.switch)
-                    .controlSize(.small)
+                DebugDrawerRow("Click Indicators", isOn: $controller.isClickIndicatorEnabled)
+            }
 
-                Divider()
-
-                Divider()
-
-                // --- Animation speed ---
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack {
-                        Text("Animation Speed")
-                            .font(.caption.weight(.medium))
-                        Spacer()
-                        Text(controller.animationSpeed == 1.0 ? "Normal" : "\(controller.animationSpeed, specifier: "%.1f")x")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
+            DebugDrawerSection("Animation") {
+                DebugDrawerRow("Animation Speed") {
                     Slider(value: $controller.animationSpeed, in: 1 ... 10, step: 0.5)
-                        .controlSize(.small)
                         .accessibilityLabel("Animation speed")
+                } accessory: {
+                    Text(controller.animationSpeed == 1.0 ? "Normal" : "\(controller.animationSpeed, specifier: "%.1f")×")
+                        .debugDrawerFont(.value)
+                        .accessibilityHidden(true)
                 }
+            }
 
-                Divider()
+            DebugDrawerSection("SwiftUI Renders") {
+                DebugDrawerRow("Render Tracking", isOn: $renderTracker.isEnabled)
 
-                // --- SwiftUI Render Tracking ---
-                VStack(alignment: .leading, spacing: 4) {
-                    Toggle("Render Tracking", isOn: $renderTracker.isEnabled)
-                        .toggleStyle(.switch)
-                        .controlSize(.small)
+                if renderTracker.isEnabled {
+                    DebugDrawerRow("Show Overlays", isOn: $renderTracker.showOverlays)
 
-                    if renderTracker.isEnabled {
-                        Toggle("Show Overlays", isOn: $renderTracker.showOverlays)
-                            .toggleStyle(.switch)
-                            .controlSize(.mini)
-
-                        if !renderTracker.renderCounts.isEmpty {
-                            HStack {
-                                Text("\(renderTracker.renderCounts.count) views, \(renderTracker.totalRenders) renders")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                                Spacer()
-                                Button("Reset") { renderTracker.reset() }
-                                    .font(.caption)
-                                    .buttonStyle(.plain)
-                                    .foregroundStyle(.secondary)
-                            }
-
-                            RenderCountList(entries: Array(renderTracker.sortedEntries.prefix(8)))
+                    if !renderTracker.renderCounts.isEmpty {
+                        DebugDrawerRow("\(renderTracker.renderCounts.count) views, \(renderTracker.totalRenders) renders") {
+                            Button("Reset") { renderTracker.reset() }
+                                .debugDrawerButtonStyle(.borderless)
+                                .accessibilityLabel("Reset render counts")
                         }
+
+                        RenderCountList(entries: Array(renderTracker.sortedEntries.prefix(8)))
                     }
                 }
+            }
 
-                Divider()
-
-                // --- View Hierarchy ---
-                HStack {
-                    Text("View Hierarchy")
-                        .font(.caption.weight(.medium))
-                    Spacer()
-
+            DebugDrawerSection("View Hierarchy") {
+                DebugDrawerActionRow {
                     Button(isHierarchyExpanded ? "Collapse" : "Snapshot") {
                         if isHierarchyExpanded {
                             isHierarchyExpanded = false
@@ -150,8 +116,7 @@
                             snapshotHierarchy()
                         }
                     }
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
+                    .accessibilityLabel(isHierarchyExpanded ? "Collapse the view hierarchy" : "Snapshot the view hierarchy")
                 }
 
                 if isHierarchyExpanded, let root = hierarchy {
@@ -163,27 +128,6 @@
             .sheet(item: $debugger3DRequest) { request in
                 ViewDebugger3DCombinedSheet(targetView: request.targetView)
             }
-        }
-
-        private func toolButton(_ label: String, icon: String, mode: InspectorToolController.Mode) -> some View {
-            Button {
-                inspectorTool.clearPreviousSession()
-                inspectorTool.mode = inspectorTool.mode == mode ? .off : mode
-            } label: {
-                HStack(spacing: 4) {
-                    Image(systemName: icon)
-                        .font(.caption2)
-                        .accessibilityHidden(true)
-                    Text(label)
-                        .font(.caption)
-                }
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
-                .background(inspectorTool.mode == mode ? Color.accentColor.opacity(0.2) : Color.secondary.opacity(0.1))
-                .cornerRadius(4)
-            }
-            .buttonStyle(.plain)
-            .accessibilityAddTraits(inspectorTool.mode == mode ? .isSelected : [])
         }
 
         #if os(macOS)

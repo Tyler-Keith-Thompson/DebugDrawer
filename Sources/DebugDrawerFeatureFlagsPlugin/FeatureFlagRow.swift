@@ -1,4 +1,5 @@
 #if DEBUG
+    import DebugDrawer
     import SwiftUI
 
     /// One flag: the control that overrides it, its key and live value, and a button that clears
@@ -19,8 +20,7 @@
                             Label("Clear override", systemImage: "arrow.uturn.backward")
                                 .labelStyle(.iconOnly)
                         }
-                        .buttonStyle(.borderless)
-                        .controlSize(.small)
+                        .debugDrawerButtonStyle(.borderless)
                         .accessibilityLabel("Clear override of \(row.title)")
                         .help("Use the live value")
                     }
@@ -28,12 +28,11 @@
                 facts
                 if let detail = row.detail {
                     Text(detail)
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
+                        .debugDrawerFont(.secondary)
+                        .debugDrawerForegroundStyle(.secondary)
                 }
             }
-            .padding(.vertical, 4)
-            .padding(.horizontal, 6)
+            .debugDrawerRowPadding()
         }
 
         @ViewBuilder
@@ -51,23 +50,21 @@
                     // A field commits its value when it loses focus too, unchanged or unparsable text
                     // as the value it showed, which is no override.
                     TextField(row.title, value: Binding(get: { number }, set: { if $0 != number { onOverride(.number($0)) } }), format: .number)
-                        .textFieldStyle(.roundedBorder)
-                        .controlSize(.small)
+                        .debugDrawerTextFieldStyle()
                         .accessibilityLabel(row.title)
                 }
 
             case let .text(text):
                 labeled {
                     TextField(row.title, text: Binding(get: { text }, set: { onOverride(.string($0)) }))
-                        .textFieldStyle(.roundedBorder)
-                        .controlSize(.small)
+                        .debugDrawerTextFieldStyle()
                         .autocorrectionDisabled()
                         .accessibilityLabel(row.title)
                 }
             }
         }
 
-        /// The key, the live value and, while overridden, a tag saying so: side by side, or one above
+        /// The key, the live value and, while overridden, a word saying so: side by side, or one above
         /// the other at accessibility text sizes.
         private var facts: some View {
             let layout = dynamicTypeSize.isAccessibilitySize
@@ -76,24 +73,26 @@
             return layout {
                 if row.title != row.id {
                     Text(row.id)
-                        .font(.system(.caption2, design: .monospaced))
+                        .debugDrawerFont(.code)
+                        .debugDrawerForegroundStyle(.tertiary)
                 }
                 Text("Live: \(row.liveValue.description)")
-                    .font(.caption2)
+                    .debugDrawerFont(.secondary)
+                    .debugDrawerForegroundStyle(.secondary)
                 if let override = row.override {
                     Text("Overridden")
-                        .font(.caption2.weight(.semibold))
-                        .foregroundStyle(.orange)
+                        .debugDrawerFont(.secondary)
+                        .fontWeight(.semibold)
+                        .debugDrawerForegroundStyle(.accent)
                         .accessibilityLabel("Overridden with \(override.description)")
                 }
             }
-            .foregroundStyle(.secondary)
             .accessibilityElement(children: .combine)
         }
 
         private var title: some View {
             Text(row.title)
-                .font(.caption)
+                .debugDrawerFont(.body)
         }
 
         /// The title beside the field, or above it at accessibility text sizes, where side by side

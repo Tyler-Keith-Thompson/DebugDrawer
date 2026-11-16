@@ -19,9 +19,7 @@
             let monitor = EnergyMonitor.shared
             // Just ensure the computed properties don't crash
             _ = monitor.thermalLabel
-            _ = monitor.thermalColor
             _ = monitor.cpuLoad
-            _ = monitor.cpuLoadColor
         }
 
         func testPluginConformance() {

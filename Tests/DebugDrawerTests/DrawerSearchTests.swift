@@ -157,7 +157,7 @@
             let field = try sut.inspect().find(ViewType.TextField.self)
 
             #expect(shortcuts.count == 1)
-            #expect(try field.labelView().text().string() == "Search plugins and actions")
+            #expect(try field.labelView().text().string() == "Filter")
         }
     }
 #endif

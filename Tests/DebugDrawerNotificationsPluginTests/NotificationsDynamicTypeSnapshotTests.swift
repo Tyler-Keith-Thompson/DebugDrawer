@@ -41,6 +41,9 @@
             // placeholders, so the view is hosted in a window that is never shown and its layer is
             // rendered, at a fixed width and scale.
             let controller = UIHostingController(rootView: sut)
+            // No safe area: the window's status bar inset would lay the view out shorter than it
+            // measured, overlapping its rows.
+            controller.safeAreaRegions = []
             let size = controller.sizeThatFits(in: CGSize(width: 352, height: 6000))
             let scene = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first
             let window = scene.map(UIWindow.init(windowScene:)) ?? UIWindow()

@@ -1,4 +1,5 @@
 #if DEBUG && os(iOS)
+    import DebugDrawer
     import SceneKit
     import SwiftUI
     import UIKit
@@ -288,13 +289,13 @@
             VStack(spacing: 0) {
                 HStack {
                     Text("3D View Hierarchy")
-                        .font(.headline)
+                        .debugDrawerFont(.title)
                         .accessibilityAddTraits(.isHeader)
                     Spacer()
                     if snapshot != nil {
                         Text("Pinch to zoom, drag to rotate")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .debugDrawerFont(.secondary)
+                            .debugDrawerForegroundStyle(.secondary)
                     }
                     Button(snapshot == nil ? "Cancel" : "Done") { dismiss() }
                 }

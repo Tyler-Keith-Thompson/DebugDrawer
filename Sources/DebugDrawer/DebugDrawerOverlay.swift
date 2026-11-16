@@ -22,6 +22,12 @@
         @State private var scrolledID: String?
         /// The last Create Report's progress or result, until dismissed.
         @State private var reportState: DrawerReportResult.State?
+        /// The navigator tab selected: all plugins, or one category's.
+        @State private var scope = DrawerScope.all
+        /// The filter bar's toggles: stack traces without the system's frames, and only the
+        /// plugins with something unread.
+        @State private var showsOnlyOwnCode = false
+        @State private var showsOnlyUnread = false
         @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
         private let drawerWidth: CGFloat = 340 * .debugDrawerTextScale
@@ -58,22 +64,25 @@
                 if drawer.isOpen {
                     panel
                         .frame(width: drawerWidth)
-                        .background(.ultraThickMaterial)
-                        .clipShape(RoundedRectangle(cornerRadius: 10))
-                        .shadow(color: .black.opacity(0.25), radius: 12, x: -4)
+                        .drawerPanelSurface()
                         .transition(.move(edge: .trailing).combined(with: .opacity))
                 }
             }
         }
 
-        /// The open drawer: header, search, and the plugin list.
+        /// The open drawer: the header block (title, jump bar, navigator tabs), the plugin outline,
+        /// and the filter bar at the foot.
         private var panel: some View {
             VStack(spacing: 0) {
                 DrawerHeader(
                     isReportInProgress: reportState?.isInProgress == true,
+                    context: DrawerJumpBar.Context.current,
                     createReport: createReport,
                     close: { drawer.toggle() }
                 )
+                DrawerNavigatorTabs(tabs: DrawerNavigatorTab.tabs(for: allPlugins, badges: drawer.badges), selection: $scope)
+                .padding(.vertical, 4)
+                DrawerRule()
                 if let reportState {
                     DrawerReportResult(
                         state: reportState,
@@ -81,12 +90,12 @@
                         dismiss: { self.reportState = nil }
                     )
                 }
-                searchField
                 if !query.isEmpty {
                     searchResults
                 }
-                Divider()
                 content
+                    .frame(maxHeight: .infinity, alignment: .top)
+                DrawerFilterBar(field: { searchField }, showsOnlyOwnCode: $showsOnlyOwnCode, showsOnlyUnread: $showsOnlyUnread)
             }
             // The shortcuts exist only inside the open drawer, so none of them opens it (N2).
             .background {
@@ -180,16 +189,23 @@
                     DrawerEmptyState()
                 } else {
                     // Local plugins first (contextual tools take precedence), then the global ones:
-                    // pinned first, then by category.
+                    // pinned first, then by category. The navigator tabs name the categories, so
+                    // the outline has no group headings.
                     LazyVStack(spacing: 0) {
-                        ForEach(sections) { section in
-                            DrawerSectionHeader(title: section.title)
+                        ForEach(listedSections) { section in
                             ForEach(section.plugins) { plugin in
                                 pluginSection(plugin, isGlobal: section.kind != .local)
                             }
                         }
+                        if listedSections.isEmpty {
+                            Text(showsOnlyUnread ? "Nothing unread" : "No plugins")
+                                .debugDrawerFont(.secondary)
+                                .foregroundStyle(DrawerPalette.secondaryText)
+                                .padding()
+                        }
                     }
                     .scrollTargetLayout()
+                    .environment(\.debugDrawerShowsOnlyOwnCode, showsOnlyOwnCode)
                 }
             }
             .scrollPosition(id: $scrolledID, anchor: .top)
@@ -204,9 +220,15 @@
             layout.sections(local: drawer.localPlugins, global: drawer.globalPlugins)
         }
 
+        /// The sections as the outline lists them: the selected tab's, and only plugins with
+        /// something unread while that toggle is on.
+        private var listedSections: [DrawerSection] {
+            scope.filter(sections, unread: showsOnlyUnread ? Set(drawer.badges.keys) : nil)
+        }
+
         /// The plugins in the order the list shows them.
         private var listedPluginIDs: [String] {
-            sections.flatMap { $0.plugins.map(\.id) }
+            listedSections.flatMap { $0.plugins.map(\.id) }
         }
 
         /// Scrolls the list to the plugin `step` places from the one at its top, and moves keyboard
@@ -234,7 +256,12 @@
             }
         }
 
+        /// Opens the plugin, first widening the outline to every plugin if a tab or toggle hides it.
         private func expand(_ plugin: AnyDebugDrawerPlugin) {
+            if !listedPluginIDs.contains(plugin.id) {
+                scope = .all
+                showsOnlyUnread = false
+            }
             guard collapsedSections.contains(plugin.id) else { return }
             toggleExpanded(plugin)
         }
@@ -259,7 +286,7 @@
             let expanded = isExpanded(plugin)
             let pinned = layout.pinned.contains(plugin.id)
 
-            return VStack(spacing: 0) {
+            return DrawerPluginSection(plugin: plugin, isExpanded: expanded) {
                 PluginSectionHeader(
                     plugin: plugin,
                     isExpanded: expanded,
@@ -270,36 +297,31 @@
                     toggleExpanded(plugin)
                 }
                 .focused($focusedPlugin, equals: plugin.id)
-                .contextMenu {
-                    if isGlobal {
-                        Button(pinned ? "Unpin" : "Pin", systemImage: pinned ? "pin.slash" : "pin") {
-                            updateLayout { $0.togglePin(plugin.id) }
-                        }
-                        Button("Move Up", systemImage: "arrow.up") {
-                            updateLayout { $0.move(plugin.id, by: -1, among: drawer.globalPlugins) }
-                        }
-                        Button("Move Down", systemImage: "arrow.down") {
-                            updateLayout { $0.move(plugin.id, by: 1, among: drawer.globalPlugins) }
-                        }
-                    }
-                    if plugin.hasHUD {
-                        let inHUD = drawer.hudLayout.pinned.contains(plugin.id)
-                        Button(inHUD ? "Remove from HUD" : "Show in HUD", systemImage: inHUD ? "rectangle.slash" : "rectangle.inset.topleft.filled") {
-                            drawer.toggleHUD(forPlugin: plugin.id)
-                        }
-                    }
-                }
-
-                if expanded {
-                    plugin.body
-                        .padding(.horizontal, 14)
-                        .padding(.bottom, 10)
-                        .transition(.opacity.combined(with: .move(edge: .top)))
-                }
-
-                Divider().padding(.leading, 14)
+                .contextMenu { pluginMenu(plugin, isGlobal: isGlobal, pinned: pinned) }
             }
             .id(plugin.id)
+        }
+
+        /// The header's context menu: pin and move a global plugin, and show it in the HUD.
+        @ViewBuilder
+        private func pluginMenu(_ plugin: AnyDebugDrawerPlugin, isGlobal: Bool, pinned: Bool) -> some View {
+            if isGlobal {
+                Button(pinned ? "Unpin" : "Pin", systemImage: pinned ? "pin.slash" : "pin") {
+                    updateLayout { $0.togglePin(plugin.id) }
+                }
+                Button("Move Up", systemImage: "arrow.up") {
+                    updateLayout { $0.move(plugin.id, by: -1, among: drawer.globalPlugins) }
+                }
+                Button("Move Down", systemImage: "arrow.down") {
+                    updateLayout { $0.move(plugin.id, by: 1, among: drawer.globalPlugins) }
+                }
+            }
+            if plugin.hasHUD {
+                let inHUD = drawer.hudLayout.pinned.contains(plugin.id)
+                Button(inHUD ? "Remove from HUD" : "Show in HUD", systemImage: inHUD ? "rectangle.slash" : "rectangle.inset.topleft.filled") {
+                    drawer.toggleHUD(forPlugin: plugin.id)
+                }
+            }
         }
     }
 
@@ -307,9 +329,7 @@
 
     extension DebugDrawerOverlay {
         private var searchField: some View {
-            TextField("Search plugins and actions", text: $query)
-                .debugDrawerTextFieldStyle()
-                .accessibilityLabel("Search plugins and actions")
+            DrawerSearchField(query: $query)
                 .focused($searchFocused)
                 .onChange(of: query) { highlighted = 0 }
                 .onSubmit { chooseHighlighted() }
@@ -324,8 +344,6 @@
                     return .handled
                 }
             #endif
-                .padding(.horizontal, 14)
-                .padding(.bottom, 8)
         }
 
         private var searchResults: some View {

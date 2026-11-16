@@ -47,68 +47,56 @@
         @ObservedObject private var store = ScreenshotStore.shared
 
         var body: some View {
-            VStack(alignment: .leading, spacing: 8) {
-                Toggle("Hide drawer for screenshot", isOn: $store.hideDrawer)
-                    .toggleStyle(.switch)
-                    .controlSize(.small)
+            VStack(alignment: .leading, spacing: 0) {
+                DebugDrawerRow("Hide drawer for screenshot", isOn: $store.hideDrawer)
 
-                HStack {
+                if let path = store.lastPath {
+                    if path.hasPrefix("Error") {
+                        DebugDrawerIssueRow(path, severity: .error)
+                    } else {
+                        DebugDrawerIssueRow("Saved", severity: .ok, subline: path)
+                    }
+                }
+
+                if let lastCapture = store.lastCapture {
+                    DebugDrawerCodeBlock {
+                        Image(platformImage: lastCapture)
+                            .resizable()
+                            .scaledToFit()
+                            .frame(maxHeight: 120)
+                            .accessibilityLabel("Last capture")
+                    }
+                }
+
+                DebugDrawerActionRow {
                     #if os(macOS)
                     Button("To Desktop") {
                         capture(to: .desktop)
                     }
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.small)
+                    .debugDrawerButtonStyle(.primary)
                     .disabled(store.isCapturing)
 
                     Button("To Clipboard") {
                         capture(to: .clipboard)
                     }
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
                     .disabled(store.isCapturing)
                     #elseif os(iOS)
                     Button("Capture") {
                         capture(to: .clipboard)
                     }
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.small)
+                    .debugDrawerButtonStyle(.primary)
                     .disabled(store.isCapturing)
                     #endif
-                }
 
-                if store.isCapturing {
-                    HStack(spacing: 4) {
-                        ProgressView().controlSize(.small)
-                        Text("Capturing...")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                    if store.isCapturing {
+                        HStack(spacing: 4) {
+                            ProgressView().controlSize(.small)
+                            Text("Capturing…")
+                                .debugDrawerFont(.secondary)
+                                .debugDrawerForegroundStyle(.secondary)
+                        }
+                        .accessibilityElement(children: .combine)
                     }
-                }
-
-                if let path = store.lastPath {
-                    HStack(spacing: 4) {
-                        Image(systemName: "checkmark.circle.fill")
-                            .foregroundStyle(.green)
-                            .font(.caption)
-                            .accessibilityHidden(true)
-                        Text(path)
-                            .font(.system(.caption2, design: .monospaced))
-                            .foregroundStyle(.secondary)
-                            .lineLimit(3)
-                            .truncationMode(.head)
-                    }
-                    .accessibilityElement(children: .combine)
-                }
-
-                if let lastCapture = store.lastCapture {
-                    Image(platformImage: lastCapture)
-                        .resizable()
-                        .scaledToFit()
-                        .frame(maxHeight: 120)
-                        .clipShape(RoundedRectangle(cornerRadius: 4))
-                        .overlay(RoundedRectangle(cornerRadius: 4).stroke(.separator))
-                        .accessibilityLabel("Last capture")
                 }
             }
             #if os(macOS)

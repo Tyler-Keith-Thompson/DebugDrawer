@@ -2,84 +2,47 @@
     import DebugDrawer
     import SwiftUI
 
-    /// One payload: its kind, what it holds and the period it covers, a New tag until it is
-    /// opened, and, open, its formatted JSON with buttons that copy and export it.
+    /// One payload as an issue row: the unread dot until it is opened, a glyph for what it holds
+    /// (an error for crashes, a warning for other diagnostics), its kind, what it holds and the
+    /// period it covers, and, open, its formatted JSON with buttons that copy, export and delete it.
+    /// The summary takes the row's width: the row opens on a tap, so it needs no chevron, and
+    /// Delete sits with the other actions once open, as a crash report's does.
     struct MetricKitPayloadRow: View {
         let payload: MetricKitPayload
         let isExpanded: Bool
         let onToggle: () -> Void
         let onDelete: () -> Void
-        @Environment(\.dynamicTypeSize) private var dynamicTypeSize
         @Environment(\.locale) private var locale
         @Environment(\.timeZone) private var timeZone
-        @ScaledMetric(relativeTo: .caption2) private var chevronWidth: CGFloat = 10
         /// The tallest the JSON gets before it scrolls: a day's metrics run to hundreds of lines.
-        @ScaledMetric(relativeTo: .caption2) private var jsonHeight: CGFloat = 280
+        @ScaledMetric(relativeTo: .body) private var jsonHeight: CGFloat = 280
 
         var body: some View {
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: 0) {
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    // The dot keeps its column on a seen row too, so the glyphs line up.
+                    DebugDrawerUnreadDot()
+                        .opacity(payload.isSeen ? 0 : 1)
+                        .accessibilityHidden(payload.isSeen)
                     Button(action: onToggle) {
                         summary
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .contentShape(Rectangle())
                     }
-                    .buttonStyle(.plain)
+                    .debugDrawerButtonStyle(.plain)
                     .accessibilityElement(children: .combine)
                     .accessibilityHint(isExpanded ? "Hides the JSON" : "Shows the JSON")
-                    Button(action: onDelete) {
-                        Label("Delete", systemImage: "trash")
-                            .labelStyle(.iconOnly)
-                    }
-                    .buttonStyle(.borderless)
-                    .controlSize(.small)
-                    .accessibilityLabel("Delete \(payload.kind.title.lowercased()) payload of \(period)")
                 }
                 if isExpanded {
                     json
                 }
             }
-            .padding(.vertical, 4)
-            .padding(.horizontal, 6)
         }
 
         private var summary: some View {
-            HStack(alignment: .firstTextBaseline, spacing: 4) {
-                // One width for both chevrons, so open and closed rows line up.
-                Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                    .frame(width: chevronWidth)
-                    .accessibilityHidden(true)
-                VStack(alignment: .leading, spacing: 2) {
-                    titleLine
-                    Text(payload.summary.text)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                    Text(period)
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
-        }
-
-        /// The kind and, until the payload is opened, a New tag: side by side, or one above the
-        /// other at accessibility text sizes.
-        private var titleLine: some View {
-            let layout = dynamicTypeSize.isAccessibilitySize
-                ? AnyLayout(VStackLayout(alignment: .leading, spacing: 2))
-                : AnyLayout(HStackLayout(alignment: .firstTextBaseline, spacing: 6))
-            return layout {
-                Text(payload.kind.title)
-                    .font(.caption.weight(.semibold))
-                if !payload.isSeen {
-                    Text("New")
-                        .font(.caption2.weight(.semibold))
-                        .foregroundStyle(.red)
-                        .accessibilityLabel("New payload")
-                }
+            DebugDrawerIssueRow(payload.kind.title, severity: payload.summary.severity) {
+                Text(payload.summary.text)
+                Text(period)
             }
         }
 
@@ -89,38 +52,51 @@
         }
 
         private var json: some View {
-            VStack(alignment: .leading, spacing: 6) {
-                ScrollView([.horizontal, .vertical]) {
-                    Text(payload.formattedJSON)
-                        .font(.system(.caption2, design: .monospaced))
-                        .textSelection(.enabled)
-                        .fixedSize()
-                        .padding(6)
-                        .frame(maxWidth: .infinity, alignment: .leading)
+            VStack(alignment: .leading, spacing: 0) {
+                DebugDrawerCodeBlock {
+                    ScrollView(.vertical) {
+                        // Long lines wrap, so the whole of each shows in the drawer's width.
+                        Text(payload.formattedJSON)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .frame(maxHeight: jsonHeight)
+                    .fixedSize(horizontal: false, vertical: true)
                 }
-                .frame(maxHeight: jsonHeight)
-                .fixedSize(horizontal: false, vertical: true)
-                .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 4))
-                buttons
+                DebugDrawerActionRow {
+                    DebugDrawerCopyButton("Copy JSON") { payload.formattedJSON }
+                    ShareLink(
+                        item: MetricKitPayloadFile(payload: payload),
+                        preview: SharePreview(payload.exportFileName)
+                    ) {
+                        Label("Export", systemImage: "square.and.arrow.up")
+                    }
+                    .accessibilityLabel("Export the payload as a JSON file")
+                } trailing: {
+                    Button("Delete", role: .destructive, action: onDelete)
+                        .debugDrawerButtonStyle(.destructive)
+                        .accessibilityLabel("Delete \(payload.kind.title.lowercased()) payload of \(period)")
+                }
             }
         }
+    }
 
-        /// Copy JSON and Export: side by side, or one above the other at accessibility text sizes.
-        private var buttons: some View {
-            let layout = dynamicTypeSize.isAccessibilitySize
-                ? AnyLayout(VStackLayout(alignment: .leading, spacing: 6))
-                : AnyLayout(HStackLayout())
-            return layout {
-                DebugDrawerCopyButton("Copy JSON") { payload.formattedJSON }
-                ShareLink(
-                    item: MetricKitPayloadFile(payload: payload),
-                    preview: SharePreview(payload.exportFileName)
-                ) {
-                    Label("Export", systemImage: "square.and.arrow.up")
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
-                .accessibilityLabel("Export the payload as a JSON file")
+    extension MetricKitPayloadSummary {
+        /// The glyph for what a payload holds: an error for crashes, a warning for other
+        /// diagnostics, ok for metrics or a diagnostics payload with none, and unknown for one
+        /// that can't be read.
+        fileprivate var severity: DebugDrawerIssueGlyph.Severity {
+            switch self {
+            case .metrics:
+                .ok
+            case let .diagnostics(counts) where counts.crashes > 0:
+                .error
+            case let .diagnostics(counts) where counts.hangs + counts.cpuExceptions + counts.diskWriteExceptions + counts.slowLaunches > 0:
+                .warning
+            case .diagnostics:
+                .ok
+            case .unreadable:
+                .neutral
             }
         }
     }

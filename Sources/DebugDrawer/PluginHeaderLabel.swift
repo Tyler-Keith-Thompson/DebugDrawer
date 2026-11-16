@@ -1,91 +1,83 @@
 #if DEBUG
     import SwiftUI
 
-    /// The face of a plugin's section header: its icon and title, a pin when it's pinned, and a
-    /// chevron that turns down while the section is expanded. At accessibility text sizes the
-    /// title takes a line of its own below the rest, so it wraps between words rather than within
-    /// them.
+    /// The face of a plugin's header row, as a group in Xcode's navigators: a filled disclosure
+    /// triangle, pointing down while the plugin is open and right while closed, the title in bold,
+    /// a pin when it's pinned, and its count in a gray capsule at the trailing edge. A plugin with
+    /// a header accessory shows no count: the accessory, beside this label, replaces it, so the
+    /// header never draws two numbers. At accessibility text sizes the title wraps between words.
     struct PluginHeaderLabel: View {
         let plugin: AnyDebugDrawerPlugin
         let isExpanded: Bool
         let isPinned: Bool
         /// The plugin's badge count, if it has one.
         var badge: Int?
-        /// The icon's column, which grows with the icon at larger text sizes so the title never
-        /// slides under it.
-        @ScaledMetric private var iconWidth: CGFloat = 20 * .debugDrawerTextScale
+        @ScaledMetric(relativeTo: .body) private var minHeight = DrawerSpacing.sectionHeaderHeight
+        @ScaledMetric(relativeTo: .body) private var triangle = DrawerSpacing.disclosure
+        @ScaledMetric(relativeTo: .body) private var scaledIndent = DrawerSpacing.contentIndent
+        @ScaledMetric(relativeTo: .body) private var scaledInset = DrawerSpacing.panelInset
+        // The indent and margins grow with the text only a little: at accessibility sizes the
+        // panel's width is better spent on the text.
+        private var indent: CGFloat { min(scaledIndent, DrawerSpacing.contentIndent * 1.25) }
+        private var inset: CGFloat { min(scaledInset, DrawerSpacing.panelInset * 1.25) }
+        @ScaledMetric(relativeTo: .body) private var gap = DrawerSpacing.itemGap
+        @ScaledMetric(relativeTo: .body) private var countPadding = DrawerSpacing.countPadding
         @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
         var body: some View {
-            Group {
-                if dynamicTypeSize.isAccessibilitySize {
-                    VStack(alignment: .leading, spacing: 4) {
-                        HStack(spacing: 8) {
-                            icon
-                            pin
-                            Spacer()
-                            trailing
-                        }
-                        // Without this, a title just wider than the line is cut short with an
-                        // ellipsis rather than wrapped.
-                        title
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                } else {
-                    HStack(spacing: 8) {
-                        icon
-                        title
-                        pin
-                        Spacer()
-                        trailing
+            HStack(alignment: .firstTextBaseline, spacing: gap) {
+                Image(systemName: isExpanded ? "arrowtriangle.down.fill" : "arrowtriangle.right.fill")
+                    .resizable()
+                    .scaledToFit()
+                    .foregroundStyle(DrawerPalette.secondaryText)
+                    .frame(width: min(triangle, indent - gap), height: min(triangle, indent - gap))
+                    // The triangle sits in the indent's width, so titles start where content does.
+                    .frame(width: indent - gap, alignment: .leading)
+                    .alignmentGuide(.firstTextBaseline) { $0[.bottom] - $0.height * 0.1 }
+                    .accessibilityHidden(true)
+                // At accessibility text sizes a word of the title can be wider than what the pin and
+                // count leave it, so they go on a line of their own under the title.
+                let layout = dynamicTypeSize.isAccessibilitySize
+                    ? AnyLayout(VStackLayout(alignment: .leading, spacing: 0))
+                    : AnyLayout(HStackLayout(alignment: .firstTextBaseline, spacing: gap))
+                layout {
+                    Text(plugin.title)
+                        .debugDrawerFont(.title)
+                        .foregroundStyle(DrawerPalette.text)
+                        .fixedSize(horizontal: false, vertical: true)
+                        // The title takes the row's width left by the pin and count, which never wrap.
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .layoutPriority(1)
+                    HStack(alignment: .firstTextBaseline, spacing: gap) {
+                        marks
                     }
                 }
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 8)
+            .padding(.horizontal, inset)
+            .frame(maxWidth: .infinity, minHeight: minHeight, alignment: .leading)
             .contentShape(Rectangle())
         }
 
-        private var icon: some View {
-            Image(systemName: plugin.icon)
-                .frame(width: iconWidth)
-                .foregroundStyle(.secondary)
-                .accessibilityHidden(true)
-        }
-
-        private var title: some View {
-            Text(plugin.title)
-                .font(.subheadline.weight(.medium))
-        }
-
-        @ViewBuilder
-        private var pin: some View {
+        /// The pin and the count.
+        @ViewBuilder private var marks: some View {
             if isPinned {
                 Image(systemName: "pin.fill")
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
+                    .debugDrawerFont(.secondary)
+                    .foregroundStyle(DrawerPalette.tertiaryText)
+                    .fixedSize()
                     .accessibilityLabel("Pinned")
             }
-        }
-
-        /// The badge, if any, and the chevron.
-        @ViewBuilder
-        private var trailing: some View {
-            if let badge {
+            if let badge, !plugin.hasHeaderAccessory {
                 Text(badge, format: .number)
-                    .font(.caption2.weight(.semibold))
+                    .debugDrawerFont(.secondary)
+                    .fontWeight(.semibold)
                     .monospacedDigit()
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 1)
-                    .background(Capsule().fill(.red))
+                    .fixedSize()
+                    .foregroundStyle(DrawerPalette.secondaryText)
+                    .padding(.horizontal, countPadding)
+                    .background(Capsule().fill(DrawerPalette.separator))
                     .accessibilityLabel("\(badge) new")
             }
-            Image(systemName: "chevron.right")
-                .font(.caption2.weight(.semibold))
-                .foregroundStyle(.tertiary)
-                .rotationEffect(.degrees(isExpanded ? 90 : 0))
-                .accessibilityHidden(true)
         }
     }
 #endif

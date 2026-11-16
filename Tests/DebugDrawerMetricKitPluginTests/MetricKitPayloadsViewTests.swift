@@ -1,5 +1,6 @@
 // ViewInspector is linked on Apple platforms only, and the views are tested on the Mac.
 #if os(macOS)
+    import DebugDrawer
     @testable import DebugDrawerMetricKitPlugin
     import Foundation
     import SwiftUI
@@ -101,7 +102,7 @@
             #expect(throws: (any Error).self) { try sut.inspect().find(button: "Copy JSON") }
         }
 
-        @Test("An unopened payload is tagged New; an opened one isn't")
+        @Test("An unopened payload shows the unread dot; an opened one keeps its column but hides it")
         func newTag() throws {
             let unseen = MetricKitPayload(
                 id: UUID(), kind: .metrics, begin: Date(timeIntervalSince1970: 1), end: Date(timeIntervalSince1970: 2),
@@ -115,13 +116,14 @@
                 payloads: [unseen, seen], expanded: .constant(nil), onOpen: { _ in }, onDelete: { _ in }, onMarkAllSeen: {}, onDeleteAll: {}
             )
 
-            let actual = try sut.inspect().findAll(ViewType.Text.self, where: { try $0.string() == "New" })
+            let expected: [Double] = [1, 0]
 
-            #expect(actual.count == 1)
-            #expect(try actual.first?.accessibilityLabel().string() == "New payload")
+            let actual = try sut.inspect().findAll(DebugDrawerUnreadDot.self).map { try $0.opacity() }
+
+            #expect(actual == expected)
         }
 
-        @Test("A payload's delete button, labelled with its kind and period, deletes that payload")
+        @Test("An open payload's delete button, labelled with its kind and period, deletes that payload")
         func deleteOne() throws {
             let payload = MetricKitPayload(
                 id: UUID(), kind: .diagnostics, begin: Date(timeIntervalSince1970: 1_763_290_000), end: Date(timeIntervalSince1970: 1_763_290_000),
@@ -129,7 +131,8 @@
             )
             var deleted: [MetricKitPayload.ID] = []
             let sut = MetricKitPayloadsView(
-                payloads: [payload], expanded: .constant(nil), onOpen: { _ in }, onDelete: { deleted.append($0) }, onMarkAllSeen: {}, onDeleteAll: {}
+                payloads: [payload], expanded: .constant(payload.id), onOpen: { _ in }, onDelete: { deleted.append($0) },
+                onMarkAllSeen: {}, onDeleteAll: {}
             )
             .environment(\.locale, Locale(identifier: "en_US"))
             .environment(\.timeZone, try #require(TimeZone(identifier: "UTC")))

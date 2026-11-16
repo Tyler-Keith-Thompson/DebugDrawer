@@ -85,17 +85,6 @@ extension CGFloat {
                 textSelection(.enabled)
             #endif
         }
-
-        /// The drawer's text field look: a small rounded border, or on tvOS and watchOS the system's
-        /// own field, which edits in a full-screen keyboard (or dictation and Scribble on the watch).
-        @ViewBuilder
-        func debugDrawerTextFieldStyle() -> some View {
-            #if os(tvOS) || os(watchOS)
-                self
-            #else
-                textFieldStyle(.roundedBorder).controlSize(.small)
-            #endif
-        }
     }
 
     #if os(macOS)

@@ -93,14 +93,6 @@
         case app = "App"
         case thirdParty = "Third-Party"
         case system = "System"
-
-        var icon: String {
-            switch self {
-            case .app: return "app"
-            case .thirdParty: return "shippingbox"
-            case .system: return "gearshape"
-            }
-        }
     }
 
     // MARK: - Plugin
@@ -145,63 +137,37 @@
         }
 
         var body: some View {
-            VStack(alignment: .leading, spacing: 6) {
-                // Counts
-                HStack {
-                    Text("\(libraries.count) libraries loaded")
-                        .font(.system(.caption2, design: .monospaced))
-                        .foregroundStyle(.secondary)
-                    Spacer()
-                    DebugDrawerCopyButton("Copy") { report }
-                }
-
-                // Category filter
+            DebugDrawerRow("\(libraries.count) libraries loaded", accessory: {
                 Picker("Category", selection: $selectedCategory) {
                     Text("All").tag(LibraryCategory?.none)
                     ForEach(LibraryCategory.allCases, id: \.self) { category in
                         Text(category.rawValue).tag(LibraryCategory?.some(category))
                     }
                 }
-                .pickerStyle(.segmented)
-                .labelsHidden()
-                .controlSize(.mini)
-                .accessibilityLabel("Category")
-                .accessibilityElement(children: .contain)
+                .pickerStyle(.menu)
+            })
+            .onAppear { loadLibraries() }
 
-                // Search
-                TextField("Filter...", text: $searchText)
-                    .textFieldStyle(.roundedBorder)
-                    .font(.caption2)
-                    .accessibilityLabel("Filter libraries by name or path")
+            TextField("Filter by name or path", text: $searchText)
+                .debugDrawerTextFieldStyle()
+                .accessibilityLabel("Filter libraries by name or path")
 
-                Divider()
-
-                // Grouped list
-                ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 4) {
-                        ForEach(grouped, id: \.0) { category, libs in
-                            HStack {
-                                Image(systemName: category.icon)
-                                    .font(.caption2)
-                                    .accessibilityHidden(true)
-                                Text("\(category.rawValue) (\(libs.count))")
-                                    .font(.caption)
-                                    .fontWeight(.semibold)
-                            }
-                            .accessibilityElement(children: .combine)
-                            .accessibilityAddTraits(.isHeader)
-                            .foregroundStyle(.secondary)
-                            .padding(.top, 4)
-
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 0) {
+                    ForEach(grouped, id: \.0) { category, libs in
+                        DebugDrawerSection("\(category.rawValue) (\(libs.count))") {
                             ForEach(libs) { lib in
                                 LoadedLibraryRow(library: lib)
                             }
                         }
                     }
                 }
-                .frame(maxHeight: 300)
             }
-            .onAppear { loadLibraries() }
+            .frame(maxHeight: 300)
+
+            DebugDrawerActionRow {
+                DebugDrawerCopyButton("Copy List") { report }
+            }
         }
 
         private func loadLibraries() {
@@ -222,35 +188,28 @@
         }
     }
 
+    /// A library: its type badge (the app, a framework or a dylib), its name and version, its
+    /// path cut in the middle so the file name shows, and its UUID and load address.
     struct LoadedLibraryRow: View {
         let library: LoadedLibrary
-        @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
         var body: some View {
-            VStack(alignment: .leading, spacing: 1) {
-                HStack(spacing: 4) {
-                    Text(library.name)
-                        .font(.system(.caption2, design: .monospaced))
-                        .lineLimit(3)
-                    if let version = library.version {
-                        Text(version)
-                            .font(.system(.caption2, design: .monospaced))
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                Text(library.path)
-                    .font(.system(.caption2, design: .monospaced))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(3)
-                    .truncationMode(.middle)
-                Text("\(library.uuid?.uuidString ?? "no UUID") · \(library.loadAddressLabel)")
-                    .font(.system(.caption2, design: .monospaced))
-                    .foregroundStyle(.tertiary)
-                    // At accessibility text sizes the UUID alone fills three lines, which would
-                    // cut off the load address.
-                    .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 3)
-            }
-            .textSelection(.enabled)
+            DebugDrawerTypeBadgeRow(
+                library.name,
+                kind: library.badgeKind,
+                path: library.path,
+                detail: "\(library.uuid?.uuidString ?? "no UUID") · \(library.loadAddressLabel)",
+                version: library.version
+            )
+        }
+    }
+
+    extension LoadedLibrary {
+        /// The app's executable is the app; a binary inside a .framework bundle is a framework;
+        /// anything else is a dylib.
+        fileprivate var badgeKind: DebugDrawerTypeBadgeRow.Kind {
+            if category == .app, !path.contains(".framework/") { return .app }
+            return path.contains(".framework/") ? .framework : .dylib
         }
     }
 

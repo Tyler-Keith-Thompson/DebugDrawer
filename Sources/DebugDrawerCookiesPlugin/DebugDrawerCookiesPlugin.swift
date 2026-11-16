@@ -37,17 +37,14 @@
 
                 // Search
                 TextField("Filter by name or domain...", text: $searchText)
-                    .textFieldStyle(.roundedBorder)
-                    .font(.caption2)
+                    .debugDrawerTextFieldStyle()
                     .accessibilityLabel("Filter cookies by name or domain")
-
-                Divider()
 
                 // Cookie list
                 if filtered.isEmpty {
                     Text(cookies.isEmpty ? "No cookies stored" : "No matches")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .debugDrawerFont(.secondary)
+                        .debugDrawerForegroundStyle(.secondary)
                         .frame(maxWidth: .infinity, alignment: .center)
                         .padding(.vertical, 8)
                 } else {
@@ -105,33 +102,39 @@
                     } label: {
                         HStack(spacing: 4) {
                             Image(systemName: expanded ? "chevron.down" : "chevron.right")
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
+                                .debugDrawerFont(.secondary)
+                                .debugDrawerForegroundStyle(.secondary)
                                 .accessibilityHidden(true)
+                            // One line cut in the middle, as the UserDefaults keys are, until
+                            // expanded; VoiceOver reads it whole.
                             Text(cookie.name)
-                                .font(.system(.caption2, design: .monospaced))
+                                .debugDrawerFont(.code)
                                 .fontWeight(.medium)
-                                .lineLimit(3)
+                                .debugDrawerForegroundStyle(.primary)
+                                .lineLimit(expanded ? nil : 1)
+                                .truncationMode(.middle)
+                                .help(cookie.name)
                         }
                     }
-                    .buttonStyle(.plain)
+                    .debugDrawerButtonStyle(.plain)
                     .accessibilityValue(expanded ? "Expanded" : "Collapsed")
 
                     Spacer()
 
+                    // Cut in the middle like the name, and whole once the cookie is expanded.
                     Text(cookie.domain)
-                        .font(.system(.caption2, design: .monospaced))
-                        .foregroundStyle(.secondary)
-                        .lineLimit(3)
+                        .debugDrawerFont(.code)
+                        .debugDrawerForegroundStyle(.tertiary)
+                        .lineLimit(expanded ? nil : 1)
+                        .truncationMode(.middle)
+                        .help(cookie.domain)
 
-                    Button {
+                    Button(role: .destructive) {
                         onDelete()
                     } label: {
                         Image(systemName: "trash")
-                            .font(.caption2)
-                            .foregroundStyle(.red)
                     }
-                    .buttonStyle(.plain)
+                    .debugDrawerButtonStyle(.borderless)
                     .accessibilityLabel("Delete \(cookie.name)")
                 }
 
@@ -151,15 +154,15 @@
 
         var body: some View {
             VStack(alignment: .leading, spacing: 2) {
-                DebugDrawerKeyValueRow("Value", value: cookie.value, redacted: cookie.redactedValue(redaction), labelWidth: 60)
-                DebugDrawerKeyValueRow("Domain", value: cookie.domain, labelWidth: 60)
-                DebugDrawerKeyValueRow("Path", value: cookie.path, labelWidth: 60)
-                DebugDrawerKeyValueRow("Secure", value: cookie.isSecure ? "Yes" : "No", labelWidth: 60)
-                DebugDrawerKeyValueRow("HTTP Only", value: cookie.isHTTPOnly ? "Yes" : "No", labelWidth: 60)
+                DebugDrawerKeyValueRow("Value", value: cookie.value, redacted: cookie.redactedValue(redaction))
+                DebugDrawerKeyValueRow("Domain", value: cookie.domain)
+                DebugDrawerKeyValueRow("Path", value: cookie.path)
+                DebugDrawerKeyValueRow("Secure", value: cookie.isSecure ? "Yes" : "No")
+                DebugDrawerKeyValueRow("HTTP Only", value: cookie.isHTTPOnly ? "Yes" : "No")
                 if let expires = cookie.expiresDate {
-                    DebugDrawerKeyValueRow("Expires", value: formatDate(expires), labelWidth: 60)
+                    DebugDrawerKeyValueRow("Expires", value: formatDate(expires))
                 } else {
-                    DebugDrawerKeyValueRow("Expires", value: "Session", labelWidth: 60)
+                    DebugDrawerKeyValueRow("Expires", value: "Session")
                 }
             }
             .lineLimit(3)

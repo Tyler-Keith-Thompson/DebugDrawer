@@ -1,4 +1,5 @@
 #if DEBUG
+    import DebugDrawer
     import SwiftUI
 
     // MARK: - Grid overlay
@@ -57,10 +58,12 @@
                 // Dimension labels at top-right
                 let dimText = "\(Int(size.width))x\(Int(size.height))"
                 context.draw(
-                    Text(dimText).font(.system(.caption2, design: .monospaced)).foregroundColor(color.opacity(0.4)),
+                    Text(dimText).foregroundColor(color.opacity(0.4)),
                     at: CGPoint(x: size.width - 40, y: 12)
                 )
             }
+            // The dimension label is drawn in the environment's font: the drawer's code type.
+            .debugDrawerFont(.code)
             .allowsHitTesting(false)
             .ignoresSafeArea()
         }

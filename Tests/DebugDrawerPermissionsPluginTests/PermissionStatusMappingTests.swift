@@ -131,15 +131,6 @@
             #expect(actual.title == "Unknown (42)")
         }
 
-        @Test("Each grant has its own symbol, so a status reads without its color")
-        func symbols() {
-            let grants: [PermissionStatus.Grant] = [.granted, .partial, .refused, .undecided, .unknown]
-
-            let actual = Set(grants.map(\.symbol))
-
-            #expect(actual.count == grants.count)
-        }
-
         @Test("Statuses group by how far they let the app go")
         func grants() {
             let statuses: [PermissionStatus] = [.authorizedWhenInUse, .limited, .writeOnly, .restricted, .notDetermined, .noStatusAPI, .checking]

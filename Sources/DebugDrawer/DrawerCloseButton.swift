@@ -5,21 +5,30 @@
     struct DrawerCloseButton: View {
         /// The smallest tap target Apple's Human Interface Guidelines allow.
         static let minimumTapSize: CGFloat = 44
-
         let action: () -> Void
 
         var body: some View {
             Button(action: action) {
-                Image(systemName: "xmark.circle.fill")
-                    .foregroundStyle(.secondary)
-                    .accessibilityHidden(true)
-                    // A plain-style button is hit only where it draws, so the glyph alone would be
-                    // a target too small to tap reliably.
-                    .frame(minWidth: Self.minimumTapSize, minHeight: Self.minimumTapSize)
-                    .contentShape(Rectangle())
+                DrawerIconButtonLabel(systemImage: "xmark")
             }
-            .buttonStyle(.plain)
+            .debugDrawerButtonStyle(.plain)
             .accessibilityLabel("Close the debug drawer")
+        }
+    }
+
+    /// The face of one of the header's icon buttons: a plain symbol in the secondary color, in a
+    /// square hit area of 44 points on iOS and 22 on the Mac, as Xcode's pane buttons are.
+    struct DrawerIconButtonLabel: View {
+        let systemImage: String
+        @ScaledMetric(relativeTo: .body) private var size = DrawerSpacing.iconButton
+
+        var body: some View {
+            Image(systemName: systemImage)
+                .debugDrawerFont(.body)
+                .foregroundStyle(DrawerPalette.secondaryText)
+                .frame(minWidth: size, minHeight: size)
+                .contentShape(Rectangle())
+                .accessibilityHidden(true)
         }
     }
 #endif

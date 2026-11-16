@@ -8,7 +8,7 @@
     @MainActor
     @Suite(.timeLimit(.minutes(1)))
     struct PermissionsViewTests {
-        @Test("Each row shows its name, its status and the usage description that declares it")
+        @Test("Each row shows its name with its status after a dash, and the usage description that declares it")
         func row() throws {
             let camera = DeclaredPermission(
                 kind: .camera, usageDescriptions: [UsageDescription(key: "NSCameraUsageDescription", text: "Scans receipts")]
@@ -18,13 +18,12 @@
                 onRequest: { _ in }, onOpenSettings: { _ in }
             )
 
-            let title = try sut.inspect().find(text: "Camera").string()
-            let status = try sut.inspect().find(ViewType.Label.self).title().text().string()
+            let expectedTitle = "Camera — Denied"
+            let title = try sut.inspect().find(text: expectedTitle).string()
             let description = try sut.inspect().find(text: "Scans receipts").string()
             let key = try sut.inspect().find(text: "NSCameraUsageDescription").string()
 
-            #expect(title == "Camera")
-            #expect(status == "Denied")
+            #expect(title == expectedTitle)
             #expect(description == "Scans receipts")
             #expect(key == "NSCameraUsageDescription")
         }

@@ -24,14 +24,15 @@
             case list = "L"
             case stat = "S"
 
-            var color: Color {
+            /// The operation in a word ("Read"), for the filter and VoiceOver.
+            var name: String {
                 switch self {
-                case .read: .blue
-                case .write: .orange
-                case .delete: .red
-                case .create: .green
-                case .list: .purple
-                case .stat: .secondary
+                case .read: "Read"
+                case .write: "Write"
+                case .delete: "Delete"
+                case .create: "Create"
+                case .list: "List"
+                case .stat: "Stat"
                 }
             }
         }

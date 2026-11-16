@@ -125,7 +125,7 @@
 
     extension DrawerSection {
         /// Categories sort alphabetically, with the default category last.
-        fileprivate static func categoryPrecedes(_ lhs: String, _ rhs: String) -> Bool {
+        static func categoryPrecedes(_ lhs: String, _ rhs: String) -> Bool {
             let fallback = defaultPluginCategory
             if (lhs == fallback) != (rhs == fallback) { return rhs == fallback }
             return lhs.localizedStandardCompare(rhs) == .orderedAscending

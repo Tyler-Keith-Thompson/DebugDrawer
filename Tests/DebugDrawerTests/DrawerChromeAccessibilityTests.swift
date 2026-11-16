@@ -53,13 +53,54 @@
             #expect(actual == expected)
         }
 
-        @Test("A group's title is a heading")
-        func groupTitleIsAHeading() throws {
-            let sut = DrawerSectionHeader(title: "Pinned")
+        @Test("Each navigator tab is named for its category, and only the selected one reads as selected")
+        func navigatorTabs() throws {
+            let tabs = [
+                DrawerNavigatorTab(scope: .all, title: "All", systemImage: "square.grid.2x2", hasUnread: true),
+                DrawerNavigatorTab(scope: .category("Storage"), title: "Storage", systemImage: "externaldrive", hasUnread: true)
+            ]
+            let sut = DrawerNavigatorTabs(tabs: tabs, selection: .constant(.category("Storage")))
+            let expectedLabels = ["All", "Storage"]
+            let expectedSelected = [false, true]
+            let expectedValues = ["Unread", "Unread"]
 
-            let actual = try sut.inspect().find(text: "Pinned").accessibilityTraits()
+            let buttons = try sut.inspect().findAll(ViewType.Button.self)
+            let labels = try buttons.map { try $0.accessibilityLabel().string() }
+            let selected = try buttons.map { try $0.accessibilityTraits().contains(.isSelected) }
+            let values = try buttons.map { try $0.accessibilityValue().string() }
 
-            #expect(actual.contains(.isHeader))
+            #expect(labels == expectedLabels)
+            #expect(selected == expectedSelected)
+            #expect(values == expectedValues)
+        }
+
+        @Test("Tapping a navigator tab selects its scope")
+        func tappingATabSelectsIt() throws {
+            var scope = DrawerScope.all
+            let binding = Binding(get: { scope }, set: { scope = $0 })
+            let tabs = [
+                DrawerNavigatorTab(scope: .all, title: "All", systemImage: "square.grid.2x2", hasUnread: false),
+                DrawerNavigatorTab(scope: .category("App"), title: "App", systemImage: "app.badge", hasUnread: false)
+            ]
+            let sut = DrawerNavigatorTabs(tabs: tabs, selection: binding)
+            let expected = DrawerScope.category("App")
+
+            try sut.inspect().findAll(ViewType.Button.self)[1].tap()
+
+            #expect(scope == expected)
+        }
+
+        @Test("The scope toggles say whether they're on")
+        func scopeToggles() throws {
+            var isOn = false
+            let binding = Binding(get: { isOn }, set: { isOn = $0 })
+            let sut = DrawerScopeToggle(title: "Show only my code", systemImage: "person.crop.square", isOn: binding)
+
+            let label = try sut.inspect().button().accessibilityLabel().string()
+            try sut.inspect().button().tap()
+
+            #expect(label == "Show only my code")
+            #expect(isOn)
         }
 
         @Test("A plugin's section header is a heading named for the plugin")

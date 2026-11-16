@@ -1,7 +1,15 @@
 #if DEBUG
+    import DebugDrawer
     import SwiftUI
 
     // MARK: - Platform text view wrappers
+
+    // The log is a platform text view rather than SwiftUI rows: it holds up to 2,000 lines,
+    // appends each batch without laying the others out again, and selects across lines. Each line
+    // is the time in the tertiary color, the issue glyph for an error or fault (drawn from the
+    // drawer's own `DebugDrawerIssueGlyph`, so it matches every other plugin's), and the text in
+    // the drawer's monospaced code type, debug lines dimmed. The view is clear and sits in a
+    // `DebugDrawerCodeBlock`, which gives it the panel's well.
 
     #if os(macOS)
         import AppKit
@@ -19,8 +27,7 @@
                 scrollView.hasVerticalScroller = true
                 scrollView.hasHorizontalScroller = false
                 scrollView.autohidesScrollers = true
-                scrollView.drawsBackground = true
-                scrollView.backgroundColor = NSColor.black.withAlphaComponent(0.3)
+                scrollView.drawsBackground = false
 
                 // scrollableTextView() makes its document view an NSTextView.
                 guard let textView = scrollView.documentView as? NSTextView else { return scrollView }
@@ -28,7 +35,8 @@
                 textView.isSelectable = true
                 textView.drawsBackground = false
                 textView.isRichText = true
-                textView.textContainerInset = NSSize(width: 4, height: 4)
+                textView.textContainerInset = .zero
+                textView.textContainer?.lineFragmentPadding = 0
                 textView.textContainer?.widthTracksTextView = true
                 textView.textContainer?.lineBreakMode = .byCharWrapping
 
@@ -47,25 +55,32 @@
                 guard let textView = scrollView.documentView as? NSTextView,
                       let storage = textView.textStorage else { return }
 
+                let coordinator = context.coordinator
                 let newCount = lines.count
-                let prevCount = context.coordinator.renderedLineCount
+                let prevCount = coordinator.renderedLineCount
+                let colorScheme = context.environment.colorScheme
 
-                if newCount == 0, prevCount > 0 {
+                // The glyphs are drawn for one appearance, so a new one redraws every line.
+                if colorScheme != coordinator.renderedColorScheme {
+                    coordinator.glyphs = ConsoleGlyphs(environment: context.environment)
+                    coordinator.renderedColorScheme = colorScheme
+                    storage.setAttributedString(buildAttributedString(from: lines, glyphs: coordinator.glyphs, prefixNewline: false))
+                    coordinator.renderedLineCount = newCount
+                } else if newCount == 0, prevCount > 0 {
                     storage.setAttributedString(NSAttributedString())
-                    context.coordinator.renderedLineCount = 0
+                    coordinator.renderedLineCount = 0
                 } else if newCount > prevCount {
                     let newLines = Array(lines[prevCount...])
-                    let fragment = buildAttributedString(from: newLines, prefixNewline: prevCount > 0)
+                    let fragment = buildAttributedString(from: newLines, glyphs: coordinator.glyphs, prefixNewline: prevCount > 0)
                     storage.append(fragment)
-                    context.coordinator.renderedLineCount = newCount
+                    coordinator.renderedLineCount = newCount
                 } else if newCount < prevCount {
                     // Ring buffer trimmed — full rebuild
-                    storage.setAttributedString(buildAttributedString(from: lines, prefixNewline: false))
-                    context.coordinator.renderedLineCount = newCount
+                    storage.setAttributedString(buildAttributedString(from: lines, glyphs: coordinator.glyphs, prefixNewline: false))
+                    coordinator.renderedLineCount = newCount
                 }
 
                 if isFollowing {
-                    let coordinator = context.coordinator
                     DispatchQueue.main.async {
                         coordinator.isProgrammaticScroll = true
                         textView.scrollToEndOfDocument(nil)
@@ -74,17 +89,19 @@
                 }
             }
 
-            private static let monoFont = NSFont.monospacedSystemFont(ofSize: 10, weight: .regular)
-            private static let smallMonoFont = NSFont.monospacedSystemFont(ofSize: 9, weight: .regular)
-            private static let badgeFont = NSFont.monospacedSystemFont(ofSize: 8, weight: .bold)
-            private static let timestampColor = NSColor.tertiaryLabelColor
+            /// The drawer's code type on the Mac: the subheadline's size, monospaced.
+            static let codeFont = NSFont.monospacedSystemFont(
+                ofSize: NSFont.preferredFont(forTextStyle: .subheadline).pointSize,
+                weight: .regular
+            )
             private static let dateFormatter: DateFormatter = {
                 let formatter = DateFormatter()
                 formatter.dateFormat = "HH:mm:ss.SSS"
                 return formatter
             }()
 
-            private func buildAttributedString(from lines: [LogLine], prefixNewline: Bool) -> NSAttributedString {
+            private func buildAttributedString(from lines: [LogLine], glyphs: ConsoleGlyphs?, prefixNewline: Bool) -> NSAttributedString {
+                let font = Self.codeFont
                 let result = NSMutableAttributedString()
                 for (index, line) in lines.enumerated() {
                     if index > 0 || prefixNewline {
@@ -93,44 +110,28 @@
 
                     let ts = Self.dateFormatter.string(from: line.timestamp)
                     result.append(NSAttributedString(string: ts + " ", attributes: [
-                        .font: Self.smallMonoFont,
-                        .foregroundColor: Self.timestampColor
+                        .font: font,
+                        .foregroundColor: NSColor.tertiaryLabelColor
                     ]))
 
-                    if let badge = line.level.label {
-                        result.append(NSAttributedString(string: badge + " ", attributes: [
-                            .font: Self.badgeFont,
-                            .foregroundColor: nsColor(for: line.level)
-                        ]))
-                    }
-
-                    if line.source == .oslog {
-                        result.append(NSAttributedString(string: "⌘ ", attributes: [
-                            .font: Self.smallMonoFont,
-                            .foregroundColor: Self.timestampColor
-                        ]))
+                    if let severity = line.level.severity, let glyph = glyphs?.attachment(for: severity, font: font) {
+                        result.append(glyph)
+                        result.append(NSAttributedString(string: " ", attributes: [.font: font]))
                     }
 
                     result.append(NSAttributedString(string: line.text, attributes: [
-                        .font: Self.monoFont,
-                        .foregroundColor: nsColor(for: line.level)
+                        .font: font,
+                        .foregroundColor: line.level == .debug ? NSColor.secondaryLabelColor : NSColor.labelColor
                     ]))
                 }
                 return result
             }
 
-            private func nsColor(for level: LogLine.Level) -> NSColor {
-                switch level {
-                case .debug: .secondaryLabelColor
-                case .info: .labelColor
-                case .notice: .labelColor
-                case .error: .systemRed
-                case .fault: .systemRed
-                }
-            }
-
             final class Coordinator: NSObject {
                 var renderedLineCount = 0
+                /// The appearance the glyphs were drawn for; nil before the first render.
+                var renderedColorScheme: ColorScheme?
+                var glyphs: ConsoleGlyphs?
                 var isProgrammaticScroll = false
                 var isFollowing: Binding<Bool>
                 weak var scrollView: NSScrollView?
@@ -152,6 +153,38 @@
             }
         }
 
+        /// The issue glyphs a log line can carry, drawn once for an appearance from the drawer's
+        /// `DebugDrawerIssueGlyph`, to set into the text as attachments.
+        @MainActor
+        struct ConsoleGlyphs {
+            private let images: [DebugDrawerIssueGlyph.Severity: NSImage]
+
+            init(environment: EnvironmentValues) {
+                var images: [DebugDrawerIssueGlyph.Severity: NSImage] = [:]
+                for severity in [DebugDrawerIssueGlyph.Severity.error, .warning] {
+                    let renderer = ImageRenderer(content: DebugDrawerIssueGlyph(severity)
+                        .environment(\.colorScheme, environment.colorScheme))
+                    renderer.scale = environment.displayScale
+                    images[severity] = renderer.nsImage
+                }
+                self.images = images
+            }
+
+            /// The glyph as text, centered on the font's capitals.
+            func attachment(for severity: DebugDrawerIssueGlyph.Severity, font: NSFont) -> NSAttributedString? {
+                guard let image = images[severity] else { return nil }
+                let attachment = NSTextAttachment()
+                attachment.image = image
+                attachment.bounds = CGRect(
+                    x: 0,
+                    y: (font.capHeight - image.size.height) / 2,
+                    width: image.size.width,
+                    height: image.size.height
+                )
+                return NSAttributedString(attachment: attachment)
+            }
+        }
+
     #elseif os(iOS)
         import UIKit
 
@@ -167,8 +200,9 @@
                 let textView = UITextView()
                 textView.isEditable = false
                 textView.isSelectable = true
-                textView.backgroundColor = UIColor.black.withAlphaComponent(0.3)
-                textView.textContainerInset = UIEdgeInsets(top: 4, left: 4, bottom: 4, right: 4)
+                textView.backgroundColor = .clear
+                textView.textContainerInset = .zero
+                textView.textContainer.lineFragmentPadding = 0
                 textView.textContainer.lineBreakMode = .byCharWrapping
                 textView.delegate = context.coordinator
                 context.coordinator.textView = textView
@@ -177,46 +211,55 @@
 
             func updateUIView(_ textView: UITextView, context: Context) {
                 let storage = textView.textStorage
+                let coordinator = context.coordinator
                 let dynamicTypeSize = context.environment.dynamicTypeSize
+                let colorScheme = context.environment.colorScheme
                 let fonts = ConsoleFonts(dynamicTypeSize: dynamicTypeSize)
 
                 let newCount = lines.count
-                let prevCount = context.coordinator.renderedLineCount
+                let prevCount = coordinator.renderedLineCount
 
-                // The fonts are baked into the rendered text, so a new text size redraws every line.
-                if dynamicTypeSize != context.coordinator.renderedDynamicTypeSize {
-                    storage.setAttributedString(buildAttributedString(from: lines, fonts: fonts, prefixNewline: false))
-                    context.coordinator.renderedLineCount = newCount
-                    context.coordinator.renderedDynamicTypeSize = dynamicTypeSize
+                // The fonts and glyphs are baked into the rendered text, so a new text size or
+                // appearance redraws every line.
+                if dynamicTypeSize != coordinator.renderedDynamicTypeSize || colorScheme != coordinator.renderedColorScheme {
+                    coordinator.glyphs = ConsoleGlyphs(environment: context.environment)
+                    storage.setAttributedString(buildAttributedString(from: lines, fonts: fonts, glyphs: coordinator.glyphs, prefixNewline: false))
+                    coordinator.renderedLineCount = newCount
+                    coordinator.renderedDynamicTypeSize = dynamicTypeSize
+                    coordinator.renderedColorScheme = colorScheme
                 } else if newCount == 0, prevCount > 0 {
                     storage.setAttributedString(NSAttributedString())
-                    context.coordinator.renderedLineCount = 0
+                    coordinator.renderedLineCount = 0
                 } else if newCount > prevCount {
                     let newLines = Array(lines[prevCount...])
-                    let fragment = buildAttributedString(from: newLines, fonts: fonts, prefixNewline: prevCount > 0)
+                    let fragment = buildAttributedString(from: newLines, fonts: fonts, glyphs: coordinator.glyphs, prefixNewline: prevCount > 0)
                     storage.append(fragment)
-                    context.coordinator.renderedLineCount = newCount
+                    coordinator.renderedLineCount = newCount
                 } else if newCount < prevCount {
-                    storage.setAttributedString(buildAttributedString(from: lines, fonts: fonts, prefixNewline: false))
-                    context.coordinator.renderedLineCount = newCount
+                    storage.setAttributedString(buildAttributedString(from: lines, fonts: fonts, glyphs: coordinator.glyphs, prefixNewline: false))
+                    coordinator.renderedLineCount = newCount
                 }
 
                 if isFollowing, storage.length > 0 {
-                    context.coordinator.isProgrammaticScroll = true
+                    coordinator.isProgrammaticScroll = true
                     let range = NSRange(location: storage.length - 1, length: 1)
                     textView.scrollRangeToVisible(range)
-                    context.coordinator.isProgrammaticScroll = false
+                    coordinator.isProgrammaticScroll = false
                 }
             }
 
-            private static let timestampColor = UIColor.tertiaryLabel
             private static let dateFormatter: DateFormatter = {
                 let formatter = DateFormatter()
                 formatter.dateFormat = "HH:mm:ss.SSS"
                 return formatter
             }()
 
-            private func buildAttributedString(from lines: [LogLine], fonts: ConsoleFonts, prefixNewline: Bool) -> NSAttributedString {
+            private func buildAttributedString(
+                from lines: [LogLine],
+                fonts: ConsoleFonts,
+                glyphs: ConsoleGlyphs?,
+                prefixNewline: Bool
+            ) -> NSAttributedString {
                 let result = NSMutableAttributedString()
                 for (index, line) in lines.enumerated() {
                     if index > 0 || prefixNewline {
@@ -225,46 +268,30 @@
 
                     let ts = Self.dateFormatter.string(from: line.timestamp)
                     result.append(NSAttributedString(string: ts + " ", attributes: [
-                        .font: fonts.small,
-                        .foregroundColor: Self.timestampColor
+                        .font: fonts.code,
+                        .foregroundColor: UIColor.tertiaryLabel
                     ]))
 
-                    if let badge = line.level.label {
-                        result.append(NSAttributedString(string: badge + " ", attributes: [
-                            .font: fonts.badge,
-                            .foregroundColor: uiColor(for: line.level)
-                        ]))
-                    }
-
-                    if line.source == .oslog {
-                        result.append(NSAttributedString(string: "⌘ ", attributes: [
-                            .font: fonts.small,
-                            .foregroundColor: Self.timestampColor
-                        ]))
+                    if let severity = line.level.severity, let glyph = glyphs?.attachment(for: severity, font: fonts.code) {
+                        result.append(glyph)
+                        result.append(NSAttributedString(string: " ", attributes: [.font: fonts.code]))
                     }
 
                     result.append(NSAttributedString(string: line.text, attributes: [
-                        .font: fonts.text,
-                        .foregroundColor: uiColor(for: line.level)
+                        .font: fonts.code,
+                        .foregroundColor: line.level == .debug ? UIColor.secondaryLabel : UIColor.label
                     ]))
                 }
                 return result
-            }
-
-            private func uiColor(for level: LogLine.Level) -> UIColor {
-                switch level {
-                case .debug: .secondaryLabel
-                case .info: .label
-                case .notice: .label
-                case .error: .systemRed
-                case .fault: .systemRed
-                }
             }
 
             final class Coordinator: NSObject, UITextViewDelegate {
                 var renderedLineCount = 0
                 /// The text size the rendered lines' fonts were made for; nil before the first render.
                 var renderedDynamicTypeSize: DynamicTypeSize?
+                /// The appearance the glyphs were drawn for; nil before the first render.
+                var renderedColorScheme: ColorScheme?
+                var glyphs: ConsoleGlyphs?
                 var isProgrammaticScroll = false
                 var isFollowing: Binding<Bool>
                 weak var textView: UITextView?
@@ -280,6 +307,39 @@
                     let atBottom = contentHeight - scrollOffset < 20
                     isFollowing.wrappedValue = atBottom
                 }
+            }
+        }
+
+        /// The issue glyphs a log line can carry, drawn once for an appearance and text size from
+        /// the drawer's `DebugDrawerIssueGlyph`, to set into the text as attachments.
+        @MainActor
+        struct ConsoleGlyphs {
+            private let images: [DebugDrawerIssueGlyph.Severity: UIImage]
+
+            init(environment: EnvironmentValues) {
+                var images: [DebugDrawerIssueGlyph.Severity: UIImage] = [:]
+                for severity in [DebugDrawerIssueGlyph.Severity.error, .warning] {
+                    let renderer = ImageRenderer(content: DebugDrawerIssueGlyph(severity)
+                        .environment(\.colorScheme, environment.colorScheme)
+                        .environment(\.dynamicTypeSize, environment.dynamicTypeSize))
+                    renderer.scale = environment.displayScale
+                    images[severity] = renderer.uiImage
+                }
+                self.images = images
+            }
+
+            /// The glyph as text, centered on the font's capitals.
+            func attachment(for severity: DebugDrawerIssueGlyph.Severity, font: UIFont) -> NSAttributedString? {
+                guard let image = images[severity] else { return nil }
+                let attachment = NSTextAttachment()
+                attachment.image = image
+                attachment.bounds = CGRect(
+                    x: 0,
+                    y: (font.capHeight - image.size.height) / 2,
+                    width: image.size.width,
+                    height: image.size.height
+                )
+                return NSAttributedString(attachment: attachment)
             }
         }
     #endif

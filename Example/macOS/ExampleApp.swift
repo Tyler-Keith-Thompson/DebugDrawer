@@ -266,5 +266,14 @@ struct ExampleContentView: View {
         .debugAccessibilityOverrides()
         .debugGrid()
         .debugDrawer()
+        // Launched with -OpenDebugDrawer, the window opens with the drawer open, so it can be
+        // checked without a hand, like the iOS example.
+        .onAppear {
+            #if DEBUG
+                if ProcessInfo.processInfo.arguments.contains("-OpenDebugDrawer"), !DebugDrawer.shared.isOpen {
+                    DebugDrawer.shared.toggle()
+                }
+            #endif
+        }
     }
 }

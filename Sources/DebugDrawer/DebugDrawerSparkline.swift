@@ -11,7 +11,7 @@ public struct DebugDrawerSparkline: View {
     let label: String
     let data: [Double]
     let range: ClosedRange<Double>?
-    let color: Color
+    let severity: DebugDrawerIssueGlyph.Severity?
     let height: CGFloat
 
     /// - Parameters:
@@ -19,13 +19,20 @@ public struct DebugDrawerSparkline: View {
     ///   - data: The samples, oldest first.
     ///   - range: The values at the bottom and top of the graph; `nil` fits the graph to the
     ///     samples' lowest and highest.
-    ///   - color: The line's color.
+    ///   - severity: Draws the line in that issue's color rather than the accent, where that
+    ///     means something (frames dropping); `nil` for the accent.
     ///   - height: The graph's height in points.
-    public init(_ label: String, data: [Double], range: ClosedRange<Double>? = nil, color: Color, height: CGFloat = 30) {
+    public init(
+        _ label: String,
+        data: [Double],
+        range: ClosedRange<Double>? = nil,
+        severity: DebugDrawerIssueGlyph.Severity? = nil,
+        height: CGFloat = 30
+    ) {
         self.label = label
         self.data = data
         self.range = range
-        self.color = color
+        self.severity = severity
         self.height = height
     }
 
@@ -45,11 +52,10 @@ public struct DebugDrawerSparkline: View {
             if let lowest = data.min(), let highest = data.max(), data.count > 1 {
                 let scale = range ?? lowest ... highest
                 Canvas { context, size in
-                    context.stroke(path(in: size, scale: scale), with: .color(color), lineWidth: 1.5)
+                    context.stroke(path(in: size, scale: scale), with: .color(DrawerPalette.fill(for: severity)), lineWidth: 1.5)
                 }
                 .frame(height: height)
-                .background(Color.primary.opacity(0.03))
-                .cornerRadius(3)
+                .background(DrawerPalette.well, in: RoundedRectangle(cornerRadius: DrawerSpacing.badgeRadius))
                 .accessibilityElement()
                 .accessibilityLabel(label)
                 .accessibilityValue(spokenSummary(lowest: lowest, highest: highest))

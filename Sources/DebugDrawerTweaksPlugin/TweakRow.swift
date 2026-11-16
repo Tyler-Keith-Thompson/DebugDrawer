@@ -1,4 +1,5 @@
 #if DEBUG
+    import DebugDrawer
     import SwiftUI
 
     /// One tweak's control, or an action's button, with a reset button while the tweak reads other
@@ -18,12 +19,12 @@
                         Label("Reset", systemImage: "arrow.uturn.backward")
                             .labelStyle(.iconOnly)
                     }
-                    .buttonStyle(.borderless)
-                    .controlSize(.small)
+                    .debugDrawerButtonStyle(.borderless)
                     .accessibilityLabel("Reset \(row.title)")
                     .help("Reset to the default")
                 }
             }
+            .debugDrawerRowPadding()
         }
 
         @ViewBuilder
@@ -52,8 +53,7 @@
             case let .text(text):
                 labeled {
                     TextField(row.title, text: Binding(get: { text }, set: { onChange(.string($0)) }))
-                        .textFieldStyle(.roundedBorder)
-                        .controlSize(.small)
+                        .debugDrawerTextFieldStyle()
                         .autocorrectionDisabled()
                         .accessibilityLabel(row.title)
                 }
@@ -63,7 +63,7 @@
                     HStack(alignment: .firstTextBaseline) {
                         title
                         Text(value, format: .number)
-                            .font(.system(.caption2, design: .monospaced))
+                            .debugDrawerFont(.value)
                     }
                 }
                 .controlSize(.small)
@@ -71,14 +71,15 @@
 
             case let .action(perform):
                 Button(row.title) { perform() }
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
+                    .debugDrawerButtonStyle(.secondary)
             }
         }
 
         private var title: some View {
             Text(row.title)
-                .font(.caption)
+                .debugDrawerFont(.body)
+                // Wraps rather than truncates beside a switch at large text sizes.
+                .fixedSize(horizontal: false, vertical: true)
         }
 
         /// The title beside the control, or above it at accessibility text sizes, where side by

@@ -32,29 +32,10 @@
             assertSnapshot(of: actual, as: .image(perceptualPrecision: 0.98), named: "\(colorScheme)")
         }
 
-        @Test("Stat badges show each figure, in its color, over its caption", arguments: [ColorScheme.light, .dark])
-        func statBadges(colorScheme: ColorScheme) throws {
-            let sut = HStack(spacing: 12) {
-                DebugDrawerStatBadge("Total", value: "12")
-                DebugDrawerStatBadge("Min", value: "41", color: .red)
-                DebugDrawerStatBadge("Peak", value: "182", color: .blue)
-            }
-            let renderer = ImageRenderer(content: sut
-                .frame(width: 320, alignment: .leading)
-                .padding()
-                .background(.background)
-                .environment(\.colorScheme, colorScheme))
-            renderer.scale = 2
-
-            let actual = try #require(renderer.nsImage)
-
-            assertSnapshot(of: actual, as: .image(perceptualPrecision: 0.98), named: "\(colorScheme)")
-        }
-
         @Test("A sparkline draws its samples, fitted to their lowest and highest, on a faint panel", arguments: [ColorScheme.light, .dark])
         func sparkline(colorScheme: ColorScheme) throws {
             let samples: [Double] = [60, 60, 58, 41, 59, 60, 30, 55, 60, 60, 60, 57]
-            let sut = DebugDrawerSparkline("Frame rate history", data: samples, color: .green)
+            let sut = DebugDrawerSparkline("Frame rate history", data: samples)
             let renderer = ImageRenderer(content: sut
                 .frame(width: 320, alignment: .leading)
                 .padding()
@@ -70,7 +51,7 @@
         @Test("A sparkline with a range draws its samples against it", arguments: [ColorScheme.light, .dark])
         func sparklineInRange(colorScheme: ColorScheme) throws {
             let samples: [Double] = [12, 18, 15, 40, 72, 65, 30, 22, 25, 90, 55, 20]
-            let sut = DebugDrawerSparkline("CPU history", data: samples, range: 0 ... 100, color: .blue)
+            let sut = DebugDrawerSparkline("CPU history", data: samples, range: 0 ... 100)
             let renderer = ImageRenderer(content: sut
                 .frame(width: 320, alignment: .leading)
                 .padding()

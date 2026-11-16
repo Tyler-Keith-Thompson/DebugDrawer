@@ -1,54 +1,35 @@
 #if DEBUG
+    import DebugDrawer
     import SwiftUI
 
-    /// The request count, the status filter and a button that clears every request.
+    /// The status filter, and a button that clears every request at the trailing edge. The
+    /// request count is the header's accessory, so the toolbar doesn't repeat it.
     struct NetworkToolbar: View {
-        let count: Int
         @Binding var filterStatus: NetworkStore.StatusFilter
         let clear: () -> Void
-        @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
         var body: some View {
-            // At accessibility sizes the count, the filter and Clear don't fit one row, and squeezing
-            // them breaks words, so the count takes its own line and the controls wrap below it.
-            if dynamicTypeSize.isAccessibilitySize {
-                VStack(alignment: .leading, spacing: 6) {
-                    countLabel
-                    ViewThatFits(in: .horizontal) {
-                        HStack(spacing: 12) { controls }
-                        VStack(alignment: .leading, spacing: 6) { controls }
+            // The filter has a line of its own: its five segments at their ideal width are wider
+            // than the drawer on iPad, and squeezed beside Clear they would truncate.
+            VStack(alignment: .leading, spacing: 0) {
+                Picker("Status", selection: $filterStatus) {
+                    ForEach(NetworkStore.StatusFilter.allCases, id: \.self) { filter in
+                        Text(filter.rawValue).tag(filter)
                     }
                 }
-            } else {
-                HStack(spacing: 6) {
-                    countLabel
-                    controls
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .accessibilityLabel("Status")
+                .accessibilityElement(children: .contain)
+                .padding(.top, 8)
+                DebugDrawerActionRow {
+                    EmptyView()
+                } trailing: {
+                    Button("Clear", role: .destructive, action: clear)
+                        .debugDrawerButtonStyle(.destructive)
+                        .accessibilityLabel("Clear requests")
                 }
             }
-        }
-
-        private var countLabel: some View {
-            Text("\(count)")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-        }
-
-        @ViewBuilder private var controls: some View {
-            Picker("Status", selection: $filterStatus) {
-                ForEach(NetworkStore.StatusFilter.allCases, id: \.self) { filter in
-                    Text(filter.rawValue).tag(filter)
-                }
-            }
-            .pickerStyle(.segmented)
-            .labelsHidden()
-            .controlSize(.mini)
-            .accessibilityLabel("Status")
-            .accessibilityElement(children: .contain)
-
-            Button("Clear", action: clear)
-                .font(.caption)
-                .buttonStyle(.plain)
-                .foregroundStyle(.secondary)
         }
     }
 #endif

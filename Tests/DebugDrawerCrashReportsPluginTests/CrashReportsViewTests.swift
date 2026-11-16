@@ -1,5 +1,6 @@
 // ViewInspector is linked on Apple platforms only, and the views are tested on the Mac.
 #if os(macOS)
+    @testable import DebugDrawer
     @testable import DebugDrawerCrashReportsPlugin
     import Foundation
     import SwiftUI
@@ -47,7 +48,7 @@
             #expect(opened == [report.id])
         }
 
-        @Test("An open report shows its stack trace and a button that copies the report")
+        @Test("An open report shows each frame of its stack trace, symbol and image, and a button that copies the report")
         func expandedShowsFrames() throws {
             let report = CrashReport(
                 id: UUID(), date: Date(timeIntervalSince1970: 1_763_290_000), title: "SIGTRAP", reason: nil,
@@ -56,9 +57,13 @@
             let sut = CrashReportsView(
                 reports: [report], expanded: .constant(report.id), onOpen: { _ in }, onDelete: { _ in }, onMarkAllSeen: {}, onDeleteAll: {}
             )
-            let expected = "0 Example 0x1 crash + 4\n1 Example 0x2 main + 8"
+            let expected = ["crash", "main", "Example"]
 
-            let actual = try sut.inspect().find(text: expected).string()
+            let actual = try [
+                sut.inspect().find(text: "crash").string(),
+                sut.inspect().find(text: "main").string(),
+                sut.inspect().find(text: "Example").string()
+            ]
 
             #expect(actual == expected)
             #expect(try sut.inspect().find(button: "Copy Report").labelView().text().string() == "Copy Report")
@@ -77,7 +82,7 @@
             #expect(throws: (any Error).self) { try sut.inspect().find(text: "0 Example 0x1") }
         }
 
-        @Test("An unopened report is tagged New; an opened one isn't")
+        @Test("An unopened report has an unread dot; an opened one hasn't")
         func newTag() throws {
             let unseen = CrashReport(
                 id: UUID(), date: Date(timeIntervalSince1970: 2), title: "SIGSEGV", reason: nil, appVersion: nil,
@@ -91,13 +96,13 @@
                 reports: [unseen, seen], expanded: .constant(nil), onOpen: { _ in }, onDelete: { _ in }, onMarkAllSeen: {}, onDeleteAll: {}
             )
 
-            let actual = try sut.inspect().findAll(ViewType.Text.self, where: { try $0.string() == "New" })
+            let actual = try sut.inspect().findAll(DebugDrawerUnreadDot.self)
 
             #expect(actual.count == 1)
             #expect(try actual.first?.accessibilityLabel().string() == "New report")
         }
 
-        @Test("A report's delete button deletes that report")
+        @Test("An open report's Delete button deletes that report")
         func deleteOne() throws {
             let report = CrashReport(
                 id: UUID(), date: Date(timeIntervalSince1970: 1), title: "SIGSEGV", reason: nil, appVersion: nil,
@@ -105,7 +110,8 @@
             )
             var deleted: [CrashReport.ID] = []
             let sut = CrashReportsView(
-                reports: [report], expanded: .constant(nil), onOpen: { _ in }, onDelete: { deleted.append($0) }, onMarkAllSeen: {}, onDeleteAll: {}
+                reports: [report], expanded: .constant(report.id),
+                onOpen: { _ in }, onDelete: { deleted.append($0) }, onMarkAllSeen: {}, onDeleteAll: {}
             )
 
             try sut.inspect().find(ViewType.Button.self, where: { try $0.accessibilityLabel().string() == "Delete report SIGSEGV" }).tap()
@@ -180,6 +186,51 @@
             let actual = try sut.inspect().find(ViewType.Text.self, where: { try $0.string().hasSuffix("MetricKit") }).string()
 
             #expect(actual == expected)
+        }
+
+        @Test("Frames in the app's executable are its own code, and the first of them is selected")
+        func ownCode() throws {
+            let report = CrashReport(
+                id: UUID(), date: Date(timeIntervalSince1970: 1), title: "SIGTRAP", reason: nil, appVersion: nil,
+                frames: [
+                    "0   libswiftCore.dylib   0x000000018f2b1a40 $ss17_assertionFailureV + 172",
+                    "1   Example              0x0000000100004a1c $s7Example5crashyyF + 48",
+                    "2   Example              0x0000000100004b00 main + 8"
+                ],
+                source: .captured, isSeen: true
+            )
+            let sut = CrashReportsView(
+                reports: [report], expanded: .constant(report.id), ownImage: "Example",
+                onOpen: { _ in }, onDelete: { _ in }, onMarkAllSeen: {}, onDeleteAll: {}
+            )
+            let expectedOwn = [false, true, true]
+            let expectedSelected = [false, true, false]
+            let expectedImages = ["libswiftCore.dylib", "Example", "Example"]
+
+            let rows = try sut.inspect().findAll(DebugDrawerStackFrameRow.self).map { try $0.actualView() }
+
+            #expect(rows.map(\.isOwnCode) == expectedOwn)
+            #expect(rows.map(\.isSelected) == expectedSelected)
+            #expect(rows.map(\.image) == expectedImages)
+        }
+
+        @Test("The header counts the reports with an error glyph, following the store, and shows nothing without one")
+        func headerAccessory() throws {
+            let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+            defer { try? FileManager.default.removeItem(at: directory) }
+            let store = CrashReportStore(directory: directory)
+            let sut = CrashReportsPlugin(store: store, ownImage: "Example")
+            let expected = "1 error"
+
+            #expect(throws: (any Error).self) { try sut.headerAccessory.inspect().find(DebugDrawerIssueCount.self) }
+            store.add(CrashReport(
+                id: UUID(), date: Date(timeIntervalSince1970: 1), title: "SIGSEGV", reason: nil, appVersion: nil,
+                frames: [], source: .captured, isSeen: false
+            ))
+            let actual = try sut.headerAccessory.inspect().find(DebugDrawerIssueCount.self).actualView()
+
+            #expect(actual.severity == .error)
+            #expect(actual.spokenLabel == expected)
         }
     }
 #endif

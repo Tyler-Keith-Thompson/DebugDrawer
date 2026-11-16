@@ -1,4 +1,5 @@
 #if DEBUG
+    import DebugDrawer
     import Foundation
     import SwiftUI
 
@@ -124,84 +125,25 @@
         }
     }
 
-    // MARK: - Waterfall view
+    // MARK: - Timing view
 
+    /// A request's phases as gauges, as Xcode's debug gauges show a measure: each phase's bar
+    /// filled by its share of the whole request, then how the connection was made.
     struct NetworkTimingView: View {
         let metrics: NetworkTimingMetrics
-        @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
         var body: some View {
-            VStack(alignment: .leading, spacing: 3) {
+            VStack(alignment: .leading, spacing: 0) {
                 ForEach(metrics.phases) { phase in
-                    // At accessibility text sizes the name and duration don't fit columns beside
-                    // the bar, so they share a line above it.
-                    if dynamicTypeSize.isAccessibilitySize {
-                        VStack(alignment: .leading, spacing: 3) {
-                            HStack(spacing: 4) {
-                                name(of: phase)
-                                Spacer()
-                                duration(of: phase)
-                            }
-                            bar(for: phase)
-                        }
-                    } else {
-                        HStack(spacing: 4) {
-                            name(of: phase)
-                                .frame(width: 56, alignment: .leading)
-                            bar(for: phase)
-                            duration(of: phase)
-                                .frame(width: 48, alignment: .trailing)
-                        }
-                    }
+                    DebugDrawerGaugeRow(
+                        phase.kind.rawValue,
+                        value: NetworkTimingMetrics.label(for: phase.duration),
+                        fraction: metrics.total > 0 ? phase.duration / metrics.total : 0
+                    )
                 }
-
-                let connectionLayout = dynamicTypeSize.isAccessibilitySize
-                    ? AnyLayout(VStackLayout(alignment: .leading, spacing: 2))
-                    : AnyLayout(HStackLayout(spacing: 10))
-                connectionLayout {
-                    Text("Protocol: \(metrics.protocolName ?? "—")")
-                    Text("Reused connection: \(metrics.isReusedConnection ? "Yes" : "No")")
-                    Text("Cache hit: \(metrics.isCacheHit ? "Yes" : "No")")
-                }
-                .font(.system(.caption2, design: .monospaced))
-                .foregroundStyle(.secondary)
-                .padding(.top, 2)
-            }
-            .padding(4)
-        }
-
-        private func name(of phase: NetworkTimingMetrics.Phase) -> some View {
-            Text(phase.kind.rawValue)
-                .font(.system(.caption2, design: .monospaced, weight: .medium))
-                .foregroundStyle(.secondary)
-        }
-
-        private func bar(for phase: NetworkTimingMetrics.Phase) -> some View {
-            GeometryReader { geo in
-                let total = metrics.total
-                let scale = total > 0 ? geo.size.width / total : 0
-                RoundedRectangle(cornerRadius: 1)
-                    .fill(color(for: phase.kind))
-                    .frame(width: max(1, phase.duration * scale))
-                    .offset(x: phase.start * scale)
-            }
-            .frame(height: 6)
-        }
-
-        private func duration(of phase: NetworkTimingMetrics.Phase) -> some View {
-            Text(NetworkTimingMetrics.label(for: phase.duration))
-                .font(.system(.caption2, design: .monospaced))
-                .foregroundStyle(.tertiary)
-        }
-
-        private func color(for kind: NetworkTimingMetrics.Phase.Kind) -> Color {
-            switch kind {
-            case .dns: .teal
-            case .connect: .orange
-            case .tls: .purple
-            case .request: .blue
-            case .timeToFirstByte: .green
-            case .response: .cyan
+                DebugDrawerKeyValueRow("Protocol", value: metrics.protocolName ?? "—")
+                DebugDrawerKeyValueRow("Reused", value: metrics.isReusedConnection ? "Yes" : "No")
+                DebugDrawerKeyValueRow("Cache hit", value: metrics.isCacheHit ? "Yes" : "No")
             }
         }
     }

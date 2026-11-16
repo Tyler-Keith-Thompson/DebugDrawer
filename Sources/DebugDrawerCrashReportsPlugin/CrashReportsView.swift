@@ -8,31 +8,41 @@
         let reports: [CrashReport]
         /// The report open to its stack trace, if any.
         @Binding var expanded: CrashReport.ID?
+        /// The app's executable's file name, which marks the app's own frames.
+        var ownImage: String?
         /// Called when a report is opened: it is then seen.
         let onOpen: (CrashReport.ID) -> Void
         let onDelete: (CrashReport.ID) -> Void
         let onMarkAllSeen: () -> Void
         let onDeleteAll: () -> Void
-        @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
         var body: some View {
-            VStack(alignment: .leading, spacing: 8) {
-                if reports.isEmpty {
+            if reports.isEmpty {
+                DebugDrawerSection {
+                    EmptyView()
+                } footer: {
                     Text("No crash reports. After a crash, its report appears here on the next launch.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                } else {
+                }
+            } else {
+                DebugDrawerSection {
                     ForEach(reports) { report in
                         CrashReportRow(
                             report: report,
                             isExpanded: expanded == report.id,
+                            ownImage: ownImage,
                             onToggle: { toggle(report.id) },
                             onDelete: { onDelete(report.id) }
                         )
-                        Divider()
                     }
-                    buttons
+                }
+                DebugDrawerActionRow {
+                    Button("Mark All Seen", action: onMarkAllSeen)
+                        .disabled(reports.allSatisfy(\.isSeen))
+                        .accessibilityHint("Clears the badge without opening each report")
+                } trailing: {
+                    Button("Delete All", role: .destructive, action: onDeleteAll)
+                        .debugDrawerButtonStyle(.destructive)
+                        .accessibilityHint("Deletes every crash report")
                 }
             }
         }
@@ -44,21 +54,6 @@
                 expanded = id
                 onOpen(id)
             }
-        }
-
-        private var buttons: some View {
-            let layout = dynamicTypeSize.isAccessibilitySize
-                ? AnyLayout(VStackLayout(alignment: .leading, spacing: 6))
-                : AnyLayout(HStackLayout())
-            return layout {
-                Button("Mark All Seen", action: onMarkAllSeen)
-                    .disabled(reports.allSatisfy(\.isSeen))
-                    .accessibilityHint("Clears the badge without opening each report")
-                Button("Delete All", role: .destructive, action: onDeleteAll)
-                    .accessibilityHint("Deletes every crash report")
-            }
-            .buttonStyle(.bordered)
-            .controlSize(.small)
         }
     }
 #endif

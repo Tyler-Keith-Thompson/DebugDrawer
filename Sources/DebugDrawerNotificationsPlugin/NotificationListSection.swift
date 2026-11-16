@@ -31,23 +31,24 @@
         let onRemoveAll: () -> Void
 
         var body: some View {
-            VStack(alignment: .leading, spacing: 6) {
-                NotificationsSectionHeading(title: "\(kind.title) (\(notifications.count))")
+            DebugDrawerSection("\(kind.title) (\(notifications.count))") {
+                ForEach(notifications) { notification in
+                    ListedNotificationRow(notification: notification, redaction: redaction) {
+                        onRemove(notification.id)
+                    }
+                }
+                if !notifications.isEmpty {
+                    DebugDrawerActionRow {
+                        EmptyView()
+                    } trailing: {
+                        Button("Remove All", role: .destructive, action: onRemoveAll)
+                            .debugDrawerButtonStyle(.destructive)
+                            .accessibilityLabel("Remove all \(kind.title.lowercased()) notifications")
+                    }
+                }
+            } footer: {
                 if notifications.isEmpty {
                     Text(kind.emptyText)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                } else {
-                    ForEach(notifications) { notification in
-                        ListedNotificationRow(notification: notification, redaction: redaction) {
-                            onRemove(notification.id)
-                        }
-                        Divider()
-                    }
-                    Button("Remove All", role: .destructive, action: onRemoveAll)
-                        .buttonStyle(.bordered)
-                        .controlSize(.small)
-                        .accessibilityLabel("Remove all \(kind.title.lowercased()) notifications")
                 }
             }
         }

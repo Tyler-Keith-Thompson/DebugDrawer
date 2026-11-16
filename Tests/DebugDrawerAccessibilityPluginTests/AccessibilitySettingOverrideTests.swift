@@ -150,8 +150,8 @@
             overrides.reduceMotion = true
             overrides.invertColors = false
             let view = AccessibilityPluginView()
-            XCTAssertNoThrow(try view.inspect().find(text: "Motion: On"))
-            XCTAssertNoThrow(try view.inspect().find(text: "Invert: Off"))
+            XCTAssertNoThrow(try view.inspect().find(text: "Motion"))
+            XCTAssertNoThrow(try view.inspect().find(text: "Invert"))
             try view.inspect().find(button: "Reset All").tap()
             XCTAssertFalse(overrides.hasOverrides)
         }

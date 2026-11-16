@@ -19,6 +19,7 @@ import SwiftUI
 public protocol DebugDrawerPlugin: Identifiable {
     associatedtype Body: View
     associatedtype HUD: View = EmptyView
+    associatedtype HeaderAccessory: View = EmptyView
 
     /// Identifies the plugin in the drawer: registration, saved state and search. Defaults to the
     /// type's name; declare one to register several instances of one type.
@@ -48,6 +49,24 @@ public protocol DebugDrawerPlugin: Identifiable {
     /// A compact readout the developer can pin to the floating HUD, which stays on screen while the
     /// drawer is closed. Defaults to none.
     @MainActor var hud: HUD? { get }
+
+    // A view rather than a value (counts and a summary) so it follows the plugin's own store,
+    // which the drawer doesn't observe, and can hold an action; the issue count is vocabulary so
+    // every header draws one alike. Rejected: a `DebugDrawerHeaderSummary` value (no live updates
+    // without the drawer observing each plugin, and a Copy action would need a case of its own),
+    // an optional like `hud` (an `EmptyView` default needs no `nil` and reads the same), and
+    // reusing the badge (it counts what's new and the drawer clears it on open).
+
+    /// A compact readout at the trailing edge of the plugin's header row, shown whether the
+    /// plugin is open or closed: what it has found (``DebugDrawerIssueCount``), a short summary
+    /// (`Text("1,204 lines")`), or a borderless action such as Copy. Text in it is set in the
+    /// drawer's monospaced code type in the tertiary color unless it names another; it keeps to
+    /// one line. Built on the main actor like ``body``, so it follows the plugin's state as the
+    /// body does. Defaults to none.
+    ///
+    /// A plugin with an accessory has no numeric badge in its header: the accessory replaces it,
+    /// and the dot on its navigator tab still marks what's new.
+    @ViewBuilder @MainActor var headerAccessory: HeaderAccessory { get }
 }
 
 public extension DebugDrawerPlugin {
@@ -79,6 +98,13 @@ public extension DebugDrawerPlugin where HUD == EmptyView {
     }
 }
 
+public extension DebugDrawerPlugin where HeaderAccessory == EmptyView {
+    /// No header accessory: the header shows the title, pin and badge alone.
+    var headerAccessory: EmptyView {
+        EmptyView()
+    }
+}
+
 /// The category of a plugin that names none.
 let defaultPluginCategory = "General"
 
@@ -95,6 +121,7 @@ let defaultPluginCategory = "General"
         public let actions: [DebugDrawerAction]
         private let _body: @MainActor () -> AnyView
         private let _hud: (@MainActor () -> AnyView)?
+        private let _headerAccessory: (@MainActor () -> AnyView)?
         private let _contribute: (@MainActor (inout DebugDrawerReport, DebugDrawerRedaction) -> Void)?
 
         @MainActor public init<P: DebugDrawerPlugin>(_ plugin: P) {
@@ -108,6 +135,11 @@ let defaultPluginCategory = "General"
                 _hud = nil
             } else {
                 _hud = { AnyView(plugin.hud) }
+            }
+            if P.HeaderAccessory.self == EmptyView.self {
+                _headerAccessory = nil
+            } else {
+                _headerAccessory = { AnyView(plugin.headerAccessory) }
             }
             if let contributor = plugin as? any DebugDrawerReportContributor {
                 _contribute = { contributor.contribute(to: &$0, redaction: $1) }
@@ -140,6 +172,16 @@ let defaultPluginCategory = "General"
         /// The plugin's HUD readout, if it offers one.
         @MainActor public var hud: AnyView? {
             _hud?()
+        }
+
+        /// The plugin's header accessory, if it declares one.
+        @MainActor public var headerAccessory: AnyView? {
+            _headerAccessory?()
+        }
+
+        /// Whether the plugin declares a header accessory, without building it.
+        var hasHeaderAccessory: Bool {
+            _headerAccessory != nil
         }
 
         /// The `UserDefaults` key that records whether the user collapsed this plugin's section.

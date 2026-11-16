@@ -6,106 +6,93 @@
         @ObservedObject private var store = DiskIOStore.shared
 
         var body: some View {
-            VStack(alignment: .leading, spacing: 6) {
-                // Stats bar
-                HStack(spacing: 10) {
-                    DebugDrawerStatBadge("R", value: "\(store.totalReads)", color: .blue)
-                    DebugDrawerStatBadge("W", value: "\(store.totalWrites)", color: .orange)
-                    DebugDrawerStatBadge("Read", value: store.totalBytesRead.byteLabel, color: .blue)
-                    DebugDrawerStatBadge("Written", value: store.totalBytesWritten.byteLabel, color: .orange)
-
-                    Spacer()
-
+            VStack(alignment: .leading, spacing: 0) {
+                DebugDrawerSection("Totals") {
+                    DebugDrawerKeyValueRow("Reads", value: "\(store.totalReads)")
+                    DebugDrawerKeyValueRow("Writes", value: "\(store.totalWrites)")
+                    DebugDrawerKeyValueRow("Read", value: store.totalBytesRead.byteLabel)
+                    DebugDrawerKeyValueRow("Written", value: store.totalBytesWritten.byteLabel)
                     if store.mainThreadOps > 0 {
-                        HStack(spacing: 2) {
-                            Image(systemName: "exclamationmark.triangle.fill")
-                                .font(.caption2)
-                                .foregroundStyle(.red)
-                                .accessibilityHidden(true)
-                            Text("\(store.mainThreadOps) main")
-                                .font(.system(.caption2, weight: .bold))
-                                .foregroundStyle(.red)
-                        }
-                        .accessibilityElement(children: .combine)
-                        .accessibilityLabel("\(store.mainThreadOps) on the main thread")
+                        DebugDrawerIssueRow("Main thread", status: "\(store.mainThreadOps) calls", severity: .warning)
                     }
                 }
 
-                // Filters
-                HStack(spacing: 4) {
-                    filterButton("All", isActive: store.filterOp == nil && !store.mainThreadOnly) {
-                        store.filterOp = nil
-                        store.mainThreadOnly = false
+                DebugDrawerSection("Calls") {
+                    DebugDrawerRow("Operation") {
+                        Picker("Operation", selection: $store.filterOp) {
+                            Text("All").tag(IOEvent.Operation?.none)
+                            ForEach([IOEvent.Operation.read, .write, .delete, .list], id: \.rawValue) { operation in
+                                Text(operation.name).tag(IOEvent.Operation?.some(operation))
+                            }
+                        }
+                        .pickerStyle(.menu)
                     }
-
-                    ForEach([IOEvent.Operation.read, .write, .delete, .list], id: \.rawValue) { op in
-                        filterButton(op.rawValue, color: op.color, isActive: store.filterOp == op) {
-                            store.filterOp = store.filterOp == op ? nil : op
+                    DebugDrawerRow("Main thread only", isOn: $store.mainThreadOnly)
+                    // With nothing to list, a sentence says why rather than an empty well.
+                    if store.filteredEvents.isEmpty {
+                        Text(store.events.isEmpty ? "No calls yet." : "No calls match the filter.")
+                            .debugDrawerFont(.secondary)
+                            .debugDrawerForegroundStyle(.secondary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .debugDrawerRowPadding()
+                    } else {
+                        DebugDrawerCodeBlock {
+                            ScrollView {
+                                LazyVStack(alignment: .leading, spacing: 0) {
+                                    ForEach(store.filteredEvents) { event in
+                                        IOEventRow(event: event)
+                                    }
+                                }
+                            }
+                            .frame(maxHeight: 250)
                         }
                     }
-
-                    Spacer()
-
-                    Toggle("Main", isOn: $store.mainThreadOnly)
-                        .toggleStyle(.switch)
-                        .controlSize(.mini)
-
-                    Button("Clear") { store.clear() }
-                        .font(.caption)
-                        .buttonStyle(.plain)
-                        .foregroundStyle(.secondary)
                 }
 
-                // Event list
-                ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 0) {
-                        ForEach(store.filteredEvents) { event in
-                            IOEventRow(event: event)
-                        }
-                    }
-                }
-                .frame(maxHeight: 250)
-                .background(Color.black.opacity(0.15))
-                .clipShape(RoundedRectangle(cornerRadius: 4))
+                DiskSpaceRows(volume: DiskSpace.home)
 
-                // Disk space
-                diskSpaceRow
+                DebugDrawerActionRow {
+                    EmptyView()
+                } trailing: {
+                    Button("Clear", role: .destructive) { store.clear() }
+                        .debugDrawerButtonStyle(.destructive)
+                        .accessibilityLabel("Clear recorded calls")
+                }
             }
         }
+    }
 
-        private func filterButton(_ label: String, color: Color = .secondary, isActive: Bool, action: @escaping () -> Void) -> some View {
-            Button(action: action) {
-                Text(label)
-                    .font(.system(.caption2, design: .monospaced, weight: isActive ? .bold : .regular))
-                    .padding(.horizontal, 5)
-                    .padding(.vertical, 2)
-                    .background(isActive ? color.opacity(0.2) : Color.clear)
-                    .cornerRadius(3)
-            }
-            .buttonStyle(.plain)
+    /// The home volume's size and free space, read when the plugin draws.
+    struct DiskSpace: Equatable {
+        let total: Int64
+        let free: Int64
+
+        /// The volume holding the home directory, or `nil` when the system won't say.
+        static var home: DiskSpace? {
+            guard let attributes = try? FileManager.default.attributesOfFileSystem(forPath: NSHomeDirectory()),
+                  let total = attributes[.systemSize] as? Int64,
+                  let free = attributes[.systemFreeSize] as? Int64,
+                  total > 0 else { return nil }
+            return DiskSpace(total: total, free: free)
         }
+    }
 
-        private var diskSpaceRow: some View {
-            HStack {
-                if let attrs = try? FileManager.default.attributesOfFileSystem(forPath: NSHomeDirectory()),
-                   let total = attrs[.systemSize] as? Int64,
-                   let free = attrs[.systemFreeSize] as? Int64 {
-                    let used = total - free
-                    let pct = Double(used) / Double(total)
+    /// How full the volume is, as a gauge, and its free space.
+    struct DiskSpaceRows: View {
+        let volume: DiskSpace?
 
-                    Text("Disk:")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-
-                    ProgressView(value: pct)
-                        .controlSize(.small)
-                        .frame(width: 80)
-
-                    Text("\(free.byteLabel) free")
-                        .font(.system(.caption2, design: .monospaced))
-                        .foregroundStyle(.secondary)
+        var body: some View {
+            if let volume {
+                let used = Double(volume.total - volume.free) / Double(volume.total)
+                DebugDrawerSection("Disk") {
+                    DebugDrawerGaugeRow(
+                        "Used",
+                        value: "\(Int((used * 100).rounded()))%",
+                        fraction: used,
+                        severity: used >= 0.9 ? .warning : nil
+                    )
+                    DebugDrawerKeyValueRow("Free", value: volume.free.byteLabel)
                 }
-                Spacer()
             }
         }
     }
@@ -115,23 +102,23 @@
     struct IOEventRow: View {
         let event: IOEvent
         @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-        @ScaledMetric(relativeTo: .caption2) private var badgeWidth = 14
+        @ScaledMetric(relativeTo: .body) private var badgeWidth = 14
 
         var body: some View {
             VStack(spacing: 0) {
                 Group {
-                    // At accessibility text sizes the path has no room beside the size and
-                    // duration, so it takes a line of its own.
+                    // At accessibility text sizes the path and the measurements have no room beside
+                    // the badge, so each takes a line of its own.
                     if dynamicTypeSize.isAccessibilitySize {
                         VStack(alignment: .leading, spacing: 0) {
                             HStack(spacing: 6) {
                                 operationBadge
                                 mainThreadWarning
-                                Spacer()
-                                measurements
                             }
                             path
+                            measurements
                         }
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     } else {
                         HStack(spacing: 6) {
                             operationBadge
@@ -142,26 +129,25 @@
                         }
                     }
                 }
-                .padding(.horizontal, 4)
                 .padding(.vertical, 2)
                 .accessibilityElement(children: .combine)
 
-                Divider().padding(.leading, 24)
+                Divider()
             }
         }
 
         private var operationBadge: some View {
             Text(event.operation.rawValue)
-                .font(.system(.caption2, design: .monospaced, weight: .bold))
+                .debugDrawerFont(.code)
+                .fontWeight(.bold)
+                .debugDrawerForegroundStyle(.secondary)
                 .frame(width: badgeWidth)
-                .foregroundStyle(event.operation.color)
+                .accessibilityLabel(event.operation.name)
         }
 
         @ViewBuilder private var mainThreadWarning: some View {
             if event.isMainThread {
-                Image(systemName: "exclamationmark.triangle.fill")
-                    .font(.caption2)
-                    .foregroundStyle(.red)
+                DebugDrawerIssueGlyph(.warning)
                     .accessibilityLabel("On the main thread")
             }
         }
@@ -169,28 +155,27 @@
         // The last two components.
         private var path: some View {
             Text(event.shortPath)
-                .font(.system(.caption2, design: .monospaced))
+                .debugDrawerFont(.code)
                 .lineLimit(3)
                 .truncationMode(.head)
         }
 
-        // The size (or item count for a listing), then the duration.
+        // The size (or item count for a listing), then the duration; a slow call's duration in
+        // the primary color, so it stands out from the tertiary ones.
         @ViewBuilder private var measurements: some View {
-            if event.size > 0 && event.operation != .list {
-                Text(event.size.byteLabel)
-                    .font(.system(.caption2, design: .monospaced))
-                    .foregroundStyle(.secondary)
+            Group {
+                if event.size > 0 && event.operation != .list {
+                    Text(event.size.byteLabel)
+                        .debugDrawerForegroundStyle(.tertiary)
+                }
+                if event.operation == .list {
+                    Text("\(event.size) items")
+                        .debugDrawerForegroundStyle(.tertiary)
+                }
+                Text(event.durationLabel)
+                    .debugDrawerForegroundStyle(event.duration > 0.01 ? .primary : .tertiary)
             }
-
-            if event.operation == .list {
-                Text("\(event.size) items")
-                    .font(.system(.caption2, design: .monospaced))
-                    .foregroundStyle(.secondary)
-            }
-
-            Text(event.durationLabel)
-                .font(.system(.caption2, design: .monospaced))
-                .foregroundStyle(event.duration > 0.01 ? Color.orange : Color.secondary)
+            .debugDrawerFont(.value)
         }
     }
 
@@ -203,18 +188,19 @@
         }
 
         fileprivate var durationLabel: String {
-            if duration < 0.001 { return "<1ms" }
-            if duration < 1 { return String(format: "%.0fms", duration * 1000) }
-            return String(format: "%.2fs", duration)
+            if duration < 0.001 { return "<1 ms" }
+            if duration < 1 { return String(format: "%.0f ms", duration * 1000) }
+            return String(format: "%.2f s", duration)
         }
     }
 
     extension Int64 {
-        /// A byte count in B, KB or MB.
+        /// A byte count in B, KB, MB or GB, the figure and unit apart ("1.5 MB").
         fileprivate var byteLabel: String {
-            if self < 1024 { return "\(self)B" }
-            if self < 1024 * 1024 { return "\(self / 1024)KB" }
-            return String(format: "%.1fMB", Double(self) / (1024 * 1024))
+            if self < 1024 { return "\(self) B" }
+            if self < 1024 * 1024 { return "\(self / 1024) KB" }
+            if self < 1024 * 1024 * 1024 { return String(format: "%.1f MB", Double(self) / (1024 * 1024)) }
+            return String(format: "%.1f GB", Double(self) / (1024 * 1024 * 1024))
         }
     }
 #endif

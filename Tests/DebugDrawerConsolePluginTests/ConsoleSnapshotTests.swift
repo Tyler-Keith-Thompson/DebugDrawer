@@ -14,7 +14,10 @@
     @MainActor
     @Suite(.timeLimit(.minutes(1)))
     struct ConsoleSnapshotTests {
-        @Test("The console shows each line's time, level badge, source mark and text, colored by level", arguments: [ColorScheme.light, .dark])
+        @Test(
+            "The console shows each line's time, an error glyph on errors and faults, and its text, debug lines dimmed",
+            arguments: [ColorScheme.light, .dark]
+        )
         func lines(colorScheme: ColorScheme) throws {
             // Local wall-clock times, so the HH:mm:ss.SSS timestamps read the same in every time zone.
             let morning = try #require(Calendar.current.date(from: DateComponents(year: 2026, month: 1, day: 5, hour: 9, minute: 41)))

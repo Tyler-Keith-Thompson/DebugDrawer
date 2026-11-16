@@ -14,7 +14,7 @@
     @MainActor
     @Suite(.timeLimit(.minutes(1)))
     struct CrashReportsSnapshotTests {
-        @Test("Reports list newest first, a new one tagged, the open one with its stack trace and copy button",
+        @Test("Reports list newest first, an unread one dotted, the open one with its frames (the app's first selected), Copy Report and Delete",
               arguments: [ColorScheme.light, .dark])
         func reports(colorScheme: ColorScheme) throws {
             let opened = CrashReport(
@@ -33,7 +33,7 @@
                 frames: [], source: .metricKit, isSeen: true
             )
             let sut = CrashReportsView(
-                reports: [opened, older], expanded: .constant(opened.id),
+                reports: [opened, older], expanded: .constant(opened.id), ownImage: "Example",
                 onOpen: { _ in }, onDelete: { _ in }, onMarkAllSeen: {}, onDeleteAll: {}
             )
             let host = NSHostingView(rootView: sut

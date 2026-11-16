@@ -1,36 +1,27 @@
 #if DEBUG
+    import DebugDrawer
     import SwiftUI
 
-    /// View types and how many times each rendered, colored by count: green up to 3, orange up to
-    /// 10, red above.
+    /// View types and how many times each rendered, as issue rows: OK up to 3 renders, a warning
+    /// up to 10, an error above.
     struct RenderCountList: View {
         /// In the order shown, most renders first.
         let entries: [RenderTracker.Entry]
 
         var body: some View {
-            VStack(alignment: .leading, spacing: 1) {
-                ForEach(entries) { entry in
-                    HStack {
-                        Text(entry.id)
-                            .font(.system(.caption2, design: .monospaced))
-                            .lineLimit(3)
-                        Spacer()
-                        Text("\(entry.count)")
-                            .font(.system(.caption2, design: .monospaced, weight: .bold))
-                            .foregroundStyle(Self.color(forCount: entry.count))
-                    }
-                    .accessibilityElement(children: .combine)
-                }
+            ForEach(entries) { entry in
+                DebugDrawerIssueRow(
+                    entry.id,
+                    status: entry.count == 1 ? "1 render" : "\(entry.count) renders",
+                    severity: Self.severity(forCount: entry.count)
+                )
             }
-            .padding(4)
-            .background(Color.primary.opacity(0.05))
-            .cornerRadius(3)
         }
 
-        private static func color(forCount count: Int) -> Color {
-            if count <= 3 { return .green }
-            if count <= 10 { return .orange }
-            return .red
+        private static func severity(forCount count: Int) -> DebugDrawerIssueGlyph.Severity {
+            if count <= 3 { return .ok }
+            if count <= 10 { return .warning }
+            return .error
         }
     }
 #endif

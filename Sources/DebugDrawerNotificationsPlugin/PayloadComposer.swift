@@ -11,35 +11,31 @@
         let sendState: SendState
         let authorization: NotificationSettings.Authorization
         let onSend: () -> Void
+        @ScaledMetric(relativeTo: .body) private var editorHeight: CGFloat = 110
         @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-        @ScaledMetric(relativeTo: .caption2) private var editorHeight: CGFloat = 110
 
         var body: some View {
             let parsed = Result { () throws(NotificationPayloadError) in try NotificationPayload(parsing: draft) }
-            VStack(alignment: .leading, spacing: 6) {
-                NotificationsSectionHeading(title: "Send a Payload")
-                TextEditor(text: $draft)
-                    .font(.system(.caption2, design: .monospaced))
-                    .autocorrectionDisabled()
-                    .frame(height: editorHeight)
-                    .scrollContentBackground(.hidden)
-                    .padding(4)
-                    .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 4))
-                    .accessibilityLabel("APNs payload")
-                    .accessibilityHint("A JSON object with an aps dictionary")
+            DebugDrawerSection("Send a payload") {
+                DebugDrawerCodeBlock {
+                    TextEditor(text: $draft)
+                        .autocorrectionDisabled()
+                        .frame(height: editorHeight)
+                        .scrollContentBackground(.hidden)
+                        .accessibilityLabel("APNs payload")
+                        .accessibilityHint("A JSON object with an aps dictionary")
                     #if os(iOS)
                         .textInputAutocapitalization(.never)
                     #endif
+                }
                 messages(parsed)
                 controls(canSend: (try? parsed.get()) != nil && sendState != .sending)
                 outcome
+            } footer: {
                 Text("""
                 The whole payload becomes the notification's userInfo. While the app is in front, the system shows it only if \
                 the app's notification center delegate asks for a banner in userNotificationCenter(_:willPresent:).
                 """)
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
             }
         }
 
@@ -48,51 +44,42 @@
         private func messages(_ parsed: Result<NotificationPayload, NotificationPayloadError>) -> some View {
             switch parsed {
             case let .failure(error):
-                Label {
-                    Text(error.message)
-                        .fixedSize(horizontal: false, vertical: true)
-                } icon: {
-                    Image(systemName: "xmark.octagon.fill")
-                        .accessibilityHidden(true)
-                }
-                .font(.caption)
-                .foregroundStyle(.red)
+                DebugDrawerIssueRow(error.message, severity: .error)
             case let .success(payload):
                 ForEach(payload.notes, id: \.self) { note in
-                    Text(note)
-                        .font(.caption2)
-                        .foregroundStyle(.orange)
-                        .fixedSize(horizontal: false, vertical: true)
+                    DebugDrawerIssueRow(note, severity: .warning)
                 }
             }
             if authorization == .denied {
-                Text("Notifications are denied: the system accepts what is sent and shows nothing.")
-                    .font(.caption2)
-                    .foregroundStyle(.orange)
-                    .fixedSize(horizontal: false, vertical: true)
+                DebugDrawerIssueRow("Notifications are denied: the system accepts what is sent and shows nothing.", severity: .warning)
             }
         }
 
-        /// The delay and Send: side by side, or one above the other at accessibility text sizes.
-        private func controls(canSend: Bool) -> some View {
-            let layout = dynamicTypeSize.isAccessibilitySize
-                ? AnyLayout(VStackLayout(alignment: .leading, spacing: 6))
-                : AnyLayout(HStackLayout())
-            return layout {
-                Picker("Deliver", selection: $delay) {
-                    ForEach(SendDelay.allCases) { delay in
-                        Text(delay.title).tag(delay)
-                    }
+        /// The delays side by side, or, at accessibility text sizes, where a segmented control's
+        /// titles don't grow, in a menu.
+        @ViewBuilder private var delayPicker: some View {
+            let picker = Picker("Deliver", selection: $delay) {
+                ForEach(SendDelay.allCases) { delay in
+                    Text(delay.title).tag(delay)
                 }
-                .pickerStyle(.segmented)
-                .controlSize(.small)
-                .labelsHidden()
-                .fixedSize()
-                .accessibilityElement(children: .contain)
-                .accessibilityLabel("When to deliver")
+            }
+            if dynamicTypeSize.isAccessibilitySize {
+                picker.pickerStyle(.menu)
+            } else {
+                picker.pickerStyle(.segmented)
+            }
+        }
+
+        /// The delay and Send, in an action row that stacks them at accessibility text sizes.
+        private func controls(canSend: Bool) -> some View {
+            DebugDrawerActionRow {
+                delayPicker
+                    .labelsHidden()
+                    .fixedSize()
+                    .accessibilityElement(children: .contain)
+                    .accessibilityLabel("When to deliver")
                 Button(authorization == .notDetermined ? "Ask and Send" : "Send", action: onSend)
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.small)
+                    .debugDrawerButtonStyle(.primary)
                     .disabled(!canSend)
                     .accessibilityLabel("Send the payload as a local notification")
             }
@@ -104,18 +91,15 @@
                 EmptyView()
             case .sending:
                 Text("Sending…")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
+                    .debugDrawerFont(.secondary)
+                    .debugDrawerForegroundStyle(.secondary)
             case let .sent(identifier, delay):
-                Text(delay == .now ? "Sent as \(identifier)." : "Sent as \(identifier), to arrive \(delay.title.lowercased()).")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+                DebugDrawerIssueRow(
+                    delay == .now ? "Sent as \(identifier)." : "Sent as \(identifier), to arrive \(delay.title.lowercased()).",
+                    severity: .ok
+                )
             case let .failed(message):
-                Text("The system refused it: \(message)")
-                    .font(.caption2)
-                    .foregroundStyle(.red)
-                    .fixedSize(horizontal: false, vertical: true)
+                DebugDrawerIssueRow("The system refused it: \(message)", severity: .error)
             }
         }
     }

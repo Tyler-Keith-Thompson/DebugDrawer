@@ -12,48 +12,42 @@
         @Binding var threshold: Duration
         /// The hang open to its stack, if any.
         @Binding var expanded: HangEvent.ID?
+        /// The app's executable's file name, which marks the app's own frames.
+        var ownImage: String?
         /// Called when a hang is opened: it is then seen.
         let onOpen: (HangEvent.ID) -> Void
         let onMarkAllSeen: () -> Void
         let onClear: () -> Void
-        @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
         var body: some View {
-            VStack(alignment: .leading, spacing: 8) {
-                thresholdPicker
+            DebugDrawerSection {
+                DebugDrawerRow("Threshold") {
+                    Picker("Threshold", selection: $threshold) {
+                        ForEach(choices, id: \.self) { choice in
+                            Text(HangEvent.milliseconds(choice)).tag(choice)
+                        }
+                    }
+                    .fixedSize()
+                    .accessibilityHint("The shortest time the main thread must be stuck to count as a hang")
+                }
+                ForEach(events) { event in
+                    HangRow(event: event, isExpanded: expanded == event.id, ownImage: ownImage) { toggle(event.id) }
+                }
+            } footer: {
                 if events.isEmpty {
                     Text("No hangs. Each time the main thread is stuck for longer than the threshold, the hang appears here with its stack.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                } else {
-                    ForEach(events) { event in
-                        HangRow(event: event, isExpanded: expanded == event.id) { toggle(event.id) }
-                        Divider()
-                    }
-                    buttons
                 }
             }
-        }
-
-        /// The picker under a label of its own, as iOS's menu picker shows only its value: side by
-        /// side, or one above the other at accessibility text sizes.
-        private var thresholdPicker: some View {
-            let layout = dynamicTypeSize.isAccessibilitySize
-                ? AnyLayout(VStackLayout(alignment: .leading, spacing: 2))
-                : AnyLayout(HStackLayout(alignment: .firstTextBaseline, spacing: 8))
-            return layout {
-                // The picker carries the same label for VoiceOver.
-                Text("Threshold")
-                    .accessibilityHidden(true)
-                Picker("Threshold", selection: $threshold) {
-                    ForEach(choices, id: \.self) { choice in
-                        Text(HangEvent.milliseconds(choice)).tag(choice)
-                    }
+            if !events.isEmpty {
+                DebugDrawerActionRow {
+                    Button("Mark All Seen", action: onMarkAllSeen)
+                        .disabled(events.allSatisfy(\.isSeen))
+                        .accessibilityHint("Clears the badge without opening each hang")
+                } trailing: {
+                    Button("Clear All", role: .destructive, action: onClear)
+                        .debugDrawerButtonStyle(.destructive)
+                        .accessibilityHint("Forgets every hang")
                 }
-                .labelsHidden()
-                .fixedSize()
-                .accessibilityHint("The shortest time the main thread must be stuck to count as a hang")
             }
         }
 
@@ -69,21 +63,6 @@
                 expanded = id
                 onOpen(id)
             }
-        }
-
-        private var buttons: some View {
-            let layout = dynamicTypeSize.isAccessibilitySize
-                ? AnyLayout(VStackLayout(alignment: .leading, spacing: 6))
-                : AnyLayout(HStackLayout())
-            return layout {
-                Button("Mark All Seen", action: onMarkAllSeen)
-                    .disabled(events.allSatisfy(\.isSeen))
-                    .accessibilityHint("Clears the badge without opening each hang")
-                Button("Clear All", role: .destructive, action: onClear)
-                    .accessibilityHint("Forgets every hang")
-            }
-            .buttonStyle(.bordered)
-            .controlSize(.small)
         }
     }
 #endif

@@ -36,84 +36,73 @@
         ]
 
         var body: some View {
-            VStack(alignment: .leading, spacing: 10) {
-                // Color scheme
-                section("Color Scheme") {
-                    Picker("Color Scheme", selection: colorSchemeBinding) {
+            DebugDrawerSection("Color Scheme") {
+                Picker("Color Scheme", selection: colorSchemeBinding) {
+                    Text("System").tag(0)
+                    Text("Light").tag(1)
+                    Text("Dark").tag(2)
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .accessibilityLabel("Color Scheme")
+                .accessibilityElement(children: .contain)
+            }
+
+            DebugDrawerSection("Dynamic Type") {
+                HStack {
+                    Slider(
+                        value: typeSizeSliderBinding,
+                        in: 0 ... Double(typeSizes.count - 1),
+                        step: 1
+                    )
+                    .accessibilityLabel("Dynamic Type size")
+                    .accessibilityValue(currentSizeLabel)
+
+                    Text(currentSizeLabel)
+                        .debugDrawerFont(.value)
+                        .debugDrawerForegroundStyle(.secondary)
+                        .fixedSize()
+                        .accessibilityHidden(true)
+
+                    Button("System") { overrides.dynamicTypeSize = nil }
+                        .debugDrawerButtonStyle(.borderless)
+                        .disabled(overrides.dynamicTypeSize == nil)
+                        .accessibilityLabel("System text size")
+                }
+
+                // A sample of text at the chosen size.
+                if let size = overrides.dynamicTypeSize {
+                    Text("The quick brown fox")
+                        .dynamicTypeSize(size)
+                        .debugDrawerFont(.body)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+
+            DebugDrawerSection("Layout Direction") {
+                #if os(macOS)
+                    Picker("Layout Direction", selection: layoutBinding) {
                         Text("System").tag(0)
-                        Text("Light").tag(1)
-                        Text("Dark").tag(2)
+                        Text("LTR").tag(1)
+                        Text("RTL").tag(2)
                     }
                     .pickerStyle(.segmented)
                     .labelsHidden()
-                    .controlSize(.small)
-                    .accessibilityLabel("Color Scheme")
+                    .accessibilityLabel("Layout Direction")
                     .accessibilityElement(children: .contain)
-                }
+                #else
+                    // iOS has a SwiftUI bug where setting .leftToRight explicitly
+                    // after .rightToLeft causes a 180-degree flip. Use a toggle instead.
+                    DebugDrawerRow("Right-to-Left", isOn: Binding(
+                        get: { overrides.layoutDirection == .rightToLeft },
+                        set: { overrides.layoutDirection = $0 ? .rightToLeft : nil }
+                    ))
+                #endif
+            }
 
-                // Dynamic Type
-                section("Dynamic Type") {
-                    HStack {
-                        Slider(
-                            value: typeSizeSliderBinding,
-                            in: 0 ... Double(typeSizes.count - 1),
-                            step: 1
-                        )
-                        .controlSize(.small)
-                        .accessibilityLabel("Dynamic Type size")
-                        .accessibilityValue(currentSizeLabel)
-
-                        Text(currentSizeLabel)
-                            .font(.system(.caption2, design: .monospaced))
-                            .foregroundStyle(.secondary)
-                            .frame(width: 30, alignment: .trailing)
-
-                        Button("System") { overrides.dynamicTypeSize = nil }
-                            .font(.caption2)
-                            .controlSize(.mini)
-                            .disabled(overrides.dynamicTypeSize == nil)
-                    }
-
-                    // Preview text at current size
-                    if let size = overrides.dynamicTypeSize {
-                        Text("The quick brown fox")
-                            .dynamicTypeSize(size)
-                            .font(.body)
-                            .padding(4)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .background(Color.primary.opacity(0.05))
-                            .cornerRadius(4)
-                    }
-                }
-
-                // Layout direction
-                section("Layout Direction") {
-                    #if os(macOS)
-                        Picker("Layout Direction", selection: layoutBinding) {
-                            Text("System").tag(0)
-                            Text("LTR").tag(1)
-                            Text("RTL").tag(2)
-                        }
-                        .pickerStyle(.segmented)
-                        .labelsHidden()
-                        .controlSize(.small)
-                        .accessibilityLabel("Layout Direction")
-                        .accessibilityElement(children: .contain)
-                    #else
-                        // iOS has a SwiftUI bug where setting .leftToRight explicitly
-                        // after .rightToLeft causes a 180-degree flip. Use a toggle instead.
-                        Toggle("Right-to-Left", isOn: Binding(
-                            get: { overrides.layoutDirection == .rightToLeft },
-                            set: { overrides.layoutDirection = $0 ? .rightToLeft : nil }
-                        ))
-                        .toggleStyle(.switch)
-                        .controlSize(.small)
-                    #endif
-                }
-
-                // Locale
-                if !overrides.availableLocales.isEmpty {
-                    section("Locale") {
+            if !overrides.availableLocales.isEmpty {
+                DebugDrawerSection("Locale") {
+                    DebugDrawerRow("Locale") {
                         Picker("Locale", selection: localeBinding) {
                             Text("System").tag("")
                             ForEach(overrides.availableLocales, id: \.identifier) { loc in
@@ -121,87 +110,67 @@
                                     .tag(loc.identifier)
                             }
                         }
-                        .labelsHidden()
-                        .controlSize(.small)
                         .accessibilityLabel("Locale")
                     }
                 }
+            }
 
-                section("Accessibility Settings") {
-                    AccessibilitySettingsSection(system: .init(
-                        reduceMotion: systemReduceMotion,
-                        increaseContrast: systemContrast == .increased,
-                        boldText: systemLegibilityWeight == .bold,
-                        reduceTransparency: systemReduceTransparency,
-                        differentiateWithoutColor: systemDifferentiateWithoutColor,
-                        invertColors: systemInvertColors
-                    ))
-                }
+            DebugDrawerSection("Accessibility Settings") {
+                AccessibilitySettingsSection(system: .init(
+                    reduceMotion: systemReduceMotion,
+                    increaseContrast: systemContrast == .increased,
+                    boldText: systemLegibilityWeight == .bold,
+                    reduceTransparency: systemReduceTransparency,
+                    differentiateWithoutColor: systemDifferentiateWithoutColor,
+                    invertColors: systemInvertColors
+                ))
+            }
 
-                if overrides.hasOverrides {
-                    Divider()
-
-                    HStack {
-                        overrideBadges
-
-                        Spacer()
-
-                        Button("Reset All") { overrides.reset() }
-                            .buttonStyle(.bordered)
-                            .controlSize(.small)
+            if overrides.hasOverrides {
+                DebugDrawerSection("Overrides") {
+                    ForEach(activeOverrides, id: \.label) { item in
+                        DebugDrawerKeyValueRow(item.label, value: item.value)
                     }
+                }
+                DebugDrawerActionRow {
+                    EmptyView()
+                } trailing: {
+                    Button("Reset All", role: .destructive) { overrides.reset() }
+                        .debugDrawerButtonStyle(.destructive)
                 }
             }
         }
 
         // MARK: - Helpers
 
-        private func section(_ title: String, @ViewBuilder content: () -> some View) -> some View {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(title)
-                    .font(.caption.weight(.medium))
-                    .accessibilityAddTraits(.isHeader)
-                content()
+        /// What the developer has overridden, each as a label and its value ("Motion", "On").
+        private var activeOverrides: [ActiveOverride] {
+            var items: [ActiveOverride] = []
+            if let scheme = overrides.colorScheme {
+                items.append(ActiveOverride(label: "Color Scheme", value: scheme == .dark ? "Dark" : "Light"))
             }
-        }
-
-        private var overrideBadges: some View {
-            HStack(spacing: 4) {
-                if overrides.colorScheme != nil {
-                    badge(overrides.colorScheme == .dark ? "Dark" : "Light")
-                }
-                if let size = overrides.dynamicTypeSize,
-                   let match = typeSizes.first(where: { $0.1 == size }) {
-                    badge(match.0)
-                }
-                if overrides.layoutDirection == .rightToLeft {
-                    badge("RTL")
-                }
-                if overrides.layoutDirection == .leftToRight {
-                    badge("LTR")
-                }
-                if let loc = overrides.locale {
-                    badge(loc.identifier)
-                }
-                ForEach(settingBadges, id: \.self) { badge($0) }
+            if let size = overrides.dynamicTypeSize,
+               let match = typeSizes.first(where: { $0.1 == size }) {
+                items.append(ActiveOverride(label: "Text Size", value: match.0))
             }
-        }
-
-        /// Short labels for the overridden accessibility settings, such as "Motion: On".
-        private var settingBadges: [String] {
-            [("Motion", overrides.reduceMotion), ("Contrast", overrides.increaseContrast),
-             ("Bold", overrides.boldText), ("Transparency", overrides.reduceTransparency),
-             ("No Color", overrides.differentiateWithoutColor), ("Invert", overrides.invertColors)]
-                .compactMap { name, value in value.map { "\(name): \($0 ? "On" : "Off")" } }
-        }
-
-        private func badge(_ text: String) -> some View {
-            Text(text)
-                .font(.system(.caption2, design: .monospaced, weight: .semibold))
-                .padding(.horizontal, 4)
-                .padding(.vertical, 2)
-                .background(Color.accentColor.opacity(0.15))
-                .cornerRadius(3)
+            if overrides.layoutDirection == .rightToLeft {
+                items.append(ActiveOverride(label: "Layout", value: "RTL"))
+            }
+            if overrides.layoutDirection == .leftToRight {
+                items.append(ActiveOverride(label: "Layout", value: "LTR"))
+            }
+            if let loc = overrides.locale {
+                items.append(ActiveOverride(label: "Locale", value: loc.identifier))
+            }
+            let settings: [(String, Bool?)] = [
+                ("Motion", overrides.reduceMotion), ("Contrast", overrides.increaseContrast),
+                ("Bold", overrides.boldText), ("Transparency", overrides.reduceTransparency),
+                ("No Color", overrides.differentiateWithoutColor), ("Invert", overrides.invertColors)
+            ]
+            items += settings.compactMap { name, value in
+                value.map { ActiveOverride(label: name, value: $0 ? "On" : "Off") }
+            }
+            return items
         }
 
         private func localeName(_ locale: Locale) -> String {
@@ -284,6 +253,12 @@
                 }
             )
         }
+    }
+
+    /// One override the developer has set, as the Overrides section lists it.
+    private struct ActiveOverride {
+        let label: String
+        let value: String
     }
 
     // MARK: - Convenience installer

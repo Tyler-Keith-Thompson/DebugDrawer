@@ -11,7 +11,7 @@
     struct NetworkToolbarDynamicTypeSnapshotTests {
         @Test("The network toolbar keeps whole words at a large accessibility text size")
         func toolbar() {
-            let sut = NetworkToolbar(count: 12, filterStatus: .constant(.all)) {}
+            let sut = NetworkToolbar(filterStatus: .constant(.all)) {}
                 .frame(width: 320, alignment: .leading)
                 .padding()
                 .background(Color(uiColor: .systemBackground))
@@ -20,6 +20,9 @@
             // placeholders, so the view is hosted in a window that is never shown and its layer is
             // rendered, at a fixed width and scale.
             let controller = UIHostingController(rootView: sut)
+            // No safe area: the window's status bar inset would lay the view out shorter than it
+            // measured, overlapping its rows.
+            controller.safeAreaRegions = []
             let size = controller.sizeThatFits(in: CGSize(width: 352, height: 2000))
             let scene = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first
             let window = scene.map(UIWindow.init(windowScene:)) ?? UIWindow()

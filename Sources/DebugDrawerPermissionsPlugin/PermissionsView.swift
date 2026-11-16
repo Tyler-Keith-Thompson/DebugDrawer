@@ -10,19 +10,16 @@
         let onOpenSettings: (PermissionKind) -> Void
 
         var body: some View {
-            VStack(alignment: .leading, spacing: 8) {
-                Text("The permissions the Info.plist declares, read again each time the app becomes active.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+            DebugDrawerSection {
                 ForEach(rows) { row in
                     PermissionRow(
                         row: row,
                         onRequest: { onRequest(row.permission.kind) },
                         onOpenSettings: { onOpenSettings(row.permission.kind) }
                     )
-                    Divider()
                 }
+            } footer: {
+                Text("The permissions the Info.plist declares, read again each time the app becomes active.")
             }
         }
     }

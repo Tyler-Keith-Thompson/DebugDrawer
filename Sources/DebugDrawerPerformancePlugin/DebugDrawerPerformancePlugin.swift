@@ -20,6 +20,8 @@
         @Published var footprintHistory: [Double] = []
         @Published var fpsHistory: [Int] = []
         @Published var isMonitoring = false
+        /// The display's highest refresh rate, read when monitoring starts.
+        @Published var maximumFPS = 60
 
         private var displayLink: CADisplayLink?
         private var frameCount = 0
@@ -45,6 +47,7 @@
             #else
                 let link = CADisplayLink(target: self, selector: #selector(displayLinkFired))
             #endif
+            maximumFPS = Self.displayMaximumFPS ?? maximumFPS
             link.add(to: .main, forMode: .common)
             displayLink = link
             lastFPSTime = CACurrentMediaTime()
@@ -57,6 +60,22 @@
             cancellable = nil
             displayLink?.invalidate()
             displayLink = nil
+        }
+
+        /// The device's physical memory, in megabytes (MiB).
+        static var physicalMemoryMB: Double {
+            Double(ProcessInfo.processInfo.physicalMemory) / (1024 * 1024)
+        }
+
+        /// The highest refresh rate of the app's displays, or `nil` when none is on screen.
+        private static var displayMaximumFPS: Int? {
+            #if os(macOS)
+                NSScreen.main?.maximumFramesPerSecond
+            #else
+                UIApplication.shared.connectedScenes
+                    .compactMap { ($0 as? UIWindowScene)?.screen.maximumFramesPerSecond }
+                    .max()
+            #endif
         }
 
         @objc private func displayLinkFired() {
@@ -81,7 +100,6 @@
             footprintHistory.append(footprintMB)
             if footprintHistory.count > historySize { footprintHistory.removeFirst() }
         }
-
     }
 
     // MARK: - Plugin
@@ -107,77 +125,81 @@
         @ObservedObject private var monitor = PerformanceMonitor.shared
 
         var body: some View {
-            VStack(alignment: .leading, spacing: 8) {
-                // Start/stop
-                Toggle("Monitor", isOn: Binding(
+            VStack(alignment: .leading, spacing: 0) {
+                DebugDrawerRow("Monitor", isOn: Binding(
                     get: { monitor.isMonitoring },
                     set: { $0 ? monitor.start() : monitor.stop() }
                 ))
-                .toggleStyle(.switch)
-                .controlSize(.small)
-
                 if monitor.isMonitoring {
                     PerformanceReadout(
                         fps: monitor.fps,
                         fpsHistory: monitor.fpsHistory,
+                        maximumFPS: monitor.maximumFPS,
                         footprintMB: monitor.footprintMB,
-                        footprintHistory: monitor.footprintHistory
+                        footprintHistory: monitor.footprintHistory,
+                        physicalMemoryMB: PerformanceMonitor.physicalMemoryMB
                     )
                 }
             }
         }
     }
 
-    /// The frame rate and memory now, their recent history as sparklines, and the minimum and
-    /// average frame rate and peak memory.
+    /// The frame rate against the display's refresh rate and the memory footprint against the
+    /// device's memory, as gauges, their recent history as sparklines, and the lowest and average
+    /// frame rate and the peak footprint.
     struct PerformanceReadout: View {
         let fps: Int
         /// Frames per second, one sample a second, oldest first.
         let fpsHistory: [Int]
+        /// The display's highest refresh rate, which a smooth frame rate reaches.
+        let maximumFPS: Int
         let footprintMB: Double
         /// The memory footprint in megabytes, one sample a second, oldest first.
         let footprintHistory: [Double]
+        /// The device's physical memory in megabytes.
+        let physicalMemoryMB: Double
 
         var body: some View {
-            VStack(alignment: .leading, spacing: 8) {
-                // FPS
-                VStack(alignment: .leading, spacing: 2) {
-                    HStack {
-                        Text("FPS")
-                            .font(.caption.weight(.medium))
-                        Spacer()
-                        Text("\(fps)")
-                            .font(.system(.title3, design: .monospaced, weight: .bold))
-                            .foregroundStyle(fpsColor)
-                    }
-                    DebugDrawerSparkline("Frame rate history", data: fpsHistory.map(Double.init), color: fpsColor)
+            VStack(alignment: .leading, spacing: 0) {
+                let frameSeverity = FrameRate.severity(fps: fps, maximum: maximumFPS)
+                let memoryFraction = footprintMB / max(physicalMemoryMB, 1)
+                DebugDrawerSection("Frames") {
+                    DebugDrawerGaugeRow(
+                        "FPS",
+                        value: "\(fps) fps",
+                        fraction: Double(fps) / Double(max(maximumFPS, 1)),
+                        severity: frameSeverity
+                    )
+                    DebugDrawerSparkline("Frame rate history", data: fpsHistory.map(Double.init), severity: frameSeverity)
+                    DebugDrawerKeyValueRow("Lowest", value: "\(fpsHistory.min() ?? 0) fps")
+                    DebugDrawerKeyValueRow("Average", value: "\(averageFPS) fps")
                 }
-
-                // Memory
-                VStack(alignment: .leading, spacing: 2) {
-                    HStack {
-                        Text("Footprint")
-                            .font(.caption.weight(.medium))
-                        Spacer()
-                        Text(String(format: "%.1f MB", footprintMB))
-                            .font(.system(.callout, design: .monospaced, weight: .medium))
-                    }
-                    DebugDrawerSparkline("Footprint history", data: footprintHistory, color: .blue)
-                }
-
-                // Stats
-                HStack(spacing: 12) {
-                    DebugDrawerStatBadge("Min", value: "\(fpsHistory.min() ?? 0)", color: fpsColor)
-                    DebugDrawerStatBadge("Avg", value: "\(fpsHistory.isEmpty ? 0 : fpsHistory.reduce(0, +) / fpsHistory.count)", color: fpsColor)
-                    DebugDrawerStatBadge("Peak", value: String(format: "%.0f", footprintHistory.max() ?? 0), color: .blue)
+                DebugDrawerSection("Memory") {
+                    DebugDrawerGaugeRow(
+                        "Footprint",
+                        value: "\(footprintMB.formatted(.number.precision(.fractionLength(1)))) MB",
+                        fraction: memoryFraction,
+                        severity: memoryFraction >= 0.5 ? .warning : nil
+                    )
+                    DebugDrawerSparkline("Footprint history", data: footprintHistory)
+                    DebugDrawerKeyValueRow("Peak", value: "\((footprintHistory.max() ?? 0).formatted(.number.precision(.fractionLength(0)))) MB")
                 }
             }
         }
 
-        private var fpsColor: Color {
-            if fps >= 55 { return .green }
-            if fps >= 30 { return .yellow }
-            return .red
+        private var averageFPS: Int {
+            fpsHistory.isEmpty ? 0 : fpsHistory.reduce(0, +) / fpsHistory.count
+        }
+    }
+
+    /// How smooth a frame rate is, against the display's highest.
+    enum FrameRate {
+        /// `nil` (the accent) at 90% of the display's rate or more, a warning from half of it,
+        /// and an error below half.
+        static func severity(fps: Int, maximum: Int) -> DebugDrawerIssueGlyph.Severity? {
+            let fraction = Double(fps) / Double(max(maximum, 1))
+            if fraction >= 0.9 { return nil }
+            return fraction >= 0.5 ? .warning : .error
         }
     }
 

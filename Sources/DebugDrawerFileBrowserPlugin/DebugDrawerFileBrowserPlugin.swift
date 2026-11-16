@@ -89,58 +89,45 @@
         private static let scanQueue = DispatchQueue(label: "com.debugdrawer.filescan", qos: .utility)
 
         var body: some View {
-            VStack(alignment: .leading, spacing: 6) {
-                HStack {
-                    Text("Sandboxed Directories")
-                        .font(.caption.weight(.medium))
-                    Spacer()
-                    if isScanning {
-                        ProgressView()
-                            .controlSize(.small)
-                        Text(scanProgress)
-                            .font(.caption2)
-                            .foregroundStyle(.tertiary)
-                    }
-                    Button(roots.isEmpty ? "Scan" : "Refresh") { scan() }
-                        .font(.caption)
-                        .buttonStyle(.bordered)
-                        .controlSize(.small)
-                        .disabled(isScanning)
-                        .accessibilityFocused($refreshFocused)
-                }
-
-                if !roots.isEmpty {
-                    ScrollView {
-                        VStack(alignment: .leading, spacing: 0) {
-                            ForEach(roots) { root in
-                                VStack(alignment: .leading, spacing: 0) {
-                                    Text(root.label)
-                                        .font(.caption.weight(.semibold))
-                                        .foregroundStyle(.secondary)
-                                        .padding(.vertical, 4)
-
-                                    Text(root.node.path)
-                                        .font(.system(.caption2, design: .monospaced))
-                                        .foregroundStyle(.tertiary)
-                                        .lineLimit(3)
-                                        .truncationMode(.head)
-                                        .textSelection(.enabled)
-
-                                    if let children = root.node.children {
-                                        ForEach(children) { child in
-                                            FileRow(node: child, depth: 0, onDelete: askToDelete, onShare: shareFile)
+            VStack(alignment: .leading, spacing: 0) {
+                DebugDrawerSection {
+                    if !roots.isEmpty {
+                        ScrollView {
+                            VStack(alignment: .leading, spacing: 0) {
+                                ForEach(roots) { root in
+                                    DebugDrawerSection(root.label) {
+                                        DebugDrawerCodeText(root.node.path)
+                                            .debugDrawerForegroundStyle(.tertiary)
+                                        if let children = root.node.children {
+                                            ForEach(children) { child in
+                                                FileRow(node: child, depth: 0, onDelete: askToDelete, onShare: shareFile)
+                                            }
                                         }
                                     }
-
-                                    Divider().padding(.vertical, 4)
                                 }
                             }
                         }
-                        .padding(.horizontal, 4)
+                        .frame(maxHeight: 300)
                     }
-                    .frame(maxHeight: 300)
-                    .background(Color.black.opacity(0.15))
-                    .clipShape(RoundedRectangle(cornerRadius: 4))
+                } footer: {
+                    Text("The app's own folders in Application Support and Caches.")
+                }
+
+                DebugDrawerActionRow {
+                    Button(roots.isEmpty ? "Scan" : "Refresh") { scan() }
+                        .disabled(isScanning)
+                        .accessibilityFocused($refreshFocused)
+                    if isScanning {
+                        HStack(spacing: 4) {
+                            ProgressView()
+                                .controlSize(.small)
+                            Text(scanProgress)
+                                .debugDrawerFont(.secondary)
+                                .debugDrawerForegroundStyle(.tertiary)
+                        }
+                        .accessibilityElement(children: .combine)
+                        .accessibilityLabel("Scanning \(scanProgress)")
+                    }
                 }
             }
             .alert("Delete File", isPresented: $showDeleteAlert) {
@@ -262,7 +249,7 @@
         let onDelete: (FSNode) -> Void
         let onShare: (FSNode) -> Void
         @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-        @ScaledMetric(relativeTo: .caption2) private var iconWidth = 14
+        @ScaledMetric(relativeTo: .body) private var iconWidth = 16
 
         var body: some View {
             VStack(alignment: .leading, spacing: 0) {
@@ -331,43 +318,40 @@
 
         private var icon: some View {
             Image(systemName: node.isDirectory ? "folder.fill" : fileIcon(node.name))
-                .font(.caption2)
-                .foregroundStyle(node.isDirectory ? .blue : .secondary)
+                .debugDrawerFont(.secondary)
+                .debugDrawerForegroundStyle(node.isDirectory ? .accent : .secondary)
                 .frame(width: iconWidth)
                 .accessibilityHidden(true)
         }
 
         private var name: some View {
             Text(node.name)
-                .font(.system(.caption2, design: .monospaced))
+                .debugDrawerFont(.code)
                 .lineLimit(3)
         }
 
+        // The size, then Share and, at the trailing end, Delete.
         private var fileActions: some View {
             Group {
                 Text(node.sizeLabel)
-                    .font(.system(.caption2, design: .monospaced))
-                    .foregroundStyle(.tertiary)
-
-                Button(role: .destructive) {
-                    onDelete(node)
-                } label: {
-                    Image(systemName: "trash")
-                        .font(.caption2)
-                        .foregroundStyle(.red.opacity(0.6))
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Delete \(node.name)")
+                    .debugDrawerFont(.value)
+                    .debugDrawerForegroundStyle(.tertiary)
 
                 Button {
                     onShare(node)
                 } label: {
                     Image(systemName: "square.and.arrow.up")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
                 }
-                .buttonStyle(.plain)
+                .debugDrawerButtonStyle(.borderless)
                 .accessibilityLabel("Share \(node.name)")
+
+                Button(role: .destructive) {
+                    onDelete(node)
+                } label: {
+                    Image(systemName: "trash")
+                }
+                .debugDrawerButtonStyle(.borderless)
+                .accessibilityLabel("Delete \(node.name)")
             }
         }
 

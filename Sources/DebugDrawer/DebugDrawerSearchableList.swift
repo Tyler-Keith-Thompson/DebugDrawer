@@ -56,11 +56,31 @@ public struct DebugDrawerSearchableList<Content: View>: View {
                     LazyVStack(alignment: .leading, spacing: 0) {
                         content
                     }
+                    .padding(.horizontal, DrawerSpacing.itemGap)
                 }
                 .frame(maxHeight: maxHeight)
-                .background(Color.black.opacity(0.15))
-                .clipShape(RoundedRectangle(cornerRadius: 4))
+                .drawerWell()
             }
+        }
+    }
+
+    extension View {
+        /// Sets the view into the panel as a well with a hairline edge, as a code block is.
+        fileprivate func drawerWell() -> some View {
+            modifier(DrawerWell())
+        }
+    }
+
+    /// The look `drawerWell()` gives a scrolling list.
+    private struct DrawerWell: ViewModifier {
+        @Environment(\.displayScale) private var displayScale
+
+        func body(content: Content) -> some View {
+            let shape = RoundedRectangle(cornerRadius: DrawerSpacing.codeRadius)
+            content
+                .background(DrawerPalette.well, in: shape)
+                .clipShape(shape)
+                .overlay { shape.strokeBorder(DrawerPalette.separator, lineWidth: 1 / displayScale) }
         }
     }
 #endif

@@ -2,68 +2,44 @@
     import DebugDrawer
     import SwiftUI
 
-    /// One hang: how long, when and where from, a New tag until it is opened, and, open, its
-    /// stack with a button that copies the whole hang.
+    /// One hang as an issue row: a warning glyph, how long, when and where from, an unread dot
+    /// until it is opened, and, open, its stack as the debug navigator shows one (the app's own
+    /// frames badged, the first of them selected), with a button that copies the whole hang.
     struct HangRow: View {
         let event: HangEvent
         let isExpanded: Bool
+        /// The app's executable's file name, which marks the app's own frames.
+        var ownImage: String?
         let onToggle: () -> Void
-        @Environment(\.dynamicTypeSize) private var dynamicTypeSize
         @Environment(\.locale) private var locale
         @Environment(\.timeZone) private var timeZone
-        @ScaledMetric(relativeTo: .caption2) private var chevronWidth: CGFloat = 10
 
         var body: some View {
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: 0) {
                 Button(action: onToggle) {
-                    summary
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .contentShape(Rectangle())
+                    DebugDrawerIssueRow(event.durationText, severity: .warning) {
+                        Text(facts)
+                    } accessory: {
+                        HStack(spacing: 6) {
+                            if !event.isSeen {
+                                DebugDrawerUnreadDot()
+                                    .accessibilityLabel("New hang")
+                            }
+                            Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
+                                .debugDrawerFont(.secondary)
+                                .debugDrawerForegroundStyle(.tertiary)
+                                .accessibilityHidden(true)
+                        }
+                    }
+                    .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
+                .debugDrawerButtonStyle(.plain)
                 .accessibilityElement(children: .combine)
+                .accessibilityLabel("Hung for \(event.durationText)")
+                .accessibilityValue(event.isSeen ? facts : "New hang, \(facts)")
                 .accessibilityHint(isExpanded ? "Hides the stack" : "Shows the stack")
                 if isExpanded {
                     stack
-                }
-            }
-            .padding(.vertical, 4)
-            .padding(.horizontal, 6)
-        }
-
-        private var summary: some View {
-            HStack(alignment: .firstTextBaseline, spacing: 4) {
-                // One width for both chevrons, so open and closed rows line up.
-                Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                    .frame(width: chevronWidth)
-                    .accessibilityHidden(true)
-                VStack(alignment: .leading, spacing: 2) {
-                    titleLine
-                    Text(facts)
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
-        }
-
-        /// The duration and, until the hang is opened, a New tag: side by side, or one above the
-        /// other at accessibility text sizes.
-        private var titleLine: some View {
-            let layout = dynamicTypeSize.isAccessibilitySize
-                ? AnyLayout(VStackLayout(alignment: .leading, spacing: 2))
-                : AnyLayout(HStackLayout(alignment: .firstTextBaseline, spacing: 6))
-            return layout {
-                Text(event.durationText)
-                    .font(.system(.caption, design: .monospaced).weight(.semibold))
-                    .accessibilityLabel("Hung for \(event.durationText)")
-                if !event.isSeen {
-                    Text("New")
-                        .font(.caption2.weight(.semibold))
-                        .foregroundStyle(.orange)
-                        .accessibilityLabel("New hang")
                 }
             }
         }
@@ -74,23 +50,26 @@
             return "\(date) · \(event.source.title)"
         }
 
-        private var stack: some View {
-            VStack(alignment: .leading, spacing: 6) {
-                if event.frames.isEmpty {
-                    Text(HangEvent.noStack)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                } else {
-                    ScrollView(.horizontal) {
-                        Text(event.frames.joined(separator: "\n"))
-                            .font(.system(.caption2, design: .monospaced))
-                            .textSelection(.enabled)
-                            .fixedSize()
-                            .padding(6)
-                    }
-                    .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 4))
+        @ViewBuilder private var stack: some View {
+            let frames = StackFrame.frames(event.frames)
+            let selected = frames.firstIndex { $0.isOwnCode(ownImage) }
+            if frames.isEmpty {
+                Text(HangEvent.noStack)
+                    .debugDrawerFont(.secondary)
+                    .debugDrawerForegroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else {
+                ForEach(Array(frames.enumerated()), id: \.offset) { position, frame in
+                    DebugDrawerStackFrameRow(
+                        index: frame.index,
+                        symbol: frame.symbol,
+                        image: frame.image,
+                        isOwnCode: frame.isOwnCode(ownImage),
+                        isSelected: position == selected
+                    )
                 }
+            }
+            DebugDrawerActionRow {
                 DebugDrawerCopyButton("Copy Report") { event.text() }
             }
         }

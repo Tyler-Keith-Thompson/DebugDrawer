@@ -15,7 +15,7 @@
     @MainActor
     @Suite(.timeLimit(.minutes(1)))
     struct HangsSnapshotTests {
-        @Test("Hangs list newest first under the threshold, a new one tagged, the open one with its stack and copy button",
+        @Test("Hangs list newest first under the threshold, an unread one dotted, the open one with its frames and Copy Report",
               arguments: [ColorScheme.light, .dark])
         func hangs(colorScheme: ColorScheme) throws {
             let opened = HangEvent(
@@ -34,7 +34,7 @@
                 frames: [], source: .metricKit, isSeen: true
             )
             let sut = HangsView(
-                events: [opened, older], threshold: .constant(.milliseconds(250)), expanded: .constant(opened.id),
+                events: [opened, older], threshold: .constant(.milliseconds(250)), expanded: .constant(opened.id), ownImage: "Example",
                 onOpen: { _ in }, onMarkAllSeen: {}, onClear: {}
             )
             let host = NSHostingView(rootView: sut

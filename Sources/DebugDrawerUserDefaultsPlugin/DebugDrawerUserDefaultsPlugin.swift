@@ -132,16 +132,15 @@
             VStack(alignment: .leading, spacing: 6) {
                 HStack {
                     Text("\(store.filteredEntries.count) keys")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .debugDrawerFont(.secondary)
+                        .debugDrawerForegroundStyle(.secondary)
                     Spacer()
                     Toggle("System", isOn: $store.showSystemKeys)
                         .toggleStyle(.switch)
                         .controlSize(.mini)
+                        .debugDrawerFont(.label)
                     Button("Reload") { store.reload() }
-                        .font(.caption)
-                        .buttonStyle(.plain)
-                        .foregroundStyle(.secondary)
+                        .debugDrawerButtonStyle(.borderless)
                 }
 
                 ScrollViewReader { proxy in

@@ -104,98 +104,96 @@
         @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
         var body: some View {
-            VStack(alignment: .leading, spacing: 6) {
-                // Input
-                HStack(spacing: 4) {
-                    TextField("Enter URL...", text: $urlText)
-                        .textFieldStyle(.roundedBorder)
-                        .font(.system(.caption2, design: .monospaced))
-                        .textContentType(.URL)
-                        .accessibilityLabel("URL to open")
-                        #if os(iOS)
-                            .keyboardType(.URL)
-                            .autocapitalization(.none)
-                        #endif
+            VStack(alignment: .leading, spacing: 0) {
+                DebugDrawerSection {
+                    HStack(spacing: 6) {
+                        TextField("Enter URL…", text: $urlText)
+                            .debugDrawerFont(.code)
+                            .debugDrawerTextFieldStyle()
+                            .textContentType(.URL)
+                            .accessibilityLabel("URL to open")
+                            #if os(iOS)
+                                .keyboardType(.URL)
+                                .autocapitalization(.none)
+                            #endif
 
-                    Group {
-                        if let url = typedURL {
-                            Link("Open", destination: url)
-                                .environment(\.openURL, OpenURLAction { url in
-                                    onOpen(url)
-                                    return .handled
-                                })
-                        } else {
-                            Button("Open") {}
-                                .disabled(true)
-                        }
-                    }
-                    .buttonStyle(.bordered)
-                    .controlSize(.mini)
-                }
-
-                if let result = lastResult {
-                    Text(result)
-                        .font(.caption2)
-                        .foregroundStyle(result.hasPrefix("Error") ? .red : .green)
-                }
-
-                // Presets
-                Divider()
-                Text("Presets")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-
-                // At accessibility text sizes a preset's name leaves its URL too little width, so
-                // the URL sits below the name.
-                let presetLayout = dynamicTypeSize.isAccessibilitySize
-                    ? AnyLayout(VStackLayout(alignment: .leading, spacing: 0))
-                    : AnyLayout(HStackLayout())
-                ForEach(presets, id: \.url) { preset in
-                    Button {
-                        urlText = preset.url
-                    } label: {
-                        presetLayout {
-                            Text(preset.label)
-                                .font(.caption2)
-                            if !dynamicTypeSize.isAccessibilitySize {
-                                Spacer()
+                        Group {
+                            if let url = typedURL {
+                                Link("Open", destination: url)
+                                    .environment(\.openURL, OpenURLAction { url in
+                                        onOpen(url)
+                                        return .handled
+                                    })
+                            } else {
+                                Button("Open") {}
+                                    .disabled(true)
                             }
-                            Text(preset.url)
-                                .font(.system(.caption2, design: .monospaced))
-                                .foregroundStyle(.secondary)
-                                .lineLimit(3)
-                                .truncationMode(.middle)
-                                // Stacked, the URL is otherwise offered one line's height and
-                                // truncates rather than wrapping.
-                                .fixedSize(horizontal: false, vertical: dynamicTypeSize.isAccessibilitySize)
                         }
+                        .debugDrawerButtonStyle(.primary)
+                        // Its ideal size: the field beside it gives up the width instead.
+                        .fixedSize()
                     }
-                    .buttonStyle(.plain)
+                    .padding(.vertical, 4)
+
+                    if let result = lastResult {
+                        DebugDrawerIssueRow(result, severity: result.hasPrefix("Error") ? .error : .ok)
+                    }
                 }
 
-                // History
-                if !history.isEmpty {
-                    Divider()
-                    HStack {
-                        Text("History (\(history.count))")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        Spacer()
-                        Button("Clear", action: onClear)
-                        .buttonStyle(.bordered)
-                        .controlSize(.mini)
-                    }
-
-                    ForEach(history, id: \.self) { entry in
+                DebugDrawerSection("Presets") {
+                    // At accessibility text sizes a preset's name leaves its URL too little width, so
+                    // the URL sits below the name.
+                    let presetLayout = dynamicTypeSize.isAccessibilitySize
+                        ? AnyLayout(VStackLayout(alignment: .leading, spacing: 0))
+                        : AnyLayout(HStackLayout())
+                    ForEach(presets, id: \.url) { preset in
                         Button {
-                            urlText = entry
+                            urlText = preset.url
                         } label: {
-                            Text(entry)
-                                .font(.system(.caption2, design: .monospaced))
-                                .lineLimit(3)
-                                .truncationMode(.middle)
+                            presetLayout {
+                                Text(preset.label)
+                                    .debugDrawerFont(.body)
+                                if !dynamicTypeSize.isAccessibilitySize {
+                                    Spacer()
+                                }
+                                Text(preset.url)
+                                    .debugDrawerFont(.code)
+                                    .debugDrawerForegroundStyle(.tertiary)
+                                    .lineLimit(3)
+                                    .truncationMode(.middle)
+                                    // Stacked, the URL is otherwise offered one line's height and
+                                    // truncates rather than wrapping.
+                                    .fixedSize(horizontal: false, vertical: dynamicTypeSize.isAccessibilitySize)
+                            }
+                            .padding(.vertical, 3)
                         }
-                        .buttonStyle(.plain)
+                        .debugDrawerButtonStyle(.plain)
+                        .accessibilityHint("Puts the URL in the field")
+                    }
+                }
+
+                if !history.isEmpty {
+                    DebugDrawerSection("History (\(history.count))") {
+                        ForEach(history, id: \.self) { entry in
+                            Button {
+                                urlText = entry
+                            } label: {
+                                Text(entry)
+                                    .debugDrawerFont(.code)
+                                    .lineLimit(3)
+                                    .truncationMode(.middle)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .padding(.vertical, 3)
+                            }
+                            .debugDrawerButtonStyle(.plain)
+                            .accessibilityHint("Puts the URL in the field")
+                        }
+                    }
+                    DebugDrawerActionRow {
+                        EmptyView()
+                    } trailing: {
+                        Button("Clear History", role: .destructive, action: onClear)
+                            .debugDrawerButtonStyle(.destructive)
                     }
                 }
             }

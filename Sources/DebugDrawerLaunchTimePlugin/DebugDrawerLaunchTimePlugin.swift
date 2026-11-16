@@ -115,66 +115,38 @@
         @ObservedObject var tracker = LaunchTimeTracker.shared
 
         var body: some View {
-            VStack(alignment: .leading, spacing: 6) {
-                // Big number: total launch time
-                if let total = tracker.totalLaunchTime {
-                    HStack(alignment: .firstTextBaseline) {
-                        Text(String(format: "%.0f", total * 1000))
-                            .font(.system(.largeTitle, design: .monospaced, weight: .bold))
-                            .foregroundStyle(.primary)
-                        Text("ms")
-                            .font(.system(.title3, weight: .medium))
-                            .foregroundStyle(.secondary)
+            VStack(alignment: .leading, spacing: 0) {
+                DebugDrawerSection {
+                    if let total = tracker.totalLaunchTime {
+                        DebugDrawerKeyValueRow("Total", value: total.milliseconds)
+                        // Each phase as its share of the whole launch.
+                        if let preMain = tracker.preMainDuration {
+                            DebugDrawerGaugeRow("Pre-main", value: preMain.milliseconds, fraction: preMain / max(total, .ulpOfOne))
+                        }
+                        if let toFrame = tracker.appInitToFirstFrame {
+                            DebugDrawerGaugeRow("To frame", value: toFrame.milliseconds, fraction: toFrame / max(total, .ulpOfOne))
+                        }
+                    } else {
+                        DebugDrawerKeyValueRow("Total", value: "Measuring…")
+                        if let preMain = tracker.preMainDuration {
+                            DebugDrawerKeyValueRow("Pre-main", value: preMain.milliseconds)
+                        }
                     }
-                    Text("Total launch time (process start to first frame)")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                } else {
-                    Text("Measuring...")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                } footer: {
+                    Text("From process start to the first frame: pre-main is dyld and static initializers, then app init to the first frame.")
                 }
-
-                Divider()
-
-                // Breakdown
-                Group {
-                    if let preMain = tracker.preMainDuration {
-                        timeRow("Pre-main (dyld + static init)", preMain)
-                    }
-                    if let toFrame = tracker.appInitToFirstFrame {
-                        timeRow("App init to first frame", toFrame)
-                    }
-                }
-
-                Divider()
-
-                // Raw timestamps
-                Group {
+                DebugDrawerSection("Uptime") {
                     if let start = tracker.processStartUptime {
-                        DebugDrawerKeyValueRow("Process start", value: String(format: "%.4fs", start), labelWidth: 90)
+                        DebugDrawerKeyValueRow("Process start", value: start.uptime)
                     }
-                    DebugDrawerKeyValueRow("App init", value: String(format: "%.4fs", tracker.appInitUptime), labelWidth: 90)
+                    DebugDrawerKeyValueRow("App init", value: tracker.appInitUptime.uptime)
                     if let frame = tracker.firstFrameUptime {
-                        DebugDrawerKeyValueRow("First frame", value: String(format: "%.4fs", frame), labelWidth: 90)
+                        DebugDrawerKeyValueRow("First frame", value: frame.uptime)
                     }
                 }
-
-                HStack {
+                DebugDrawerActionRow {
                     DebugDrawerCopyButton("Copy") { report }
                 }
-            }
-        }
-
-        private func timeRow(_ label: String, _ seconds: TimeInterval) -> some View {
-            HStack {
-                Text(label)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                Spacer()
-                Text(String(format: "%.0f ms", seconds * 1000))
-                    .font(.system(.caption2, design: .monospaced))
-                    .fontWeight(.medium)
             }
         }
 
@@ -198,6 +170,18 @@
                 report += "First frame uptime: \(String(format: "%.4fs", frame))\n"
             }
             return report
+        }
+    }
+
+    extension TimeInterval {
+        /// The duration in whole milliseconds ("412 ms").
+        fileprivate var milliseconds: String {
+            String(format: "%.0f ms", self * 1000)
+        }
+
+        /// The system uptime in seconds to a tenth of a millisecond ("100.4000s").
+        fileprivate var uptime: String {
+            String(format: "%.4fs", self)
         }
     }
 

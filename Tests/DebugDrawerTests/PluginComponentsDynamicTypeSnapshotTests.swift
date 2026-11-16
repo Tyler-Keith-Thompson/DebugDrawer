@@ -32,29 +32,10 @@
             assertSnapshot(of: actual, as: .image(perceptualPrecision: 0.98), named: "accessibility3")
         }
 
-        @Test("Stat badges stay readable at a large accessibility text size")
-        func statBadges() throws {
-            let sut = HStack(spacing: 12) {
-                DebugDrawerStatBadge("Total", value: "12")
-                DebugDrawerStatBadge("Min", value: "41", color: .red)
-                DebugDrawerStatBadge("Peak", value: "182", color: .blue)
-            }
-            let renderer = ImageRenderer(content: sut
-                .frame(width: 320, alignment: .leading)
-                .padding()
-                .background(.background)
-                .environment(\.dynamicTypeSize, .accessibility3))
-            renderer.scale = 2
-
-            let actual = try #require(renderer.uiImage)
-
-            assertSnapshot(of: actual, as: .image(perceptualPrecision: 0.98), named: "accessibility3")
-        }
-
         @Test("A sparkline keeps its height at a large accessibility text size")
         func sparkline() throws {
             let samples: [Double] = [60, 60, 58, 41, 59, 60, 30, 55, 60, 60, 60, 57]
-            let sut = DebugDrawerSparkline("Frame rate history", data: samples, color: .green)
+            let sut = DebugDrawerSparkline("Frame rate history", data: samples)
             let renderer = ImageRenderer(content: sut
                 .frame(width: 320, alignment: .leading)
                 .padding()
@@ -75,6 +56,9 @@
                 .background(Color(uiColor: .systemBackground))
                 .environment(\.dynamicTypeSize, .accessibility3)
             let controller = UIHostingController(rootView: sut)
+            // No safe area: the window's status bar inset would lay the view out shorter than it
+            // measured, overlapping its rows.
+            controller.safeAreaRegions = []
             let size = controller.sizeThatFits(in: CGSize(width: 352, height: 2000))
             let scene = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first
             let window = scene.map(UIWindow.init(windowScene:)) ?? UIWindow()
@@ -112,6 +96,9 @@
             .background(Color(uiColor: .systemBackground))
             .environment(\.dynamicTypeSize, .accessibility3)
             let controller = UIHostingController(rootView: sut)
+            // No safe area: the window's status bar inset would lay the view out shorter than it
+            // measured, overlapping its rows.
+            controller.safeAreaRegions = []
             let size = controller.sizeThatFits(in: CGSize(width: 352, height: 2000))
             let scene = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first
             let window = scene.map(UIWindow.init(windowScene:)) ?? UIWindow()

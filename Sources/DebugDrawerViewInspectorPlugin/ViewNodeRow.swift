@@ -1,4 +1,5 @@
 #if DEBUG
+    import DebugDrawer
     import SwiftUI
 
     #if os(macOS)
@@ -15,7 +16,6 @@
         let depth: Int
         /// Matched against class names, accessibility labels and roles; empty matches everything.
         let filter: String
-        @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
         var body: some View {
             if subtreeMatchesFilter(node) {
@@ -30,99 +30,67 @@
             }
         }
 
-        // At accessibility text sizes a row of flags squeezes each one to a few letters per line,
-        // so each flag takes a line of its own.
-        private func flagLayout(spacing: CGFloat) -> AnyLayout {
-            dynamicTypeSize.isAccessibilitySize
-                ? AnyLayout(VStackLayout(alignment: .leading, spacing: 1))
-                : AnyLayout(HStackLayout(spacing: spacing))
-        }
-
+        // The class on one line and the flags in words joined by dots on the next, so at any
+        // text size the flags wrap between words rather than each squeezing into a column.
         private var label: some View {
-            let classLayout = flagLayout(spacing: 4)
-            let detailLayout = flagLayout(spacing: 6)
-            return VStack(alignment: .leading, spacing: 1) {
-                classLayout {
-                    Text(node.className)
-                        .font(.system(.caption2, design: .monospaced))
-                        .foregroundStyle(node.accessibilityLabel != nil ? Color.accentColor : .primary)
-
+            VStack(alignment: .leading, spacing: 1) {
+                HStack(alignment: .firstTextBaseline, spacing: 4) {
                     if node.isHidden {
-                        Text("HIDDEN")
-                            .font(.system(.caption2, design: .monospaced, weight: .bold))
-                            .foregroundStyle(.red)
+                        DebugDrawerIssueGlyph(.warning)
+                            .accessibilityHidden(true)
                     }
-
-                    if node.alpha < 1.0 {
-                        Text("a\(node.alpha, specifier: "%.1f")")
-                            .font(.system(.caption2, design: .monospaced))
-                            .foregroundStyle(.orange)
+                    if let background = node.backgroundColor {
+                        swatch(background)
                     }
-
-                    if node.hasClipping {
-                        Text("CLIP")
-                            .font(.system(.caption2, design: .monospaced, weight: .bold))
-                            .foregroundStyle(.purple)
-                    }
+                    Text(node.className)
+                        .debugDrawerFont(.code)
+                        .debugDrawerForegroundStyle(.primary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
-
-                detailLayout {
-                    Text("\(Int(node.frame.width))x\(Int(node.frame.height))")
-                        .font(.system(.caption2, design: .monospaced))
-                        .foregroundStyle(.tertiary)
-
-                    if node.cornerRadius > 0 {
-                        Text("r\(Int(node.cornerRadius))")
-                            .font(.system(.caption2, design: .monospaced))
-                            .foregroundStyle(.cyan)
-                    }
-
-                    if let bg = node.backgroundColor {
-                        HStack(spacing: 2) {
-                            #if os(macOS)
-                            Circle()
-                                .fill(Color(nsColor: NSColor(hex: bg)))
-                                .frame(width: 6, height: 6)
-                            #elseif os(iOS)
-                            Circle()
-                                .fill(Color(uiColor: UIColor(hex: bg)))
-                                .frame(width: 6, height: 6)
-                            #endif
-                            Text(bg)
-                                .font(.system(.caption2, design: .monospaced))
-                                .foregroundStyle(.tertiary)
-                        }
-                    }
-
-                    if let role = node.accessibilityRole {
-                        Text(role)
-                            .font(.system(.caption2, design: .monospaced))
-                            .padding(.horizontal, 3)
-                            .background(Color.purple.opacity(0.15))
-                            .cornerRadius(2)
-                    }
-
-                    if let label = node.accessibilityLabel {
-                        Text(label)
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(3)
-                    }
-
-                    if node.constraintCount > 0 {
-                        Text("c\(node.constraintCount)")
-                            .font(.system(.caption2, design: .monospaced))
-                            .foregroundStyle(.tertiary)
-                    }
-
-                    if node.subviewCount > 0 {
-                        Text("(\(node.subviewCount))")
-                            .font(.system(.caption2, design: .monospaced))
-                            .foregroundStyle(.tertiary)
-                    }
+                Text(flags.joined(separator: " · "))
+                    .debugDrawerFont(.code)
+                    .debugDrawerForegroundStyle(.tertiary)
+                    .fixedSize(horizontal: false, vertical: true)
+                if let label = node.accessibilityLabel {
+                    Text(label)
+                        .debugDrawerFont(.secondary)
+                        .debugDrawerForegroundStyle(.secondary)
+                        .lineLimit(3)
                 }
             }
             .padding(.vertical, 1)
+        }
+
+        /// The size and, in words, every flag that applies: hidden, alpha, clipping, corner
+        /// radius, background, role, constraints and subviews.
+        private var flags: [String] {
+            var flags = ["\(Int(node.frame.width))×\(Int(node.frame.height))"]
+            if node.isHidden { flags.append("hidden") }
+            if node.alpha < 1.0 { flags.append("alpha \(String(format: "%.1f", node.alpha))") }
+            if node.hasClipping { flags.append("clips") }
+            if node.cornerRadius > 0 { flags.append("r\(Int(node.cornerRadius))") }
+            if let background = node.backgroundColor { flags.append(background) }
+            if let role = node.accessibilityRole { flags.append(role) }
+            if node.constraintCount > 0 { flags.append("c\(node.constraintCount)") }
+            if node.subviewCount > 0 { flags.append("(\(node.subviewCount))") }
+            return flags
+        }
+
+        // The swatch shows the view's own background color: a value read from the app, not a
+        // meaning, so it takes that color rather than one from the drawer's palette.
+        @ViewBuilder
+        private func swatch(_ hex: String) -> some View {
+            #if os(macOS)
+                Circle()
+                    .fill(Color(nsColor: NSColor(hex: hex)))
+                    .frame(width: 6, height: 6)
+                    .accessibilityHidden(true)
+            #elseif os(iOS)
+                Circle()
+                    .fill(Color(uiColor: UIColor(hex: hex)))
+                    .frame(width: 6, height: 6)
+                    .accessibilityHidden(true)
+            #endif
         }
 
         private func matchesFilter(_ node: ViewNode) -> Bool {

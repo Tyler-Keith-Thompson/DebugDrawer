@@ -70,35 +70,34 @@
             window.rootViewController = controller
             window.isHidden = false
             let before = try shownFontSize(controller)
-            let expected = ConsoleFonts(dynamicTypeSize: .accessibility3).text.pointSize
+            let expectedBefore: CGFloat = 13
+            let expected = ConsoleFonts(dynamicTypeSize: .accessibility3).code.pointSize
 
             controller.rootView = console(.accessibility3)
             let actual = try shownFontSize(controller)
             window.isHidden = true
 
-            #expect(before == 10)
+            #expect(before == expectedBefore)
             #expect(actual == expected)
         }
 
-        @Test("The console's fonts are 10, 9 and 8 pt at the default text size")
-        func fontsAtTheDefaultSize() {
-            let expected: [CGFloat] = [10, 9, 8]
+        @Test("The console's font is the drawer's code type, the footnote's 13 pt monospaced, at the default text size")
+        func fontAtTheDefaultSize() {
+            let expected: CGFloat = 13
 
-            let fonts = ConsoleFonts(dynamicTypeSize: .large)
-            let actual = [fonts.text.pointSize, fonts.small.pointSize, fonts.badge.pointSize]
+            let actual = ConsoleFonts(dynamicTypeSize: .large).code
 
-            #expect(actual == expected)
+            #expect(actual.pointSize == expected)
+            #expect(actual.fontDescriptor.symbolicTraits.contains(.traitMonoSpace))
         }
 
-        @Test("Every console font grows at an accessibility text size")
-        func fontsGrowAtAccessibilitySizes() {
+        @Test("The console's font grows at an accessibility text size")
+        func fontGrowsAtAccessibilitySizes() {
             let standard = ConsoleFonts(dynamicTypeSize: .large)
 
             let actual = ConsoleFonts(dynamicTypeSize: .accessibility3)
 
-            #expect(actual.text.pointSize > standard.text.pointSize)
-            #expect(actual.small.pointSize > standard.small.pointSize)
-            #expect(actual.badge.pointSize > standard.badge.pointSize)
+            #expect(actual.code.pointSize > standard.code.pointSize)
         }
     }
 #endif

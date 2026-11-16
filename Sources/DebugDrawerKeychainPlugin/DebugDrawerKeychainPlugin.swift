@@ -123,16 +123,14 @@
             VStack(alignment: .leading, spacing: 6) {
                 HStack {
                     Text("\(store.filteredEntries.count) items")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .debugDrawerFont(.secondary)
+                        .debugDrawerForegroundStyle(.secondary)
                     Spacer()
                     Button(loaded ? "Reload" : "Load") {
                         store.reload()
                         loaded = true
                     }
-                    .font(.caption)
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
+                    .debugDrawerButtonStyle(.secondary)
                 }
 
                 if loaded {
@@ -170,49 +168,50 @@
                 Button(action: onSelect) {
                     summary
                 }
-                .buttonStyle(.plain)
+                .debugDrawerButtonStyle(.plain)
                 .accessibilityAddTraits(isSelected ? .isSelected : [])
 
                 if isSelected {
                     KeychainEntryDetail(entry: entry, redaction: redaction, onDelete: onDelete)
                 }
-
-                Divider().padding(.leading, 6)
             }
         }
 
-        // At accessibility text sizes the class badge leaves the account and service too little
-        // width, so it sits above them.
+        // The account and service in the drawer's code type, the item's class after them in
+        // tertiary text; at accessibility text sizes the class sits below them. Each keeps to one
+        // line cut in the middle, as the UserDefaults keys do, until the item is selected.
         private var summary: some View {
             let layout = dynamicTypeSize.isAccessibilitySize
                 ? AnyLayout(VStackLayout(alignment: .leading, spacing: 2))
                 : AnyLayout(HStackLayout(spacing: 6))
             return layout {
-                Text(entry.itemClass)
-                    .font(.system(.caption2, design: .monospaced, weight: .medium))
-                    .padding(.horizontal, 3)
-                    .background(entry.itemClass == "Password" ? Color.green.opacity(0.15) : Color.blue.opacity(0.15))
-                    .cornerRadius(2)
-
                 VStack(alignment: .leading, spacing: 0) {
                     Text(entry.account)
-                        .font(.system(.caption2, design: .monospaced))
-                        .lineLimit(3)
+                        .debugDrawerFont(.code)
+                        .debugDrawerForegroundStyle(.primary)
+                        .lineLimit(isSelected ? nil : 1)
+                        .truncationMode(.middle)
+                        .help(entry.account)
                     if !entry.service.isEmpty {
                         Text(entry.service)
-                            .font(.system(.caption2, design: .monospaced))
-                            .foregroundStyle(.tertiary)
-                            .lineLimit(3)
+                            .debugDrawerFont(.code)
+                            .debugDrawerForegroundStyle(.tertiary)
+                            .lineLimit(isSelected ? nil : 1)
+                            .truncationMode(.middle)
+                            .help(entry.service)
                     }
                 }
 
                 if !dynamicTypeSize.isAccessibilitySize {
                     Spacer()
                 }
+
+                Text(entry.itemClass)
+                    .debugDrawerFont(.secondary)
+                    .debugDrawerForegroundStyle(.tertiary)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 6)
-            .padding(.vertical, 3)
+            .debugDrawerRowPadding()
             .contentShape(Rectangle())
         }
     }
@@ -229,60 +228,45 @@
         var body: some View {
             VStack(alignment: .leading, spacing: 4) {
                 if let label = entry.label {
-                    HStack {
-                        Text("Label:")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        Text(label)
-                            .font(.system(.caption2, design: .monospaced))
-                    }
-                    .accessibilityElement(children: .combine)
+                    // The item's label is an identifier the app chose, even when it is a word.
+                    DebugDrawerKeyValueRow("Label", value: label)
+                        .debugDrawerValueStyle(.code)
                 }
 
-                RedactedText(
-                    entry.valuePreview,
-                    redacted: entry.isSensitive(under: redaction) ? DebugDrawerRedaction.mask : entry.valuePreview
-                )
-                .font(.system(.caption2, design: .monospaced))
-                .padding(4)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color.primary.opacity(0.05))
-                .cornerRadius(3)
+                DebugDrawerCodeBlock {
+                    RedactedText(
+                        entry.valuePreview,
+                        redacted: entry.isSensitive(under: redaction) ? DebugDrawerRedaction.mask : entry.valuePreview
+                    )
+                }
 
-                HStack {
+                DebugDrawerActionRow {
                     DebugDrawerCopyButton("Copy Value") { entry.copiedValue(redaction: redaction) }
-
-                    Spacer()
-
+                } trailing: {
                     if isConfirmingDelete {
                         confirmation
                     } else {
-                        Button("Delete") { isConfirmingDelete = true }
-                            .controlSize(.small)
-                            .buttonStyle(.bordered)
-                            .foregroundStyle(.red)
+                        Button("Delete", role: .destructive) { isConfirmingDelete = true }
+                            .debugDrawerButtonStyle(.destructive)
                     }
                 }
             }
-            .padding(.horizontal, 6)
             .padding(.bottom, 4)
         }
 
         private var confirmation: some View {
             HStack {
                 Text("Sure?")
-                    .font(.caption)
-                    .foregroundStyle(.red)
-                Button("Yes") {
+                    .debugDrawerFont(.body)
+                    .debugDrawerForegroundStyle(.error)
+                Button("Cancel") { isConfirmingDelete = false }
+                    .debugDrawerButtonStyle(.secondary)
+                Button("Delete", role: .destructive) {
                     isConfirmingDelete = false
                     onDelete()
                 }
-                .controlSize(.small)
-                .buttonStyle(.borderedProminent)
-                .tint(.red)
-                Button("Cancel") { isConfirmingDelete = false }
-                    .controlSize(.small)
-                    .buttonStyle(.bordered)
+                .debugDrawerButtonStyle(.destructive)
+                .accessibilityLabel("Delete \(entry.account)")
             }
             .accessibilityElement(children: .contain)
             .accessibilityLabel("Delete \(entry.account)?")

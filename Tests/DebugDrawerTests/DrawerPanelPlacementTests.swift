@@ -36,12 +36,16 @@
             #expect(actual == expected)
         }
 
-        @Test("The close button's tap target is at least 44 by 44 points")
-        func closeButtonTargetIsAtLeast44Points() throws {
+        @Test("The close button's target is at least 44 points on a touch screen, and its 22 point square on the Mac, as Xcode's pane buttons are")
+        func closeButtonTarget() throws {
             let sut = DrawerCloseButton {}
-            let expected: CGFloat = 44
+            #if os(macOS)
+                let expected: CGFloat = 22
+            #else
+                let expected: CGFloat = 44
+            #endif
 
-            let actual = try sut.inspect().button().labelView().image().flexFrame()
+            let actual = try sut.inspect().find(ViewType.Image.self).flexFrame()
 
             #expect(actual.minWidth == expected)
             #expect(actual.minHeight == expected)

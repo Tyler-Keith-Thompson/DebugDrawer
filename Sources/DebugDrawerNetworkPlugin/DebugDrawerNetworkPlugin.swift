@@ -24,14 +24,10 @@
         /// Timing of the request's last transaction, from `URLSessionTaskMetrics`.
         public var metrics: NetworkTimingMetrics?
 
-        public var statusColor: Color {
-            guard let code = statusCode else { return .secondary }
-            switch code {
-            case 200 ..< 300: return .green
-            case 300 ..< 400: return .blue
-            case 400 ..< 500: return .orange
-            default: return .red
-            }
+        /// Whether the request failed: the server answered with a status of 400 or more, or the
+        /// request never got an answer (a transport error).
+        var isFailure: Bool {
+            error != nil || (statusCode ?? 0) >= 400
         }
 
         public var responseSizeLabel: String {
@@ -104,7 +100,7 @@
             case .success: result = result.filter { ($0.statusCode ?? 0) >= 200 && ($0.statusCode ?? 0) < 300 }
             case .clientError: result = result.filter { ($0.statusCode ?? 0) >= 400 && ($0.statusCode ?? 0) < 500 }
             case .serverError: result = result.filter { ($0.statusCode ?? 0) >= 500 }
-            case .errors: result = result.filter { $0.error != nil || ($0.statusCode ?? 0) >= 400 }
+            case .errors: result = result.filter(\.isFailure)
             }
             if !filterText.isEmpty {
                 let query = filterText.lowercased()
@@ -168,6 +164,11 @@
 
         public var body: some View {
             NetworkPluginView()
+        }
+
+        /// How many requests were captured, and how many of them failed.
+        public var headerAccessory: some View {
+            NetworkHeaderAccessoryView()
         }
     }
 

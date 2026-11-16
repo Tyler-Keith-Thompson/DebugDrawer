@@ -175,16 +175,6 @@
             }
         }
 
-        public var thermalColor: Color {
-            switch thermalState {
-            case .nominal: .green
-            case .fair: .yellow
-            case .serious: .orange
-            case .critical: .red
-            @unknown default: .secondary
-            }
-        }
-
         /// This process's CPU use, bucketed. It is not Xcode's Energy Impact: that also
         /// weighs GPU, network, location and wakeups, which aren't measured here.
         public var cpuLoad: String {
@@ -192,13 +182,6 @@
             if cpuUsage < 20 { return "Moderate" }
             if cpuUsage < 50 { return "High" }
             return "Very High"
-        }
-
-        public var cpuLoadColor: Color {
-            if cpuUsage < 5 { return .green }
-            if cpuUsage < 20 { return .yellow }
-            if cpuUsage < 50 { return .orange }
-            return .red
         }
     }
 
@@ -218,109 +201,82 @@
 
     struct EnergyPluginView: View {
         @ObservedObject var monitor = EnergyMonitor.shared
+        /// The cores CPU use is measured against: the process's threads together can use each.
+        var processorCount = ProcessInfo.processInfo.activeProcessorCount
 
         var body: some View {
-            VStack(alignment: .leading, spacing: 8) {
-                // Start/stop
-                Toggle("Monitor", isOn: Binding(
+            VStack(alignment: .leading, spacing: 0) {
+                DebugDrawerRow("Monitor", isOn: Binding(
                     get: { monitor.isMonitoring },
                     set: { $0 ? monitor.start() : monitor.stop() }
                 ))
-                .toggleStyle(.switch)
-                .controlSize(.small)
-
                 if monitor.isMonitoring {
-                    // CPU load (not Energy Impact: no energy counters behind it)
-                    HStack {
-                        Text("CPU Load")
-                            .font(.caption.weight(.medium))
-                        Spacer()
-                        Text(monitor.cpuLoad)
-                            .font(.system(.callout, design: .rounded, weight: .bold))
-                            .foregroundStyle(monitor.cpuLoadColor)
-                    }
-
-                    // CPU
-                    VStack(alignment: .leading, spacing: 2) {
-                        HStack {
-                            Text("CPU")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                            Spacer()
-                            Text(String(format: "%.1f%%", monitor.cpuUsage))
-                                .font(.system(.caption2, design: .monospaced, weight: .medium))
-                        }
+                    DebugDrawerSection("Processor") {
+                        // CPU load, not Energy Impact: no energy counters behind it.
+                        DebugDrawerKeyValueRow("CPU Load", value: monitor.cpuLoad)
+                        DebugDrawerGaugeRow(
+                            "CPU",
+                            value: "\(monitor.cpuUsage.formatted(.number.precision(.fractionLength(1))))%",
+                            fraction: monitor.cpuUsage / Double(100 * max(processorCount, 1)),
+                            severity: monitor.cpuLoadSeverity
+                        )
                         DebugDrawerSparkline(
                             "CPU history",
                             data: monitor.cpuHistory,
                             range: 0 ... max(100, monitor.cpuHistory.max() ?? 100),
-                            color: .blue
+                            severity: monitor.cpuLoadSeverity
                         )
                     }
-
-                    // Battery (if available)
+                    // A desktop Mac has no battery.
                     if monitor.batteryLevel >= 0 {
-                        VStack(alignment: .leading, spacing: 2) {
-                            HStack {
-                                Image(systemName: monitor.isCharging ? "battery.100.bolt" : "battery.50")
-                                    .foregroundStyle(batteryColor)
-                                    .accessibilityHidden(true)
-                                Text("\(monitor.batteryLevel)%")
-                                    .font(.system(.callout, design: .monospaced, weight: .bold))
-                                    .foregroundStyle(batteryColor)
-
-                                Spacer()
-
-                                Text(monitor.isCharging ? "Charging" : "Battery")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                            .accessibilityElement(children: .combine)
-
+                        DebugDrawerSection("Battery") {
+                            DebugDrawerGaugeRow(
+                                monitor.isCharging ? "Charging" : "Battery",
+                                value: "\(monitor.batteryLevel)%",
+                                fraction: Double(monitor.batteryLevel) / 100,
+                                severity: monitor.batterySeverity
+                            )
                             DebugDrawerSparkline(
                                 "Battery history",
                                 data: monitor.batteryHistory.map { Double($0.level) },
                                 range: 0 ... 100,
-                                color: batteryColor
+                                severity: monitor.batterySeverity
                             )
                         }
                     }
-
-                    // Thermal state
-                    HStack {
-                        Text("Thermal")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        Spacer()
-                        HStack(spacing: 4) {
-                            Circle()
-                                .fill(monitor.thermalColor)
-                                .frame(width: 6, height: 6)
-                            Text(monitor.thermalLabel)
-                                .font(.system(.caption2, weight: .medium))
-                                .foregroundStyle(monitor.thermalColor)
-                        }
-                    }
-
-                    // Power source
-                    HStack {
-                        Text("Power Source")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        Spacer()
-                        Text(monitor.powerSource)
-                            .font(.system(.caption2, design: .monospaced))
-                            .foregroundStyle(.secondary)
+                    DebugDrawerSection("Device") {
+                        DebugDrawerIssueRow("Thermal State", status: monitor.thermalLabel, severity: monitor.thermalSeverity)
+                        DebugDrawerKeyValueRow("Power Source", value: monitor.powerSource)
                     }
                 }
             }
         }
+    }
 
-        private var batteryColor: Color {
-            if monitor.isCharging { return .green }
-            if monitor.batteryLevel > 20 { return .primary }
-            if monitor.batteryLevel > 10 { return .orange }
-            return .red
+    extension EnergyMonitor {
+        /// How heavy the CPU load is: `nil` (the accent) while low or moderate, a warning while
+        /// high, an error while very high.
+        var cpuLoadSeverity: DebugDrawerIssueGlyph.Severity? {
+            if cpuUsage < 20 { return nil }
+            return cpuUsage < 50 ? .warning : .error
+        }
+
+        /// How low the battery is: `nil` while charging or above 20%, a warning to 10%, an error
+        /// below.
+        var batterySeverity: DebugDrawerIssueGlyph.Severity? {
+            if isCharging || batteryLevel > 20 { return nil }
+            return batteryLevel > 10 ? .warning : .error
+        }
+
+        /// The issue glyph for the thermal state: ok while nominal, a warning while fair or
+        /// serious, an error while critical.
+        var thermalSeverity: DebugDrawerIssueGlyph.Severity {
+            switch thermalState {
+            case .nominal: .ok
+            case .fair, .serious: .warning
+            case .critical: .error
+            @unknown default: .neutral
+            }
         }
     }
 

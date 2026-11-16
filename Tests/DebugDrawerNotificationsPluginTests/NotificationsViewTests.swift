@@ -56,12 +56,12 @@
                 settings: NotificationSettings(authorization: .authorized, items: []), request: .idle, onRequest: {}, onRefresh: {}
             )
 
-            let status = try undecided.inspect().find(text: "Not Asked").string()
+            let status = try undecided.inspect().find(text: "Notifications — Not Asked").string()
             let alerts = try undecided.inspect().find(text: "Not Supported").string()
             try undecided.inspect().find(button: "Request").tap()
             try undecided.inspect().find(button: "Refresh").tap()
 
-            #expect(status == "Not Asked")
+            #expect(status == "Notifications — Not Asked")
             #expect(alerts == "Not Supported")
             #expect(requested == 1)
             #expect(refreshed == 1)

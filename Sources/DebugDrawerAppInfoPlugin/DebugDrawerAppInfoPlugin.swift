@@ -125,20 +125,18 @@
         let refresh: () -> Void
 
         var body: some View {
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: 0) {
                 ForEach(Array(facts.sections.enumerated()), id: \.offset) { _, section in
-                    ForEach(section, id: \.label) { fact in
-                        DebugDrawerKeyValueRow(fact.label, value: fact.value)
+                    DebugDrawerSection {
+                        ForEach(section, id: \.label) { fact in
+                            DebugDrawerKeyValueRow(fact.label, value: fact.value)
+                        }
                     }
-                    Divider()
                 }
 
-                HStack {
+                DebugDrawerActionRow {
                     DebugDrawerCopyButton("Copy Info") { facts.report }
-
                     Button("Refresh", action: refresh)
-                        .buttonStyle(.bordered)
-                        .controlSize(.small)
                 }
             }
         }

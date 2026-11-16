@@ -230,64 +230,73 @@
         let active: Coordinate?
         let presets: [LocationSimulator.PresetLocation]
         let onPreset: (LocationSimulator.PresetLocation) -> Void
-        // Grows with the text, so "Lat" and "Lon" keep fitting their column at large sizes.
-        @ScaledMetric(relativeTo: .caption) private var labelWidth = 24
+        // Grows with the text, so "Longitude" keeps fitting its column at large sizes.
+        @ScaledMetric(relativeTo: .body) private var labelWidth = 72
+        @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
         var body: some View {
-            VStack(alignment: .leading, spacing: 6) {
-                Toggle("Spoof Location", isOn: $isEnabled)
-                    .toggleStyle(.switch)
-                    .controlSize(.small)
+            VStack(alignment: .leading, spacing: 0) {
+                DebugDrawerRow("Spoof Location", isOn: $isEnabled)
 
                 if isEnabled {
-                    coordinateField("Lat", "Latitude", text: $latitudeText)
-                    coordinateField("Lon", "Longitude", text: $longitudeText)
-
-                    if let active {
-                        Text("Active: \(String(format: "%.4f", active.latitude)), \(String(format: "%.4f", active.longitude))")
-                            .font(.system(.caption2, design: .monospaced))
-                            .foregroundStyle(.green)
+                    DebugDrawerSection {
+                        coordinateField("Latitude", text: $latitudeText)
+                        coordinateField("Longitude", text: $longitudeText)
+                        if let active {
+                            DebugDrawerIssueRow(
+                                "Active",
+                                status: "\(String(format: "%.4f", active.latitude)), \(String(format: "%.4f", active.longitude))",
+                                severity: .ok
+                            )
+                        }
                     }
 
-                    Divider()
-
-                    Text("Presets")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-
-                    ForEach(presets) { preset in
-                        Button {
-                            onPreset(preset)
-                        } label: {
-                            HStack {
-                                Text(preset.name)
-                                    .font(.caption2)
-                                Spacer()
-                                Text("\(String(format: "%.2f", preset.latitude)), \(String(format: "%.2f", preset.longitude))")
-                                    .font(.system(.caption2, design: .monospaced))
-                                    .foregroundStyle(.secondary)
+                    DebugDrawerSection("Presets") {
+                        ForEach(presets) { preset in
+                            Button {
+                                onPreset(preset)
+                            } label: {
+                                // At accessibility text sizes the coordinates go under the name, where
+                                // they fit on one line.
+                                let layout = dynamicTypeSize.isAccessibilitySize
+                                    ? AnyLayout(VStackLayout(alignment: .leading, spacing: 0))
+                                    : AnyLayout(HStackLayout(alignment: .firstTextBaseline))
+                                layout {
+                                    Text(preset.name)
+                                        .debugDrawerFont(.body)
+                                    if !dynamicTypeSize.isAccessibilitySize {
+                                        Spacer()
+                                    }
+                                    Text("\(String(format: "%.2f", preset.latitude)), \(String(format: "%.2f", preset.longitude))")
+                                        .debugDrawerFont(.value)
+                                        .debugDrawerForegroundStyle(.tertiary)
+                                }
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.vertical, 3)
                             }
+                            .debugDrawerButtonStyle(.plain)
+                            .accessibilityHint("Spoofs this location")
                         }
-                        .buttonStyle(.plain)
                     }
                 }
             }
         }
 
-        private func coordinateField(_ shortName: String, _ name: String, text: Binding<String>) -> some View {
-            HStack(spacing: 4) {
-                Text(shortName)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .frame(width: labelWidth, alignment: .leading)
+        private func coordinateField(_ name: String, text: Binding<String>) -> some View {
+            HStack(spacing: 8) {
+                Text(name)
+                    .debugDrawerFont(.label)
+                    .debugDrawerForegroundStyle(.secondary)
+                    .frame(width: labelWidth, alignment: .trailing)
                 TextField(name, text: text)
-                    .textFieldStyle(.roundedBorder)
-                    .font(.system(.caption2, design: .monospaced))
+                    .debugDrawerFont(.code)
+                    .debugDrawerTextFieldStyle()
                     .accessibilityLabel(name)
                     #if os(iOS)
                         .keyboardType(.decimalPad)
                     #endif
             }
+            .padding(.vertical, 3)
         }
     }
 

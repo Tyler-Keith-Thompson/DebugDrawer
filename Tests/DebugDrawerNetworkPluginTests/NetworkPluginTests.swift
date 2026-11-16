@@ -17,22 +17,6 @@
             XCTAssertFalse(entry.isComplete)
         }
 
-        func testStatusColor() {
-            var entry = NetworkEntry(
-                timestamp: Date(), method: "GET", url: "", host: "", path: "",
-                requestHeaders: [:], requestBody: nil, isComplete: true
-            )
-            entry.statusCode = 200
-            // Can't test Color equality easily, but ensure no crash
-            _ = entry.statusColor
-
-            entry.statusCode = 404
-            _ = entry.statusColor
-
-            entry.statusCode = 500
-            _ = entry.statusColor
-        }
-
         func testResponseSizeLabel() {
             var entry = NetworkEntry(
                 timestamp: Date(), method: "GET", url: "", host: "", path: "",

@@ -8,19 +8,15 @@
         @State private var selectedId: UUID?
 
         var body: some View {
-            VStack(alignment: .leading, spacing: 6) {
-                // Stats summary
+            VStack(alignment: .leading, spacing: 0) {
+                // The request count is in the header; the rates are an inspector form here.
                 if !store.entries.isEmpty {
                     let stats = NetworkStats(store.entries)
-                    HStack(spacing: 12) {
-                        DebugDrawerStatBadge("Total", value: "\(stats.total)")
-                        DebugDrawerStatBadge("Success", value: stats.successRate)
-                        DebugDrawerStatBadge("Avg Time", value: stats.averageTime)
-                    }
-                    .padding(.vertical, 2)
+                    DebugDrawerKeyValueRow("Succeeded", value: stats.successRate)
+                    DebugDrawerKeyValueRow("Average", value: stats.averageTime)
                 }
 
-                NetworkToolbar(count: store.filteredEntries.count, filterStatus: $store.filterStatus) { store.clear() }
+                NetworkToolbar(filterStatus: $store.filterStatus) { store.clear() }
 
                 DebugDrawerSearchableList(
                     "Filter URL...",
@@ -34,6 +30,37 @@
                         }
                     }
                 }
+            }
+        }
+    }
+
+    /// The Network plugin's header accessory, read from the shared store as the plugin's body
+    /// reads it.
+    struct NetworkHeaderAccessoryView: View {
+        @ObservedObject private var store = NetworkStore.shared
+
+        var body: some View {
+            NetworkHeaderSummary(entries: store.entries)
+        }
+    }
+
+    /// How many requests the plugin holds ("38 requests"), and an error glyph with the count of
+    /// those that failed, when any did.
+    struct NetworkHeaderSummary: View {
+        let total: Int
+        let failures: Int
+
+        init(entries: [NetworkEntry]) {
+            total = entries.count
+            failures = entries.count(where: \.isFailure)
+        }
+
+        var body: some View {
+            HStack {
+                if failures > 0 {
+                    DebugDrawerIssueCount(.error, count: failures)
+                }
+                Text(total == 1 ? "1 request" : "\(total.formatted()) requests")
             }
         }
     }
@@ -61,7 +88,8 @@
         }
     }
 
-    /// A request's method, status, path and duration; selected, it shows the request's detail.
+    /// A request's method, status, path and duration, after an error glyph when it failed;
+    /// selected, it shows the request's detail.
     struct NetworkRequestRow: View {
         let entry: NetworkEntry
         let redaction: DebugDrawerRedaction
@@ -72,90 +100,71 @@
         var body: some View {
             VStack(alignment: .leading, spacing: 0) {
                 Button(action: onSelect) {
-                    Group {
-                        // At accessibility text sizes the path has no room beside the method,
-                        // status and duration, so it takes a line of its own.
-                        if dynamicTypeSize.isAccessibilitySize {
-                            VStack(alignment: .leading, spacing: 1) {
-                                HStack(spacing: 6) {
-                                    methodBadge
-                                    status
-                                    Spacer()
-                                    duration
-                                }
-                                path
-                            }
-                        } else {
-                            HStack(spacing: 6) {
-                                methodBadge
-                                status
-                                path
-                                Spacer()
-                                duration
-                            }
+                    // At accessibility text sizes the path and the duration have no room beside
+                    // the method and status, so each takes a line of its own.
+                    let layout = dynamicTypeSize.isAccessibilitySize
+                        ? AnyLayout(VStackLayout(alignment: .leading, spacing: 1))
+                        : AnyLayout(HStackLayout(alignment: .firstTextBaseline))
+                    layout {
+                        HStack(alignment: .firstTextBaseline) {
+                            glyph
+                            Text(entry.method)
+                                .debugDrawerFont(.code)
+                                .debugDrawerForegroundStyle(.secondary)
+                            status
                         }
+                        Text(entry.path)
+                            .debugDrawerFont(.code)
+                            .debugDrawerForegroundStyle(.primary)
+                            .lineLimit(3)
+                            .truncationMode(.middle)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        duration
                     }
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 3)
+                    .debugDrawerRowPadding()
                     .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
+                .debugDrawerButtonStyle(.plain)
                 .accessibilityAddTraits(isSelected ? .isSelected : [])
 
                 if isSelected {
                     NetworkRequestDetail(entry: entry, redaction: redaction)
-                        .padding(.horizontal, 6)
-                        .padding(.bottom, 6)
                 }
-
-                Divider().padding(.leading, 6)
             }
         }
 
-        private var methodBadge: some View {
-            Text(entry.method)
-                .font(.system(.caption2, design: .monospaced, weight: .bold))
-                .padding(.horizontal, 3)
-                .background(methodColor(entry.method).opacity(0.15))
-                .cornerRadius(2)
+        /// The error glyph for a failed request; for any other, the same space left empty (or a
+        /// spinner while it runs), so methods line up from row to row.
+        private var glyph: some View {
+            DebugDrawerIssueGlyph(.error)
+                .opacity(entry.isFailure ? 1 : 0)
+                .accessibilityHidden(!entry.isFailure)
+                .overlay {
+                    if !entry.isComplete {
+                        ProgressView()
+                            .controlSize(.mini)
+                            .accessibilityLabel("In progress")
+                    }
+                }
+                .alignmentGuide(.firstTextBaseline) { $0[.bottom] - $0.height * 0.15 }
         }
 
         @ViewBuilder private var status: some View {
             if let code = entry.statusCode {
-                Text("\(code)")
-                    .font(.system(.caption2, design: .monospaced, weight: .bold))
-                    .foregroundStyle(entry.statusColor)
-            } else if !entry.isComplete {
-                ProgressView()
-                    .controlSize(.mini)
-            } else {
+                Text(String(code))
+                    .debugDrawerFont(.value)
+                    .debugDrawerForegroundStyle(entry.isFailure ? .error : .primary)
+            } else if entry.isComplete {
                 Text("ERR")
-                    .font(.system(.caption2, design: .monospaced, weight: .bold))
-                    .foregroundStyle(.red)
+                    .debugDrawerFont(.value)
+                    .debugDrawerForegroundStyle(.error)
             }
-        }
-
-        private var path: some View {
-            Text(entry.path)
-                .font(.system(.caption2, design: .monospaced))
-                .lineLimit(3)
-                .truncationMode(.middle)
         }
 
         private var duration: some View {
             Text(entry.durationLabel)
-                .font(.system(.caption2, design: .monospaced))
-                .foregroundStyle(.tertiary)
-        }
-
-        private func methodColor(_ method: String) -> Color {
-            switch method {
-            case "GET": .blue
-            case "POST": .green
-            case "PUT", "PATCH": .orange
-            case "DELETE": .red
-            default: .secondary
-            }
+                .debugDrawerFont(.value)
+                .debugDrawerForegroundStyle(.tertiary)
         }
     }
 
@@ -165,34 +174,24 @@
     struct NetworkRequestDetail: View {
         let entry: NetworkEntry
         let redaction: DebugDrawerRedaction
-        @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
         var body: some View {
-            VStack(alignment: .leading, spacing: 6) {
-                // URL
+            VStack(alignment: .leading, spacing: 0) {
                 RedactedText(entry.url, redacted: redaction.redacting(url: entry.url))
-                    .font(.system(.caption2, design: .monospaced))
-                    .foregroundStyle(.secondary)
+                    .debugDrawerFont(.code)
+                    .debugDrawerForegroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
 
-                // Timing + size + actions. At accessibility text sizes the badges and the button
-                // don't fit one line, so the button goes below the badges.
-                let summaryLayout = dynamicTypeSize.isAccessibilitySize
-                    ? AnyLayout(VStackLayout(alignment: .leading, spacing: 6))
-                    : AnyLayout(HStackLayout(spacing: 12))
-                summaryLayout {
-                    HStack(spacing: 12) {
-                        DebugDrawerStatBadge("Time", value: entry.durationLabel)
-                        DebugDrawerStatBadge("Size", value: entry.responseSizeLabel)
-                        if let code = entry.statusCode {
-                            DebugDrawerStatBadge("Status", value: "\(code)")
-                        }
+                DebugDrawerKeyValueRow("Time", value: entry.durationLabel)
+                DebugDrawerKeyValueRow("Size", value: entry.responseSizeLabel)
+                if let code = entry.statusCode {
+                    DebugDrawerKeyValueRow("Status", value: String(code))
+                }
+
+                if let error = entry.error {
+                    DebugDrawerIssueRow("Request failed", severity: .error) {
+                        Text(error)
                     }
-
-                    if !dynamicTypeSize.isAccessibilitySize {
-                        Spacer()
-                    }
-
-                    DebugDrawerCopyButton("Copy cURL") { entry.curl(redaction: redaction) }
                 }
 
                 // URL query parameters
@@ -200,21 +199,14 @@
                    let components = URLComponents(url: urlObj, resolvingAgainstBaseURL: false),
                    let queryItems = components.queryItems, !queryItems.isEmpty {
                     collapsibleSection("Query Parameters") {
-                        VStack(alignment: .leading, spacing: 1) {
-                            ForEach(queryItems, id: \.name) { item in
-                                HStack(alignment: .top, spacing: 4) {
-                                    Text(item.name + ":")
-                                        .font(.system(.caption2, design: .monospaced, weight: .medium))
-                                        .foregroundStyle(.secondary)
-                                    RedactedText(
-                                        item.value ?? "",
-                                        redacted: redaction.redacting(item.value ?? "", forKey: item.name)
-                                    )
-                                    .font(.system(.caption2, design: .monospaced))
-                                }
-                            }
+                        ForEach(queryItems, id: \.name) { item in
+                            DebugDrawerKeyValueRow(
+                                item.name,
+                                value: item.value ?? "",
+                                redacted: redaction.redacting(item.value ?? "", forKey: item.name)
+                            )
                         }
-                        .padding(4)
+                        .debugDrawerValueStyle(.code)
                     }
                 }
 
@@ -224,44 +216,34 @@
                     }
                 }
 
-                if let error = entry.error {
-                    Text(error)
-                        .font(.system(.caption2, design: .monospaced))
-                        .foregroundStyle(.red)
-                        .padding(4)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(Color.red.opacity(0.1))
-                        .cornerRadius(3)
-                }
-
                 payload
+
+                DebugDrawerActionRow {
+                    DebugDrawerCopyButton("Copy cURL") { entry.curl(redaction: redaction) }
+                }
             }
         }
 
         @ViewBuilder
         private var payload: some View {
-            // Request headers
             if !entry.requestHeaders.isEmpty {
                 collapsibleSection("Request Headers") {
                     headersView(entry.requestHeaders)
                 }
             }
 
-            // Request body
             if let body = entry.requestBody, let pretty = body.prettyBody {
                 collapsibleSection("Request Body") {
                     codeBlock(pretty, redacted: redaction.redacting(json: body).prettyBody ?? pretty)
                 }
             }
 
-            // Response headers
             if let headers = entry.responseHeaders, !headers.isEmpty {
                 collapsibleSection("Response Headers") {
                     headersView(headers)
                 }
             }
 
-            // Response body
             if let body = entry.responseBody, let pretty = body.prettyBody {
                 collapsibleSection("Response Body") {
                     codeBlock(pretty, redacted: redaction.redacting(json: body).prettyBody ?? pretty)
@@ -270,37 +252,31 @@
         }
 
         private func collapsibleSection(_ title: String, @ViewBuilder content: @escaping () -> some View) -> some View {
-            DisclosureGroup(title) {
-                content()
+            DisclosureGroup {
+                VStack(alignment: .leading, spacing: 0) {
+                    content()
+                }
+            } label: {
+                Text(title)
+                    .debugDrawerFont(.heading)
             }
-            .font(.caption)
         }
 
+        @ViewBuilder
         private func headersView(_ headers: [String: String]) -> some View {
-            VStack(alignment: .leading, spacing: 1) {
-                ForEach(headers.keys.sorted(), id: \.self) { key in
-                    HStack(alignment: .top, spacing: 4) {
-                        Text(key + ":")
-                            .font(.system(.caption2, design: .monospaced, weight: .medium))
-                            .foregroundStyle(.secondary)
-                        let value = headers[key] ?? ""
-                        RedactedText(value, redacted: redaction.masksHeader(key) ? DebugDrawerRedaction.mask : value)
-                            .font(.system(.caption2, design: .monospaced))
-                    }
-                }
+            ForEach(headers.keys.sorted(), id: \.self) { key in
+                let value = headers[key] ?? ""
+                DebugDrawerKeyValueRow(key, value: value, redacted: redaction.masksHeader(key) ? DebugDrawerRedaction.mask : value)
             }
-            .padding(4)
+            // A header's value is code even when it is a word ("gzip", "close").
+            .debugDrawerValueStyle(.code)
         }
 
         private func codeBlock(_ text: String, redacted: String) -> some View {
-            ScrollView(.horizontal) {
+            DebugDrawerCodeBlock {
                 RedactedText(text, redacted: redacted)
-                    .font(.system(.caption2, design: .monospaced))
-                    .padding(4)
+                    .fixedSize(horizontal: false, vertical: true)
             }
-            .frame(maxHeight: 150)
-            .background(Color.primary.opacity(0.05))
-            .cornerRadius(3)
         }
     }
 #endif

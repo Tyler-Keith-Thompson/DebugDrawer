@@ -1,6 +1,7 @@
 import SwiftUI
 
-/// A small bordered button that copies text to the clipboard.
+/// A button that copies text to the clipboard, in the drawer's
+/// ``DebugDrawerButtonStyle/secondary`` style.
 ///
 /// The text is read when the button is pressed, so a report is built only when someone copies
 /// it. Pass what a copy may carry: mask sensitive values with the drawer's
@@ -40,8 +41,7 @@ public struct DebugDrawerCopyButton: View {
                     debugDrawerCopyToClipboard(text)
                 }
             }
-            .buttonStyle(.bordered)
-            .controlSize(.small)
+            .debugDrawerButtonStyle(.secondary)
             .accessibilityHint("Copies to the clipboard")
         }
     }

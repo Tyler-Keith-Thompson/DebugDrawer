@@ -77,11 +77,25 @@ Core has the views the shipped plugins are built from, so a plugin of your own l
 
 | View | Shows |
 |---|---|
+| `DebugDrawerSection` | A group of rows with an optional heading and footer note |
+| `DebugDrawerRow` | An icon, a title, details and a trailing accessory such as a toggle |
 | `DebugDrawerKeyValueRow` | A label and a monospaced value; pass `redacted:` to mask a sensitive value until revealed |
+| `DebugDrawerIssueRow` | An issue glyph, a title and its status, a monospaced subline and details |
+| `DebugDrawerGaugeRow` | A measure with a bar meter, as Xcode's debug gauges |
+| `DebugDrawerStackFrameRow` | A stack frame with an own-code or system badge |
+| `DebugDrawerTypeBadgeRow` | A binary with a letter badge for its kind, its path and version |
+| `DebugDrawerActionRow` | A plugin's push buttons, a destructive one at the trailing edge |
+| `DebugDrawerIssueGlyph`, `DebugDrawerIssueCount` | A severity glyph, alone or with a count |
+| `DebugDrawerUnreadDot` | The dot beside what hasn't been opened |
+| `DebugDrawerCodeText`, `DebugDrawerCodeBlock` | A monospaced token cut in the middle, and a well of code or JSON |
 | `DebugDrawerCopyButton` | A button that copies the text its closure returns when pressed |
-| `DebugDrawerStatBadge` | A figure over its caption, for a row of totals |
 | `DebugDrawerSparkline` | A line graph of recent samples |
 | `DebugDrawerSearchableList` | A filter field above a scrolling list of rows; the plugin filters the rows |
+
+Text, buttons, fields and colors take the drawer's look through `debugDrawerFont(_:)`,
+`debugDrawerButtonStyle(_:)`, `debugDrawerTextFieldStyle()`, `debugDrawerForegroundStyle(_:)`
+and `debugDrawerRowPadding()`. A plugin's `headerAccessory` puts a count, a summary or an action
+at the trailing edge of its header row, shown while the plugin is closed too.
 
 Each lays itself out for accessibility text sizes and labels itself for VoiceOver. They exist in
 every configuration, so a plugin's body compiles in release, where they draw nothing.

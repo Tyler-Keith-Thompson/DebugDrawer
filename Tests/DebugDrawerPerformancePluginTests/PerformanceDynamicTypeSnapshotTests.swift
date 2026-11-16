@@ -15,8 +15,10 @@
             let sut = PerformanceReadout(
                 fps: 58,
                 fpsHistory: [60, 60, 58, 41, 59, 60, 30, 55, 60, 60, 60, 58],
+                maximumFPS: 60,
                 footprintMB: 182.4,
-                footprintHistory: [150, 152, 158, 161, 170, 168, 175, 180, 179, 182.4]
+                footprintHistory: [150, 152, 158, 161, 170, 168, 175, 180, 179, 182.4],
+                physicalMemoryMB: 8192
             )
             let renderer = ImageRenderer(content: sut
                 .frame(width: 320, alignment: .leading)

@@ -1,4 +1,5 @@
 #if DEBUG
+    import DebugDrawer
     import SwiftUI
 
     /// Performance's HUD readout: the frame rate and memory now. It monitors while it is on screen
@@ -8,7 +9,7 @@
         @State private var startedMonitoring = false
 
         public var body: some View {
-            PerformanceHUDReadout(fps: monitor.fps, footprintMB: monitor.footprintMB)
+            PerformanceHUDReadout(fps: monitor.fps, maximumFPS: monitor.maximumFPS, footprintMB: monitor.footprintMB)
                 .onAppear {
                     guard !monitor.isMonitoring else { return }
                     monitor.start()
@@ -22,27 +23,24 @@
         }
     }
 
-    /// The frame rate, colored by how smooth it is, and the memory footprint, on one line.
+    /// The frame rate, with an issue glyph while frames drop, and the memory footprint, on one
+    /// line.
     struct PerformanceHUDReadout: View {
         let fps: Int
+        var maximumFPS = 60
         let footprintMB: Double
 
         var body: some View {
             HStack(spacing: 10) {
+                if let severity = FrameRate.severity(fps: fps, maximum: maximumFPS) {
+                    DebugDrawerIssueGlyph(severity)
+                        .accessibilityLabel(severity == .error ? "Frames dropping badly" : "Frames dropping")
+                }
                 Text("\(fps) FPS")
-                    .foregroundStyle(fpsColor)
-                Text(footprintMB, format: .number.precision(.fractionLength(0)))
-                    + Text(" MB")
+                Text("\(Text(footprintMB, format: .number.precision(.fractionLength(0)))) MB")
             }
-            .font(.system(.caption, design: .monospaced, weight: .semibold))
-            .monospacedDigit()
+            .debugDrawerFont(.value)
             .accessibilityElement(children: .combine)
-        }
-
-        private var fpsColor: Color {
-            if fps >= 55 { return .green }
-            if fps >= 30 { return .yellow }
-            return .red
         }
     }
 #endif

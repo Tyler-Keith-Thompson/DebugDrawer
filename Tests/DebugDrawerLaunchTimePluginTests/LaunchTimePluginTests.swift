@@ -32,7 +32,7 @@
             let secondOpen = try texts(LaunchTimePluginView(tracker: tracker))
 
             for shown in [firstOpen, secondOpen] {
-                XCTAssertTrue(shown.contains("900"), "total should be 900 ms: \(shown)")
+                XCTAssertTrue(shown.contains("900 ms"), "total should be 900 ms: \(shown)")
                 XCTAssertTrue(shown.contains("400 ms"), "pre-main should be 400 ms: \(shown)")
                 XCTAssertTrue(shown.contains("500 ms"), "app init to first frame should be 500 ms: \(shown)")
             }
@@ -47,7 +47,7 @@
             clock.now = 500
             let shown = try texts(LaunchTimePluginView(tracker: tracker))
             XCTAssertNil(tracker.firstFrameUptime)
-            XCTAssertTrue(shown.contains("Measuring..."), "\(shown)")
+            XCTAssertTrue(shown.contains("Measuring…"), "\(shown)")
         }
 
         func testFirstFrameIsRecordedWhenTheMainRunLoopGoesIdle() async throws {

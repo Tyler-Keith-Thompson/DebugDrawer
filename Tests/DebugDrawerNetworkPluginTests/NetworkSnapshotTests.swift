@@ -11,7 +11,10 @@
     @MainActor
     @Suite(.timeLimit(.minutes(1)))
     struct NetworkSnapshotTests {
-        @Test("Request rows show the method, status or progress, path and duration", arguments: [ColorScheme.light, .dark])
+        @Test(
+            "Request rows show an error glyph when failed, then the method, status or progress, path and duration",
+            arguments: [ColorScheme.light, .dark]
+        )
         func rows(colorScheme: ColorScheme) throws {
             let start = Date(timeIntervalSinceReferenceDate: 800_000_000)
             let entries = [
@@ -85,7 +88,7 @@
             assertSnapshot(of: actual, as: .image(perceptualPrecision: 0.98), named: "\(colorScheme)")
         }
 
-        @Test("The timing waterfall shows each phase's bar and duration, then the protocol", arguments: [ColorScheme.light, .dark])
+        @Test("The timing shows each phase as a gauge of its share of the request, then the protocol", arguments: [ColorScheme.light, .dark])
         func timing(colorScheme: ColorScheme) throws {
             let metrics = NetworkTimingMetrics(
                 phases: [

@@ -15,11 +15,9 @@
             XCTAssertTrue(event.isMainThread)
         }
 
-        func testIOOperationColors() {
-            // Ensure each operation has a distinct color (no crashes)
-            for op in [IOEvent.Operation.read, .write, .delete, .create, .list, .stat] {
-                _ = op.color
-            }
+        func testIOOperationNames() {
+            let names = [IOEvent.Operation.read, .write, .delete, .create, .list, .stat].map(\.name)
+            XCTAssertEqual(names, ["Read", "Write", "Delete", "Create", "List", "Stat"])
         }
 
         func testDiskIOStoreFilter() {
