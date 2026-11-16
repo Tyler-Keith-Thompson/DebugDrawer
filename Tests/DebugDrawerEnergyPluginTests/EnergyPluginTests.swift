@@ -20,8 +20,8 @@
             // Just ensure the computed properties don't crash
             _ = monitor.thermalLabel
             _ = monitor.thermalColor
-            _ = monitor.energyImpact
-            _ = monitor.energyImpactColor
+            _ = monitor.cpuLoad
+            _ = monitor.cpuLoadColor
         }
 
         func testPluginConformance() {

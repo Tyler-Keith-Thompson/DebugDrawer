@@ -133,7 +133,8 @@ let package = Package(
                     dependencies: ["DebugDrawerDiskIOPlugin", "DebugDrawer"],
                     path: "Tests/DebugDrawerDiskIOPluginTests"),
         .testTarget(name: "DebugDrawerEnergyPluginTests",
-                    dependencies: ["DebugDrawerEnergyPlugin", "DebugDrawer"],
+                    dependencies: ["DebugDrawerEnergyPlugin", "DebugDrawer",
+                                   .product(name: "ViewInspector", package: "ViewInspector")],
                     path: "Tests/DebugDrawerEnergyPluginTests",
                     linkerSettings: [.linkedFramework("IOKit", .when(platforms: [.macOS]))]),
     ]

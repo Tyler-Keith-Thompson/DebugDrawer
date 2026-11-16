@@ -9,6 +9,7 @@ swift_test(
         "//Sources/DebugDrawer",
         "//Sources/DebugDrawerEnergyPlugin",
         "@swiftpkg_mockable//:Mockable",
+        "@swiftpkg_viewinspector//:ViewInspector",
     ],
     linkopts = ["-framework", "IOKit"],
 )

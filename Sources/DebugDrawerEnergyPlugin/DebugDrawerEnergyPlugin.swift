@@ -9,24 +9,46 @@
     #endif
     import SwiftUI
 
+    // MARK: - Battery monitoring switch
+
+    /// The platform's battery-monitoring setting, which the host app can see and set too.
+    @MainActor
+    protocol BatteryMonitoringSwitch: AnyObject {
+        var isEnabled: Bool { get set }
+    }
+
+    #if os(iOS)
+        @MainActor
+        final class DeviceBatteryMonitoring: BatteryMonitoringSwitch {
+            var isEnabled: Bool {
+                get { UIDevice.current.isBatteryMonitoringEnabled }
+                set { UIDevice.current.isBatteryMonitoringEnabled = newValue }
+            }
+        }
+    #endif
+
     // MARK: - Energy monitor
 
     @MainActor
     public final class EnergyMonitor: ObservableObject {
         public static let shared = EnergyMonitor()
 
-        @Published public var batteryLevel: Int = -1 // -1 = no battery (desktop Mac)
-        @Published public var isCharging = false
-        @Published public var powerSource = "Unknown"
-        @Published public var thermalState: ProcessInfo.ThermalState = .nominal
-        @Published public var cpuUsage: Double = 0
-        @Published public var isMonitoring = false
+        @Published public private(set) var batteryLevel: Int = -1 // -1 = no battery (desktop Mac)
+        @Published public private(set) var isCharging = false
+        @Published public private(set) var powerSource = "Unknown"
+        @Published public private(set) var thermalState: ProcessInfo.ThermalState = .nominal
+        @Published public private(set) var cpuUsage: Double = 0
+        @Published public private(set) var isMonitoring = false
 
-        @Published public var batteryHistory: [BatterySnapshot] = []
-        @Published public var cpuHistory: [Double] = []
+        @Published public private(set) var batteryHistory: [BatterySnapshot] = []
+        @Published public private(set) var cpuHistory: [Double] = []
 
         private var cancellable: AnyCancellable?
         private let historySize = 120 // 2 minutes at 1s intervals
+
+        /// Turned on while monitoring (iOS reports no battery level otherwise), then put back.
+        private let batteryMonitoring: BatteryMonitoringSwitch?
+        private var hostBatteryMonitoring: Bool?
 
         public struct BatterySnapshot: Identifiable {
             public let id = UUID()
@@ -35,11 +57,25 @@
             public let isCharging: Bool
         }
 
-        private init() {}
+        private convenience init() {
+            #if os(iOS)
+                self.init(batteryMonitoring: DeviceBatteryMonitoring())
+            #else
+                self.init(batteryMonitoring: nil)
+            #endif
+        }
+
+        init(batteryMonitoring: BatteryMonitoringSwitch?) {
+            self.batteryMonitoring = batteryMonitoring
+        }
 
         public func start() {
             guard !isMonitoring else { return }
             isMonitoring = true
+            if let batteryMonitoring {
+                hostBatteryMonitoring = batteryMonitoring.isEnabled
+                batteryMonitoring.isEnabled = true
+            }
             sample()
 
             cancellable = Timer.publish(every: 1, on: .main, in: .common)
@@ -48,9 +84,14 @@
         }
 
         public func stop() {
+            guard isMonitoring else { return }
             isMonitoring = false
             cancellable?.cancel()
             cancellable = nil
+            if let batteryMonitoring, let hostBatteryMonitoring {
+                batteryMonitoring.isEnabled = hostBatteryMonitoring
+                self.hostBatteryMonitoring = nil
+            }
         }
 
         private func sample() {
@@ -70,7 +111,6 @@
                     powerSource = "AC Power"
                 }
             #elseif os(iOS)
-                UIDevice.current.isBatteryMonitoringEnabled = true
                 let level = UIDevice.current.batteryLevel
                 batteryLevel = level >= 0 ? Int(level * 100) : -1
                 let state = UIDevice.current.batteryState
@@ -98,7 +138,7 @@
             }
         }
 
-        private static func processCPUUsage() -> Double {
+        static func processCPUUsage() -> Double {
             var threadList: thread_act_array_t?
             var threadCount: mach_msg_type_number_t = 0
 
@@ -118,6 +158,8 @@
                 if result == KERN_SUCCESS, info.flags & TH_FLAGS_IDLE == 0 {
                     totalUsage += Double(info.cpu_usage) / Double(TH_USAGE_SCALE) * 100
                 }
+                // task_threads hands us a send right on each thread; release it.
+                mach_port_deallocate(mach_task_self_, threads[i])
             }
 
             vm_deallocate(mach_task_self_, vm_address_t(bitPattern: threads), vm_size_t(Int(threadCount) * MemoryLayout<thread_act_t>.size))
@@ -144,14 +186,16 @@
             }
         }
 
-        public var energyImpact: String {
+        /// This process's CPU use, bucketed. It is not Xcode's Energy Impact: that also
+        /// weighs GPU, network, location and wakeups, which aren't measured here.
+        public var cpuLoad: String {
             if cpuUsage < 5 { return "Low" }
             if cpuUsage < 20 { return "Moderate" }
             if cpuUsage < 50 { return "High" }
             return "Very High"
         }
 
-        public var energyImpactColor: Color {
+        public var cpuLoadColor: Color {
             if cpuUsage < 5 { return .green }
             if cpuUsage < 20 { return .yellow }
             if cpuUsage < 50 { return .orange }
@@ -196,7 +240,7 @@
     }
 
     struct EnergyPluginView: View {
-        @ObservedObject private var monitor = EnergyMonitor.shared
+        @ObservedObject var monitor = EnergyMonitor.shared
 
         var body: some View {
             VStack(alignment: .leading, spacing: 8) {
@@ -209,14 +253,14 @@
                 .controlSize(.small)
 
                 if monitor.isMonitoring {
-                    // Energy impact
+                    // CPU load (not Energy Impact: no energy counters behind it)
                     HStack {
-                        Text("Energy Impact")
+                        Text("CPU Load")
                             .font(.caption.weight(.medium))
                         Spacer()
-                        Text(monitor.energyImpact)
+                        Text(monitor.cpuLoad)
                             .font(.system(size: 12, weight: .bold, design: .rounded))
-                            .foregroundStyle(monitor.energyImpactColor)
+                            .foregroundStyle(monitor.cpuLoadColor)
                     }
 
                     // CPU
