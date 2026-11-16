@@ -31,6 +31,19 @@
         }
     }
 
+    struct QueuePlugin: DebugDrawerPlugin {
+        var title = "Queue"
+        var icon = "tray.full"
+
+        var body: some View {
+            Text("3 jobs waiting")
+        }
+
+        var hud: Text? {
+            Text("3 jobs")
+        }
+    }
+
     struct UploadsPlugin: DebugDrawerPlugin {
         var title = "Uploads"
         var icon = "arrow.up.circle"
@@ -66,6 +79,15 @@
             // Leave the shared drawer as the other suites expect it, within this one main-actor turn.
             DebugDrawer.shared.toggle()
             DebugDrawer.shared.unregisterGlobal(id: CachePlugin().id)
+        }
+
+        @Test("Floating HUD")
+        func floatingHUD() {
+            let queue = AnyDebugDrawerPlugin(QueuePlugin())
+            let uploads = AnyDebugDrawerPlugin(UploadsPlugin())
+
+            #expect(queue.hasHUD)
+            #expect(!uploads.hasHUD)
         }
 
         @Test("Badges and toasts")

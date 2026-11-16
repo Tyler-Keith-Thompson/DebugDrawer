@@ -120,6 +120,30 @@ uploads.postToast("Upload of report.pdf failed")
 uploads.clearBadge()
 ```
 
+### Floating HUD
+
+A plugin can offer a compact readout for the floating HUD, which stays on screen while the drawer
+is closed. Choose Show in HUD from a plugin's context menu in the drawer to pin its readout; drag
+the HUD anywhere in the window. Only the HUD itself takes touches; the rest of the window reaches
+the app. The pinned readouts and the HUD's position are remembered across launches, and the
+Screenshot plugin leaves the HUD out of its captures. Performance offers its frame rate and memory.
+A plugin declares a readout like this; it declares none unless it says so:
+
+```swift
+struct QueuePlugin: DebugDrawerPlugin {
+    var title = "Queue"
+    var icon = "tray.full"
+
+    var body: some View {
+        Text("3 jobs waiting")
+    }
+
+    var hud: Text? {
+        Text("3 jobs")
+    }
+}
+```
+
 ### Installing the shipped plugins
 
 Each plugin installs itself with one call at startup. All of them:

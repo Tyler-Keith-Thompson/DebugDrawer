@@ -281,6 +281,12 @@
                             updateLayout { $0.move(plugin.id, by: 1, among: drawer.globalPlugins) }
                         }
                     }
+                    if plugin.hasHUD {
+                        let inHUD = drawer.hudLayout.pinned.contains(plugin.id)
+                        Button(inHUD ? "Remove from HUD" : "Show in HUD", systemImage: inHUD ? "rectangle.slash" : "rectangle.inset.topleft.filled") {
+                            drawer.toggleHUD(forPlugin: plugin.id)
+                        }
+                    }
                 }
 
                 if expanded {

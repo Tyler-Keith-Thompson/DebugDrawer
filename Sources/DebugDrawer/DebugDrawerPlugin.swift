@@ -18,6 +18,7 @@ import SwiftUI
 /// The drawer persists each plugin's expand/collapse state via UserDefaults.
 public protocol DebugDrawerPlugin: Identifiable {
     associatedtype Body: View
+    associatedtype HUD: View = EmptyView
 
     /// Identifies the plugin in the drawer: registration, saved state and search. Defaults to the
     /// type's name; declare one to register several instances of one type.
@@ -43,6 +44,10 @@ public protocol DebugDrawerPlugin: Identifiable {
 
     /// Actions the drawer's search field offers, run when the user picks one. Defaults to none.
     var actions: [DebugDrawerAction] { get }
+
+    /// A compact readout the developer can pin to the floating HUD, which stays on screen while the
+    /// drawer is closed. Defaults to none.
+    @MainActor var hud: HUD? { get }
 }
 
 public extension DebugDrawerPlugin {
@@ -67,6 +72,13 @@ public extension DebugDrawerPlugin {
     }
 }
 
+public extension DebugDrawerPlugin where HUD == EmptyView {
+    /// No HUD: the plugin can't be pinned to the floating HUD.
+    var hud: EmptyView? {
+        nil
+    }
+}
+
 /// The category of a plugin that names none.
 let defaultPluginCategory = "General"
 
@@ -82,6 +94,7 @@ let defaultPluginCategory = "General"
         public let category: String
         public let actions: [DebugDrawerAction]
         private let _body: @MainActor () -> AnyView
+        private let _hud: (@MainActor () -> AnyView)?
 
         @MainActor public init<P: DebugDrawerPlugin>(_ plugin: P) {
             id = plugin.id
@@ -90,10 +103,25 @@ let defaultPluginCategory = "General"
             category = plugin.category
             actions = plugin.actions
             _body = { AnyView(plugin.body) }
+            if plugin.hud == nil {
+                _hud = nil
+            } else {
+                _hud = { AnyView(plugin.hud) }
+            }
         }
 
         @MainActor public var body: AnyView {
             _body()
+        }
+
+        /// Whether the plugin offers a HUD readout.
+        public var hasHUD: Bool {
+            _hud != nil
+        }
+
+        /// The plugin's HUD readout, if it offers one.
+        @MainActor public var hud: AnyView? {
+            _hud?()
         }
 
         /// The `UserDefaults` key that records whether the user collapsed this plugin's section.

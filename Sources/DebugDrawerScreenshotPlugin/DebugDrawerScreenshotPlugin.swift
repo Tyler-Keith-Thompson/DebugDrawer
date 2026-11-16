@@ -114,11 +114,8 @@
                 await performCapture(destination: destination)
             }
 
-            if hideDrawer {
-                DebugDrawer.shared.performWhileHidden(doCapture)
-            } else {
-                Task { await doCapture() }
-            }
+            // The HUD is always left out of the capture; the drawer only when asked.
+            DebugDrawer.shared.performWhileHidden(drawer: hideDrawer, doCapture)
         }
 
         #if os(macOS)

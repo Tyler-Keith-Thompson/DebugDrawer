@@ -76,22 +76,28 @@
             }
         }
 
-        /// Hide the drawer, run an async action, then reopen it.
-        /// Useful for screenshots or any operation that needs a clean view.
-        public func performWhileHidden(_ action: @escaping @MainActor () async -> Void) {
-            let wasOpen = isOpen
-            guard wasOpen else {
+        /// Hides the HUD, and the drawer unless `drawer` is false, runs `action` once that has
+        /// rendered, then shows them again. For screenshots and anything else that needs a clean view.
+        public func performWhileHidden(drawer hidesDrawer: Bool = true, _ action: @escaping @MainActor () async -> Void) {
+            let reopens = hidesDrawer && isOpen
+            let hidesHUD = !hudLayout.pinned.isEmpty
+            guard reopens || hidesHUD else {
                 Task { await action() }
                 return
             }
 
-            withAnimation(Self.motion(.easeInOut(duration: 0.15))) {
-                self.isOpen = false
+            // The completion runs once the hiding has rendered. A fade is no motion, so the HUD's
+            // transaction animates even when the system reduces motion; the drawer's own modifier
+            // drops its slide then.
+            withAnimation(Self.motion(.easeInOut(duration: 0.15)) ?? .linear(duration: 0.1)) {
+                if reopens { self.isOpen = false }
+                self.isHUDHidden = true
             } completion: { [weak self] in
                 Task { @MainActor [weak self] in
                     await action()
-                    withAnimation(Self.motion(.easeInOut(duration: 0.25))) {
-                        self?.isOpen = true
+                    withAnimation(Self.motion(.easeInOut(duration: 0.25)) ?? .linear(duration: 0.1)) {
+                        if reopens { self?.isOpen = true }
+                        self?.isHUDHidden = false
                     }
                 }
             }
@@ -106,6 +112,32 @@
         /// Whether there are any plugins registered at all.
         public var hasPlugins: Bool {
             !globalPlugins.isEmpty || !localPlugins.isEmpty
+        }
+
+        // MARK: - HUD
+
+        /// Which plugins are pinned to the floating HUD, and where it sits. Saved in `UserDefaults`.
+        @Published public private(set) var hudLayout = HUDLayout(from: .standard)
+
+        /// Whether the HUD is hidden for a moment, as while ``performWhileHidden(drawer:_:)`` runs.
+        @Published public private(set) var isHUDHidden = false
+
+        /// Pins the plugin's readout to the HUD, or removes it if it is pinned, and saves the change.
+        public func toggleHUD(forPlugin id: String) {
+            hudLayout.togglePin(id)
+            hudLayout.save(to: .standard)
+        }
+
+        /// Moves the HUD's top-leading corner to `origin` and saves it.
+        public func moveHUD(to origin: CGPoint) {
+            hudLayout.origin = origin
+            hudLayout.save(to: .standard)
+        }
+
+        /// The registered plugins pinned to the HUD that offer one, in the order they were pinned.
+        public var hudPlugins: [AnyDebugDrawerPlugin] {
+            let plugins = localPlugins + globalPlugins
+            return hudLayout.pinned.compactMap { id in plugins.first { $0.id == id && $0.hasHUD } }
         }
 
         // MARK: - Badges and toasts

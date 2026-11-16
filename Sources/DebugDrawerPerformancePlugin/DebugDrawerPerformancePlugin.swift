@@ -151,6 +151,11 @@
         public var body: some View {
             PerformancePluginView()
         }
+
+        /// The frame rate and memory, for the floating HUD.
+        public var hud: PerformanceHUD? {
+            PerformanceHUD()
+        }
     }
 
     struct PerformancePluginView: View {

@@ -9,6 +9,19 @@
 
         func body(content: Content) -> some View {
             content
+                // Under the drawer, which takes no touches while closed, so the HUD keeps working.
+                .overlay {
+                    let readouts = drawer.hudPlugins
+                    if !readouts.isEmpty {
+                        DrawerHUDView(
+                            readouts: readouts,
+                            origin: drawer.hudLayout.origin,
+                            move: { drawer.moveHUD(to: $0) },
+                            unpin: { drawer.toggleHUD(forPlugin: $0) }
+                        )
+                        .opacity(drawer.isHUDHidden ? 0 : 1)
+                    }
+                }
                 .overlay(alignment: .trailing) {
                     DebugDrawerOverlay(drawer: drawer)
                         .accessibilityIdentifier(debugDrawerOverlayIdentifier)
