@@ -17,6 +17,7 @@ import DebugDrawerDeepLinkPlugin
 import DebugDrawerCookiesPlugin
 import DebugDrawerLaunchTimePlugin
 import DebugDrawerTweaksPlugin
+import DebugDrawerFeatureFlagsPlugin
 import SwiftUI
 
 /// Demonstrates Send Report without a server: "sends" each report by copying it into the app's
@@ -55,6 +56,7 @@ struct DebugDrawerExampleiOSApp: App {
             DebugDrawer.shared.installCookies()
             DebugDrawer.shared.installLaunchTime()
             ExampleTweaks.install()
+            ExampleFeatureFlags.install()
             DebugDrawer.shared.reportUploader = FolderReportUploader()
         #endif
     }
@@ -112,6 +114,7 @@ struct ExampleContentView_iOS: View {
                         .accessibilityAddTraits(.isHeader)
 
                     ExampleTweaksBanner()
+                    ExampleFeatureFlagsSummary()
                 }
 
                 Section("Inputs") {

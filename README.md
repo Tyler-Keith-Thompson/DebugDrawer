@@ -290,7 +290,8 @@ DebugDrawer.shared.installLaunchTime()
 ```
 
 Each call needs its plugin's module imported (`import DebugDrawerConsolePlugin`, and so on).
-Tweaks takes the settings it shows, so it has a section of its own, next.
+Tweaks takes the settings it shows and Feature Flags the adapter it reads, so each has a section
+of its own, next.
 
 ### Tweaks: the app's own debug settings
 
@@ -361,6 +362,66 @@ struct CheckoutButton: View {
 drawer and nothing is stored: `value` is always the declared default and `publisher` sends only
 that. Mark a tweak `.productionSafe()` to say it may be offered outside debug builds; the drawer
 shows it the same either way.
+
+### Feature Flags: overriding the app's flags
+
+The Feature Flags plugin shows every flag the app's flag service serves, with its live value, and
+overrides any of them on this device. It knows no vendor: the app adapts its service (LaunchDarkly,
+Firebase Remote Config, Statsig or its own) to `FeatureFlagProvider`, which lists the flags, says
+what the app reads for one, and applies and clears an override. A flag's value is a Boolean, a
+number or a string:
+
+```swift
+import DebugDrawerFeatureFlagsPlugin
+
+/// The app's own flag service, adapted for the drawer: live values from the server, and overrides
+/// that win over them.
+final class AppFlags: FeatureFlagProvider {
+    var live: [String: FeatureFlagValue] = ["new-checkout": .bool(false), "discount": .number(0.1)]
+    private var overrides: [String: FeatureFlagValue] = [:]
+
+    func flags() -> [FeatureFlag] {
+        live.sorted { $0.key < $1.key }.map { FeatureFlag(key: $0.key, liveValue: $0.value) }
+    }
+
+    func currentValue(forKey key: String) -> FeatureFlagValue? {
+        overrides[key] ?? live[key]
+    }
+
+    func setOverride(_ value: FeatureFlagValue, forKey key: String) {
+        overrides[key] = value
+    }
+
+    func clearOverride(forKey key: String) {
+        overrides[key] = nil
+    }
+}
+
+let appFlags = AppFlags()
+
+#if DEBUG
+DebugDrawer.shared.installFeatureFlags(provider: appFlags)
+#endif
+
+// Anywhere in the app, through the adapter, so overrides apply:
+let isNewCheckout = appFlags.currentValue(forKey: "new-checkout") == .bool(true)
+```
+
+An adapter over a vendor SDK maps the SDK's flags to `FeatureFlag`s and answers
+`currentValue(forKey:)` with the override it holds, if any, before asking the SDK; where the SDK has
+local overrides of its own, `setOverride` and `clearOverride` call them. The plugin keeps the
+overrides: they persist across launches in the standard `UserDefaults`, under
+`com.debugdrawer.featureFlags.overrides`, and `installFeatureFlags` applies each one to the adapter
+again before it returns, so an adapter can hold overrides in memory. Pass
+`installFeatureFlags(provider:storage:)` a `UserDefaultsFeatureFlagOverrideStorage` with other
+defaults or another key, or a `FeatureFlagOverrideStorage` of your own, to keep them elsewhere.
+
+The drawer lists the flags with a search over their keys and titles and an Overridden only switch.
+A Boolean flag has a switch, a number or string flag a field; an overridden flag has a button that
+clears its override, and Reset All clears them all. The drawer reads the adapter again each time
+it shows the plugin and when Refresh is pressed. `FeatureFlagProvider`, `FeatureFlag`,
+`FeatureFlagValue` and the storage types exist in every configuration, so an adapter compiles in
+release, where nothing calls it and the app reads its service's live values.
 
 ### Opening the drawer
 
@@ -471,6 +532,7 @@ ContentView()
 | `DebugDrawerCookiesPlugin` | Browse, search and delete HTTPCookieStorage cookies |
 | `DebugDrawerLaunchTimePlugin` | Pre-main, app-init-to-first-frame and total launch time |
 | `DebugDrawerTweaksPlugin` | The app's own debug settings: toggles, pickers, text fields, steppers and actions, in sections, read through typed accessors |
+| `DebugDrawerFeatureFlagsPlugin` | The app's feature flags through an adapter to its flag service: live values, local overrides that persist, search, an overridden-only filter and Reset All |
 
 ## Development
 

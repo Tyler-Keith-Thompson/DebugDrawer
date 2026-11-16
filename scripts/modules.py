@@ -77,6 +77,7 @@ MODULES = [
     ("DebugDrawerCookiesPlugin", "Plugins", "Browse and delete HTTPCookieStorage cookies.", ["DebugDrawer"]),
     ("DebugDrawerLaunchTimePlugin", "Plugins", "Pre-main, app-init-to-first-frame and total launch time.", ["DebugDrawer"]),
     ("DebugDrawerTweaksPlugin", "Plugins", "The host's own debug settings: toggles, pickers, text fields, steppers and actions, in sections.", ["DebugDrawer"]),
+    ("DebugDrawerFeatureFlagsPlugin", "Plugins", "The app's feature flags through an adapter to its flag service: live values, local overrides that persist, search and reset.", ["DebugDrawer"]),
 ]
 
 # Modules only iOS builds: SwiftUI views and what they draw with. Bazel builds them for the
@@ -140,6 +141,7 @@ TEST_TARGETS = [
     ("DebugDrawerDeepLinkPluginTests", ["DebugDrawerDeepLinkPlugin", "DebugDrawer", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
     ("DebugDrawerCookiesPluginTests", ["DebugDrawerCookiesPlugin", "DebugDrawer", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
     ("DebugDrawerTweaksPluginTests", ["DebugDrawerTweaksPlugin", "DebugDrawer", "viewinspector/ViewInspector", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
+    ("DebugDrawerFeatureFlagsPluginTests", ["DebugDrawerFeatureFlagsPlugin", "DebugDrawer", "viewinspector/ViewInspector", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
 ]
 
 # The modules the test-support target depends on (fixtures are usually written against the
