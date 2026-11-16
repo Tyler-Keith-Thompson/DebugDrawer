@@ -4,91 +4,99 @@
 
     // MARK: - Launch time capture
 
-    /// Captures timing data as early as possible.
+    /// Launch timing, measured from app-level events so that opening the drawer late
+    /// never changes it.
     ///
-    /// The `moduleInitTime` is set at static-init time (before `main()` for Swift).
-    /// `firstAppearTime` is set when the plugin view first appears.
+    /// - Process start comes from the kernel (`kinfo_proc.p_starttime`).
+    /// - App init is when `installLaunchTime()` ran (call it from your `App.init` or
+    ///   `application(_:didFinishLaunchingWithOptions:)`).
+    /// - First frame is the first time the main run loop goes idle after install: by then
+    ///   the first frame has been laid out and committed.
     @MainActor
     final class LaunchTimeTracker: ObservableObject {
         static let shared = LaunchTimeTracker()
 
-        /// Approximate time the process started, derived from `ProcessInfo.processInfo.systemUptime`
-        /// captured at module init. This is as close to process-start as we can get without
-        /// reading `kern.proc` sysctl data.
-        let processStartUptime: TimeInterval
+        /// System uptime (seconds since boot) now. Injected in tests.
+        private let clock: () -> TimeInterval
 
-        /// System uptime when this module's static initializer ran.
-        /// Captured before main() for ObjC-loaded modules, or at first access for pure Swift.
-        let moduleInitUptime: TimeInterval
+        /// System uptime when the process started, or nil if the kernel didn't say.
+        let processStartUptime: TimeInterval?
 
-        /// System uptime when the plugin view first appeared.
-        @Published var firstAppearUptime: TimeInterval?
+        /// System uptime when the tracker was created by `installLaunchTime()`.
+        let appInitUptime: TimeInterval
 
-        /// Whether the first appear has been recorded.
-        @Published var recorded = false
+        /// System uptime when the first frame was committed.
+        @Published private(set) var firstFrameUptime: TimeInterval?
 
-        private init() {
-            // Capture as early as possible
-            let now = ProcessInfo.processInfo.systemUptime
-            self.moduleInitUptime = now
+        private var firstFrameObserver: CFRunLoopObserver?
 
-            // Estimate process start from ProcessInfo
-            // processInfo.systemUptime is monotonic seconds since boot.
-            // We can approximate the process start by reading the process creation time.
-            self.processStartUptime = Self.estimateProcessStart() ?? now
+        init(clock: @escaping () -> TimeInterval = { ProcessInfo.processInfo.systemUptime },
+             processStartUptime: TimeInterval? = LaunchTimeTracker.processStartUptimeFromKernel())
+        {
+            self.clock = clock
+            appInitUptime = clock()
+            self.processStartUptime = processStartUptime
         }
 
-        func recordFirstAppear() {
-            guard !recorded else { return }
-            firstAppearUptime = ProcessInfo.processInfo.systemUptime
-            recorded = true
+        /// Records the first frame the first time the main run loop is about to sleep:
+        /// layout and the Core Animation commit for the first frame happen before that.
+        func observeFirstFrame() {
+            guard firstFrameObserver == nil, firstFrameUptime == nil else { return }
+            let observer = CFRunLoopObserverCreateWithHandler(
+                nil, CFRunLoopActivity.beforeWaiting.rawValue, false, CFIndex.max
+            ) { [weak self] _, _ in
+                MainActor.assumeIsolated { self?.recordFirstFrame() }
+            }
+            firstFrameObserver = observer
+            CFRunLoopAddObserver(CFRunLoopGetMain(), observer, .commonModes)
+        }
+
+        func recordFirstFrame() {
+            if let observer = firstFrameObserver {
+                CFRunLoopObserverInvalidate(observer)
+                firstFrameObserver = nil
+            }
+            guard firstFrameUptime == nil else { return }
+            firstFrameUptime = clock()
         }
 
         // MARK: - Computed times
 
+        /// Process start to app init: dyld, static initializers, and the app's code before install.
         var preMainDuration: TimeInterval? {
-            // Time from process start to module init
-            moduleInitUptime - processStartUptime
+            processStartUptime.map { appInitUptime - $0 }
         }
 
-        var mainToFirstFrame: TimeInterval? {
-            guard let appear = firstAppearUptime else { return nil }
-            return appear - moduleInitUptime
+        var appInitToFirstFrame: TimeInterval? {
+            firstFrameUptime.map { $0 - appInitUptime }
         }
 
         var totalLaunchTime: TimeInterval? {
-            guard let appear = firstAppearUptime else { return nil }
-            return appear - processStartUptime
+            guard let start = processStartUptime, let frame = firstFrameUptime else { return nil }
+            return frame - start
         }
 
-        // MARK: - Process start estimation
+        // MARK: - Process start
 
-        /// Uses sysctl to get the actual process start time.
-        private static func estimateProcessStart() -> TimeInterval? {
+        /// The process's start time from `kinfo_proc`, converted to system uptime.
+        nonisolated static func processStartUptimeFromKernel() -> TimeInterval? {
+            guard let wallStart = processStartWallClock() else { return nil }
+            // uptime now - (wall now - wall start) = uptime at process start
+            let elapsed = Date().timeIntervalSince1970 - wallStart
+            return ProcessInfo.processInfo.systemUptime - elapsed
+        }
+
+        /// The process's start time (seconds since 1970) from `kinfo_proc.kp_proc.p_starttime`.
+        nonisolated static func processStartWallClock() -> TimeInterval? {
             var mib = [CTL_KERN, KERN_PROC, KERN_PROC_PID, getpid()]
             var info = kinfo_proc()
             var size = MemoryLayout<kinfo_proc>.size
-
-            let result = sysctl(&mib, UInt32(mib.count), &info, &size, nil, 0)
-            guard result == 0 else { return nil }
-
-            let startSec = info.kp_proc.p_starttime.tv_sec
-            let startUsec = info.kp_proc.p_starttime.tv_usec
-
-            // Convert wall-clock process start to system uptime.
-            // wall-clock now - process wall-clock start = elapsed since start
-            // system uptime now - elapsed = system uptime at process start
-            let now = ProcessInfo.processInfo.systemUptime
-            let wallNow = Date().timeIntervalSince1970
-            let wallStart = TimeInterval(startSec) + TimeInterval(startUsec) / 1_000_000
-            let elapsed = wallNow - wallStart
-
-            return now - elapsed
+            guard sysctl(&mib, UInt32(mib.count), &info, &size, nil, 0) == 0 else { return nil }
+            let start = info.kp_proc.p_starttime
+            guard start.tv_sec > 0 else { return nil }
+            return TimeInterval(start.tv_sec) + TimeInterval(start.tv_usec) / 1_000_000
         }
     }
-
-    // LaunchTimeTracker.shared is initialized lazily on first access.
-    // The install() method triggers this.
 
     // MARK: - Plugin
 
@@ -103,8 +111,8 @@
         }
     }
 
-    private struct LaunchTimePluginView: View {
-        @ObservedObject private var tracker = LaunchTimeTracker.shared
+    struct LaunchTimePluginView: View {
+        @ObservedObject var tracker = LaunchTimeTracker.shared
 
         var body: some View {
             VStack(alignment: .leading, spacing: 6) {
@@ -131,11 +139,11 @@
 
                 // Breakdown
                 Group {
-                    if let preMail = tracker.preMainDuration {
-                        timeRow("Pre-main (dyld + static init)", preMail)
+                    if let preMain = tracker.preMainDuration {
+                        timeRow("Pre-main (dyld + static init)", preMain)
                     }
-                    if let mainToFrame = tracker.mainToFirstFrame {
-                        timeRow("Main to first frame", mainToFrame)
+                    if let toFrame = tracker.appInitToFirstFrame {
+                        timeRow("App init to first frame", toFrame)
                     }
                 }
 
@@ -143,10 +151,12 @@
 
                 // Raw timestamps
                 Group {
-                    infoRow("Process start", String(format: "%.4fs", tracker.processStartUptime))
-                    infoRow("Module init", String(format: "%.4fs", tracker.moduleInitUptime))
-                    if let appear = tracker.firstAppearUptime {
-                        infoRow("First appear", String(format: "%.4fs", appear))
+                    if let start = tracker.processStartUptime {
+                        infoRow("Process start", String(format: "%.4fs", start))
+                    }
+                    infoRow("App init", String(format: "%.4fs", tracker.appInitUptime))
+                    if let frame = tracker.firstFrameUptime {
+                        infoRow("First frame", String(format: "%.4fs", frame))
                     }
                 }
 
@@ -155,9 +165,6 @@
                         .buttonStyle(.bordered)
                         .controlSize(.mini)
                 }
-            }
-            .onAppear {
-                tracker.recordFirstAppear()
             }
         }
 
@@ -194,13 +201,15 @@
             if let pre = tracker.preMainDuration {
                 report += "Pre-main: \(String(format: "%.0f ms", pre * 1000))\n"
             }
-            if let main = tracker.mainToFirstFrame {
-                report += "Main to first frame: \(String(format: "%.0f ms", main * 1000))\n"
+            if let toFrame = tracker.appInitToFirstFrame {
+                report += "App init to first frame: \(String(format: "%.0f ms", toFrame * 1000))\n"
             }
-            report += "\nProcess start uptime: \(String(format: "%.4fs", tracker.processStartUptime))\n"
-            report += "Module init uptime: \(String(format: "%.4fs", tracker.moduleInitUptime))\n"
-            if let appear = tracker.firstAppearUptime {
-                report += "First appear uptime: \(String(format: "%.4fs", appear))\n"
+            if let start = tracker.processStartUptime {
+                report += "\nProcess start uptime: \(String(format: "%.4fs", start))\n"
+            }
+            report += "App init uptime: \(String(format: "%.4fs", tracker.appInitUptime))\n"
+            if let frame = tracker.firstFrameUptime {
+                report += "First frame uptime: \(String(format: "%.4fs", frame))\n"
             }
             debugDrawerCopyToClipboard(report)
         }
@@ -209,7 +218,11 @@
     // MARK: - Convenience installer
 
     public extension DebugDrawer {
+        /// Install the launch time plugin. Call it as early as you can (your `App.init` or
+        /// `application(_:didFinishLaunchingWithOptions:)`): app init is measured here, and
+        /// the first frame is the first time the main run loop goes idle afterwards.
         func installLaunchTime() {
+            LaunchTimeTracker.shared.observeFirstFrame()
             registerGlobal(LaunchTimePlugin())
         }
     }
