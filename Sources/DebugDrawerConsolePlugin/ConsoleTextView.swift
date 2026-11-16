@@ -170,7 +170,6 @@
                 textView.backgroundColor = UIColor.black.withAlphaComponent(0.3)
                 textView.textContainerInset = UIEdgeInsets(top: 4, left: 4, bottom: 4, right: 4)
                 textView.textContainer.lineBreakMode = .byCharWrapping
-                textView.font = .monospacedSystemFont(ofSize: 10, weight: .regular)
                 textView.delegate = context.coordinator
                 context.coordinator.textView = textView
                 return textView
@@ -178,20 +177,27 @@
 
             func updateUIView(_ textView: UITextView, context: Context) {
                 let storage = textView.textStorage
+                let dynamicTypeSize = context.environment.dynamicTypeSize
+                let fonts = ConsoleFonts(dynamicTypeSize: dynamicTypeSize)
 
                 let newCount = lines.count
                 let prevCount = context.coordinator.renderedLineCount
 
-                if newCount == 0, prevCount > 0 {
+                // The fonts are baked into the rendered text, so a new text size redraws every line.
+                if dynamicTypeSize != context.coordinator.renderedDynamicTypeSize {
+                    storage.setAttributedString(buildAttributedString(from: lines, fonts: fonts, prefixNewline: false))
+                    context.coordinator.renderedLineCount = newCount
+                    context.coordinator.renderedDynamicTypeSize = dynamicTypeSize
+                } else if newCount == 0, prevCount > 0 {
                     storage.setAttributedString(NSAttributedString())
                     context.coordinator.renderedLineCount = 0
                 } else if newCount > prevCount {
                     let newLines = Array(lines[prevCount...])
-                    let fragment = buildAttributedString(from: newLines, prefixNewline: prevCount > 0)
+                    let fragment = buildAttributedString(from: newLines, fonts: fonts, prefixNewline: prevCount > 0)
                     storage.append(fragment)
                     context.coordinator.renderedLineCount = newCount
                 } else if newCount < prevCount {
-                    storage.setAttributedString(buildAttributedString(from: lines, prefixNewline: false))
+                    storage.setAttributedString(buildAttributedString(from: lines, fonts: fonts, prefixNewline: false))
                     context.coordinator.renderedLineCount = newCount
                 }
 
@@ -203,9 +209,6 @@
                 }
             }
 
-            private static let monoFont = UIFont.monospacedSystemFont(ofSize: 10, weight: .regular)
-            private static let smallMonoFont = UIFont.monospacedSystemFont(ofSize: 9, weight: .regular)
-            private static let badgeFont = UIFont.monospacedSystemFont(ofSize: 8, weight: .bold)
             private static let timestampColor = UIColor.tertiaryLabel
             private static let dateFormatter: DateFormatter = {
                 let formatter = DateFormatter()
@@ -213,7 +216,7 @@
                 return formatter
             }()
 
-            private func buildAttributedString(from lines: [LogLine], prefixNewline: Bool) -> NSAttributedString {
+            private func buildAttributedString(from lines: [LogLine], fonts: ConsoleFonts, prefixNewline: Bool) -> NSAttributedString {
                 let result = NSMutableAttributedString()
                 for (index, line) in lines.enumerated() {
                     if index > 0 || prefixNewline {
@@ -222,26 +225,26 @@
 
                     let ts = Self.dateFormatter.string(from: line.timestamp)
                     result.append(NSAttributedString(string: ts + " ", attributes: [
-                        .font: Self.smallMonoFont,
+                        .font: fonts.small,
                         .foregroundColor: Self.timestampColor
                     ]))
 
                     if let badge = line.level.label {
                         result.append(NSAttributedString(string: badge + " ", attributes: [
-                            .font: Self.badgeFont,
+                            .font: fonts.badge,
                             .foregroundColor: uiColor(for: line.level)
                         ]))
                     }
 
                     if line.source == .oslog {
                         result.append(NSAttributedString(string: "⌘ ", attributes: [
-                            .font: Self.smallMonoFont,
+                            .font: fonts.small,
                             .foregroundColor: Self.timestampColor
                         ]))
                     }
 
                     result.append(NSAttributedString(string: line.text, attributes: [
-                        .font: Self.monoFont,
+                        .font: fonts.text,
                         .foregroundColor: uiColor(for: line.level)
                     ]))
                 }
@@ -260,6 +263,8 @@
 
             final class Coordinator: NSObject, UITextViewDelegate {
                 var renderedLineCount = 0
+                /// The text size the rendered lines' fonts were made for; nil before the first render.
+                var renderedDynamicTypeSize: DynamicTypeSize?
                 var isProgrammaticScroll = false
                 var isFollowing: Binding<Bool>
                 weak var textView: UITextView?
