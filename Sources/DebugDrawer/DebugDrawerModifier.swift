@@ -108,7 +108,9 @@
     public extension View {
         /// Attaches the debug drawer overlay to this view.
         /// Place once at the root of your view hierarchy. While the drawer is open, Cmd-K focuses its
-        /// search field, which finds plugins and their ``DebugDrawerPlugin/actions``.
+        /// search field, which finds plugins and their ``DebugDrawerPlugin/actions``; Cmd-Option-Down
+        /// and Cmd-Option-Up move to the next and previous plugin; Escape clears the search, then
+        /// closes the drawer. Opening it is the app's job: call ``DebugDrawer/toggle()``.
         func debugDrawer() -> some View {
             modifier(DebugDrawerModifier())
         }

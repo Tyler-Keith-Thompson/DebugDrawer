@@ -7,11 +7,14 @@
         let result: DrawerSearchResult
         /// The result Return runs.
         let isHighlighted: Bool
+        /// The icon's column, which grows with the icon at larger text sizes so the title never
+        /// slides under it.
+        @ScaledMetric private var iconWidth: CGFloat = 20
 
         var body: some View {
             HStack(spacing: 8) {
                 Image(systemName: result.icon)
-                    .frame(width: 20)
+                    .frame(width: iconWidth)
                     .foregroundStyle(.secondary)
                     .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 1) {

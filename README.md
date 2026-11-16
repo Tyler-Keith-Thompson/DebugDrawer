@@ -274,6 +274,21 @@ override func motionEnded(_ motion: UIEvent.EventSubtype, with event: UIEvent?) 
 .onTapGesture(count: 3) { DebugDrawer.shared.toggle() }
 ```
 
+### Keyboard
+
+The app's own trigger opens the drawer (Ctrl-D in the example apps). While the drawer is open it
+adds these shortcuts, on macOS and on iOS with a hardware keyboard; none of them exists while it
+is closed, so they never open it or take a key from the app:
+
+| Keys | Does |
+|---|---|
+| Cmd-K | Focuses the search field |
+| Cmd-Option-Down / Cmd-Option-Up | Scrolls to the next or previous plugin's section and moves focus to its header |
+| Escape | Clears the search field if it holds text, otherwise closes the drawer |
+
+With keyboard navigation turned on (Full Keyboard Access on iOS, Keyboard navigation in macOS's
+settings), Tab reaches every section header, and Space expands or collapses the section.
+
 ### Optional modifiers
 
 ```swift
