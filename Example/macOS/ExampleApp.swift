@@ -22,6 +22,7 @@ import DebugDrawerFeatureFlagsPlugin
 import DebugDrawerCrashReportsPlugin
 import DebugDrawerHangDetectorPlugin
 import DebugDrawerLeakDetectorPlugin
+import DebugDrawerMetricKitPlugin
 import SwiftUI
 
 /// Demonstrates Send Report without a server: "sends" each report by copying it into the app's
@@ -69,6 +70,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         LeakDetector.install()
         if ProcessInfo.processInfo.arguments.contains(ExampleLeak.launchArgument) {
             ExampleLeak.presentAndDismissAfterLaunch()
+        }
+        // Compiles in release too, where it does nothing; launched with -AddSampleMetricKitPayloads,
+        // the app adds a sample metric payload and a sample diagnostic payload.
+        MetricKitPayloads.install()
+        if ProcessInfo.processInfo.arguments.contains(ExampleMetricKit.launchArgument) {
+            ExampleMetricKit.addSamples()
         }
         #if DEBUG
             DebugDrawer.shared.installConsole()
@@ -215,6 +222,11 @@ struct ExampleContentView: View {
                 Button("Block the Main Thread for 500 ms") { ExampleHang.blockMainThread() }
                 // Leaks flags the sheet once it is closed, with a toast.
                 Button("Open a Leaking Screen") { ExampleLeak.presentLeakingScreen() }
+                // MetricKit lists the samples, clearly named as such: MetricKit itself delivers nothing
+                // to a debug run in time to see. Adding does nothing in release, so neither does the button.
+                #if DEBUG
+                    Button("Add Sample MetricKit Payloads") { ExampleMetricKit.addSamples() }
+                #endif
 
                 HStack {
                     TextField("Sample text field", text: .constant(""))

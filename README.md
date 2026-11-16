@@ -291,7 +291,7 @@ DebugDrawer.shared.installLaunchTime()
 
 Each call needs its plugin's module imported (`import DebugDrawerConsolePlugin`, and so on).
 Tweaks takes the settings it shows and Feature Flags the adapter it reads, and Crash Reports,
-Hangs and Leaks install outside `#if DEBUG`, so each has a section of its own, next.
+Hangs, Leaks and MetricKit install outside `#if DEBUG`, so each has a section of its own, next.
 
 ### Tweaks: the app's own debug settings
 
@@ -539,6 +539,42 @@ a class for this run, Stop Ignoring brings them back, and a bug report carries t
 `leaks.txt`. A screen the app keeps on purpose to show again is flagged while it is off screen;
 ignore its class.
 
+### MetricKit: the system's own measurements
+
+MetricKit delivers the app a day's metrics (launch-time and hang histograms, disk writes, memory,
+CPU, exits) about once a day, and diagnostics (crashes, hangs, CPU and disk-write exceptions,
+slow launches) as they happen. The MetricKit plugin keeps every payload, so they can be read on
+the device that measured them:
+
+```swift
+import DebugDrawerMetricKitPlugin
+
+// At startup:
+MetricKitPayloads.install()
+
+// A payload from elsewhere, such as one a device exported:
+let json = Data(#"{"appVersion": "1.2", "cpuMetrics": {}}"#.utf8)
+MetricKitPayloads.add(json: json, kind: .metrics)
+```
+
+`MetricKitPayloads` exists in every configuration, so the calls need no `#if DEBUG`: in release
+they do nothing. In debug builds `install()` subscribes to `MXMetricManager` where MetricKit
+exists (iOS, macOS, visionOS; macOS reports a subset of the metrics), and first keeps the payloads
+the system still holds from before. MetricKit delivers to every subscriber, so an analytics SDK,
+Crash Reports and Hangs subscribing as well still get each payload. `add(json:kind:)` keeps a
+payload the app has from elsewhere as if MetricKit had delivered it; the period it covers is read
+from its `timeStampBegin` and `timeStampEnd`. MetricKit delivers nothing in the simulator, so
+the example apps add a sample pair from a button, Add Sample MetricKit Payloads.
+
+Each payload is kept once (the same kind and JSON delivered again adds nothing), the newest fifty,
+in the app's Application Support directory (`install(directory:)` takes another), so the history
+survives relaunches. The drawer lists them, the latest period first, each with its kind, the
+period it covers and a line of what it holds (`App 1.2 (34) · 9 metric groups`,
+`1 crash · 2 hangs`), puts a badge on its header for each not yet opened and posts a toast for
+each new one. Opening one shows its JSON, indented with sorted keys and selectable, with Copy JSON
+and Export, which shares it as a `.json` file, and marks it seen. Mark All Seen clears the badge,
+and each payload can be deleted, or all of them. A bug report carries every payload as a JSON file.
+
 ### Opening the drawer
 
 The drawer doesn't decide how it opens. Call `DebugDrawer.shared.toggle()` from whatever trigger
@@ -652,6 +688,7 @@ ContentView()
 | `DebugDrawerCrashReportsPlugin` | Uncaught exceptions and fatal signals, handed on to the app's other crash handlers, shown on the next launch with a badge and stack trace; MetricKit crash diagnostics too |
 | `DebugDrawerHangDetectorPlugin` | Main-thread hangs over a threshold the drawer can change, each with its duration and the stack it was stuck on, a toast and a badge; MetricKit hang diagnostics too |
 | `DebugDrawerLeakDetectorPlugin` | View controllers still alive a run-loop turn after their screen was dismissed, and opted-in classes with more live instances than allowed, by class with a count, a toast and a badge |
+| `DebugDrawerMetricKitPlugin` | MetricKit's metric and diagnostic payloads, kept across launches and listed by date with a summary, each open as formatted JSON to copy or export; a toast and a badge for new ones |
 
 ## Development
 
