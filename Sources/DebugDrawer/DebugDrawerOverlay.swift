@@ -19,7 +19,6 @@
         @State private var scrolledID: String?
 
         private let drawerWidth: CGFloat = 340
-        private let defaultsPrefix = "com.debugdrawer.collapsed."
 
         var body: some View {
             GeometryReader { geometry in
@@ -63,7 +62,7 @@
 
         private func loadCollapsedState() {
             for plugin in allPlugins {
-                if UserDefaults.standard.bool(forKey: defaultsPrefix + plugin.id) {
+                if UserDefaults.standard.bool(forKey: plugin.collapsedStateKey) {
                     collapsedSections.insert(plugin.id)
                 }
             }
@@ -264,7 +263,7 @@
         private func toggleExpanded(_ plugin: AnyDebugDrawerPlugin) {
             updateLayout { $0.lastUsed = plugin.id }
             withAnimation(.easeInOut(duration: 0.2)) {
-                let key = defaultsPrefix + plugin.id
+                let key = plugin.collapsedStateKey
                 if collapsedSections.contains(plugin.id) {
                     collapsedSections.remove(plugin.id)
                     UserDefaults.standard.removeObject(forKey: key)

@@ -19,6 +19,10 @@ import SwiftUI
 public protocol DebugDrawerPlugin: Identifiable {
     associatedtype Body: View
 
+    /// Identifies the plugin in the drawer: registration, saved state and search. Defaults to the
+    /// type's name; declare one to register several instances of one type.
+    var id: String { get }
+
     /// Display title shown in the section header.
     var title: String { get }
 
@@ -90,6 +94,11 @@ let defaultPluginCategory = "General"
 
         @MainActor public var body: AnyView {
             _body()
+        }
+
+        /// The `UserDefaults` key that records whether the user collapsed this plugin's section.
+        var collapsedStateKey: String {
+            "com.debugdrawer.collapsed." + id
         }
     }
 #endif
