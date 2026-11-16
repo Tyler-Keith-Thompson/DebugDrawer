@@ -3,7 +3,7 @@
 
     #if os(macOS)
         import AppKit
-    #elseif os(iOS)
+    #elseif os(iOS) || os(visionOS)
         import UIKit
     #endif
 
@@ -12,7 +12,7 @@
         #if os(macOS)
             NSPasteboard.general.clearContents()
             NSPasteboard.general.setString(string, forType: .string)
-        #elseif os(iOS)
+        #elseif os(iOS) || os(visionOS)
             UIPasteboard.general.string = string
         #endif
     }
@@ -23,7 +23,7 @@
             let pb = NSPasteboard.general
             pb.clearContents()
             pb.writeObjects([image])
-        #elseif os(iOS)
+        #elseif os(iOS) || os(visionOS)
             UIPasteboard.general.image = image
         #endif
     }
@@ -33,7 +33,7 @@
     @MainActor var debugDrawerSystemReduceMotion: Bool {
         #if os(macOS)
             NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
-        #elseif os(iOS)
+        #elseif os(iOS) || os(visionOS)
             UIAccessibility.isReduceMotionEnabled
         #else
             false
@@ -44,7 +44,7 @@
         public typealias PlatformImage = NSImage
         public typealias PlatformColor = NSColor
         public typealias PlatformFont = NSFont
-    #elseif os(iOS)
+    #elseif os(iOS) || os(visionOS)
         public typealias PlatformImage = UIImage
         public typealias PlatformColor = UIColor
         public typealias PlatformFont = UIFont

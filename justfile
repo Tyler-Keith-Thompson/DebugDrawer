@@ -61,9 +61,23 @@ test-release:
 resolve:
     cd {{PROJECT_ROOT}}/swift && {{SWIFT}} package resolve
 
-[doc('Build via SwiftPM too, to verify the published package')]
+[doc('Build via SwiftPM too, to verify the published package (the Mac, then the visionOS modules)')]
 spm:
     {{SWIFT}} build
+    just spm-visionos
+
+# `swift build` builds for the host only, so xcodebuild builds the modules ported to visionOS
+# (VISIONOS_MODULES in scripts/modules.py) for its simulator, from the same Package.swift.
+VISIONOS_BUILD_DESTINATION := "generic/platform=visionOS Simulator"
+
+[doc('Build the visionOS modules through SwiftPM for the visionOS simulator')]
+spm-visionos:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    for module in $(python3 {{PROJECT_ROOT}}/scripts/modules.py visionos-modules); do
+        xcodebuild build -quiet -scheme "$module" -destination '{{VISIONOS_BUILD_DESTINATION}}' \
+            -derivedDataPath {{PROJECT_ROOT}}/.build/xcode-visionos SWIFT_TREAT_WARNINGS_AS_ERRORS=YES
+    done
 
 [doc('Run the tests via SwiftPM')]
 spm-test *args="":
@@ -94,8 +108,11 @@ generate *args="":
 release:
     {{BAZEL_RELEASE}} build --config=release //...
 
-[doc('Build and launch an example app: just run, or just run iOS')]
-run target="macOS":
+# The simulator `just run visionOS` boots, by name.
+VISIONOS_DEVICE := env("VISIONOS_DEVICE", "Apple Vision Pro")
+
+[doc('Build and launch an example app: just run, just run iOS or just run visionOS')]
+run target="macOS" *args="":
     #!/usr/bin/env bash
     set -euo pipefail
     case "{{target}}" in
@@ -111,8 +128,23 @@ run target="macOS":
         iOS|ios)
             {{BAZEL}} run //Example:ExampleApp_iOS
             ;;
+        visionOS|visionos)
+            # Installed from a writable copy: the simulator can't copy Bazel's read-only bundle.
+            # Extra arguments go to the app; -OpenDebugDrawer opens the drawer at launch.
+            RUN_DIR="/tmp/debugdrawer-example-visionos"
+            rm -rf "$RUN_DIR"
+            mkdir -p "$RUN_DIR"
+            {{BAZEL}} build //Example:ExampleApp_visionOS
+            APP=$({{BAZEL}} cquery //Example:ExampleApp_visionOS --output=files 2>/dev/null | grep '\.app$')
+            cp -RL "$APP" "$RUN_DIR/"
+            chmod -R u+w "$RUN_DIR"
+            xcrun simctl boot "{{VISIONOS_DEVICE}}" 2>/dev/null || true
+            xcrun simctl bootstatus "{{VISIONOS_DEVICE}}" -b
+            xcrun simctl install "{{VISIONOS_DEVICE}}" "$RUN_DIR/DebugDrawerExample.app"
+            xcrun simctl launch "{{VISIONOS_DEVICE}}" com.debugdrawer.example.visionos {{args}}
+            ;;
         *)
-            echo "Unknown target: {{target}}. Use 'macOS' or 'iOS'"
+            echo "Unknown target: {{target}}. Use 'macOS', 'iOS' or 'visionOS'"
             exit 1
             ;;
     esac

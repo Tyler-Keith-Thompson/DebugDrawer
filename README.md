@@ -6,7 +6,10 @@ to a no-op outside `DEBUG`, so builds that ship to end users carry none of it.
 
 ## Installation
 
-DebugDrawer requires Swift 6.3 and supports macOS 15 and iOS 17 or later.
+DebugDrawer requires Swift 6.3 and supports macOS 15 and iOS 17 or later. The core module,
+`DebugDrawer` (the drawer, the plugin protocol and the shared views), also builds for visionOS 1
+or later, where the drawer opens in an ornament beside the window rather than over it; the shipped
+plugins build for macOS and iOS only so far, so a visionOS app registers plugins of its own.
 
 ```swift
 dependencies: [
@@ -338,7 +341,7 @@ Bazel is the development build; SwiftPM is the published package. Both are gener
 | `just lint` | SwiftLint and a11y-check over every first-party target |
 | `just record-snapshots` | Every snapshot reference, re-recorded into the workspace |
 | `just generate` | An Xcode project from the Bazel graph |
-| `just run [macOS\|iOS]` | Build and launch the example app |
+| `just run [macOS\|iOS\|visionOS]` | Build and launch the example app |
 
 `AGENTS.md` describes the layout, the workflow and the house rules in full.
 

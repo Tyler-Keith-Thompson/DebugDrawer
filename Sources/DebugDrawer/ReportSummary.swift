@@ -72,6 +72,8 @@
         fileprivate static var operatingSystemName: String {
             #if os(macOS)
                 "macOS"
+            #elseif os(visionOS)
+                "visionOS"
             #else
                 "iOS"
             #endif

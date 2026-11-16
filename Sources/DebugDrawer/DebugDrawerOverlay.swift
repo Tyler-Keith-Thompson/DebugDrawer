@@ -26,15 +26,28 @@
         private let drawerWidth: CGFloat = 340
 
         var body: some View {
-            // The reader respects the safe area so its proxy reports the window's insets; the panel
-            // inside it ignores the safe area and pads by them, so it reaches the window's edges
-            // without sliding under the status bar.
-            GeometryReader { geometry in
-                panelRow
-                    .padding(.drawerPanel(safeArea: geometry.safeAreaInsets))
-                    .ignoresSafeArea()
-            }
-            .onAppear { loadCollapsedState() }
+            #if os(visionOS)
+                // An ornament beside the window (DebugDrawerModifier), sized by the modifier: the
+                // panel alone, on glass, with no window edges or status bar to keep clear of.
+                Group {
+                    if drawer.isOpen {
+                        panel
+                            .frame(width: drawerWidth)
+                            .glassBackgroundEffect()
+                    }
+                }
+                .onAppear { loadCollapsedState() }
+            #else
+                // The reader respects the safe area so its proxy reports the window's insets; the panel
+                // inside it ignores the safe area and pads by them, so it reaches the window's edges
+                // without sliding under the status bar.
+                GeometryReader { geometry in
+                    panelRow
+                        .padding(.drawerPanel(safeArea: geometry.safeAreaInsets))
+                        .ignoresSafeArea()
+                }
+                .onAppear { loadCollapsedState() }
+            #endif
         }
 
         private var panelRow: some View {
@@ -42,38 +55,43 @@
                 Spacer()
 
                 if drawer.isOpen {
-                    VStack(spacing: 0) {
-                        DrawerHeader(
-                            isCreatingReport: reportState == .creating,
-                            createReport: createReport,
-                            close: { drawer.toggle() }
-                        )
-                        if let reportState {
-                            DrawerReportResult(state: reportState) { self.reportState = nil }
-                        }
-                        searchField
-                        if !query.isEmpty {
-                            searchResults
-                        }
-                        Divider()
-                        content
-                    }
-                    // The shortcuts exist only inside the open drawer, so none of them opens it (N2).
-                    .background {
-                        DrawerKeyboardShortcuts(
-                            closesOnEscape: query.isEmpty,
-                            search: { searchFocused = true },
-                            nextPlugin: { showPlugin(by: 1) },
-                            previousPlugin: { showPlugin(by: -1) },
-                            close: { drawer.toggle() }
-                        )
-                    }
-                    .frame(width: drawerWidth)
-                    .background(.ultraThickMaterial)
-                    .clipShape(RoundedRectangle(cornerRadius: 10))
-                    .shadow(color: .black.opacity(0.25), radius: 12, x: -4)
-                    .transition(.move(edge: .trailing).combined(with: .opacity))
+                    panel
+                        .frame(width: drawerWidth)
+                        .background(.ultraThickMaterial)
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                        .shadow(color: .black.opacity(0.25), radius: 12, x: -4)
+                        .transition(.move(edge: .trailing).combined(with: .opacity))
                 }
+            }
+        }
+
+        /// The open drawer: header, search, and the plugin list.
+        private var panel: some View {
+            VStack(spacing: 0) {
+                DrawerHeader(
+                    isCreatingReport: reportState == .creating,
+                    createReport: createReport,
+                    close: { drawer.toggle() }
+                )
+                if let reportState {
+                    DrawerReportResult(state: reportState) { self.reportState = nil }
+                }
+                searchField
+                if !query.isEmpty {
+                    searchResults
+                }
+                Divider()
+                content
+            }
+            // The shortcuts exist only inside the open drawer, so none of them opens it (N2).
+            .background {
+                DrawerKeyboardShortcuts(
+                    closesOnEscape: query.isEmpty,
+                    search: { searchFocused = true },
+                    nextPlugin: { showPlugin(by: 1) },
+                    previousPlugin: { showPlugin(by: -1) },
+                    close: { drawer.toggle() }
+                )
             }
         }
 

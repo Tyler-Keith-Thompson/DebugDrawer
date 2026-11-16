@@ -1,5 +1,6 @@
 load("@rules_apple//apple:ios.bzl", "ios_application")
 load("@rules_apple//apple:macos.bzl", "macos_application")
+load("@rules_apple//apple:visionos.bzl", "visionos_application")
 load("//tools:swift_rules.bzl", "swift_library")
 
 # ── All plugin deps (shared between macOS and iOS) ───────────────────
@@ -62,5 +63,26 @@ ios_application(
     infoplists = ["iOS/Info.plist"],
     minimum_os_version = "17.0",
     deps = [":ExampleAppLib_iOS"],
+    visibility = ["//visibility:public"],
+)
+
+# ── visionOS ─────────────────────────────────────────────────────────
+# Core alone: no plugin builds for visionOS yet (VISIONOS_MODULES in scripts/modules.py), so the
+# app registers plugins of its own.
+
+swift_library(
+    name = "ExampleAppLib_visionOS",
+    srcs = glob(["visionOS/*.swift"]),
+    module_name = "ExampleApp_visionOS",
+    deps = ["//Sources/DebugDrawer"],
+)
+
+visionos_application(
+    name = "ExampleApp_visionOS",
+    bundle_id = "com.debugdrawer.example.visionos",
+    bundle_name = "DebugDrawerExample",
+    infoplists = ["visionOS/Info.plist"],
+    minimum_os_version = "1.0",
+    deps = [":ExampleAppLib_visionOS"],
     visibility = ["//visibility:public"],
 )

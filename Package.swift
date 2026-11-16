@@ -91,7 +91,7 @@ let targets: [Target] = [
 let package = Package(
     name: "DebugDrawer",
     // Keep in step with .bazelrc's --macos_minimum_os.
-    platforms: [.macOS(.v15), .iOS(.v17)],
+    platforms: [.macOS(.v15), .iOS(.v17), .visionOS(.v1)],
     products: products,
     dependencies: dependencies,
     targets: targets

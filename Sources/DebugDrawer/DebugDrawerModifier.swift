@@ -22,7 +22,7 @@
                         .opacity(drawer.isHUDHidden ? 0 : 1)
                     }
                 }
-                .overlay(alignment: .trailing) {
+                .drawerPresentation(isOpen: drawer.isOpen) {
                     DebugDrawerOverlay(drawer: drawer)
                         .accessibilityIdentifier(debugDrawerOverlayIdentifier)
                         .background(DebugDrawerTagView())
@@ -45,6 +45,44 @@
         }
     }
 
+    // MARK: - Presentation
+
+    extension View {
+        /// Places the drawer's panel: an overlay along the window's trailing edge, or on visionOS an
+        /// ornament beside the window.
+        @ViewBuilder
+        fileprivate func drawerPresentation(isOpen: Bool, @ViewBuilder panel: () -> some View) -> some View {
+            #if os(visionOS)
+                // An ornament, not a separate window: it needs no scene from the host (a window
+                // would need a WindowGroup the app declares and an openWindow call), it moves with
+                // the app's window and stays beside it instead of floating wherever the system puts
+                // a new window, and it covers none of the app, which an overlay on a spatial window
+                // would. It takes the window's height, so the plugin list scrolls as it does in the
+                // overlay.
+                modifier(DrawerOrnament(isOpen: isOpen, panel: panel()))
+            #else
+                overlay(alignment: .trailing, content: panel)
+            #endif
+        }
+    }
+
+    #if os(visionOS)
+        /// The drawer's panel in an ornament on the window's trailing edge, as tall as the window.
+        private struct DrawerOrnament<Panel: View>: ViewModifier {
+            let isOpen: Bool
+            let panel: Panel
+            @State private var windowHeight: CGFloat?
+
+            func body(content: Content) -> some View {
+                content
+                    .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { windowHeight = $0 }
+                    .ornament(visibility: isOpen ? .visible : .hidden, attachmentAnchor: .scene(.trailing), contentAlignment: .leading) {
+                        panel.frame(height: windowHeight)
+                    }
+            }
+        }
+    #endif
+
     // MARK: - Platform view tagger
 
     /// Tags the nearest platform view with a known tag so the a11y auditor
@@ -61,7 +99,7 @@
 
             func updateNSView(_: NSView, context _: Context) {}
         }
-    #elseif os(iOS)
+    #elseif os(iOS) || os(visionOS)
         struct DebugDrawerTagView: UIViewRepresentable {
             func makeUIView(context _: Context) -> UIView {
                 let view = UIView()
