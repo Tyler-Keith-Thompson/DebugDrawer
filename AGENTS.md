@@ -138,8 +138,12 @@ iOS by SwiftPM.
 - **View tests** use ViewInspector on the Mac: `inspect()` a value-taking view, act on what it
   finds (`tap`, `setInput`), then check what it shows. Get-only accessibility environment keys
   need a hosted probe: a probe view defined in the test target, carrying its own `Inspection`,
-  hosted with `ViewHosting.host` under the modifier being tested. Production views carry no
-  inspection hook.
+  hosted with `ViewHosting.host` under the modifier being tested. A view whose own `@State`
+  a test must change (a reveal toggle, say) uses ViewInspector's hook, approach #2 of its guide:
+  it holds `let inspection = Inspection<Self>()` (the module's internal `Inspection`) and ends
+  its body with `.onReceive(inspection.notice) { inspection.visit(self, $0) }`; the test target
+  conforms `Inspection` to `InspectionEmissary`, hosts the view with `ViewHosting.host(sut) { }`
+  and acts through `sut.inspection.inspect { }`.
 - **Snapshot tests** pin how each state renders, in light and dark, with fixture values rather than
   shared or persisted state: `ImageRenderer` draws the view in the color scheme the test sets, and
   `assertSnapshot` compares it with the reference in `__Snapshots__` beside the test (Bazel puts

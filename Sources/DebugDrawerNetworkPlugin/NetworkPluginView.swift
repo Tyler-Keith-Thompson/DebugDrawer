@@ -4,6 +4,7 @@
 
     struct NetworkPluginView: View {
         @ObservedObject private var store = NetworkStore.shared
+        @ObservedObject private var drawer = DebugDrawer.shared
         @State private var selectedId: UUID?
 
         var body: some View {
@@ -51,7 +52,7 @@
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 0) {
                         ForEach(store.filteredEntries) { entry in
-                            NetworkRequestRow(entry: entry, isSelected: selectedId == entry.id) {
+                            NetworkRequestRow(entry: entry, redaction: drawer.redaction, isSelected: selectedId == entry.id) {
                                 selectedId = selectedId == entry.id ? nil : entry.id
                             }
                         }
@@ -100,6 +101,7 @@
     /// A request's method, status, path and duration; selected, it shows the request's detail.
     struct NetworkRequestRow: View {
         let entry: NetworkEntry
+        let redaction: DebugDrawerRedaction
         let isSelected: Bool
         let onSelect: () -> Void
 
@@ -149,7 +151,7 @@
                 .accessibilityAddTraits(isSelected ? .isSelected : [])
 
                 if isSelected {
-                    NetworkRequestDetail(entry: entry)
+                    NetworkRequestDetail(entry: entry, redaction: redaction)
                         .padding(.horizontal, 6)
                         .padding(.bottom, 6)
                 }
@@ -170,16 +172,17 @@
     }
 
     /// A request in full: its URL, time, size and status, query parameters, timing, error, headers
-    /// and bodies, with a button to copy it as a cURL command.
+    /// and bodies, with a button to copy it as a cURL command. Values the redaction rules call
+    /// sensitive are masked in the copy, and on screen until revealed.
     struct NetworkRequestDetail: View {
         let entry: NetworkEntry
+        let redaction: DebugDrawerRedaction
 
         var body: some View {
             VStack(alignment: .leading, spacing: 6) {
                 // URL
-                Text(entry.url)
+                RedactedText(entry.url, redacted: redaction.redacting(url: entry.url))
                     .font(.system(.caption2, design: .monospaced))
-                    .textSelection(.enabled)
                     .foregroundStyle(.secondary)
 
                 // Timing + size + actions
@@ -193,7 +196,7 @@
                     Spacer()
 
                     Button("Copy cURL") {
-                        debugDrawerCopyToClipboard(curl)
+                        debugDrawerCopyToClipboard(entry.curl(redaction: redaction))
                     }
                     .font(.caption2)
                     .buttonStyle(.plain)
@@ -211,9 +214,11 @@
                                     Text(item.name + ":")
                                         .font(.system(.caption2, design: .monospaced, weight: .medium))
                                         .foregroundStyle(.secondary)
-                                    Text(item.value ?? "")
-                                        .font(.system(.caption2, design: .monospaced))
-                                        .textSelection(.enabled)
+                                    RedactedText(
+                                        item.value ?? "",
+                                        redacted: redaction.redacting(item.value ?? "", forKey: item.name)
+                                    )
+                                    .font(.system(.caption2, design: .monospaced))
                                 }
                             }
                         }
@@ -251,9 +256,9 @@
             }
 
             // Request body
-            if let body = entry.prettyRequestBody {
+            if let body = entry.requestBody, let pretty = body.prettyBody {
                 collapsibleSection("Request Body") {
-                    codeBlock(body)
+                    codeBlock(pretty, redacted: redaction.redacting(json: body).prettyBody ?? pretty)
                 }
             }
 
@@ -265,9 +270,9 @@
             }
 
             // Response body
-            if let body = entry.prettyResponseBody {
+            if let body = entry.responseBody, let pretty = body.prettyBody {
                 collapsibleSection("Response Body") {
-                    codeBlock(body)
+                    codeBlock(pretty, redacted: redaction.redacting(json: body).prettyBody ?? pretty)
                 }
             }
         }
@@ -296,48 +301,24 @@
                         Text(key + ":")
                             .font(.system(.caption2, design: .monospaced, weight: .medium))
                             .foregroundStyle(.secondary)
-                        Text(headers[key] ?? "")
+                        let value = headers[key] ?? ""
+                        RedactedText(value, redacted: redaction.masksHeader(key) ? DebugDrawerRedaction.mask : value)
                             .font(.system(.caption2, design: .monospaced))
-                            .textSelection(.enabled)
                     }
                 }
             }
             .padding(4)
         }
 
-        private func codeBlock(_ text: String) -> some View {
+        private func codeBlock(_ text: String, redacted: String) -> some View {
             ScrollView(.horizontal) {
-                Text(text)
+                RedactedText(text, redacted: redacted)
                     .font(.system(.caption2, design: .monospaced))
-                    .textSelection(.enabled)
                     .padding(4)
             }
             .frame(maxHeight: 150)
             .background(Color.primary.opacity(0.05))
             .cornerRadius(3)
-        }
-
-        /// The request as a cURL command.
-        private var curl: String {
-            var parts = ["curl"]
-
-            if entry.method != "GET" {
-                parts.append("-X \(entry.method)")
-            }
-
-            parts.append("'\(entry.url)'")
-
-            for (key, value) in entry.requestHeaders.sorted(by: { $0.key < $1.key }) {
-                let escaped = value.replacingOccurrences(of: "'", with: "'\\''")
-                parts.append("-H '\(key): \(escaped)'")
-            }
-
-            if let body = entry.requestBody, let bodyStr = String(data: body, encoding: .utf8), !bodyStr.isEmpty {
-                let escaped = bodyStr.replacingOccurrences(of: "'", with: "'\\''")
-                parts.append("-d '\(escaped)'")
-            }
-
-            return parts.joined(separator: " \\\n  ")
         }
     }
 #endif

@@ -114,6 +114,22 @@
             !globalPlugins.isEmpty || !localPlugins.isEmpty
         }
 
+        // MARK: - Redaction
+
+        /// What plugins mask in copies, exports and, until revealed, on screen. Starts as
+        /// ``DebugDrawerRedaction/standard``; assign ``DebugDrawerRedaction/none`` to mask nothing.
+        @Published public var redaction = DebugDrawerRedaction.standard
+
+        /// Masks more header names, keys containing these patterns, and JSON paths, on top of
+        /// the current rules.
+        public func redact(
+            headers: some Sequence<String> = [String](),
+            keys: some Sequence<String> = [String](),
+            jsonPaths: some Sequence<String> = [String]()
+        ) {
+            redaction = redaction.adding(headers: headers, keys: keys, jsonPaths: jsonPaths)
+        }
+
         // MARK: - HUD
 
         /// Which plugins are pinned to the floating HUD, and where it sits. Saved in `UserDefaults`.

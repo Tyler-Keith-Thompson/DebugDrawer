@@ -16,7 +16,7 @@
             let cookie = try #require(HTTPCookie(properties: [
                 .name: "session", .value: "a1b2c3", .domain: "example.com", .path: "/"
             ]))
-            let sut = CookieRow(cookie: cookie) {}
+            let sut = CookieRow(cookie: cookie, redaction: .standard) {}
             let renderer = ImageRenderer(content: sut
                 .frame(width: 320, alignment: .leading)
                 .padding()
@@ -34,7 +34,7 @@
             let cookie = try #require(HTTPCookie(properties: [
                 .name: "session", .value: "a1b2c3", .domain: "example.com", .path: "/", .secure: "TRUE"
             ]))
-            let sut = CookieDetails(cookie: cookie)
+            let sut = CookieDetails(cookie: cookie, redaction: .standard)
             let renderer = ImageRenderer(content: sut
                 .frame(width: 320, alignment: .leading)
                 .padding()

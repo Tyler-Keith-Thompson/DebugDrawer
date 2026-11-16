@@ -111,6 +111,27 @@
             #expect(DebugDrawer.shared.badges["UploadsPlugin"] == nil)
         }
 
+        @Test("Redacting sensitive values")
+        func redactingSensitiveValues() throws {
+            let previous = DebugDrawer.shared.redaction
+
+            DebugDrawer.shared.redact(
+                headers: ["X-Api-Signature"],
+                keys: ["pin"],
+                jsonPaths: ["user.ssn", "cards.number"]
+            )
+            let actual = DebugDrawer.shared.redaction
+            let body = Data(#"{"cards":[{"number":"4111","exp":"12/30"}],"user":{"ssn":"1"}}"#.utf8)
+            let redactedBody = try #require(String(bytes: actual.redacting(json: body), encoding: .utf8))
+
+            // Leave the shared drawer as the other suites expect it, within this one main-actor turn.
+            DebugDrawer.shared.redaction = previous
+            #expect(actual.masksHeader("x-api-signature"))
+            #expect(actual.masksHeader("Authorization"))
+            #expect(actual.masksKey("userPin"))
+            #expect(redactedBody == #"{"cards":[{"exp":"12/30","number":"[REDACTED]"}],"user":{"ssn":"[REDACTED]"}}"#)
+        }
+
         @Test("Searching plugins and actions")
         func searchingPluginsAndActions() {
             let expectedTitles = ["Expire token"]

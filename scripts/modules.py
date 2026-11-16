@@ -63,7 +63,7 @@ MODULES = [
     ("DebugDrawerViewInspectorPlugin", "Plugins", "View borders by depth, alignment grid, click indicators, animation speed, render tracking, hierarchy snapshot.", ["DebugDrawer"]),
     ("DebugDrawerAccessibilityPlugin", "Plugins", "Overrides color scheme, Dynamic Type, layout direction, locale and the system accessibility settings at runtime.", ["DebugDrawer"]),
     ("DebugDrawerAppInfoPlugin", "Plugins", "Bundle, version, OS, memory, uptime, process, debugger, screen and reachability facts.", ["DebugDrawer"]),
-    ("DebugDrawerUserDefaultsPlugin", "Plugins", "Browse, search, edit and delete UserDefaults keys.", ["DebugDrawer"]),
+    ("DebugDrawerUserDefaultsPlugin", "Plugins", "Browse, search, edit, copy and delete UserDefaults keys.", ["DebugDrawer"]),
     ("DebugDrawerPerformancePlugin", "Plugins", "Live FPS and memory with sparkline graphs.", ["DebugDrawer"]),
     ("DebugDrawerNetworkPlugin", "Plugins", "URLProtocol HTTP interception: requests, responses, timing, cURL export.", ["DebugDrawer"]),
     ("DebugDrawerKeychainPlugin", "Plugins", "Browse generic and internet passwords; copy and delete entries.", ["DebugDrawer"]),

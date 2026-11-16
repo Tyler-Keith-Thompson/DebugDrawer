@@ -144,6 +144,30 @@ struct QueuePlugin: DebugDrawerPlugin {
 }
 ```
 
+### Redacting sensitive values
+
+Network's Copy cURL, Keychain's and UserDefaults' Copy Value and Cookies' Copy mask what the
+drawer's redaction rules call sensitive, and the same values are masked on screen until the eye
+button beside them reveals them. Revealing never changes a copy. The rules start as
+`DebugDrawerRedaction.standard`: the `Authorization`, `Proxy-Authorization`, `Cookie` and
+`Set-Cookie` headers, and keys containing `token`, `secret`, `password`, `session`, `auth` or
+`apikey`. Add your own with one call:
+
+```swift
+#if DEBUG
+DebugDrawer.shared.redact(
+    headers: ["X-Api-Signature"],
+    keys: ["pin"],
+    jsonPaths: ["user.ssn", "cards.number"]
+)
+#endif
+```
+
+Header names and key patterns match case-insensitively; a key pattern matches header names, URL
+query items, JSON keys at any depth, keychain accounts, services and labels, cookie names and
+`UserDefaults` keys. A JSON path is dot-separated keys from the root, `*` matches any one key,
+and arrays are transparent. Assign `DebugDrawer.shared.redaction = .none` to mask nothing.
+
 ### Installing the shipped plugins
 
 Each plugin installs itself with one call at startup. All of them:
@@ -219,7 +243,7 @@ ContentView()
 | `DebugDrawerNetworkPlugin` | URLProtocol HTTP interception: method, URL, status, timing, headers, body, cURL export |
 | `DebugDrawerDiskIOPlugin` | FileManager reads, writes, deletes and listings, flagging main-thread I/O |
 | `DebugDrawerAppInfoPlugin` | Bundle, version, OS, memory, uptime, process, debugger, screen and reachability facts |
-| `DebugDrawerUserDefaultsPlugin` | Browse, search, edit and delete UserDefaults keys |
+| `DebugDrawerUserDefaultsPlugin` | Browse, search, edit, copy and delete UserDefaults keys |
 | `DebugDrawerKeychainPlugin` | Generic and internet passwords: copy and delete entries |
 | `DebugDrawerScreenshotPlugin` | The app window captured to a file or the clipboard, optionally without the drawer |
 | `DebugDrawerFileBrowserPlugin` | The app's Application Support and Caches directories: delete and share files |

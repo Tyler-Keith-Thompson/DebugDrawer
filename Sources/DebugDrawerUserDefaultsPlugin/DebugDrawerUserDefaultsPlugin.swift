@@ -10,6 +10,12 @@
         let value: String
         let type: String
         let rawValue: Any
+
+        /// What Copy Value puts on the clipboard: the value's description, or the mask when the
+        /// key contains a key pattern.
+        func copiedValue(redaction: DebugDrawerRedaction) -> String {
+            redaction.redacting(value, forKey: key)
+        }
     }
 
     @MainActor
@@ -117,6 +123,7 @@
 
     struct UserDefaultsPluginView: View {
         @ObservedObject private var store = UserDefaultsStore.shared
+        @ObservedObject private var drawer = DebugDrawer.shared
         @State private var selectedKey: String?
         @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -147,6 +154,7 @@
                             ForEach(store.filteredEntries) { entry in
                                 DefaultsEntryRow(
                                     entry: entry,
+                                    redaction: drawer.redaction,
                                     isSelected: selectedKey == entry.key,
                                     onSelect: { selectedKey = selectedKey == entry.key ? nil : entry.key },
                                     onSet: { value in
@@ -178,9 +186,11 @@
     }
 
     /// A key and its value's type; selected, it shows the value, controls to change it (Bool,
-    /// String and Number values) and a button to delete the key, which asks first.
+    /// String and Number values), a button to copy the value and one to delete the key, which
+    /// asks first. A sensitive value is masked in the copy, and on screen until revealed.
     struct DefaultsEntryRow: View {
         let entry: DefaultsEntry
+        let redaction: DebugDrawerRedaction
         let isSelected: Bool
         let onSelect: () -> Void
         let onSet: (Any) -> Void
@@ -190,12 +200,14 @@
 
         init(
             entry: DefaultsEntry,
+            redaction: DebugDrawerRedaction,
             isSelected: Bool,
             onSelect: @escaping () -> Void,
             onSet: @escaping (Any) -> Void,
             onDelete: @escaping () -> Void
         ) {
             self.entry = entry
+            self.redaction = redaction
             self.isSelected = isSelected
             self.onSelect = onSelect
             self.onSet = onSet
@@ -213,9 +225,8 @@
 
                 if isSelected {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text(entry.value)
+                        RedactedText(entry.value, redacted: entry.copiedValue(redaction: redaction))
                             .font(.system(.caption2, design: .monospaced))
-                            .textSelection(.enabled)
                             .padding(4)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .background(Color.primary.opacity(0.05))
@@ -224,6 +235,12 @@
                         editControls
 
                         HStack {
+                            Button("Copy Value") {
+                                debugDrawerCopyToClipboard(entry.copiedValue(redaction: redaction))
+                            }
+                            .controlSize(.small)
+                            .buttonStyle(.bordered)
+
                             Spacer()
                             if isConfirmingDelete {
                                 deleteConfirmation

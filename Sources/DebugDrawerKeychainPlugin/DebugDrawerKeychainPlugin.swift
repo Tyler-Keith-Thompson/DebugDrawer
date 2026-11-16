@@ -21,6 +21,19 @@
             }
             return "<\(data.count) bytes>"
         }
+
+        /// Whether the rules call this item's value sensitive: its account, service or label
+        /// contains a key pattern.
+        func isSensitive(under redaction: DebugDrawerRedaction) -> Bool {
+            [account, service, label ?? ""].contains { redaction.masksKey($0) }
+        }
+
+        /// What Copy Value puts on the clipboard: the value as UTF-8 text, or the mask when the
+        /// item is sensitive; nil when the value isn't text.
+        func copiedValue(redaction: DebugDrawerRedaction) -> String? {
+            guard let data, let value = String(data: data, encoding: .utf8) else { return nil }
+            return isSensitive(under: redaction) ? DebugDrawerRedaction.mask : value
+        }
     }
 
     @MainActor
@@ -102,6 +115,7 @@
 
     struct KeychainPluginView: View {
         @ObservedObject private var store = KeychainStore.shared
+        @ObservedObject private var drawer = DebugDrawer.shared
         @State private var selectedId: UUID?
         @State private var loaded = false
 
@@ -132,6 +146,7 @@
                             ForEach(store.filteredEntries) { entry in
                                 KeychainRow(
                                     entry: entry,
+                                    redaction: drawer.redaction,
                                     isSelected: selectedId == entry.id,
                                     onSelect: { selectedId = selectedId == entry.id ? nil : entry.id },
                                     onDelete: {
@@ -154,6 +169,7 @@
     /// copy it and to delete the item.
     struct KeychainRow: View {
         let entry: KeychainEntry
+        let redaction: DebugDrawerRedaction
         let isSelected: Bool
         let onSelect: () -> Void
         let onDelete: () -> Void
@@ -167,7 +183,7 @@
                 .accessibilityAddTraits(isSelected ? .isSelected : [])
 
                 if isSelected {
-                    KeychainEntryDetail(entry: entry, onDelete: onDelete)
+                    KeychainEntryDetail(entry: entry, redaction: redaction, onDelete: onDelete)
                 }
 
                 Divider().padding(.leading, 6)
@@ -203,9 +219,11 @@
     }
 
     /// A selected keychain item's label and value, with buttons to copy the value and to delete
-    /// the item, which asks first.
+    /// the item, which asks first. A sensitive value is masked in the copy, and on screen until
+    /// revealed.
     struct KeychainEntryDetail: View {
         let entry: KeychainEntry
+        let redaction: DebugDrawerRedaction
         let onDelete: () -> Void
         @State private var isConfirmingDelete = false
 
@@ -222,17 +240,19 @@
                     .accessibilityElement(children: .combine)
                 }
 
-                Text(entry.valuePreview)
-                    .font(.system(.caption2, design: .monospaced))
-                    .textSelection(.enabled)
-                    .padding(4)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(Color.primary.opacity(0.05))
-                    .cornerRadius(3)
+                RedactedText(
+                    entry.valuePreview,
+                    redacted: entry.isSensitive(under: redaction) ? DebugDrawerRedaction.mask : entry.valuePreview
+                )
+                .font(.system(.caption2, design: .monospaced))
+                .padding(4)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color.primary.opacity(0.05))
+                .cornerRadius(3)
 
                 HStack {
                     Button("Copy Value") {
-                        if let data = entry.data, let value = String(data: data, encoding: .utf8) {
+                        if let value = entry.copiedValue(redaction: redaction) {
                             debugDrawerCopyToClipboard(value)
                         }
                     }

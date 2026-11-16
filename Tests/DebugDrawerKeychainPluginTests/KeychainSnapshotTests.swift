@@ -17,7 +17,7 @@
                 itemClass: "Generic Password", account: "ada@example.com", service: "com.example.App",
                 label: "API token", data: Data("s3cr3t-token".utf8)
             )
-            let sut = KeychainRow(entry: entry, isSelected: false, onSelect: {}, onDelete: {})
+            let sut = KeychainRow(entry: entry, redaction: .standard, isSelected: false, onSelect: {}, onDelete: {})
             let renderer = ImageRenderer(content: sut
                 .frame(width: 320, alignment: .leading)
                 .padding()
@@ -36,7 +36,7 @@
                 itemClass: "Generic Password", account: "ada@example.com", service: "com.example.App",
                 label: "API token", data: Data("s3cr3t-token".utf8)
             )
-            let sut = KeychainRow(entry: entry, isSelected: true, onSelect: {}, onDelete: {})
+            let sut = KeychainRow(entry: entry, redaction: .standard, isSelected: true, onSelect: {}, onDelete: {})
             let renderer = ImageRenderer(content: sut
                 .frame(width: 320, alignment: .leading)
                 .padding()

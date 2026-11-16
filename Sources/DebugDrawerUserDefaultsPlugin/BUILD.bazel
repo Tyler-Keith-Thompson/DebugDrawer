@@ -3,7 +3,7 @@
 load("//tools:docc.bzl", "docc_archive")
 load("//tools:swift_rules.bzl", "swift_library")
 
-# Browse, search, edit and delete UserDefaults keys.
+# Browse, search, edit, copy and delete UserDefaults keys.
 swift_library(
     name = "DebugDrawerUserDefaultsPlugin",
     srcs = glob(["**/*.swift"]),

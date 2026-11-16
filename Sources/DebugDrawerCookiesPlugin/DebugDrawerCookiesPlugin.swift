@@ -21,6 +21,7 @@
     private struct CookiesPluginView: View {
         @State private var cookies: [HTTPCookie] = []
         @State private var searchText = ""
+        @ObservedObject private var drawer = DebugDrawer.shared
 
         private var filtered: [HTTPCookie] {
             guard !searchText.isEmpty else { return cookies }
@@ -69,7 +70,7 @@
                     ScrollView {
                         LazyVStack(alignment: .leading, spacing: 8) {
                             ForEach(Array(filtered.enumerated()), id: \.offset) { _, cookie in
-                                CookieRow(cookie: cookie) {
+                                CookieRow(cookie: cookie, redaction: drawer.redaction) {
                                     deleteCookie(cookie)
                                 }
                             }
@@ -99,25 +100,14 @@
         }
 
         private func copyReport() {
-            var report = "HTTP Cookies (\(cookies.count))\n"
-            report += String(repeating: "=", count: 40) + "\n"
-            for cookie in cookies {
-                report += "\nName: \(cookie.name)\n"
-                report += "Value: \(cookie.value)\n"
-                report += "Domain: \(cookie.domain)\n"
-                report += "Path: \(cookie.path)\n"
-                report += "Secure: \(cookie.isSecure)\n"
-                if let expires = cookie.expiresDate {
-                    report += "Expires: \(expires)\n"
-                }
-            }
-            debugDrawerCopyToClipboard(report)
+            debugDrawerCopyToClipboard(cookies.report(redaction: drawer.redaction))
         }
     }
 
     /// A cookie's name and domain, with a button to delete it; tapping the name shows the rest.
     struct CookieRow: View {
         let cookie: HTTPCookie
+        let redaction: DebugDrawerRedaction
         let onDelete: () -> Void
 
         @State private var expanded = false
@@ -162,20 +152,22 @@
                 }
 
                 if expanded {
-                    CookieDetails(cookie: cookie)
+                    CookieDetails(cookie: cookie, redaction: redaction)
                         .padding(.leading, 16)
                 }
             }
         }
     }
 
-    /// A cookie's value, domain, path, flags and expiry, one labeled field each.
+    /// A cookie's value, domain, path, flags and expiry, one labeled field each. A sensitive
+    /// value is masked until revealed.
     struct CookieDetails: View {
         let cookie: HTTPCookie
+        let redaction: DebugDrawerRedaction
 
         var body: some View {
             VStack(alignment: .leading, spacing: 2) {
-                cookieField("Value", cookie.value)
+                cookieField("Value", cookie.value, redacted: cookie.redactedValue(redaction))
                 cookieField("Domain", cookie.domain)
                 cookieField("Path", cookie.path)
                 cookieField("Secure", cookie.isSecure ? "Yes" : "No")
@@ -188,15 +180,14 @@
             }
         }
 
-        private func cookieField(_ label: String, _ value: String) -> some View {
+        private func cookieField(_ label: String, _ value: String, redacted: String? = nil) -> some View {
             HStack(alignment: .top) {
                 Text(label)
                     .font(.caption2)
                     .foregroundStyle(.secondary)
                     .frame(width: 60, alignment: .leading)
-                Text(value)
+                RedactedText(value, redacted: redacted ?? value)
                     .font(.system(.caption2, design: .monospaced))
-                    .textSelection(.enabled)
                     .lineLimit(3)
             }
         }

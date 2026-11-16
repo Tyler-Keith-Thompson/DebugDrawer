@@ -17,7 +17,7 @@
         @Test("An unselected defaults row shows the key and the value's type", arguments: [ColorScheme.light, .dark])
         func unselectedRow(colorScheme: ColorScheme) throws {
             let entry = DefaultsEntry(id: "launchCount", key: "launchCount", value: "12", type: "Int", rawValue: 12)
-            let sut = DefaultsEntryRow(entry: entry, isSelected: false, onSelect: {}, onSet: { _ in }, onDelete: {})
+            let sut = DefaultsEntryRow(entry: entry, redaction: .standard, isSelected: false, onSelect: {}, onSet: { _ in }, onDelete: {})
             let host = NSHostingView(rootView: sut
                 .frame(width: 320, alignment: .leading)
                 .padding()
@@ -44,7 +44,7 @@
         @Test("A selected string row shows the value, a field to edit it and a delete button", arguments: [ColorScheme.light, .dark])
         func selectedStringRow(colorScheme: ColorScheme) throws {
             let entry = DefaultsEntry(id: "username", key: "username", value: "ada", type: "String", rawValue: "ada")
-            let sut = DefaultsEntryRow(entry: entry, isSelected: true, onSelect: {}, onSet: { _ in }, onDelete: {})
+            let sut = DefaultsEntryRow(entry: entry, redaction: .standard, isSelected: true, onSelect: {}, onSet: { _ in }, onDelete: {})
             let host = NSHostingView(rootView: sut
                 .frame(width: 320, alignment: .leading)
                 .padding()
@@ -73,7 +73,7 @@
             let entry = DefaultsEntry(
                 id: "onboarding.completed", key: "onboarding.completed", value: "true", type: "Bool", rawValue: true
             )
-            let sut = DefaultsEntryRow(entry: entry, isSelected: true, onSelect: {}, onSet: { _ in }, onDelete: {})
+            let sut = DefaultsEntryRow(entry: entry, redaction: .standard, isSelected: true, onSelect: {}, onSet: { _ in }, onDelete: {})
             let host = NSHostingView(rootView: sut
                 .frame(width: 320, alignment: .leading)
                 .padding()

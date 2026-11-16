@@ -48,24 +48,23 @@
         }
 
         public var prettyResponseBody: String? {
-            guard let data = responseBody else { return nil }
-            // Try JSON pretty-print
-            if let json = try? JSONSerialization.jsonObject(with: data),
-               let pretty = try? JSONSerialization.data(withJSONObject: json, options: [.prettyPrinted, .sortedKeys]),
-               let str = String(data: pretty, encoding: .utf8) {
-                return str
-            }
-            return String(data: data, encoding: .utf8)
+            responseBody?.prettyBody
         }
 
         public var prettyRequestBody: String? {
-            guard let data = requestBody else { return nil }
-            if let json = try? JSONSerialization.jsonObject(with: data),
+            requestBody?.prettyBody
+        }
+    }
+
+    extension Data {
+        /// This body as pretty-printed JSON with sorted keys, or as UTF-8 text when it isn't JSON.
+        var prettyBody: String? {
+            if let json = try? JSONSerialization.jsonObject(with: self),
                let pretty = try? JSONSerialization.data(withJSONObject: json, options: [.prettyPrinted, .sortedKeys]),
-               let str = String(data: pretty, encoding: .utf8) {
-                return str
+               let text = String(data: pretty, encoding: .utf8) {
+                return text
             }
-            return String(data: data, encoding: .utf8)
+            return String(data: self, encoding: .utf8)
         }
     }
 

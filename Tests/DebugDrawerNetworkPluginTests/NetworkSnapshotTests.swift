@@ -33,7 +33,7 @@
             ]
             let sut = VStack(spacing: 0) {
                 ForEach(entries) { entry in
-                    NetworkRequestRow(entry: entry, isSelected: false, onSelect: {})
+                    NetworkRequestRow(entry: entry, redaction: .standard, isSelected: false, onSelect: {})
                 }
             }
             let renderer = ImageRenderer(content: sut
@@ -72,7 +72,7 @@
                 responseBody: Data(#"{"users":[{"name":"Ada"}]}"#.utf8), duration: 0.142, isComplete: true,
                 metrics: metrics
             )
-            let sut = NetworkRequestRow(entry: entry, isSelected: true, onSelect: {})
+            let sut = NetworkRequestRow(entry: entry, redaction: .standard, isSelected: true, onSelect: {})
             let renderer = ImageRenderer(content: sut
                 .frame(width: 320, alignment: .leading)
                 .padding()
