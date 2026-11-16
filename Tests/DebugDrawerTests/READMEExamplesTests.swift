@@ -53,9 +53,47 @@
         }
     }
 
+    struct CartPlugin: DebugDrawerPlugin, DebugDrawerReportContributor {
+        var title = "Cart"
+        var icon = "cart"
+
+        var body: some View {
+            Text("2 items")
+        }
+
+        func contribute(to report: inout DebugDrawerReport, redaction: DebugDrawerRedaction) {
+            report.add(text: "2 items", named: "cart.txt")
+            let checkout = Data(#"{"card":"4111","token":"t0k3n"}"#.utf8)
+            report.add(jsonData: redaction.redacting(json: checkout), named: "checkout.json")
+        }
+    }
+
     @MainActor
     @Suite("README examples")
     struct READMEExamplesTests {
+        @Test("Bug reports")
+        func bugReports() throws {
+            let previous = DebugDrawer.shared.redaction
+            DebugDrawer.shared.redaction = .standard
+            // Leave the shared drawer as the other suites expect it, within this one main-actor turn.
+            defer {
+                DebugDrawer.shared.unregisterGlobal(id: CartPlugin().id)
+                DebugDrawer.shared.redaction = previous
+            }
+
+            DebugDrawer.shared.registerGlobal(CartPlugin())
+            let zip = try DebugDrawer.shared.createReport() // the same zip the button makes
+
+            defer { try? FileManager.default.removeItem(at: zip) }
+            var contribution = DebugDrawerReport()
+            CartPlugin().contribute(to: &contribution, redaction: DebugDrawer.shared.redaction)
+            let checkout = try #require(contribution.files.last)
+            #expect(zip.pathExtension == "zip")
+            #expect(FileManager.default.fileExists(atPath: zip.path))
+            #expect(contribution.files.map(\.name) == ["cart.txt", "checkout.json"])
+            #expect(String(bytes: checkout.data, encoding: .utf8) == #"{"card":"4111","token":"[REDACTED]"}"#)
+        }
+
         @Test("Usage")
         func usage() {
             let wasOpen = DebugDrawer.shared.isOpen

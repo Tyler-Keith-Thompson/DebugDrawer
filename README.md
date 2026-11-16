@@ -168,6 +168,44 @@ query items, JSON keys at any depth, keychain accounts, services and labels, coo
 `UserDefaults` keys. A JSON path is dot-separated keys from the root, `*` matches any one key,
 and arrays are transparent. Assign `DebugDrawer.shared.redaction = .none` to mask nothing.
 
+### Bug reports
+
+The drawer's header has a Create Report button that collects every plugin's data into one zip to
+attach to a bug: a `summary.txt` (app, version, OS, device model, date and the list of files) and a
+folder per plugin, named after its title. Every file is plain text, JSON, HAR or PNG, so it opens
+without DebugDrawer, and the redaction rules mask what they call sensitive. Console adds its log
+lines, Network an HTTP Archive (`network.har`) of the captured requests, App Info its facts,
+UserDefaults the app's keys, Cookies the stored cookies and Screenshot the key window; Keychain
+adds nothing. When the zip is ready, the drawer shows its name and a share button.
+
+A plugin adds its own files by adopting `DebugDrawerReportContributor`; a plugin that doesn't is
+left out. Pass what you add through the redaction it is handed:
+
+```swift
+struct CartPlugin: DebugDrawerPlugin, DebugDrawerReportContributor {
+    var title = "Cart"
+    var icon = "cart"
+
+    var body: some View {
+        Text("2 items")
+    }
+
+    func contribute(to report: inout DebugDrawerReport, redaction: DebugDrawerRedaction) {
+        report.add(text: "2 items", named: "cart.txt")
+        let checkout = Data(#"{"card":"4111","token":"t0k3n"}"#.utf8)
+        report.add(jsonData: redaction.redacting(json: checkout), named: "checkout.json")
+    }
+}
+
+#if DEBUG
+DebugDrawer.shared.registerGlobal(CartPlugin())
+let zip = try DebugDrawer.shared.createReport() // the same zip the button makes
+#endif
+```
+
+The protocol, `DebugDrawerReport` and `DebugDrawerRedaction` exist in every configuration, so a
+conformance compiles in release, where there is no drawer and no report.
+
 ### Installing the shipped plugins
 
 Each plugin installs itself with one call at startup. All of them:

@@ -95,6 +95,7 @@ let defaultPluginCategory = "General"
         public let actions: [DebugDrawerAction]
         private let _body: @MainActor () -> AnyView
         private let _hud: (@MainActor () -> AnyView)?
+        private let _contribute: (@MainActor (inout DebugDrawerReport, DebugDrawerRedaction) -> Void)?
 
         @MainActor public init<P: DebugDrawerPlugin>(_ plugin: P) {
             id = plugin.id
@@ -108,6 +109,23 @@ let defaultPluginCategory = "General"
             } else {
                 _hud = { AnyView(plugin.hud) }
             }
+            if let contributor = plugin as? any DebugDrawerReportContributor {
+                _contribute = { contributor.contribute(to: &$0, redaction: $1) }
+            } else {
+                _contribute = nil
+            }
+        }
+
+        /// Whether the plugin adopts ``DebugDrawerReportContributor``, and so adds files to the
+        /// bug report.
+        public var contributesToReport: Bool {
+            _contribute != nil
+        }
+
+        /// Adds the plugin's files to `report`; a plugin that doesn't adopt
+        /// ``DebugDrawerReportContributor`` adds nothing.
+        @MainActor public func contribute(to report: inout DebugDrawerReport, redaction: DebugDrawerRedaction) {
+            _contribute?(&report, redaction)
         }
 
         @MainActor public var body: AnyView {

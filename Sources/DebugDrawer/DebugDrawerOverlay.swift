@@ -17,6 +17,8 @@
         @State private var layout = DrawerLayout()
         /// The plugin at the top of the list: set to scroll there, and kept current as the user scrolls.
         @State private var scrolledID: String?
+        /// The last Create Report's progress or result, until dismissed.
+        @State private var reportState: DrawerReportResult.State?
         @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
         private let drawerWidth: CGFloat = 340
@@ -39,7 +41,14 @@
 
                 if drawer.isOpen {
                     VStack(spacing: 0) {
-                        header
+                        DrawerHeader(
+                            isCreatingReport: reportState == .creating,
+                            createReport: createReport,
+                            close: { drawer.toggle() }
+                        )
+                        if let reportState {
+                            DrawerReportResult(state: reportState) { self.reportState = nil }
+                        }
                         searchField
                         if !query.isEmpty {
                             searchResults
@@ -83,22 +92,19 @@
             layout.save(to: .standard)
         }
 
-        // MARK: - Header
+        // MARK: - Report
 
-        private var header: some View {
-            HStack {
-                Image(systemName: "ladybug")
-                    .foregroundStyle(.orange)
-                    .accessibilityHidden(true)
-                Text("Debug")
-                    .font(.headline)
-                    .accessibilityAddTraits(.isHeader)
-                Spacer()
-                DrawerCloseButton { drawer.toggle() }
+        /// Writes the report with the drawer and HUD hidden, so a screenshot in it shows the app
+        /// rather than the drawer over it; the drawer reopens on the result.
+        private func createReport() {
+            reportState = .creating
+            drawer.performWhileHidden {
+                do {
+                    reportState = try .ready(drawer.createReport())
+                } catch {
+                    reportState = .failed("The report couldn't be written.")
+                }
             }
-            // The close button's 44 pt target supplies the header's height and trailing margin.
-            .padding(.leading, 14)
-            .padding(.trailing, 2)
         }
 
         // MARK: - Search

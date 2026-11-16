@@ -27,7 +27,7 @@
         @Published var showSystemKeys = false
 
         var filteredEntries: [DefaultsEntry] {
-            var result = showSystemKeys ? entries : entries.filter { !isSystemKey($0.key) }
+            var result = showSystemKeys ? entries : entries.filter { !Self.isSystemKey($0.key) }
             if !searchText.isEmpty {
                 let query = searchText.lowercased()
                 result = result.filter {
@@ -43,7 +43,8 @@
             "METAL_", "MTL", "CTDirtyCount"
         ]
 
-        private func isSystemKey(_ key: String) -> Bool {
+        /// Whether the system or a framework, not the app, wrote the key, judged by its prefix.
+        static func isSystemKey(_ key: String) -> Bool {
             Self.systemPrefixes.contains(where: { key.hasPrefix($0) })
         }
 

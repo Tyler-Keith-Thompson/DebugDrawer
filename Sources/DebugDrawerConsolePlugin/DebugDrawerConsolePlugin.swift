@@ -253,7 +253,7 @@
                     lineCount: visibleLines.count,
                     isFollowing: $isFollowing,
                     filterLevel: $store.filterLevel,
-                    copyAll: { debugDrawerCopyToClipboard(Self.copiedText(of: visibleLines)) },
+                    copyAll: { debugDrawerCopyToClipboard(visibleLines.copiedText) },
                     clear: { store.clear() }
                 )
 
@@ -264,21 +264,6 @@
                 .frame(minHeight: 120, maxHeight: 300)
                 .clipShape(RoundedRectangle(cornerRadius: 4))
             }
-        }
-
-        private static let copyDateFormatter: DateFormatter = {
-            let formatter = DateFormatter()
-            formatter.dateFormat = "HH:mm:ss.SSS"
-            return formatter
-        }()
-
-        /// The lines as Copy All copies them: time, level badge and text, one per line.
-        private static func copiedText(of lines: [LogLine]) -> String {
-            lines.map { line in
-                let ts = copyDateFormatter.string(from: line.timestamp)
-                let badge = line.level.label.map { $0 + " " } ?? ""
-                return "\(ts) \(badge)\(line.text)"
-            }.joined(separator: "\n")
         }
     }
 
