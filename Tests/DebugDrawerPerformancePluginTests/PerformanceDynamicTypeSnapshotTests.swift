@@ -15,8 +15,8 @@
             let sut = PerformanceReadout(
                 fps: 58,
                 fpsHistory: [60, 60, 58, 41, 59, 60, 30, 55, 60, 60, 60, 58],
-                memoryMB: 182.4,
-                memoryHistory: [150, 152, 158, 161, 170, 168, 175, 180, 179, 182.4]
+                footprintMB: 182.4,
+                footprintHistory: [150, 152, 158, 161, 170, 168, 175, 180, 179, 182.4]
             )
             let renderer = ImageRenderer(content: sut
                 .frame(width: 320, alignment: .leading)
@@ -32,7 +32,7 @@
 
         @Test("The HUD readout stays readable at a large accessibility text size")
         func hudReadout() throws {
-            let sut = PerformanceHUDReadout(fps: 41, memoryMB: 182.4)
+            let sut = PerformanceHUDReadout(fps: 41, footprintMB: 182.4)
             let renderer = ImageRenderer(content: sut
                 .frame(width: 320, alignment: .leading)
                 .padding()

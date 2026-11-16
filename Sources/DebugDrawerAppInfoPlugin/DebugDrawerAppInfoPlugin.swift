@@ -38,7 +38,7 @@
     final class AppMetrics: ObservableObject {
         static let shared = AppMetrics()
 
-        @Published private(set) var memoryMB: Double = 0
+        @Published private(set) var footprintMB: Double = 0
         /// Time since the process started, or nil if the kernel didn't say when that was.
         @Published private(set) var uptime: TimeInterval?
         @Published private(set) var networkStatus: String = "Unknown"
@@ -68,7 +68,7 @@
         }
 
         func refresh() {
-            memoryMB = Self.currentMemoryMB()
+            footprintMB = MemoryFootprint.currentMB()
             uptime = processStart.map { now().timeIntervalSince($0.date) }
         }
 
@@ -95,17 +95,6 @@
             pathMonitor.start(queue: DispatchQueue(label: "com.debugdrawer.network-monitor"))
         }
 
-        private static func currentMemoryMB() -> Double {
-            var info = mach_task_basic_info()
-            var count = mach_msg_type_number_t(MemoryLayout<mach_task_basic_info>.size) / 4
-            let result = withUnsafeMutablePointer(to: &info) { ptr in
-                ptr.withMemoryRebound(to: integer_t.self, capacity: Int(count)) { intPtr in
-                    task_info(mach_task_self_, task_flavor_t(MACH_TASK_BASIC_INFO), intPtr, &count)
-                }
-            }
-            guard result == KERN_SUCCESS else { return 0 }
-            return Double(info.resident_size) / (1024 * 1024)
-        }
     }
 
     // MARK: - Plugin

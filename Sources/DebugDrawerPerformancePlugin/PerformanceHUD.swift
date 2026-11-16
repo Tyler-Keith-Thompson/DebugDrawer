@@ -8,7 +8,7 @@
         @State private var startedMonitoring = false
 
         public var body: some View {
-            PerformanceHUDReadout(fps: monitor.fps, memoryMB: monitor.memoryMB)
+            PerformanceHUDReadout(fps: monitor.fps, footprintMB: monitor.footprintMB)
                 .onAppear {
                     guard !monitor.isMonitoring else { return }
                     monitor.start()
@@ -22,16 +22,16 @@
         }
     }
 
-    /// The frame rate, colored by how smooth it is, and resident memory, on one line.
+    /// The frame rate, colored by how smooth it is, and the memory footprint, on one line.
     struct PerformanceHUDReadout: View {
         let fps: Int
-        let memoryMB: Double
+        let footprintMB: Double
 
         var body: some View {
             HStack(spacing: 10) {
                 Text("\(fps) FPS")
                     .foregroundStyle(fpsColor)
-                Text(memoryMB, format: .number.precision(.fractionLength(0)))
+                Text(footprintMB, format: .number.precision(.fractionLength(0)))
                     + Text(" MB")
             }
             .font(.system(.caption, design: .monospaced, weight: .semibold))

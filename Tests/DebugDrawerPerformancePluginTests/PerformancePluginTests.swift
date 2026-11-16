@@ -20,7 +20,7 @@
             // FPS and memory should have been sampled if previously started
             // Just verify no crash on access
             _ = monitor.fps
-            _ = monitor.memoryMB
+            _ = monitor.footprintMB
         }
 
         func testPluginConformance() {

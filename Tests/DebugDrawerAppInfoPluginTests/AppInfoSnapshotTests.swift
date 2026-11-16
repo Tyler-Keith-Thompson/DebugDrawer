@@ -19,7 +19,7 @@
                     .init(label: "Version", value: "1.2.3 (45)")
                 ],
                 [
-                    .init(label: "Memory", value: "182.4 MB"),
+                    .init(label: "Footprint", value: "182.4 MB"),
                     .init(label: "Uptime", value: "2m 14s")
                 ],
                 [

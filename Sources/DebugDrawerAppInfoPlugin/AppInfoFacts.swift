@@ -60,7 +60,7 @@
                     Fact(label: Self.operatingSystemName, value: process.operatingSystemVersionString)
                 ],
                 [
-                    Fact(label: "Memory", value: String(format: "%.1f MB", metrics.memoryMB)),
+                    Fact(label: "Footprint", value: String(format: "%.1f MB", metrics.footprintMB)),
                     Fact(label: "Uptime", value: metrics.uptime.map(Self.formatDuration) ?? "—"),
                     Fact(label: "PID", value: "\(process.processIdentifier)"),
                     Fact(label: "Arch", value: process.machineHardwareName),

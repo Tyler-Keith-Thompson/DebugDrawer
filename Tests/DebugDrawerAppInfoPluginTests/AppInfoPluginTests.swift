@@ -8,7 +8,7 @@
         func testAppMetricsRefresh() {
             let metrics = AppMetrics.shared
             metrics.refresh()
-            XCTAssertGreaterThan(metrics.memoryMB, 0)
+            XCTAssertGreaterThan(metrics.footprintMB, 0)
             XCTAssertGreaterThan(try XCTUnwrap(metrics.uptime), 0)
         }
 

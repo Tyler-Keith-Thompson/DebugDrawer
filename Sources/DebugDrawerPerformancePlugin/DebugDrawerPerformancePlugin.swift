@@ -16,8 +16,8 @@
         static let shared = PerformanceMonitor()
 
         @Published var fps: Int = 0
-        @Published var memoryMB: Double = 0
-        @Published var memoryHistory: [Double] = []
+        @Published var footprintMB: Double = 0
+        @Published var footprintHistory: [Double] = []
         @Published var fpsHistory: [Int] = []
         @Published var isMonitoring = false
 
@@ -77,22 +77,11 @@
             if fpsHistory.count > historySize { fpsHistory.removeFirst() }
 
             // Memory
-            memoryMB = Self.currentMemoryMB()
-            memoryHistory.append(memoryMB)
-            if memoryHistory.count > historySize { memoryHistory.removeFirst() }
+            footprintMB = MemoryFootprint.currentMB()
+            footprintHistory.append(footprintMB)
+            if footprintHistory.count > historySize { footprintHistory.removeFirst() }
         }
 
-        private static func currentMemoryMB() -> Double {
-            var info = mach_task_basic_info()
-            var count = mach_msg_type_number_t(MemoryLayout<mach_task_basic_info>.size) / 4
-            let result = withUnsafeMutablePointer(to: &info) { ptr in
-                ptr.withMemoryRebound(to: integer_t.self, capacity: Int(count)) { intPtr in
-                    task_info(mach_task_self_, task_flavor_t(MACH_TASK_BASIC_INFO), intPtr, &count)
-                }
-            }
-            guard result == KERN_SUCCESS else { return 0 }
-            return Double(info.resident_size) / (1024 * 1024)
-        }
     }
 
     // MARK: - Sparkline
@@ -175,8 +164,8 @@
                     PerformanceReadout(
                         fps: monitor.fps,
                         fpsHistory: monitor.fpsHistory,
-                        memoryMB: monitor.memoryMB,
-                        memoryHistory: monitor.memoryHistory
+                        footprintMB: monitor.footprintMB,
+                        footprintHistory: monitor.footprintHistory
                     )
                 }
             }
@@ -189,9 +178,9 @@
         let fps: Int
         /// Frames per second, one sample a second, oldest first.
         let fpsHistory: [Int]
-        let memoryMB: Double
-        /// Resident memory in megabytes, one sample a second, oldest first.
-        let memoryHistory: [Double]
+        let footprintMB: Double
+        /// The memory footprint in megabytes, one sample a second, oldest first.
+        let footprintHistory: [Double]
 
         var body: some View {
             VStack(alignment: .leading, spacing: 8) {
@@ -215,14 +204,14 @@
                 // Memory
                 VStack(alignment: .leading, spacing: 2) {
                     HStack {
-                        Text("Memory")
+                        Text("Footprint")
                             .font(.caption.weight(.medium))
                         Spacer()
-                        Text(String(format: "%.1f MB", memoryMB))
+                        Text(String(format: "%.1f MB", footprintMB))
                             .font(.system(.callout, design: .monospaced, weight: .medium))
                     }
-                    if memoryHistory.count > 1 {
-                        Sparkline(data: memoryHistory, color: .blue, height: 30)
+                    if footprintHistory.count > 1 {
+                        Sparkline(data: footprintHistory, color: .blue, height: 30)
                             .background(Color.primary.opacity(0.03))
                             .cornerRadius(3)
                     }
@@ -232,7 +221,7 @@
                 HStack(spacing: 12) {
                     statBadge("Min", "\(fpsHistory.min() ?? 0)", fpsColor)
                     statBadge("Avg", "\(fpsHistory.isEmpty ? 0 : fpsHistory.reduce(0, +) / fpsHistory.count)", fpsColor)
-                    statBadge("Mem Peak", String(format: "%.0f", memoryHistory.max() ?? 0), .blue)
+                    statBadge("Peak", String(format: "%.0f", footprintHistory.max() ?? 0), .blue)
                 }
             }
         }
