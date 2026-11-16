@@ -195,7 +195,7 @@ run target="macOS" *args="":
             ;;
     esac
 
-[doc('Release a new version: verify, tag, push the tag and create the GitHub release, e.g. just deploy minor')]
+[doc('Release origin/main as a new version: verify, tag it, push only the tag and create the GitHub release; runs from any worktree whose HEAD is origin/main, e.g. just deploy minor')]
 deploy bump="patch":
     #!/usr/bin/env bash
     set -euo pipefail
@@ -203,10 +203,31 @@ deploy bump="patch":
         echo "Error: working tree is dirty. Commit or stash changes first."
         exit 1
     fi
+    just _require-origin-main
     # Every drawer entry point is #if DEBUG, so the tests run in debug; release must still build.
     just verify
     just release
+    NEW_VERSION=$(just _push-version-tag {{bump}} | tail -1)
+    gh release create "${NEW_VERSION}" --title "${NEW_VERSION}" --generate-notes --verify-tag
+    echo "Released ${NEW_VERSION}: $(gh repo view --json url -q .url)/releases/tag/${NEW_VERSION}"
 
+# Refuses unless HEAD is origin/main's tip, so a release is always of what main holds on the
+# remote, never of a local branch, whatever branch this worktree has checked out.
+_require-origin-main:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    git fetch origin
+    if [ "$(git rev-parse HEAD)" != "$(git rev-parse origin/main)" ]; then
+        echo "Error: HEAD ($(git rev-parse --short HEAD)) is not origin/main ($(git rev-parse --short origin/main)). Release from a checkout of origin/main." >&2
+        exit 1
+    fi
+
+# Tags HEAD with the next version and pushes only that tag, never a branch, so a local main that
+# is behind (or another worktree's branch) is neither pushed nor needed. Prints the new version last.
+_push-version-tag bump="patch":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    just _require-origin-main
     CURRENT=$(git describe --tags --abbrev=0 --match 'v*' 2>/dev/null || echo "")
     if [ -z "$CURRENT" ]; then
         NEW_VERSION="v0.0.1"
@@ -225,9 +246,8 @@ deploy bump="patch":
         echo "    New: ${NEW_VERSION}"
     fi
     git tag -a "${NEW_VERSION}" -m "Release ${NEW_VERSION}"
-    git push origin main --tags
-    gh release create "${NEW_VERSION}" --title "${NEW_VERSION}" --generate-notes
-    echo "Released ${NEW_VERSION}: $(gh repo view --json url -q .url)/releases/tag/${NEW_VERSION}"
+    git push origin "${NEW_VERSION}"
+    echo "${NEW_VERSION}"
 
 [doc('Store the BuildBuddy API key in the login Keychain (asks for it), once per Mac: every project from the template then builds with the remote cache (tools/bazel)')]
 buildbuddy-key:
