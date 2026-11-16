@@ -70,9 +70,20 @@
             ]
         }
 
-        private static var operatingSystemName: String {
+        /// The OS row's label. The same names as core's bug-report summary, written out again
+        /// here because core's are private to it, not part of the plugin contract.
+        static var operatingSystemName: String {
             #if os(macOS)
                 "macOS"
+            #elseif targetEnvironment(macCatalyst)
+                // ProcessInfo reports the Mac's macOS version, not an iOS one, under Catalyst.
+                "macOS (Mac Catalyst)"
+            #elseif os(visionOS)
+                "visionOS"
+            #elseif os(tvOS)
+                "tvOS"
+            #elseif os(watchOS)
+                "watchOS"
             #else
                 "iOS"
             #endif
