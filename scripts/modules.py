@@ -85,6 +85,7 @@ MODULES = [
     ("DebugDrawerPermissionsPlugin", "Plugins", "Every privacy permission the app declares in its Info.plist, with its live status, a button that asks when it is undecided and one that opens Settings.", ["DebugDrawer"]),
     ("DebugDrawerNotificationsPlugin", "Plugins", "The APNs device token to copy, notification authorization and settings, pending and delivered notifications to inspect and remove, and a pasted APNs payload sent as a local notification.", ["DebugDrawer"]),
     ("DebugDrawerBackgroundTasksPlugin", "Plugins", "The BGTaskScheduler identifiers the Info.plist permits and the pending task requests, with their kind and earliest begin date, each cancellable; a request scheduled on demand, and the LLDB commands that simulate a launch or an expiration.", ["DebugDrawer"]),
+    ("DebugDrawerAnalyticsPlugin", "Plugins", "The analytics events the app records, live, newest first, with their time and properties: search by name, key or value, each open as inspector rows and JSON to copy, all exported as a JSON file.", ["DebugDrawer"]),
 ]
 
 # Modules only iOS builds: SwiftUI views and what they draw with. Bazel builds them for the
@@ -104,11 +105,11 @@ IOS_MINIMUM = "17.0"
 # only on modules listed for it.
 EXTRA_PLATFORMS = {
     # visionOS 1 shipped with iOS 17's SwiftUI.
-    "visionOS": ("1.0", ["DebugDrawer"]),
+    "visionOS": ("1.0", ["DebugDrawer", "DebugDrawerAnalyticsPlugin"]),
     # tvOS 17 shipped with iOS 17's SwiftUI.
-    "tvOS": ("17.0", ["DebugDrawer"]),
+    "tvOS": ("17.0", ["DebugDrawer", "DebugDrawerAnalyticsPlugin"]),
     # watchOS 10 shipped with iOS 17's SwiftUI.
-    "watchOS": ("10.0", ["DebugDrawer"]),
+    "watchOS": ("10.0", ["DebugDrawer", "DebugDrawerAnalyticsPlugin"]),
 }
 
 # Modules that also build for Mac Catalyst, the iOS SDK's UIKit running in a Mac window, where
@@ -118,7 +119,7 @@ EXTRA_PLATFORMS = {
 # beside each library compiles it for the IOS_MINIMUM Catalyst target triple instead. A module
 # listed here depends only on modules listed here, and on no C or Objective-C package, which that
 # rule would still build for macOS.
-CATALYST_MODULES = ["DebugDrawer"]
+CATALYST_MODULES = ["DebugDrawer", "DebugDrawerAnalyticsPlugin"]
 
 # Executables: (name, description, dependencies). Each is an `.executableTarget` and product in
 # Package.swift and a swift_binary in Bazel (`bazel run //Sources/<name>`). Keep them thin: the
@@ -156,6 +157,7 @@ TEST_TARGETS = [
     ("DebugDrawerPermissionsPluginTests", ["DebugDrawerPermissionsPlugin", "DebugDrawer", "viewinspector/ViewInspector", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
     ("DebugDrawerNotificationsPluginTests", ["DebugDrawerNotificationsPlugin", "DebugDrawer", "viewinspector/ViewInspector", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
     ("DebugDrawerBackgroundTasksPluginTests", ["DebugDrawerBackgroundTasksPlugin", "DebugDrawer", "viewinspector/ViewInspector", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
+    ("DebugDrawerAnalyticsPluginTests", ["DebugDrawerAnalyticsPlugin", "DebugDrawer", "viewinspector/ViewInspector", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
 ]
 
 # The modules the test-support target depends on (fixtures are usually written against the
@@ -183,6 +185,7 @@ PERFORMANCE_TESTS = [
     "DebugDrawerPermissionsPluginTests",
     "DebugDrawerNotificationsPluginTests",
     "DebugDrawerBackgroundTasksPluginTests",
+    "DebugDrawerAnalyticsPluginTests",
 ]
 
 # Performance tests run up to their one-minute limits each, so their targets get "medium" (300 s).

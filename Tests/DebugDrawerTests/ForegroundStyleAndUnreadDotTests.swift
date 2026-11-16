@@ -23,6 +23,22 @@
             #expect(actual == expected)
         }
 
+        @Test("On the selection fill every foreground style is white, the supporting ones dimmed as a selected stack frame's are")
+        func foregroundColorsOnSelection() {
+            let dimmed = DrawerPalette.onSelection.opacity(0.78)
+            let expected: [DebugDrawerForegroundStyle: Color] = [
+                .primary: DrawerPalette.onSelection,
+                .secondary: dimmed,
+                .tertiary: dimmed,
+                .accent: DrawerPalette.onSelection,
+                .error: DrawerPalette.onSelection
+            ]
+
+            let actual = Dictionary(uniqueKeysWithValues: DebugDrawerForegroundStyle.allCases.map { ($0, $0.colorOnSelection) })
+
+            #expect(actual == expected)
+        }
+
         @Test("A gauge's or graph's fill is the accent with no severity, and the issue's color with one")
         func fills() {
             let severities: [DebugDrawerIssueGlyph.Severity?] = [nil, .error, .warning, .ok, .neutral]

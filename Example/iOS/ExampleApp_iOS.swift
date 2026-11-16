@@ -25,6 +25,7 @@ import DebugDrawerMetricKitPlugin
 import DebugDrawerPermissionsPlugin
 import DebugDrawerNotificationsPlugin
 import DebugDrawerBackgroundTasksPlugin
+import DebugDrawerAnalyticsPlugin
 import SwiftUI
 
 /// Demonstrates Send Report without a server: "sends" each report by copying it into the app's
@@ -84,6 +85,13 @@ struct DebugDrawerExampleiOSApp: App {
         // Compiles in release too, where it does nothing. The Info.plist permits two task
         // identifiers, whose launch handlers the app delegate registers.
         BackgroundTaskRequests.install()
+        // Compiles in release too, where it does nothing and records nothing. The counter's
+        // buttons and Track Sample Event record events; launched with -TrackSampleAnalyticsEvents,
+        // the app records one of each sample at startup.
+        AnalyticsEvents.install()
+        if ProcessInfo.processInfo.arguments.contains(ExampleAnalytics.launchArgument) {
+            ExampleAnalytics.trackAllSamples()
+        }
         #if DEBUG
             DebugDrawer.shared.installConsole()
             DebugDrawer.shared.installNetwork()
@@ -148,13 +156,27 @@ struct ExampleContentView_iOS: View {
             List {
                 Section("Controls") {
                     HStack {
-                        Button("Increment") { counter += ExampleTweaks.counterStep.value }
+                        Button("Increment") {
+                            counter += ExampleTweaks.counterStep.value
+                            ExampleAnalytics.trackCounter("increment", value: counter)
+                        }
                         Button("Print") { print("Counter: \(counter)") }
-                        Button("Reset") { counter = 0 }
+                        Button("Reset") {
+                            counter = 0
+                            ExampleAnalytics.trackCounter("reset", value: counter)
+                        }
                     }
                     .buttonStyle(.bordered)
 
-                    Button("Show Sheet") { isShowingSheet = true }
+                    Button("Show Sheet") {
+                        isShowingSheet = true
+                        ExampleAnalytics.track("sheet_shown")
+                    }
+                    // Analytics lists each event as it is recorded. Recording does nothing in
+                    // release, so neither does the button.
+                    #if DEBUG
+                        Button("Track Sample Event") { ExampleAnalytics.trackSample() }
+                    #endif
                     // Crash Reports shows the crash on the next launch.
                     Button("Crash the App", role: .destructive) { ExampleCrash.crash() }
                     // Hangs reports the stall with its stack and a toast.

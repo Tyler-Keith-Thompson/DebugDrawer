@@ -20,12 +20,13 @@ public enum DebugDrawerForegroundStyle: CaseIterable, Sendable {
 
 public extension View {
     /// Colors the text and symbols in this view in one of the drawer's
-    /// ``DebugDrawerForegroundStyle`` colors.
+    /// ``DebugDrawerForegroundStyle`` colors. Inside a view drawn `debugDrawerSelected(_:)`, the
+    /// colors that read on the selection fill.
     ///
     /// In release it changes nothing, so a caller compiles unchanged.
     func debugDrawerForegroundStyle(_ style: DebugDrawerForegroundStyle) -> some View {
         #if DEBUG
-            foregroundStyle(style.color)
+            modifier(DrawerForegroundStyle(style: style))
         #else
             self
         #endif
@@ -33,7 +34,26 @@ public extension View {
 }
 
 #if DEBUG
+    /// Colors text in a ``DebugDrawerForegroundStyle``, or on the selection fill in white, the
+    /// supporting styles dimmed as the selected stack frame dims its index and image.
+    struct DrawerForegroundStyle: ViewModifier {
+        let style: DebugDrawerForegroundStyle
+        @Environment(\.debugDrawerIsSelected) private var isSelected
+
+        func body(content: Content) -> some View {
+            content.foregroundStyle(isSelected ? style.colorOnSelection : style.color)
+        }
+    }
+
     extension DebugDrawerForegroundStyle {
+        /// The style's color on the selection fill.
+        var colorOnSelection: Color {
+            switch self {
+            case .primary, .accent, .error: DrawerPalette.onSelection
+            case .secondary, .tertiary: DrawerPalette.onSelection.opacity(0.78)
+            }
+        }
+
         /// The style's color.
         var color: Color {
             switch self {

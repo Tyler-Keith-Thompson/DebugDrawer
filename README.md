@@ -305,7 +305,7 @@ DebugDrawer.shared.installLaunchTime()
 
 Each call needs its plugin's module imported (`import DebugDrawerConsolePlugin`, and so on).
 Tweaks takes the settings it shows and Feature Flags the adapter it reads, and Crash Reports,
-Hangs, Leaks, MetricKit, Permissions, Notifications and Background Tasks install outside `#if DEBUG`, so each has a
+Hangs, Leaks, MetricKit, Permissions, Notifications, Background Tasks and Analytics install outside `#if DEBUG`, so each has a
 section of its own, next.
 
 ### Tweaks: the app's own debug settings
@@ -744,6 +744,50 @@ calls. It reads the pending requests when installed, each time the app becomes a
 of its own actions and on Refresh; nothing polls. A bug report carries `background-tasks.txt`: the
 background modes, the permitted identifiers and every pending request.
 
+### Analytics: did the right event fire?
+
+The Analytics plugin lists the analytics events the app sends, as it sends them, so QA can check
+that the right event fired with the right properties. The app records each event where it hands
+it to its analytics service:
+
+```swift
+import DebugDrawerAnalyticsPlugin
+
+// At startup:
+AnalyticsEvents.install()
+
+// Wherever the app sends an event to its analytics service:
+AnalyticsEvents.record("checkout_completed", properties: [
+    "plan": "pro", "seats": 3, "total": 29.99, "trial": false, "coupon": nil,
+    "items": ["sku-1", "sku-2"], "shipping": ["country": "NZ"]
+], source: "Segment")
+
+// From an SDK's untyped properties:
+let properties: [String: Any] = ["screen": "Settings", "dark_mode": true]
+AnalyticsEvents.record("screen_viewed", properties: properties.mapValues(AnalyticsValue.init(converting:)))
+```
+
+`AnalyticsEvents` and `AnalyticsValue` exist in every configuration, so the calls need no
+`#if DEBUG`: in release they do nothing, and `record` doesn't even evaluate its arguments. In
+debug builds `record` can be called from any thread or actor and returns at once. Property values
+are `AnalyticsValue`s (strings, integers, doubles, Booleans, dates, `nil`, arrays and objects of
+them), which literals convert to; `AnalyticsValue(converting:)` reads a value from a
+`[String: Any]` as SDKs take them. `source` names the service, for an app that sends to more than
+one.
+
+The plugin keeps the newest thousand events in memory (`install(capacity:)` takes another number),
+including those recorded before `install()`, so the ones sent while the app launches show too.
+The drawer lists them, the newest first, each with its name, the time it was recorded to the
+millisecond, its source and how many properties it has; the header shows how many there are, and
+a badge counts those that arrived while the list was off screen. The filter matches the name, the
+source, and property keys and values, nested ones included. Opening an event shows each property
+beside its key and the event's JSON (sorted keys, ISO 8601 dates), with Copy JSON. Export All
+shares every event as a `.json` array, and Clear drops them. Values the redaction rules call
+sensitive (an `auth_token`, say) are masked on screen until revealed, and in the copy, the export
+and the bug report, which carries every event as `analytics.json`. The plugin runs on every
+platform the drawer does; tvOS and watchOS have no pasteboard or share sheet, so there it offers
+no Copy JSON or Export All.
+
 ### Opening the drawer
 
 The drawer doesn't decide how it opens. Call `DebugDrawer.shared.toggle()` from whatever trigger
@@ -861,6 +905,7 @@ ContentView()
 | `DebugDrawerPermissionsPlugin` | Every privacy permission the app declares in its Info.plist, with its live status, a button that asks when it is undecided and one that opens Settings |
 | `DebugDrawerNotificationsPlugin` | The APNs device token to copy, notification authorization and settings, pending and delivered notifications to inspect and remove, and a pasted APNs payload sent as a local notification |
 | `DebugDrawerBackgroundTasksPlugin` | The BGTaskScheduler identifiers the Info.plist permits and the pending task requests, with their kind and earliest begin date, each cancellable; a request scheduled on demand, and the LLDB commands that simulate a launch or an expiration |
+| `DebugDrawerAnalyticsPlugin` | The analytics events the app records, live, newest first, with their time and properties: search by name, key or value, each open as inspector rows and JSON to copy, all exported as a JSON file |
 
 ## Development
 

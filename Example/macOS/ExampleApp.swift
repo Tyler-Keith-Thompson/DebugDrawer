@@ -25,6 +25,7 @@ import DebugDrawerLeakDetectorPlugin
 import DebugDrawerMetricKitPlugin
 import DebugDrawerPermissionsPlugin
 import DebugDrawerNotificationsPlugin
+import DebugDrawerAnalyticsPlugin
 import SwiftUI
 
 /// Demonstrates Send Report without a server: "sends" each report by copying it into the app's
@@ -86,6 +87,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // device token, or why registering failed.
         PushNotifications.install()
         ExamplePushNotifications.register()
+        // Compiles in release too, where it does nothing and records nothing. The counter's
+        // buttons and Track Sample Event record events; launched with -TrackSampleAnalyticsEvents,
+        // the app records one of each sample at startup.
+        AnalyticsEvents.install()
+        if ProcessInfo.processInfo.arguments.contains(ExampleAnalytics.launchArgument) {
+            ExampleAnalytics.trackAllSamples()
+        }
         #if DEBUG
             DebugDrawer.shared.installConsole()
             DebugDrawer.shared.installNetwork()
@@ -219,9 +227,15 @@ struct ExampleContentView: View {
                 Divider()
 
                 HStack(spacing: 16) {
-                    Button("Increment") { counter += ExampleTweaks.counterStep.value }
+                    Button("Increment") {
+                        counter += ExampleTweaks.counterStep.value
+                        ExampleAnalytics.trackCounter("increment", value: counter)
+                    }
                     Button("Print") { print("Counter: \(counter)") }
-                    Button("Reset") { counter = 0 }
+                    Button("Reset") {
+                        counter = 0
+                        ExampleAnalytics.trackCounter("reset", value: counter)
+                    }
                 }
                 .accessibilityElement(children: .contain)
                 .accessibilityLabel("Counter actions")
@@ -243,6 +257,11 @@ struct ExampleContentView: View {
                 // to a debug run in time to see. Adding does nothing in release, so neither does the button.
                 #if DEBUG
                     Button("Add Sample MetricKit Payloads") { ExampleMetricKit.addSamples() }
+                #endif
+                // Analytics lists each event as it is recorded. Recording does nothing in release,
+                // so neither does the button.
+                #if DEBUG
+                    Button("Track Sample Event") { ExampleAnalytics.trackSample() }
                 #endif
 
                 HStack {
