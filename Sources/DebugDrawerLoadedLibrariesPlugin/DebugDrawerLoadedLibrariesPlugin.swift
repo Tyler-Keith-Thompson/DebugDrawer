@@ -152,9 +152,7 @@
                         .font(.system(.caption2, design: .monospaced))
                         .foregroundStyle(.secondary)
                     Spacer()
-                    Button("Copy") { copyReport() }
-                        .buttonStyle(.bordered)
-                        .controlSize(.mini)
+                    DebugDrawerCopyButton("Copy") { report }
                 }
 
                 // Category filter
@@ -210,7 +208,7 @@
             libraries = LoadedLibrary.loadAll()
         }
 
-        private func copyReport() {
+        private var report: String {
             var report = "Loaded Libraries (\(libraries.count))\n"
             report += String(repeating: "=", count: 40) + "\n"
             for (cat, libs) in grouped {
@@ -220,7 +218,7 @@
                     report += "    UUID \(lib.uuid?.uuidString ?? "—") at \(lib.loadAddressLabel)\n"
                 }
             }
-            debugDrawerCopyToClipboard(report)
+            return report
         }
     }
 

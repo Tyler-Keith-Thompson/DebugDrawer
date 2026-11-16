@@ -123,47 +123,24 @@
     struct AppInfoFactsView: View {
         let facts: AppInfoFacts
         let refresh: () -> Void
-        @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
         var body: some View {
             VStack(alignment: .leading, spacing: 6) {
                 ForEach(Array(facts.sections.enumerated()), id: \.offset) { _, section in
                     ForEach(section, id: \.label) { fact in
-                        row(fact)
+                        DebugDrawerKeyValueRow(fact.label, value: fact.value)
                     }
                     Divider()
                 }
 
                 HStack {
-                    Button("Copy Info") { debugDrawerCopyToClipboard(facts.report) }
-                        .buttonStyle(.bordered)
-                        .controlSize(.small)
+                    DebugDrawerCopyButton("Copy Info") { facts.report }
 
                     Button("Refresh", action: refresh)
                         .buttonStyle(.bordered)
                         .controlSize(.small)
                 }
             }
-        }
-
-        // At accessibility text sizes a label no longer fits its column, so it sits above the value.
-        private func row(_ fact: AppInfoFacts.Fact) -> some View {
-            let layout = dynamicTypeSize.isAccessibilitySize
-                ? AnyLayout(VStackLayout(alignment: .leading, spacing: 0))
-                : AnyLayout(HStackLayout())
-            return layout {
-                Text(fact.label)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .frame(width: dynamicTypeSize.isAccessibilitySize ? nil : 80, alignment: .leading)
-                Text(fact.value)
-                    .font(.system(.caption2, design: .monospaced))
-                    .textSelection(.enabled)
-                if !dynamicTypeSize.isAccessibilitySize {
-                    Spacer()
-                }
-            }
-            .accessibilityElement(children: .combine)
         }
     }
 

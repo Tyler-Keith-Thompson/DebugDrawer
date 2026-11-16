@@ -113,7 +113,6 @@
 
     struct LaunchTimePluginView: View {
         @ObservedObject var tracker = LaunchTimeTracker.shared
-        @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
         var body: some View {
             VStack(alignment: .leading, spacing: 6) {
@@ -153,18 +152,16 @@
                 // Raw timestamps
                 Group {
                     if let start = tracker.processStartUptime {
-                        infoRow("Process start", String(format: "%.4fs", start))
+                        DebugDrawerKeyValueRow("Process start", value: String(format: "%.4fs", start), labelWidth: 90)
                     }
-                    infoRow("App init", String(format: "%.4fs", tracker.appInitUptime))
+                    DebugDrawerKeyValueRow("App init", value: String(format: "%.4fs", tracker.appInitUptime), labelWidth: 90)
                     if let frame = tracker.firstFrameUptime {
-                        infoRow("First frame", String(format: "%.4fs", frame))
+                        DebugDrawerKeyValueRow("First frame", value: String(format: "%.4fs", frame), labelWidth: 90)
                     }
                 }
 
                 HStack {
-                    Button("Copy") { copyReport() }
-                        .buttonStyle(.bordered)
-                        .controlSize(.mini)
+                    DebugDrawerCopyButton("Copy") { report }
                 }
             }
         }
@@ -181,25 +178,7 @@
             }
         }
 
-        // At accessibility text sizes a label no longer fits its column, so it sits above the value.
-        private func infoRow(_ label: String, _ value: String) -> some View {
-            let layout = dynamicTypeSize.isAccessibilitySize
-                ? AnyLayout(VStackLayout(alignment: .leading, spacing: 0))
-                : AnyLayout(HStackLayout())
-            return layout {
-                Text(label)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .frame(width: dynamicTypeSize.isAccessibilitySize ? nil : 90, alignment: .leading)
-                Text(value)
-                    .font(.system(.caption2, design: .monospaced))
-                if !dynamicTypeSize.isAccessibilitySize {
-                    Spacer()
-                }
-            }
-        }
-
-        private func copyReport() {
+        private var report: String {
             var report = "Launch Time Report\n"
             report += String(repeating: "=", count: 30) + "\n"
             if let total = tracker.totalLaunchTime {
@@ -218,7 +197,7 @@
             if let frame = tracker.firstFrameUptime {
                 report += "First frame uptime: \(String(format: "%.4fs", frame))\n"
             }
-            debugDrawerCopyToClipboard(report)
+            return report
         }
     }
 

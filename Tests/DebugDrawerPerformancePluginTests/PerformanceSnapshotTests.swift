@@ -44,21 +44,5 @@
 
             assertSnapshot(of: actual, as: .image(perceptualPrecision: 0.98), named: "\(colorScheme)")
         }
-
-        @Test("The frame-rate sparkline draws its samples", arguments: [ColorScheme.light, .dark])
-        func sparkline(colorScheme: ColorScheme) throws {
-            let samples = [60, 60, 58, 41, 59, 60, 30, 55, 60, 60, 60, 57]
-            let sut = IntSparkline(data: samples, color: .green, height: 30)
-            let renderer = ImageRenderer(content: sut
-                .frame(width: 320, alignment: .leading)
-                .padding()
-                .background(.background)
-                .environment(\.colorScheme, colorScheme))
-            renderer.scale = 2
-
-            let actual = try #require(renderer.nsImage)
-
-            assertSnapshot(of: actual, as: .image(perceptualPrecision: 0.98), named: "\(colorScheme)")
-        }
     }
 #endif

@@ -136,30 +136,20 @@
                 }
 
                 if loaded {
-                    TextField("Filter...", text: $store.searchText)
-                        .textFieldStyle(.roundedBorder)
-                        .controlSize(.small)
-                        .accessibilityLabel("Filter keychain items")
-
-                    ScrollView {
-                        LazyVStack(alignment: .leading, spacing: 0) {
-                            ForEach(store.filteredEntries) { entry in
-                                KeychainRow(
-                                    entry: entry,
-                                    redaction: drawer.redaction,
-                                    isSelected: selectedId == entry.id,
-                                    onSelect: { selectedId = selectedId == entry.id ? nil : entry.id },
-                                    onDelete: {
-                                        store.deleteEntry(entry)
-                                        selectedId = nil
-                                    }
-                                )
-                            }
+                    DebugDrawerSearchableList("Filter...", text: $store.searchText, accessibilityLabel: "Filter keychain items") {
+                        ForEach(store.filteredEntries) { entry in
+                            KeychainRow(
+                                entry: entry,
+                                redaction: drawer.redaction,
+                                isSelected: selectedId == entry.id,
+                                onSelect: { selectedId = selectedId == entry.id ? nil : entry.id },
+                                onDelete: {
+                                    store.deleteEntry(entry)
+                                    selectedId = nil
+                                }
+                            )
                         }
                     }
-                    .frame(maxHeight: 250)
-                    .background(Color.black.opacity(0.15))
-                    .clipShape(RoundedRectangle(cornerRadius: 4))
                 }
             }
         }
@@ -260,13 +250,7 @@
                 .cornerRadius(3)
 
                 HStack {
-                    Button("Copy Value") {
-                        if let value = entry.copiedValue(redaction: redaction) {
-                            debugDrawerCopyToClipboard(value)
-                        }
-                    }
-                    .controlSize(.small)
-                    .buttonStyle(.bordered)
+                    DebugDrawerCopyButton("Copy Value") { entry.copiedValue(redaction: redaction) }
 
                     Spacer()
 

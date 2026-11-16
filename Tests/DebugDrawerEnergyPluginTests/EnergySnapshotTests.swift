@@ -39,21 +39,5 @@
 
             assertSnapshot(of: actual, as: .image(perceptualPrecision: 0.98), named: "\(colorScheme)")
         }
-
-        @Test("The sparkline draws its samples scaled to the maximum", arguments: [ColorScheme.light, .dark])
-        func sparkline(colorScheme: ColorScheme) throws {
-            let samples: [Double] = [12, 18, 15, 40, 72, 65, 30, 22, 25, 90, 55, 20]
-            let sut = EnergySparkline(data: samples, color: .blue, maxValue: 100)
-            let renderer = ImageRenderer(content: sut.frame(height: 30)
-                .frame(width: 320, alignment: .leading)
-                .padding()
-                .background(.background)
-                .environment(\.colorScheme, colorScheme))
-            renderer.scale = 2
-
-            let actual = try #require(renderer.nsImage)
-
-            assertSnapshot(of: actual, as: .image(perceptualPrecision: 0.98), named: "\(colorScheme)")
-        }
     }
 #endif

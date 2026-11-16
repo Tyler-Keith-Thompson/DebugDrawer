@@ -144,31 +144,24 @@
                         .foregroundStyle(.secondary)
                 }
 
-                TextField("Filter...", text: $store.searchText)
-                    .textFieldStyle(.roundedBorder)
-                    .controlSize(.small)
-                    .accessibilityLabel("Filter keys and values")
-
                 ScrollViewReader { proxy in
-                    ScrollView {
-                        LazyVStack(alignment: .leading, spacing: 0) {
-                            ForEach(store.filteredEntries) { entry in
-                                DefaultsEntryRow(
-                                    entry: entry,
-                                    redaction: drawer.redaction,
-                                    isSelected: selectedKey == entry.key,
-                                    onSelect: { selectedKey = selectedKey == entry.key ? nil : entry.key },
-                                    onSet: { value in
-                                        store.setValue(entry.key, value)
-                                        selectedKey = nil
-                                    },
-                                    onDelete: {
-                                        store.deleteKey(entry.key)
-                                        selectedKey = nil
-                                    }
-                                )
-                                .id(entry.key)
-                            }
+                    DebugDrawerSearchableList("Filter...", text: $store.searchText, accessibilityLabel: "Filter keys and values") {
+                        ForEach(store.filteredEntries) { entry in
+                            DefaultsEntryRow(
+                                entry: entry,
+                                redaction: drawer.redaction,
+                                isSelected: selectedKey == entry.key,
+                                onSelect: { selectedKey = selectedKey == entry.key ? nil : entry.key },
+                                onSet: { value in
+                                    store.setValue(entry.key, value)
+                                    selectedKey = nil
+                                },
+                                onDelete: {
+                                    store.deleteKey(entry.key)
+                                    selectedKey = nil
+                                }
+                            )
+                            .id(entry.key)
                         }
                     }
                     .onChange(of: selectedKey) { _, newKey in
@@ -179,9 +172,6 @@
                         }
                     }
                 }
-                .frame(maxHeight: 250)
-                .background(Color.black.opacity(0.15))
-                .clipShape(RoundedRectangle(cornerRadius: 4))
             }
         }
     }

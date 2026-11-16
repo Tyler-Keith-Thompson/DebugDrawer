@@ -56,11 +56,7 @@
                         // they stack.
                         let actionsLayout = stackingLayout()
                         actionsLayout {
-                            Button("Copy Value") {
-                                debugDrawerCopyToClipboard(entry.copiedValue(redaction: redaction))
-                            }
-                            .controlSize(.small)
-                            .buttonStyle(.bordered)
+                            DebugDrawerCopyButton("Copy Value") { entry.copiedValue(redaction: redaction) }
 
                             if !dynamicTypeSize.isAccessibilitySize {
                                 Spacer()

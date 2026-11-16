@@ -202,34 +202,6 @@
         }
     }
 
-    // MARK: - Sparkline
-
-    struct EnergySparkline: View {
-        let data: [Double]
-        let color: Color
-        let maxValue: Double
-
-        var body: some View {
-            Canvas { context, size in
-                guard data.count > 1, maxValue > 0 else { return }
-                var path = Path()
-                for (index, value) in data.enumerated() {
-                    let point = CGPoint(
-                        x: size.width * CGFloat(index) / CGFloat(data.count - 1),
-                        y: size.height * (1 - CGFloat(value / maxValue))
-                    )
-                    if index == 0 {
-                        path.move(to: point)
-                    } else {
-                        path.addLine(to: point)
-                    }
-                }
-                context.stroke(path, with: .color(color), lineWidth: 1.5)
-            }
-            .frame(height: 30)
-        }
-    }
-
     // MARK: - Plugin
 
     public struct EnergyPlugin: DebugDrawerPlugin {
@@ -278,11 +250,12 @@
                             Text(String(format: "%.1f%%", monitor.cpuUsage))
                                 .font(.system(.caption2, design: .monospaced, weight: .medium))
                         }
-                        if monitor.cpuHistory.count > 1 {
-                            EnergySparkline(data: monitor.cpuHistory, color: .blue, maxValue: max(100, monitor.cpuHistory.max() ?? 100))
-                                .background(Color.primary.opacity(0.03))
-                                .cornerRadius(3)
-                        }
+                        DebugDrawerSparkline(
+                            "CPU history",
+                            data: monitor.cpuHistory,
+                            range: 0 ... max(100, monitor.cpuHistory.max() ?? 100),
+                            color: .blue
+                        )
                     }
 
                     // Battery (if available)
@@ -304,15 +277,12 @@
                             }
                             .accessibilityElement(children: .combine)
 
-                            if monitor.batteryHistory.count > 1 {
-                                EnergySparkline(
-                                    data: monitor.batteryHistory.map { Double($0.level) },
-                                    color: batteryColor,
-                                    maxValue: 100
-                                )
-                                .background(Color.primary.opacity(0.03))
-                                .cornerRadius(3)
-                            }
+                            DebugDrawerSparkline(
+                                "Battery history",
+                                data: monitor.batteryHistory.map { Double($0.level) },
+                                range: 0 ... 100,
+                                color: batteryColor
+                            )
                         }
                     }
 

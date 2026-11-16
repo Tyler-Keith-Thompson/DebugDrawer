@@ -44,21 +44,5 @@
 
             assertSnapshot(of: actual, as: .image(perceptualPrecision: 0.98), named: "accessibility3")
         }
-
-        @Test("The frame-rate sparkline keeps its height at a large accessibility text size")
-        func sparkline() throws {
-            let samples = [60, 60, 58, 41, 59, 60, 30, 55, 60, 60, 60, 57]
-            let sut = IntSparkline(data: samples, color: .green, height: 30)
-            let renderer = ImageRenderer(content: sut
-                .frame(width: 320, alignment: .leading)
-                .padding()
-                .background(.background)
-                .environment(\.dynamicTypeSize, .accessibility3))
-            renderer.scale = 2
-
-            let actual = try #require(renderer.uiImage)
-
-            assertSnapshot(of: actual, as: .image(perceptualPrecision: 0.98), named: "accessibility3")
-        }
     }
 #endif

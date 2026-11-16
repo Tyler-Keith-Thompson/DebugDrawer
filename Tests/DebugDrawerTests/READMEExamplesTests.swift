@@ -10,6 +10,9 @@
         var icon = "trash" // an SF Symbol
 
         var body: some View {
+            let usage = "\(URLCache.shared.currentDiskUsage / 1024) KB"
+            DebugDrawerKeyValueRow("Disk usage", value: usage)
+            DebugDrawerCopyButton("Copy Usage") { usage }
             Button("Clear URL cache") { URLCache.shared.removeAllCachedResponses() }
         }
     }

@@ -148,37 +148,21 @@
     struct CookieDetails: View {
         let cookie: HTTPCookie
         let redaction: DebugDrawerRedaction
-        @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
         var body: some View {
             VStack(alignment: .leading, spacing: 2) {
-                cookieField("Value", cookie.value, redacted: cookie.redactedValue(redaction))
-                cookieField("Domain", cookie.domain)
-                cookieField("Path", cookie.path)
-                cookieField("Secure", cookie.isSecure ? "Yes" : "No")
-                cookieField("HTTP Only", cookie.isHTTPOnly ? "Yes" : "No")
+                DebugDrawerKeyValueRow("Value", value: cookie.value, redacted: cookie.redactedValue(redaction), labelWidth: 60)
+                DebugDrawerKeyValueRow("Domain", value: cookie.domain, labelWidth: 60)
+                DebugDrawerKeyValueRow("Path", value: cookie.path, labelWidth: 60)
+                DebugDrawerKeyValueRow("Secure", value: cookie.isSecure ? "Yes" : "No", labelWidth: 60)
+                DebugDrawerKeyValueRow("HTTP Only", value: cookie.isHTTPOnly ? "Yes" : "No", labelWidth: 60)
                 if let expires = cookie.expiresDate {
-                    cookieField("Expires", formatDate(expires))
+                    DebugDrawerKeyValueRow("Expires", value: formatDate(expires), labelWidth: 60)
                 } else {
-                    cookieField("Expires", "Session")
+                    DebugDrawerKeyValueRow("Expires", value: "Session", labelWidth: 60)
                 }
             }
-        }
-
-        // At accessibility text sizes a label no longer fits its column, so it sits above the value.
-        private func cookieField(_ label: String, _ value: String, redacted: String? = nil) -> some View {
-            let layout = dynamicTypeSize.isAccessibilitySize
-                ? AnyLayout(VStackLayout(alignment: .leading, spacing: 0))
-                : AnyLayout(HStackLayout(alignment: .top))
-            return layout {
-                Text(label)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                    .frame(width: dynamicTypeSize.isAccessibilitySize ? nil : 60, alignment: .leading)
-                RedactedText(value, redacted: redacted ?? value)
-                    .font(.system(.caption2, design: .monospaced))
-                    .lineLimit(3)
-            }
+            .lineLimit(3)
         }
 
         private func formatDate(_ date: Date) -> String {

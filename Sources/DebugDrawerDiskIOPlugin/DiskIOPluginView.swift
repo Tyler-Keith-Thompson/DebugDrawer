@@ -9,10 +9,10 @@
             VStack(alignment: .leading, spacing: 6) {
                 // Stats bar
                 HStack(spacing: 10) {
-                    statBadge("R", value: "\(store.totalReads)", color: .blue)
-                    statBadge("W", value: "\(store.totalWrites)", color: .orange)
-                    statBadge("Read", value: store.totalBytesRead.byteLabel, color: .blue)
-                    statBadge("Written", value: store.totalBytesWritten.byteLabel, color: .orange)
+                    DebugDrawerStatBadge("R", value: "\(store.totalReads)", color: .blue)
+                    DebugDrawerStatBadge("W", value: "\(store.totalWrites)", color: .orange)
+                    DebugDrawerStatBadge("Read", value: store.totalBytesRead.byteLabel, color: .blue)
+                    DebugDrawerStatBadge("Written", value: store.totalBytesWritten.byteLabel, color: .orange)
 
                     Spacer()
 
@@ -70,17 +70,6 @@
 
                 // Disk space
                 diskSpaceRow
-            }
-        }
-
-        private func statBadge(_ label: String, value: String, color: Color) -> some View {
-            VStack(spacing: 0) {
-                Text(value)
-                    .font(.system(.caption2, design: .monospaced, weight: .bold))
-                    .foregroundStyle(color)
-                Text(label)
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
             }
         }
 

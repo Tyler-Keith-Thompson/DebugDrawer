@@ -155,19 +155,9 @@
                 }
 
                 if isHierarchyExpanded, let root = hierarchy {
-                    TextField("Filter...", text: $searchText)
-                        .textFieldStyle(.roundedBorder)
-                        .controlSize(.small)
-                        .accessibilityLabel("Filter views by class, label or role")
-
-                    ScrollView {
-                        VStack(alignment: .leading, spacing: 0) {
-                            ViewNodeRow(node: root, depth: 0, filter: searchText)
-                        }
+                    DebugDrawerSearchableList("Filter...", text: $searchText, accessibilityLabel: "Filter views by class, label or role") {
+                        ViewNodeRow(node: root, depth: 0, filter: searchText)
                     }
-                    .frame(maxHeight: 250)
-                    .background(Color.black.opacity(0.15))
-                    .clipShape(RoundedRectangle(cornerRadius: 4))
                 }
             }
             .sheet(item: $debugger3DRequest) { request in

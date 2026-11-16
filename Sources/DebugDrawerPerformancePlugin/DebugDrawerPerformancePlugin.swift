@@ -84,50 +84,6 @@
 
     }
 
-    // MARK: - Sparkline
-
-    struct Sparkline<T: BinaryFloatingPoint>: View {
-        let data: [T]
-        let color: Color
-        let height: CGFloat
-
-        var body: some View {
-            Canvas { context, size in
-                guard data.count > 1 else { return }
-                let maxVal = data.max() ?? 1
-                let minVal = data.min() ?? 0
-                let range = maxVal - minVal
-                let effectiveRange = range > 0 ? range : 1
-
-                var path = Path()
-                for (index, value) in data.enumerated() {
-                    let normalized = CGFloat((value - minVal) / effectiveRange)
-                    let point = CGPoint(
-                        x: size.width * CGFloat(index) / CGFloat(data.count - 1),
-                        y: size.height * (1 - normalized)
-                    )
-                    if index == 0 {
-                        path.move(to: point)
-                    } else {
-                        path.addLine(to: point)
-                    }
-                }
-                context.stroke(path, with: .color(color), lineWidth: 1.5)
-            }
-            .frame(height: height)
-        }
-    }
-
-    struct IntSparkline: View {
-        let data: [Int]
-        let color: Color
-        let height: CGFloat
-
-        var body: some View {
-            Sparkline(data: data.map(Double.init), color: color, height: height)
-        }
-    }
-
     // MARK: - Plugin
 
     public struct PerformancePlugin: DebugDrawerPlugin {
@@ -194,11 +150,7 @@
                             .font(.system(.title3, design: .monospaced, weight: .bold))
                             .foregroundStyle(fpsColor)
                     }
-                    if fpsHistory.count > 1 {
-                        IntSparkline(data: fpsHistory, color: fpsColor, height: 30)
-                            .background(Color.primary.opacity(0.03))
-                            .cornerRadius(3)
-                    }
+                    DebugDrawerSparkline("Frame rate history", data: fpsHistory.map(Double.init), color: fpsColor)
                 }
 
                 // Memory
@@ -210,18 +162,14 @@
                         Text(String(format: "%.1f MB", footprintMB))
                             .font(.system(.callout, design: .monospaced, weight: .medium))
                     }
-                    if footprintHistory.count > 1 {
-                        Sparkline(data: footprintHistory, color: .blue, height: 30)
-                            .background(Color.primary.opacity(0.03))
-                            .cornerRadius(3)
-                    }
+                    DebugDrawerSparkline("Footprint history", data: footprintHistory, color: .blue)
                 }
 
                 // Stats
                 HStack(spacing: 12) {
-                    statBadge("Min", "\(fpsHistory.min() ?? 0)", fpsColor)
-                    statBadge("Avg", "\(fpsHistory.isEmpty ? 0 : fpsHistory.reduce(0, +) / fpsHistory.count)", fpsColor)
-                    statBadge("Peak", String(format: "%.0f", footprintHistory.max() ?? 0), .blue)
+                    DebugDrawerStatBadge("Min", value: "\(fpsHistory.min() ?? 0)", color: fpsColor)
+                    DebugDrawerStatBadge("Avg", value: "\(fpsHistory.isEmpty ? 0 : fpsHistory.reduce(0, +) / fpsHistory.count)", color: fpsColor)
+                    DebugDrawerStatBadge("Peak", value: String(format: "%.0f", footprintHistory.max() ?? 0), color: .blue)
                 }
             }
         }
@@ -230,17 +178,6 @@
             if fps >= 55 { return .green }
             if fps >= 30 { return .yellow }
             return .red
-        }
-
-        private func statBadge(_ label: String, _ value: String, _ color: Color) -> some View {
-            VStack(spacing: 1) {
-                Text(value)
-                    .font(.system(.caption2, design: .monospaced, weight: .bold))
-                    .foregroundStyle(color)
-                Text(label)
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
-            }
         }
     }
 

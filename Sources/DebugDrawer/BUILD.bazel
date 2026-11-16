@@ -3,7 +3,7 @@
 load("//tools:docc.bzl", "docc_archive")
 load("//tools:swift_rules.bzl", "swift_library")
 
-# The drawer: its window, the plugin protocol and registry, and release-build stand-ins.
+# The drawer: its window, the plugin protocol and registry, the views plugins are built from, and release-build stand-ins.
 swift_library(
     name = "DebugDrawer",
     srcs = glob(["**/*.swift"]),

@@ -13,43 +13,27 @@
                 if !store.entries.isEmpty {
                     let stats = NetworkStats(store.entries)
                     HStack(spacing: 12) {
-                        statBadge("\(stats.total)", "Total")
-                        statBadge(stats.successRate, "Success")
-                        statBadge(stats.averageTime, "Avg Time")
+                        DebugDrawerStatBadge("Total", value: "\(stats.total)")
+                        DebugDrawerStatBadge("Success", value: stats.successRate)
+                        DebugDrawerStatBadge("Avg Time", value: stats.averageTime)
                     }
                     .padding(.vertical, 2)
                 }
 
                 NetworkToolbar(count: store.filteredEntries.count, filterStatus: $store.filterStatus) { store.clear() }
 
-                TextField("Filter URL...", text: $store.filterText)
-                    .textFieldStyle(.roundedBorder)
-                    .controlSize(.small)
-                    .accessibilityLabel("Filter requests by URL, method or response")
-
-                // Request list
-                ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 0) {
-                        ForEach(store.filteredEntries) { entry in
-                            NetworkRequestRow(entry: entry, redaction: drawer.redaction, isSelected: selectedId == entry.id) {
-                                selectedId = selectedId == entry.id ? nil : entry.id
-                            }
+                DebugDrawerSearchableList(
+                    "Filter URL...",
+                    text: $store.filterText,
+                    accessibilityLabel: "Filter requests by URL, method or response",
+                    maxHeight: 300
+                ) {
+                    ForEach(store.filteredEntries) { entry in
+                        NetworkRequestRow(entry: entry, redaction: drawer.redaction, isSelected: selectedId == entry.id) {
+                            selectedId = selectedId == entry.id ? nil : entry.id
                         }
                     }
                 }
-                .frame(maxHeight: 300)
-                .background(Color.black.opacity(0.15))
-                .clipShape(RoundedRectangle(cornerRadius: 4))
-            }
-        }
-
-        private func statBadge(_ value: String, _ label: String) -> some View {
-            VStack(spacing: 1) {
-                Text(value)
-                    .font(.system(.caption2, design: .monospaced, weight: .medium))
-                Text(label)
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
             }
         }
     }
@@ -197,10 +181,10 @@
                     : AnyLayout(HStackLayout(spacing: 12))
                 summaryLayout {
                     HStack(spacing: 12) {
-                        detailBadge("Time", entry.durationLabel)
-                        detailBadge("Size", entry.responseSizeLabel)
+                        DebugDrawerStatBadge("Time", value: entry.durationLabel)
+                        DebugDrawerStatBadge("Size", value: entry.responseSizeLabel)
                         if let code = entry.statusCode {
-                            detailBadge("Status", "\(code)")
+                            DebugDrawerStatBadge("Status", value: "\(code)")
                         }
                     }
 
@@ -208,12 +192,7 @@
                         Spacer()
                     }
 
-                    Button("Copy cURL") {
-                        debugDrawerCopyToClipboard(entry.curl(redaction: redaction))
-                    }
-                    .font(.caption2)
-                    .buttonStyle(.plain)
-                    .foregroundStyle(.secondary)
+                    DebugDrawerCopyButton("Copy cURL") { entry.curl(redaction: redaction) }
                 }
 
                 // URL query parameters
@@ -287,16 +266,6 @@
                 collapsibleSection("Response Body") {
                     codeBlock(pretty, redacted: redaction.redacting(json: body).prettyBody ?? pretty)
                 }
-            }
-        }
-
-        private func detailBadge(_ label: String, _ value: String) -> some View {
-            VStack(spacing: 1) {
-                Text(value)
-                    .font(.system(.caption2, design: .monospaced, weight: .medium))
-                Text(label)
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
             }
         }
 

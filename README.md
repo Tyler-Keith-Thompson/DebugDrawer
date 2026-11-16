@@ -41,6 +41,9 @@ struct CachePlugin: DebugDrawerPlugin {
     var icon = "trash" // an SF Symbol
 
     var body: some View {
+        let usage = "\(URLCache.shared.currentDiskUsage / 1024) KB"
+        DebugDrawerKeyValueRow("Disk usage", value: usage)
+        DebugDrawerCopyButton("Copy Usage") { usage }
         Button("Clear URL cache") { URLCache.shared.removeAllCachedResponses() }
     }
 }
@@ -61,6 +64,21 @@ DebugDrawer.shared.toggle()
 `DebugDrawer.shared` and the plugins' `install*()` calls exist in debug builds only, so wrap them
 in `#if DEBUG`. The `DebugDrawerPlugin` protocol exists in every configuration, so conformances
 compile in release, and `.debugDrawer()` and `.debugLocalPlugin()` do nothing there.
+
+### Building a plugin's view
+
+Core has the views the shipped plugins are built from, so a plugin of your own looks like them:
+
+| View | Shows |
+|---|---|
+| `DebugDrawerKeyValueRow` | A label and a monospaced value; pass `redacted:` to mask a sensitive value until revealed |
+| `DebugDrawerCopyButton` | A button that copies the text its closure returns when pressed |
+| `DebugDrawerStatBadge` | A figure over its caption, for a row of totals |
+| `DebugDrawerSparkline` | A line graph of recent samples |
+| `DebugDrawerSearchableList` | A filter field above a scrolling list of rows; the plugin filters the rows |
+
+Each lays itself out for accessibility text sizes and labels itself for VoiceOver. They exist in
+every configuration, so a plugin's body compiles in release, where they draw nothing.
 
 ### Grouping, pinning and ordering
 
@@ -272,7 +290,7 @@ ContentView()
 
 | Module | Holds |
 |---|---|
-| `DebugDrawer` | The drawer: its window, the plugin protocol and registry, and release-build stand-ins |
+| `DebugDrawer` | The drawer: its window, the plugin protocol and registry, the views plugins are built from, and release-build stand-ins |
 | `DebugDrawerConsolePlugin` | `os_log` entries (stdout and stderr on macOS): level filter, search, auto-follow, copy |
 | `DebugDrawerViewInspectorPlugin` | View borders by depth, alignment grid, click indicators, animation speed, SwiftUI render tracking, hierarchy snapshot |
 | `DebugDrawerAccessibilityPlugin` | Runtime overrides of color scheme, Dynamic Type, layout direction, locale and the system accessibility settings SwiftUI exposes, each beside the system's value |
