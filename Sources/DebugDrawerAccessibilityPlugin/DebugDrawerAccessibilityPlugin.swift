@@ -2,25 +2,15 @@
     import DebugDrawer
     import SwiftUI
 
-    // MARK: - View helper
-
-    private extension View {
-        @ViewBuilder
-        func applyIf<V>(_ value: V?, transform: (Self, V) -> some View) -> some View {
-            if let value {
-                transform(self, value)
-            } else {
-                self
-            }
-        }
-    }
-
     // MARK: - Conditional environment modifier
 
-    /// Applies an environment override only when the value is non-nil.
-    /// When nil, passes through without modifying the environment.
-    /// Uses `_makeImmutable` pattern to keep view tree stable.
-    private struct ConditionalEnvironment<V>: ViewModifier {
+    /// Overrides an environment value when `value` is non-nil and leaves the inherited
+    /// (system) value alone when it is nil.
+    ///
+    /// The view tree has the same shape either way: an `if let` here would be a
+    /// conditional branch, so the host's subtree would get a new identity, losing its
+    /// `@State` and navigation, each time an override went between nil and a value.
+    private struct ConditionalEnvironment<V: Sendable>: ViewModifier {
         let keyPath: WritableKeyPath<EnvironmentValues, V>
         let value: V?
 
@@ -30,10 +20,8 @@
         }
 
         func body(content: Content) -> some View {
-            if let value {
-                content.environment(keyPath, value)
-            } else {
-                content
+            content.transformEnvironment(keyPath) { [value] current in
+                if let value { current = value }
             }
         }
     }
@@ -95,10 +83,8 @@
         public init() {}
 
         public func body(content: Content) -> some View {
-            // Each override is only applied when non-nil.
-            // We use a single Group to keep the view tree shape stable
-            // (no @ViewBuilder branching that would cause SwiftUI to
-            // destroy and recreate the content).
+            // Every modifier is always applied, so the host's view tree keeps its shape
+            // (and its state) whether or not an override is set.
             let modified = content
                 .modifier(ConditionalEnvironment(\.dynamicTypeSize, value: overrides.dynamicTypeSize))
                 .modifier(ConditionalEnvironment(\.layoutDirection, value: overrides.layoutDirection))
@@ -186,6 +172,11 @@
                             .font(.system(size: 10, design: .monospaced))
                             .foregroundStyle(.secondary)
                             .frame(width: 30, alignment: .trailing)
+
+                        Button("System") { overrides.dynamicTypeSize = nil }
+                            .font(.system(size: 9))
+                            .controlSize(.mini)
+                            .disabled(overrides.dynamicTypeSize == nil)
                     }
 
                     // Preview text at current size
