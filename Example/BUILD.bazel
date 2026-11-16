@@ -33,6 +33,7 @@ _SHARED_DEPS = [
     "//Sources/DebugDrawerMetricKitPlugin",
     "//Sources/DebugDrawerPermissionsPlugin",
     "//Sources/DebugDrawerNotificationsPlugin",
+    "//Sources/DebugDrawerBackgroundTasksPlugin",
 ]
 
 # ── macOS ────────────────────────────────────────────────────────────

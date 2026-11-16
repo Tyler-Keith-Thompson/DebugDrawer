@@ -8,4 +8,5 @@ PERFORMANCE_TEST_PACKAGES = [
     "Tests/DebugDrawerMetricKitPluginTests",
     "Tests/DebugDrawerPermissionsPluginTests",
     "Tests/DebugDrawerNotificationsPluginTests",
+    "Tests/DebugDrawerBackgroundTasksPluginTests",
 ]

@@ -305,7 +305,7 @@ DebugDrawer.shared.installLaunchTime()
 
 Each call needs its plugin's module imported (`import DebugDrawerConsolePlugin`, and so on).
 Tweaks takes the settings it shows and Feature Flags the adapter it reads, and Crash Reports,
-Hangs, Leaks, MetricKit, Permissions and Notifications install outside `#if DEBUG`, so each has a
+Hangs, Leaks, MetricKit, Permissions, Notifications and Background Tasks install outside `#if DEBUG`, so each has a
 section of its own, next.
 
 ### Tweaks: the app's own debug settings
@@ -694,6 +694,56 @@ send a real remote notification to the simulator from the Mac instead, `xcrun si
 <device> <bundle id> payload.json` takes the same JSON. A bug report carries `notifications.txt`:
 the token (masked), the settings, and every pending and delivered notification.
 
+### Background Tasks: launching a task without waiting for the system
+
+The Background Tasks plugin lists the task identifiers the Info.plist permits
+(`BGTaskSchedulerPermittedIdentifiers`) and the requests waiting in `BGTaskScheduler`, and copies
+the LLDB commands that make the system launch a task, or expire it, at once:
+
+```swift
+import DebugDrawerBackgroundTasksPlugin
+
+// At startup, after registering the app's own launch handlers:
+BackgroundTaskRequests.install()
+```
+
+`BackgroundTaskRequests` exists in every configuration, so the call needs no `#if DEBUG`: in
+release it does nothing, and the plugin references nothing of BackgroundTasks. macOS has no
+`BGTaskScheduler`, so there it adds nothing either; on iOS, iPadOS and Mac Catalyst the plugin
+shows:
+
+- **Permitted Identifiers**: each identifier, whether a request for it is pending, a Schedule
+  button for each kind the `UIBackgroundModes` allow (App Refresh for `fetch`, Processing for
+  `processing`), which submits a request that may begin now, and a copy button for its LLDB
+  commands. A refused request shows why on its row: unavailable (the simulator, or Background App
+  Refresh turned off), not permitted, or too many pending. A wildcard identifier (`….*`, for
+  continued processing tasks) is listed with what it is for. Without the modes the section warns
+  that the system runs no request.
+- **Pending Requests**: each request with its identifier, kind (app refresh or processing, with
+  whether it needs network or external power) and earliest begin date, each cancellable, with
+  Cancel All and Refresh.
+
+The plugin registers no launch handlers: `BGTaskScheduler` requires the app's own, registered for
+every permitted identifier before it finishes launching
+(`BGTaskScheduler.shared.register(forTaskWithIdentifier:using:launchHandler:)` in
+`application(_:didFinishLaunchingWithOptions:)`).
+
+To run a task's launch handler now, on a device (the simulator runs no background tasks):
+
+1. Schedule a request for the identifier, from the drawer or from the app's own code.
+2. Copy its launch command with the copy button beside the identifier:
+   `e -l objc -- (void)[[BGTaskScheduler sharedScheduler] _simulateLaunchForTaskWithIdentifier:@"com.example.refresh"]`
+3. Pause the app in Xcode (Debug ▸ Pause, or the pause button in the debug bar), paste the command
+   at the `(lldb)` prompt, press Return, and continue the app. The system launches the task as it
+   would in the background.
+4. To test the expiration handler, pause again while the task runs and paste its expiration
+   command, `_simulateExpirationForTaskWithIdentifier:` with the same identifier.
+
+The drawer only copies these commands: the selectors are private API, which the app itself never
+calls. It reads the pending requests when installed, each time the app becomes active, after each
+of its own actions and on Refresh; nothing polls. A bug report carries `background-tasks.txt`: the
+background modes, the permitted identifiers and every pending request.
+
 ### Opening the drawer
 
 The drawer doesn't decide how it opens. Call `DebugDrawer.shared.toggle()` from whatever trigger
@@ -810,6 +860,7 @@ ContentView()
 | `DebugDrawerMetricKitPlugin` | MetricKit's metric and diagnostic payloads, kept across launches and listed by date with a summary, each open as formatted JSON to copy or export; a toast and a badge for new ones |
 | `DebugDrawerPermissionsPlugin` | Every privacy permission the app declares in its Info.plist, with its live status, a button that asks when it is undecided and one that opens Settings |
 | `DebugDrawerNotificationsPlugin` | The APNs device token to copy, notification authorization and settings, pending and delivered notifications to inspect and remove, and a pasted APNs payload sent as a local notification |
+| `DebugDrawerBackgroundTasksPlugin` | The BGTaskScheduler identifiers the Info.plist permits and the pending task requests, with their kind and earliest begin date, each cancellable; a request scheduled on demand, and the LLDB commands that simulate a launch or an expiration |
 
 ## Development
 

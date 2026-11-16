@@ -24,6 +24,7 @@ import DebugDrawerLeakDetectorPlugin
 import DebugDrawerMetricKitPlugin
 import DebugDrawerPermissionsPlugin
 import DebugDrawerNotificationsPlugin
+import DebugDrawerBackgroundTasksPlugin
 import SwiftUI
 
 /// Demonstrates Send Report without a server: "sends" each report by copying it into the app's
@@ -80,6 +81,9 @@ struct DebugDrawerExampleiOSApp: App {
         // Compiles in release too, where it does nothing. The app delegate forwards the device
         // token.
         PushNotifications.install()
+        // Compiles in release too, where it does nothing. The Info.plist permits two task
+        // identifiers, whose launch handlers the app delegate registers.
+        BackgroundTaskRequests.install()
         #if DEBUG
             DebugDrawer.shared.installConsole()
             DebugDrawer.shared.installNetwork()

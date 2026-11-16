@@ -1,0 +1,66 @@
+// Views render on the Mac; the snapshot packages are linked on Apple platforms only.
+#if os(macOS)
+    import AppKit
+    @testable import DebugDrawerBackgroundTasksPlugin
+    import SnapshotTesting
+    import SwiftUI
+    import Testing
+
+    // ImageRenderer draws AppKit-backed controls (the buttons, the progress indicator) as
+    // placeholders, so the tests host the view in a window that is never shown and draw it into a
+    // bitmap at a fixed 2x scale, in the appearance the test asks for: the snapshot doesn't depend
+    // on the Mac's own appearance or display. macOS doesn't scale text with Dynamic Type, so the Mac
+    // pins light and dark only.
+    @MainActor
+    @Suite(.timeLimit(.minutes(1)))
+    struct BackgroundTasksSnapshotTests {
+        @Test("A pending identifier, a refused one, a wildcard, and the pending requests with their kinds and dates",
+              arguments: [ColorScheme.light, .dark])
+        func backgroundTasks(colorScheme: ColorScheme) throws {
+            let sut = BackgroundTasksView(
+                declaration: BackgroundTaskDeclaration(
+                    identifiers: [
+                        PermittedIdentifier("com.example.orders.refresh"),
+                        PermittedIdentifier("com.example.orders.database-cleanup"),
+                        PermittedIdentifier("com.example.orders.export.*")
+                    ],
+                    kinds: [.appRefresh, .processing]
+                ),
+                pending: .loaded([
+                    BackgroundTaskRequest(
+                        id: "com.example.orders.refresh", earliestBeginDate: Date(timeIntervalSince1970: 1_800_000_000), kind: .appRefresh
+                    ),
+                    BackgroundTaskRequest(
+                        id: "com.example.orders.sync", earliestBeginDate: nil,
+                        kind: .processing(requiresNetworkConnectivity: true, requiresExternalPower: true)
+                    )
+                ]),
+                schedule: .failed(identifier: "com.example.orders.database-cleanup", kind: .processing, failure: .unavailable),
+                actions: BackgroundTasksActions()
+            )
+            let host = NSHostingView(rootView: sut
+                .frame(width: 320, alignment: .leading)
+                .padding()
+                .background(.background)
+                .environment(\.locale, Locale(identifier: "en_US_POSIX"))
+                .environment(\.timeZone, TimeZone(identifier: "UTC") ?? .gmt))
+            host.appearance = NSAppearance(named: colorScheme == .dark ? .darkAqua : .aqua)
+            let window = NSWindow(contentRect: .zero, styleMask: .borderless, backing: .buffered, defer: true)
+            window.contentView = host
+            host.frame = CGRect(origin: .zero, size: host.fittingSize)
+            host.layoutSubtreeIfNeeded()
+            let bitmap = try #require(NSBitmapImageRep(
+                bitmapDataPlanes: nil, pixelsWide: Int(host.bounds.width) * 2, pixelsHigh: Int(host.bounds.height) * 2,
+                bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
+                colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0
+            ))
+            bitmap.size = host.bounds.size
+            host.cacheDisplay(in: host.bounds, to: bitmap)
+
+            let actual = NSImage(size: host.bounds.size)
+            actual.addRepresentation(bitmap)
+
+            assertSnapshot(of: actual, as: .image(perceptualPrecision: 0.98), named: "\(colorScheme)")
+        }
+    }
+#endif

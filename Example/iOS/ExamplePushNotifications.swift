@@ -9,7 +9,8 @@
     #endif
 
     /// The app delegate a SwiftUI app adds for push: registers for remote notifications and forwards
-    /// the token, or the failure, to the Notifications plugin. The app's entitlements declare
+    /// the token, or the failure, to the Notifications plugin. It also registers the app's
+    /// background task handlers, which must be in place before launching finishes. The app's entitlements declare
     /// `aps-environment`, so the simulator gives it a token. In debug builds it is also the
     /// notification center's delegate, so a payload the drawer sends shows as a banner while the app
     /// is in front, and it logs each notification the user opens.
@@ -18,6 +19,8 @@
             #if DEBUG
                 UNUserNotificationCenter.current().delegate = self
             #endif
+            // Launch handlers must be registered before launching finishes.
+            ExampleBackgroundTasks.register()
             application.registerForRemoteNotifications()
             return true
         }

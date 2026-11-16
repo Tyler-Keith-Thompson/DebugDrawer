@@ -84,6 +84,7 @@ MODULES = [
     ("DebugDrawerMetricKitPlugin", "Plugins", "MetricKit's metric and diagnostic payloads, kept across launches and listed by date with a summary, each open as formatted JSON to copy or export; a toast and a badge for new ones.", ["DebugDrawer"]),
     ("DebugDrawerPermissionsPlugin", "Plugins", "Every privacy permission the app declares in its Info.plist, with its live status, a button that asks when it is undecided and one that opens Settings.", ["DebugDrawer"]),
     ("DebugDrawerNotificationsPlugin", "Plugins", "The APNs device token to copy, notification authorization and settings, pending and delivered notifications to inspect and remove, and a pasted APNs payload sent as a local notification.", ["DebugDrawer"]),
+    ("DebugDrawerBackgroundTasksPlugin", "Plugins", "The BGTaskScheduler identifiers the Info.plist permits and the pending task requests, with their kind and earliest begin date, each cancellable; a request scheduled on demand, and the LLDB commands that simulate a launch or an expiration.", ["DebugDrawer"]),
 ]
 
 # Modules only iOS builds: SwiftUI views and what they draw with. Bazel builds them for the
@@ -154,6 +155,7 @@ TEST_TARGETS = [
     ("DebugDrawerMetricKitPluginTests", ["DebugDrawerMetricKitPlugin", "DebugDrawer", "viewinspector/ViewInspector", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
     ("DebugDrawerPermissionsPluginTests", ["DebugDrawerPermissionsPlugin", "DebugDrawer", "viewinspector/ViewInspector", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
     ("DebugDrawerNotificationsPluginTests", ["DebugDrawerNotificationsPlugin", "DebugDrawer", "viewinspector/ViewInspector", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
+    ("DebugDrawerBackgroundTasksPluginTests", ["DebugDrawerBackgroundTasksPlugin", "DebugDrawer", "viewinspector/ViewInspector", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
 ]
 
 # The modules the test-support target depends on (fixtures are usually written against the
@@ -180,6 +182,7 @@ PERFORMANCE_TESTS = [
     "DebugDrawerMetricKitPluginTests",
     "DebugDrawerPermissionsPluginTests",
     "DebugDrawerNotificationsPluginTests",
+    "DebugDrawerBackgroundTasksPluginTests",
 ]
 
 # Performance tests run up to their one-minute limits each, so their targets get "medium" (300 s).

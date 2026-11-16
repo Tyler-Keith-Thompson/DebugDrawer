@@ -24,5 +24,15 @@
     <string>The example asks for your location to show the Permissions plugin's Request button.</string>
     <key>NSContactsUsageDescription</key>
     <string>The example asks for contacts to show the Permissions plugin's Request button.</string>
+    <key>BGTaskSchedulerPermittedIdentifiers</key>
+    <array>
+        <string>com.debugdrawer.example.refresh</string>
+        <string>com.debugdrawer.example.cleanup</string>
+    </array>
+    <key>UIBackgroundModes</key>
+    <array>
+        <string>fetch</string>
+        <string>processing</string>
+    </array>
 </dict>
 </plist>
