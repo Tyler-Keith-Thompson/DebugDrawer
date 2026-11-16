@@ -20,6 +20,7 @@ import DebugDrawerTweaksPlugin
 import DebugDrawerFeatureFlagsPlugin
 import DebugDrawerCrashReportsPlugin
 import DebugDrawerHangDetectorPlugin
+import DebugDrawerLeakDetectorPlugin
 import SwiftUI
 
 /// Demonstrates Send Report without a server: "sends" each report by copying it into the app's
@@ -50,6 +51,13 @@ struct DebugDrawerExampleiOSApp: App {
         HangDetector.install()
         if ProcessInfo.processInfo.arguments.contains(ExampleHang.launchArgument) {
             ExampleHang.blockAfterLaunch()
+        }
+        // Compiles in release too, where it does nothing; launched with -LeakOnLaunch, the app
+        // presents and dismisses a screen without a leak and one with a retain cycle once it first
+        // goes idle.
+        LeakDetector.install()
+        if ProcessInfo.processInfo.arguments.contains(ExampleLeak.launchArgument) {
+            ExampleLeak.presentAndDismissAfterLaunch()
         }
         #if DEBUG
             DebugDrawer.shared.installConsole()
@@ -126,6 +134,8 @@ struct ExampleContentView_iOS: View {
                     Button("Crash the App", role: .destructive) { ExampleCrash.crash() }
                     // Hangs reports the stall with its stack and a toast.
                     Button("Block the Main Thread for 500 ms") { ExampleHang.blockMainThread() }
+                    // Leaks flags the screen once it is dismissed, with a toast.
+                    Button("Open a Leaking Screen") { ExampleLeak.presentLeakingScreen() }
 
                     Text("Counter: \(counter)")
                         .font(.title2.monospacedDigit())

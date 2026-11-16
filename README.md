@@ -290,8 +290,8 @@ DebugDrawer.shared.installLaunchTime()
 ```
 
 Each call needs its plugin's module imported (`import DebugDrawerConsolePlugin`, and so on).
-Tweaks takes the settings it shows and Feature Flags the adapter it reads, and Crash Reports
-and Hangs install outside `#if DEBUG`, so each has a section of its own, next.
+Tweaks takes the settings it shows and Feature Flags the adapter it reads, and Crash Reports,
+Hangs and Leaks install outside `#if DEBUG`, so each has a section of its own, next.
 
 ### Tweaks: the app's own debug settings
 
@@ -494,6 +494,51 @@ shows its stack, selectable, with a button that copies it, and marks it seen. It
 changes the threshold while the app runs. Mark All Seen clears the badge, Clear All forgets them,
 and a bug report carries them all in `hangs.txt`.
 
+### Leaks: screens and objects that outlive their use
+
+A retain cycle that keeps a dismissed screen alive shows nothing until memory runs short. The
+Leaks plugin flags the app's view controllers still alive after their screen was dismissed, and
+objects that opt in, alive in greater numbers than their class allows:
+
+```swift
+import DebugDrawerLeakDetectorPlugin
+
+// At startup: watches the app's view controllers.
+LeakDetector.install()
+
+// An object that opts in, with one call: one should be alive at a time.
+final class ProfileModel {
+    init() {
+        LeakDetector.trackLifetime(of: self)
+    }
+}
+```
+
+`LeakDetector` exists in every configuration, so the calls need no `#if DEBUG`: in release they do
+nothing. In debug builds `install()` exchanges `viewDidDisappear` on `UIViewController`
+(`NSViewController` on macOS) for an implementation that calls the original, then notes a view
+controller that is leaving for good: on iOS, one being dismissed or removed from its container, or
+inside a container that is; on macOS, any whose view leaves its window. At the end of the next turn
+of the main run loop, after the autorelease pool of the turn that dismissed it has drained, one
+still alive and still off screen (neither it nor its outermost container in a window or
+presented) is a suspect. Every decision follows an event: the disappearance, the run loop about to
+wait, a deallocation; nothing waits on a timer. The detector holds no reference: an object of its
+own, attached to each one it watches, tells it of the deallocation. Only the app's own classes are
+watched, not the system's (SwiftUI's hosting and presentation controllers, alerts), which their
+frameworks keep for reuse; a plain `UIHostingController<Content>` is a specialization made at run
+time and isn't watched either, while a subclass of it is.
+
+`trackLifetime(of:maxCount:)` counts an object among the live instances of its class until it
+deallocates; while more than `maxCount` (one by default) are alive, the class is a suspect. It can
+be called from any thread, and before `install()`.
+
+The plugin lists the suspects by class, most recently flagged first, with how many are alive, puts
+a badge on its header for each and posts a toast ("ProfileViewController is still alive after it
+was dismissed"). A suspect that deallocates later, or is shown again, stops being one. Ignore hides
+a class for this run, Stop Ignoring brings them back, and a bug report carries the suspects in
+`leaks.txt`. A screen the app keeps on purpose to show again is flagged while it is off screen;
+ignore its class.
+
 ### Opening the drawer
 
 The drawer doesn't decide how it opens. Call `DebugDrawer.shared.toggle()` from whatever trigger
@@ -606,6 +651,7 @@ ContentView()
 | `DebugDrawerFeatureFlagsPlugin` | The app's feature flags through an adapter to its flag service: live values, local overrides that persist, search, an overridden-only filter and Reset All |
 | `DebugDrawerCrashReportsPlugin` | Uncaught exceptions and fatal signals, handed on to the app's other crash handlers, shown on the next launch with a badge and stack trace; MetricKit crash diagnostics too |
 | `DebugDrawerHangDetectorPlugin` | Main-thread hangs over a threshold the drawer can change, each with its duration and the stack it was stuck on, a toast and a badge; MetricKit hang diagnostics too |
+| `DebugDrawerLeakDetectorPlugin` | View controllers still alive a run-loop turn after their screen was dismissed, and opted-in classes with more live instances than allowed, by class with a count, a toast and a badge |
 
 ## Development
 
