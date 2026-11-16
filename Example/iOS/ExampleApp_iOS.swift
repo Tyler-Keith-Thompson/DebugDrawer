@@ -18,6 +18,20 @@ import DebugDrawerCookiesPlugin
 import DebugDrawerLaunchTimePlugin
 import SwiftUI
 
+/// Demonstrates Send Report without a server: "sends" each report by copying it into the app's
+/// Caches/Sent Reports folder.
+struct FolderReportUploader: DebugDrawerReportUploader {
+    func upload(_ archive: URL, progress: @escaping @Sendable (Double) -> Void) async throws {
+        let folder = URL.cachesDirectory.appending(path: "Sent Reports", directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        progress(0.5)
+        let destination = folder.appending(path: archive.lastPathComponent)
+        try? FileManager.default.removeItem(at: destination)
+        try FileManager.default.copyItem(at: archive, to: destination)
+        progress(1)
+    }
+}
+
 @main
 struct DebugDrawerExampleiOSApp: App {
     init() {
@@ -39,6 +53,7 @@ struct DebugDrawerExampleiOSApp: App {
             DebugDrawer.shared.installDeepLink()
             DebugDrawer.shared.installCookies()
             DebugDrawer.shared.installLaunchTime()
+            DebugDrawer.shared.reportUploader = FolderReportUploader()
         #endif
     }
 

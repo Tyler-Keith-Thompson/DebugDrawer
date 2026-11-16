@@ -230,6 +230,39 @@ let zip = try DebugDrawer.shared.createReport() // the same zip the button makes
 The protocol, `DebugDrawerReport` and `DebugDrawerRedaction` exist in every configuration, so a
 conformance compiles in release, where there is no drawer and no report.
 
+#### Sending reports
+
+To send a report straight to your team (an internal endpoint, an issue tracker's webhook), give
+the drawer an uploader. It is handed the zip's URL and reports the fraction sent; the drawer then
+shows a send button beside every finished report, the upload's progress, and the uploader's error
+with a Retry button when it fails. The zip stays on disk until the system clears the temporary
+directory, so a failed upload can be retried or shared instead. Until an uploader is set there
+is no send button, and DebugDrawer itself never touches the network.
+
+```swift
+struct TeamReportUploader: DebugDrawerReportUploader {
+    let endpoint: URL
+
+    func upload(_ archive: URL, progress: @escaping @Sendable (Double) -> Void) async throws {
+        var request = URLRequest(url: endpoint)
+        request.httpMethod = "POST"
+        request.setValue("application/zip", forHTTPHeaderField: "Content-Type")
+        let (_, response) = try await URLSession.shared.upload(for: request, fromFile: archive)
+        guard let status = (response as? HTTPURLResponse)?.statusCode, (200..<300).contains(status) else {
+            throw URLError(.badServerResponse)
+        }
+        progress(1)
+    }
+}
+
+#if DEBUG
+DebugDrawer.shared.reportUploader = TeamReportUploader(endpoint: reportsEndpoint)
+#endif
+```
+
+`DebugDrawerReportUploader` exists in every configuration too, so the uploader compiles in
+release, where nothing calls it.
+
 ### Installing the shipped plugins
 
 Each plugin installs itself with one call at startup. All of them:

@@ -30,7 +30,7 @@
         @Test("At the largest accessibility text size the header and long plugin titles wrap rather than truncate")
         func chrome() throws {
             let sut = VStack(spacing: 0) {
-                DrawerHeader(isCreatingReport: false, createReport: {}, close: {})
+                DrawerHeader(isReportInProgress: false, createReport: {}, close: {})
                 DrawerSectionHeader(title: "Pinned")
                 PluginSectionHeader(
                     plugin: AnyDebugDrawerPlugin(SnapshotLibrariesPlugin()),

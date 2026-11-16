@@ -5,8 +5,8 @@
     /// accessibility text sizes the title and the buttons don't share a line, so the buttons sit on
     /// a line below the title.
     struct DrawerHeader: View {
-        /// A report is being written, so another can't be started.
-        let isCreatingReport: Bool
+        /// A report is being written or sent, so another can't be started.
+        let isReportInProgress: Bool
         let createReport: () -> Void
         let close: () -> Void
         @Environment(\.dynamicTypeSize) private var dynamicTypeSize
@@ -61,7 +61,7 @@
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .disabled(isCreatingReport)
+            .disabled(isReportInProgress)
             .accessibilityLabel("Create a bug report")
             .help("Create a bug report")
             DrawerCloseButton(action: close)

@@ -70,12 +70,16 @@
         private var panel: some View {
             VStack(spacing: 0) {
                 DrawerHeader(
-                    isCreatingReport: reportState == .creating,
+                    isReportInProgress: reportState?.isInProgress == true,
                     createReport: createReport,
                     close: { drawer.toggle() }
                 )
                 if let reportState {
-                    DrawerReportResult(state: reportState) { self.reportState = nil }
+                    DrawerReportResult(
+                        state: reportState,
+                        send: drawer.reportUploader.map { uploader in { sendReport($0, with: uploader) } },
+                        dismiss: { self.reportState = nil }
+                    )
                 }
                 searchField
                 if !query.isEmpty {
@@ -146,6 +150,14 @@
                 } catch {
                     reportState = .failed("The report couldn't be written.")
                 }
+            }
+        }
+
+        /// Sends the zip with the app's uploader, showing its progress and outcome; Retry calls
+        /// this again with the same zip.
+        private func sendReport(_ archive: URL, with uploader: any DebugDrawerReportUploader) {
+            Task {
+                await DrawerReportResult.State.send(archive, with: uploader) { reportState = $0 }
             }
         }
 

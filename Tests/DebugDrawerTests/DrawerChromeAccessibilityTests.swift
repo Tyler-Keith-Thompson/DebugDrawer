@@ -16,7 +16,7 @@
     struct DrawerChromeAccessibilityTests {
         @Test("The header's title is a heading")
         func headerTitleIsAHeading() throws {
-            let sut = DrawerHeader(isCreatingReport: false, createReport: {}, close: {})
+            let sut = DrawerHeader(isReportInProgress: false, createReport: {}, close: {})
 
             let actual = try sut.inspect().find(text: "Debug").accessibilityTraits()
 
@@ -26,7 +26,7 @@
         @Test("The header's close button is labelled and closes the drawer")
         func closeButton() throws {
             var closed = 0
-            let sut = DrawerHeader(isCreatingReport: false, createReport: {}, close: { closed += 1 })
+            let sut = DrawerHeader(isReportInProgress: false, createReport: {}, close: { closed += 1 })
 
             try sut.inspect().find(ViewType.Button.self) { try $0.accessibilityLabel().string() == "Close the debug drawer" }.tap()
 
@@ -36,7 +36,7 @@
         @Test("The header's report button is labelled and creates a report")
         func reportButton() throws {
             var created = 0
-            let sut = DrawerHeader(isCreatingReport: false, createReport: { created += 1 }, close: {})
+            let sut = DrawerHeader(isReportInProgress: false, createReport: { created += 1 }, close: {})
 
             try sut.inspect().find(ViewType.Button.self) { try $0.accessibilityLabel().string() == "Create a bug report" }.tap()
 
@@ -45,7 +45,7 @@
 
         @Test("Every button in the header has a label")
         func everyHeaderButtonIsLabelled() throws {
-            let sut = DrawerHeader(isCreatingReport: false, createReport: {}, close: {})
+            let sut = DrawerHeader(isReportInProgress: false, createReport: {}, close: {})
             let expected = ["Create a bug report", "Close the debug drawer"]
 
             let actual = try sut.inspect().findAll(ViewType.Button.self).map { try $0.accessibilityLabel().string() }

@@ -130,6 +130,12 @@
             redaction = redaction.adding(headers: headers, keys: keys, jsonPaths: jsonPaths)
         }
 
+        // MARK: - Report upload
+
+        /// What sends a finished bug report to the team; the drawer shows Send Report only while
+        /// one is set. Starts as nil: reports stay on the device and the library sends nothing.
+        @Published public var reportUploader: (any DebugDrawerReportUploader)?
+
         // MARK: - HUD
 
         /// Which plugins are pinned to the floating HUD, and where it sits. Saved in `UserDefaults`.

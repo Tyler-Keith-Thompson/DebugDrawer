@@ -71,9 +71,37 @@
         }
     }
 
+    struct TeamReportUploader: DebugDrawerReportUploader {
+        let endpoint: URL
+
+        func upload(_ archive: URL, progress: @escaping @Sendable (Double) -> Void) async throws {
+            var request = URLRequest(url: endpoint)
+            request.httpMethod = "POST"
+            request.setValue("application/zip", forHTTPHeaderField: "Content-Type")
+            let (_, response) = try await URLSession.shared.upload(for: request, fromFile: archive)
+            guard let status = (response as? HTTPURLResponse)?.statusCode, (200..<300).contains(status) else {
+                throw URLError(.badServerResponse)
+            }
+            progress(1)
+        }
+    }
+
     @MainActor
     @Suite("README examples")
     struct READMEExamplesTests {
+        @Test("Sending reports")
+        func sendingReports() throws {
+            let reportsEndpoint = try #require(URL(string: "https://bugs.example.com/reports"))
+            let previous = DebugDrawer.shared.reportUploader
+
+            DebugDrawer.shared.reportUploader = TeamReportUploader(endpoint: reportsEndpoint)
+
+            let actual = DebugDrawer.shared.reportUploader as? TeamReportUploader
+            // Leave the shared drawer as the other suites expect it, within this one main-actor turn.
+            DebugDrawer.shared.reportUploader = previous
+            #expect(actual?.endpoint == reportsEndpoint)
+        }
+
         @Test("Bug reports")
         func bugReports() throws {
             let previous = DebugDrawer.shared.redaction
