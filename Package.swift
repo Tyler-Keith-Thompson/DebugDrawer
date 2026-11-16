@@ -88,6 +88,10 @@ let package = Package(
                 path: "Sources/DebugDrawerLaunchTimePlugin"),
 
         // ── Test targets (per plugin) ───────────────────────────────
+        .testTarget(name: "DebugDrawerLoadedLibrariesPluginTests",
+                    dependencies: ["DebugDrawerLoadedLibrariesPlugin", "DebugDrawer",
+                                   .product(name: "ViewInspector", package: "ViewInspector")],
+                    path: "Tests/DebugDrawerLoadedLibrariesPluginTests"),
         .testTarget(name: "DebugDrawerLaunchTimePluginTests",
                     dependencies: ["DebugDrawerLaunchTimePlugin", "DebugDrawer",
                                    .product(name: "ViewInspector", package: "ViewInspector")],
