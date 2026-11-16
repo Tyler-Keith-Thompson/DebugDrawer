@@ -114,7 +114,6 @@
 
     struct AccessibilityPluginView: View {
         @ObservedObject private var overrides = AccessibilityOverrides.shared
-        @State private var showAuditor = true
 
         private let typeSizes: [(String, DynamicTypeSize)] = [
             ("XS", .xSmall), ("S", .small), ("M", .medium),
@@ -214,13 +213,6 @@
                             .controlSize(.small)
                     }
                 }
-
-                // Auditor hidden until drawer view exclusion is solved
-                // DisclosureGroup("Accessibility Audit", isExpanded: $showAuditor) {
-                //     A11yAuditorView()
-                //         .padding(.top, 4)
-                // }
-                // .font(.caption.weight(.medium))
             }
         }
 

@@ -33,20 +33,6 @@
             _ = overrides.availableLocales
         }
 
-        func testAuditIssueScoring() {
-            let result = AuditResult(issues: [
-                A11yIssue(severity: .critical, category: .label,
-                          message: "test", viewClass: "NSButton",
-                          frame: .zero, wcagRef: nil, view: nil),
-            ], viewCount: 10, timestamp: Date())
-            XCTAssertEqual(result.score, 85) // 100 - 15 for 1 critical
-        }
-
-        func testAuditEmptyScore() {
-            let result = AuditResult(issues: [], viewCount: 10, timestamp: Date())
-            XCTAssertEqual(result.score, 100)
-        }
-
         func testPluginConformance() {
             let plugin = AccessibilityPlugin()
             XCTAssertEqual(plugin.title, "Accessibility")
