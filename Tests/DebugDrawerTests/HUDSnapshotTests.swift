@@ -1,6 +1,7 @@
 // Views render on the Mac; the snapshot packages are linked on Apple platforms only.
 #if os(macOS)
     @testable import DebugDrawer
+    import AppKit
     import SnapshotTesting
     import SwiftUI
     import Testing
@@ -40,6 +41,52 @@
 
             let actual = try #require(renderer.nsImage)
 
+            assertSnapshot(of: actual, as: .image(perceptualPrecision: 0.98), named: "\(colorScheme)")
+        }
+
+        // The drawer's overlay holds an NSViewRepresentable, which ImageRenderer draws as a
+        // placeholder, so this hosts the app in a window that is never shown and draws it at 2x.
+        // Synchronous: the shared drawer is changed and restored in one main-actor turn.
+        @Test("With the drawer closed, the app's drawer modifier draws the pinned HUD over the app", arguments: [ColorScheme.light, .dark])
+        func hudOverTheApp(colorScheme: ColorScheme) throws {
+            let drawer = DebugDrawer.shared
+            let previous = drawer.hudLayout
+            let wasOpen = drawer.isOpen
+            drawer.isOpen = false
+            drawer.registerGlobal(SnapshotFramesPlugin())
+            drawer.hudLayout = HUDLayout()
+            drawer.hudLayout.pinned = ["SnapshotFramesPlugin"]
+            let app = VStack(spacing: 12) {
+                Text("Orders").font(.title)
+                Button("Refresh") {}
+            }
+            .frame(width: 320, height: 160)
+            .background(.background)
+            .debugDrawer()
+            let window = NSWindow(
+                contentRect: NSRect(x: 0, y: 0, width: 320, height: 160),
+                styleMask: [.borderless],
+                backing: .buffered,
+                defer: false
+            )
+            window.appearance = NSAppearance(named: colorScheme == .dark ? .darkAqua : .aqua)
+            let host = NSHostingView(rootView: app)
+            host.frame = NSRect(x: 0, y: 0, width: 320, height: 160)
+            window.contentView = host
+            host.layoutSubtreeIfNeeded()
+            let bitmap = try #require(NSBitmapImageRep(
+                bitmapDataPlanes: nil, pixelsWide: 640, pixelsHigh: 320, bitsPerSample: 8,
+                samplesPerPixel: 4, hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB,
+                bytesPerRow: 0, bitsPerPixel: 0
+            ))
+            bitmap.size = host.bounds.size
+            host.cacheDisplay(in: host.bounds, to: bitmap)
+            let actual = NSImage(size: host.bounds.size)
+            actual.addRepresentation(bitmap)
+
+            drawer.hudLayout = previous
+            drawer.unregisterGlobal(id: "SnapshotFramesPlugin")
+            drawer.isOpen = wasOpen
             assertSnapshot(of: actual, as: .image(perceptualPrecision: 0.98), named: "\(colorScheme)")
         }
     }
