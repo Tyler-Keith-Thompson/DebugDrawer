@@ -10,5 +10,8 @@ let package = Package(
     dependencies: [
         .package(url: "https://github.com/CheekyGhost-Labs/OSLogClient", from: "2.0.0"),
         .package(url: "https://github.com/nalexn/ViewInspector", from: "0.10.5"),
+        .package(url: "https://github.com/pointfreeco/swift-snapshot-testing", from: "1.19.7"),
+        .package(url: "https://github.com/pointfreeco/swift-custom-dump", exact: "1.7.0"),
+        .package(url: "https://github.com/pointfreeco/xctest-dynamic-overlay", from: "1.9.0"),
     ]
 )

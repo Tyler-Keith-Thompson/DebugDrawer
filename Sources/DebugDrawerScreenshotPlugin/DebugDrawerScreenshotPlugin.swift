@@ -79,12 +79,14 @@
                         Image(systemName: "checkmark.circle.fill")
                             .foregroundStyle(.green)
                             .font(.caption)
+                            .accessibilityHidden(true)
                         Text(path)
-                            .font(.system(size: 9, design: .monospaced))
+                            .font(.system(.caption2, design: .monospaced))
                             .foregroundStyle(.secondary)
-                            .lineLimit(1)
+                            .lineLimit(3)
                             .truncationMode(.head)
                     }
+                    .accessibilityElement(children: .combine)
                 }
             }
             #if os(macOS)

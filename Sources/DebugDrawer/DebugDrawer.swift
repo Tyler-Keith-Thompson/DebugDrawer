@@ -71,7 +71,7 @@
 
         /// Toggle drawer visibility.
         public func toggle() {
-            withAnimation(.easeInOut(duration: 0.25)) {
+            withAnimation(Self.motion(.easeInOut(duration: 0.25))) {
                 isOpen.toggle()
             }
         }
@@ -85,16 +85,22 @@
                 return
             }
 
-            withAnimation(.easeInOut(duration: 0.15)) {
+            withAnimation(Self.motion(.easeInOut(duration: 0.15))) {
                 self.isOpen = false
             } completion: { [weak self] in
                 Task { @MainActor [weak self] in
                     await action()
-                    withAnimation(.easeInOut(duration: 0.25)) {
+                    withAnimation(Self.motion(.easeInOut(duration: 0.25))) {
                         self?.isOpen = true
                     }
                 }
             }
+        }
+
+        /// `animation`, or none when the user asked the system to reduce motion. The drawer is not a
+        /// view, so it reads the system setting rather than `\.accessibilityReduceMotion`.
+        private static func motion(_ animation: Animation) -> Animation? {
+            debugDrawerSystemReduceMotion ? nil : animation
         }
 
         /// Whether there are any plugins registered at all.

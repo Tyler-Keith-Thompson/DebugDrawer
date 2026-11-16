@@ -29,7 +29,7 @@
             XCTAssertEqual(late.uptime, 600)
             XCTAssertEqual(early.uptime, 600)
             XCTAssertTrue(try texts(late).contains("10m 0s"))
-            XCTAssertTrue(try texts(late).contains(AppInfoPluginView.launchFormatter.string(from: start.date)),
+            XCTAssertTrue(try texts(late).contains(AppInfoFacts.launchFormatter.string(from: start.date)),
                           "Launched should show the process start, whenever the metrics were created")
         }
 

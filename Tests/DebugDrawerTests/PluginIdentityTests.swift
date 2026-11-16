@@ -68,7 +68,7 @@
         func instancesWithDifferentIDsAreSeparate() {
             let plugins = [
                 AnyDebugDrawerPlugin(NamedInstancePlugin(id: "document-1", title: "First")),
-                AnyDebugDrawerPlugin(NamedInstancePlugin(id: "document-2", title: "Second")),
+                AnyDebugDrawerPlugin(NamedInstancePlugin(id: "document-2", title: "Second"))
             ]
             var sut = DrawerLayout()
             let expected = [["Second"], ["First"]]

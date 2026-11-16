@@ -141,7 +141,7 @@
                 ("Bold Text", { self.overrides.boldText }),
                 ("Reduce Transparency", { self.overrides.reduceTransparency }),
                 ("Differentiate Without Color", { self.overrides.differentiateWithoutColor }),
-                ("Invert Colors", { self.overrides.invertColors }),
+                ("Invert Colors", { self.overrides.invertColors })
             ]
             XCTAssertEqual(settings.count, settingValues.count)
             for (picker, (name, value)) in zip(settings, settingValues) {

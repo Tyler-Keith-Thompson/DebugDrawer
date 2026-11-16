@@ -13,6 +13,7 @@ swift_library(
     # references them by name.
     alwayslink = True,
     srcs = glob(["**/*.swift"]),
+    data = glob(["__Snapshots__/**"], allow_empty = True),
     module_name = "DebugDrawerViewInspectorPluginTests",
     tags = ["debug-only"],
     # Read by //:package_swift_test, which checks Package.swift against the Bazel graph.
@@ -20,7 +21,14 @@ swift_library(
     deps = [
         "//Sources/DebugDrawerViewInspectorPlugin",
         "//Sources/DebugDrawer",
-    ],
+    ] + select({
+        # Apple-only packages (APPLE_ONLY_PACKAGES in scripts/modules.py).
+        "@platforms//os:macos": [
+            "@swiftpkg_swift_snapshot_testing//:SnapshotTesting",
+            "@swiftpkg_xctest_dynamic_overlay//:IssueReportingTestSupport",
+        ],
+        "//conditions:default": [],
+    }),
 )
 
 # `bazel test` / `just test`: a standalone executable, fast to start and run in Bazel's sandbox.

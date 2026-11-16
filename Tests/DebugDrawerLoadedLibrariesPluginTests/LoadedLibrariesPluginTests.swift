@@ -16,7 +16,7 @@
             ("/Applications/My.app/Contents/Frameworks/Foo.framework/Versions/A/Foo", "/Applications/My.app"),
             ("/opt/homebrew/lib/libfoo.dylib", "/Applications/My.app"),
             // A sibling bundle whose name starts the same isn't inside this one.
-            ("/Applications/My.app2/Contents/MacOS/Other", "/Applications/My.app"),
+            ("/Applications/My.app2/Contents/MacOS/Other", "/Applications/My.app")
         ])
         func embeddedFrameworksAndOutsideImagesAreThirdParty(path: String, bundle: String) {
             #expect(LoadedLibrary.categorize(path: path, bundlePath: bundle) == .thirdParty)
@@ -25,7 +25,7 @@
         @Test(arguments: [
             ("/var/containers/Bundle/Application/X/My.app/My", "/var/containers/Bundle/Application/X/My.app"),
             ("/Applications/My.app/Contents/MacOS/My", "/Applications/My.app"),
-            ("/Applications/My.app/Contents/MacOS/My.debug.dylib", "/Applications/My.app"),
+            ("/Applications/My.app/Contents/MacOS/My.debug.dylib", "/Applications/My.app")
         ])
         func mainExecutableAndOtherBundleImagesAreApp(path: String, bundle: String) {
             #expect(LoadedLibrary.categorize(path: path, bundlePath: bundle) == .app)
@@ -76,7 +76,7 @@
             process.standardOutput = pipe
             process.standardError = Pipe()
             do { try process.run() } catch { return nil }
-            let output = String(decoding: pipe.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
+            guard let output = String(bytes: pipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) else { return nil }
             process.waitUntilExit()
             guard process.terminationStatus == 0 else { return nil }
             // "UUID: 1234ABCD-... (arm64) /path"

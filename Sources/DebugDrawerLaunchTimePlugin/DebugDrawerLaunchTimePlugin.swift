@@ -31,8 +31,7 @@
         private var firstFrameObserver: CFRunLoopObserver?
 
         init(clock: @escaping () -> TimeInterval = { ProcessInfo.processInfo.systemUptime },
-             processStartUptime: TimeInterval? = LaunchTimeTracker.processStartUptimeFromKernel())
-        {
+             processStartUptime: TimeInterval? = LaunchTimeTracker.processStartUptimeFromKernel()) {
             self.clock = clock
             appInitUptime = clock()
             self.processStartUptime = processStartUptime
@@ -121,14 +120,14 @@
                 if let total = tracker.totalLaunchTime {
                     HStack(alignment: .firstTextBaseline) {
                         Text(String(format: "%.0f", total * 1000))
-                            .font(.system(size: 28, weight: .bold, design: .monospaced))
+                            .font(.system(.largeTitle, design: .monospaced, weight: .bold))
                             .foregroundStyle(.primary)
                         Text("ms")
-                            .font(.system(size: 14, weight: .medium))
+                            .font(.system(.title3, weight: .medium))
                             .foregroundStyle(.secondary)
                     }
                     Text("Total launch time (process start to first frame)")
-                        .font(.system(size: 9))
+                        .font(.caption2)
                         .foregroundStyle(.secondary)
                 } else {
                     Text("Measuring...")
@@ -172,11 +171,11 @@
         private func timeRow(_ label: String, _ seconds: TimeInterval) -> some View {
             HStack {
                 Text(label)
-                    .font(.system(size: 10))
+                    .font(.caption2)
                     .foregroundStyle(.secondary)
                 Spacer()
                 Text(String(format: "%.0f ms", seconds * 1000))
-                    .font(.system(size: 10, design: .monospaced))
+                    .font(.system(.caption2, design: .monospaced))
                     .fontWeight(.medium)
             }
         }
@@ -188,7 +187,7 @@
                     .foregroundStyle(.secondary)
                     .frame(width: 90, alignment: .leading)
                 Text(value)
-                    .font(.system(size: 10, design: .monospaced))
+                    .font(.system(.caption2, design: .monospaced))
                 Spacer()
             }
         }

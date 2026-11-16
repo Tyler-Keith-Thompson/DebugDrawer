@@ -101,8 +101,7 @@
                 let sources = IOPSCopyPowerSourcesList(snapshot).takeRetainedValue() as [CFTypeRef]
 
                 if let source = sources.first,
-                   let desc = IOPSGetPowerSourceDescription(snapshot, source).takeUnretainedValue() as? [String: Any]
-                {
+                   let desc = IOPSGetPowerSourceDescription(snapshot, source).takeUnretainedValue() as? [String: Any] {
                     batteryLevel = desc[kIOPSCurrentCapacityKey] as? Int ?? -1
                     isCharging = (desc[kIOPSIsChargingKey] as? Bool) ?? false
                     powerSource = (desc[kIOPSPowerSourceStateKey] as? String) ?? "Unknown"
@@ -147,19 +146,19 @@
             else { return 0 }
 
             var totalUsage: Double = 0
-            for i in 0 ..< Int(threadCount) {
+            for index in 0 ..< Int(threadCount) {
                 var info = thread_basic_info()
                 var count = mach_msg_type_number_t(MemoryLayout<thread_basic_info_data_t>.size / MemoryLayout<natural_t>.size)
                 let result = withUnsafeMutablePointer(to: &info) { ptr in
                     ptr.withMemoryRebound(to: integer_t.self, capacity: Int(count)) { intPtr in
-                        thread_info(threads[i], thread_flavor_t(THREAD_BASIC_INFO), intPtr, &count)
+                        thread_info(threads[index], thread_flavor_t(THREAD_BASIC_INFO), intPtr, &count)
                     }
                 }
                 if result == KERN_SUCCESS, info.flags & TH_FLAGS_IDLE == 0 {
                     totalUsage += Double(info.cpu_usage) / Double(TH_USAGE_SCALE) * 100
                 }
                 // task_threads hands us a send right on each thread; release it.
-                mach_port_deallocate(mach_task_self_, threads[i])
+                mach_port_deallocate(mach_task_self_, threads[index])
             }
 
             vm_deallocate(mach_task_self_, vm_address_t(bitPattern: threads), vm_size_t(Int(threadCount) * MemoryLayout<thread_act_t>.size))
@@ -214,11 +213,16 @@
             Canvas { context, size in
                 guard data.count > 1, maxValue > 0 else { return }
                 var path = Path()
-                for (i, val) in data.enumerated() {
-                    let x = size.width * CGFloat(i) / CGFloat(data.count - 1)
-                    let y = size.height * (1 - CGFloat(val / maxValue))
-                    if i == 0 { path.move(to: .init(x: x, y: y)) }
-                    else { path.addLine(to: .init(x: x, y: y)) }
+                for (index, value) in data.enumerated() {
+                    let point = CGPoint(
+                        x: size.width * CGFloat(index) / CGFloat(data.count - 1),
+                        y: size.height * (1 - CGFloat(value / maxValue))
+                    )
+                    if index == 0 {
+                        path.move(to: point)
+                    } else {
+                        path.addLine(to: point)
+                    }
                 }
                 context.stroke(path, with: .color(color), lineWidth: 1.5)
             }
@@ -260,7 +264,7 @@
                             .font(.caption.weight(.medium))
                         Spacer()
                         Text(monitor.cpuLoad)
-                            .font(.system(size: 12, weight: .bold, design: .rounded))
+                            .font(.system(.callout, design: .rounded, weight: .bold))
                             .foregroundStyle(monitor.cpuLoadColor)
                     }
 
@@ -272,7 +276,7 @@
                                 .foregroundStyle(.secondary)
                             Spacer()
                             Text(String(format: "%.1f%%", monitor.cpuUsage))
-                                .font(.system(size: 10, weight: .medium, design: .monospaced))
+                                .font(.system(.caption2, design: .monospaced, weight: .medium))
                         }
                         if monitor.cpuHistory.count > 1 {
                             EnergySparkline(data: monitor.cpuHistory, color: .blue, maxValue: max(100, monitor.cpuHistory.max() ?? 100))
@@ -287,8 +291,9 @@
                             HStack {
                                 Image(systemName: monitor.isCharging ? "battery.100.bolt" : "battery.50")
                                     .foregroundStyle(batteryColor)
+                                    .accessibilityHidden(true)
                                 Text("\(monitor.batteryLevel)%")
-                                    .font(.system(size: 12, weight: .bold, design: .monospaced))
+                                    .font(.system(.callout, design: .monospaced, weight: .bold))
                                     .foregroundStyle(batteryColor)
 
                                 Spacer()
@@ -297,6 +302,7 @@
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                             }
+                            .accessibilityElement(children: .combine)
 
                             if monitor.batteryHistory.count > 1 {
                                 EnergySparkline(
@@ -321,7 +327,7 @@
                                 .fill(monitor.thermalColor)
                                 .frame(width: 6, height: 6)
                             Text(monitor.thermalLabel)
-                                .font(.system(size: 10, weight: .medium))
+                                .font(.system(.caption2, weight: .medium))
                                 .foregroundStyle(monitor.thermalColor)
                         }
                     }
@@ -333,7 +339,7 @@
                             .foregroundStyle(.secondary)
                         Spacer()
                         Text(monitor.powerSource)
-                            .font(.system(size: 10, design: .monospaced))
+                            .font(.system(.caption2, design: .monospaced))
                             .foregroundStyle(.secondary)
                     }
                 }

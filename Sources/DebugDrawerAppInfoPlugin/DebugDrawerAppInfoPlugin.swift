@@ -125,126 +125,49 @@
     struct AppInfoPluginView: View {
         @ObservedObject var metrics = AppMetrics.shared
 
-        private let bundle = Bundle.main
+        var body: some View {
+            AppInfoFactsView(facts: AppInfoFacts(metrics: metrics)) { metrics.refresh() }
+        }
+    }
+
+    /// The facts, in sections, with buttons to copy them and to read them again.
+    struct AppInfoFactsView: View {
+        let facts: AppInfoFacts
+        let refresh: () -> Void
 
         var body: some View {
             VStack(alignment: .leading, spacing: 6) {
-                // Bundle info
-                Group {
-                    infoRow("Bundle ID", bundle.bundleIdentifier ?? "—")
-                    infoRow("Version", "\(bundle.infoDictionary?["CFBundleShortVersionString"] as? String ?? "—") (\(bundle.infoDictionary?["CFBundleVersion"] as? String ?? "—"))")
-                    #if os(macOS)
-                    infoRow("macOS", ProcessInfo.processInfo.operatingSystemVersionString)
-                #elseif os(iOS)
-                    infoRow("iOS", ProcessInfo.processInfo.operatingSystemVersionString)
-                #endif
+                ForEach(Array(facts.sections.enumerated()), id: \.offset) { _, section in
+                    ForEach(section, id: \.label) { fact in
+                        row(fact)
+                    }
+                    Divider()
                 }
-
-                Divider()
-
-                // Runtime
-                Group {
-                    infoRow("Memory", String(format: "%.1f MB", metrics.memoryMB))
-                    infoRow("Uptime", metrics.uptime.map(formatDuration) ?? "—")
-                    infoRow("PID", "\(ProcessInfo.processInfo.processIdentifier)")
-                    infoRow("Arch", ProcessInfo.processInfo.machineHardwareName)
-                    infoRow("Arguments", "\(CommandLine.arguments.count)")
-                }
-
-                Divider()
-
-                // Environment
-                Group {
-                    #if os(macOS)
-                        // iOS, tvOS, watchOS and visionOS apps are always sandboxed,
-                        // and don't get this variable.
-                        infoRow("Sandbox", isSandboxed ? "Yes" : "No")
-                    #endif
-                    infoRow("Debugger", metrics.processStart.map { $0.isTraced ? "Attached" : "Not attached" } ?? "—")
-                    infoRow("Active CPU", "\(ProcessInfo.processInfo.activeProcessorCount)")
-                    infoRow("Physical Mem", String(format: "%.0f GB", Double(ProcessInfo.processInfo.physicalMemory) / (1024 * 1024 * 1024)))
-                    infoRow("Screen", screenResolution)
-                    infoRow("Network", metrics.networkStatus)
-                    infoRow("Launched", metrics.processStart.map { Self.launchFormatter.string(from: $0.date) } ?? "—")
-                }
-
-                Divider()
 
                 HStack {
-                    Button("Copy Info") { copyToClipboard() }
+                    Button("Copy Info") { debugDrawerCopyToClipboard(facts.report) }
                         .buttonStyle(.bordered)
                         .controlSize(.small)
 
-                    Button("Refresh") { metrics.refresh() }
+                    Button("Refresh", action: refresh)
                         .buttonStyle(.bordered)
                         .controlSize(.small)
                 }
             }
         }
 
-        private func infoRow(_ label: String, _ value: String) -> some View {
+        private func row(_ fact: AppInfoFacts.Fact) -> some View {
             HStack {
-                Text(label)
+                Text(fact.label)
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .frame(width: 80, alignment: .leading)
-                Text(value)
-                    .font(.system(size: 10, design: .monospaced))
+                Text(fact.value)
+                    .font(.system(.caption2, design: .monospaced))
                     .textSelection(.enabled)
                 Spacer()
             }
-        }
-
-        static let launchFormatter: DateFormatter = {
-            let formatter = DateFormatter()
-            formatter.dateStyle = .short
-            formatter.timeStyle = .medium
-            return formatter
-        }()
-
-        private func formatDuration(_ seconds: TimeInterval) -> String {
-            let h = Int(seconds) / 3600
-            let m = (Int(seconds) % 3600) / 60
-            let s = Int(seconds) % 60
-            if h > 0 { return "\(h)h \(m)m \(s)s" }
-            if m > 0 { return "\(m)m \(s)s" }
-            return "\(s)s"
-        }
-
-        private var isSandboxed: Bool {
-            ProcessInfo.processInfo.environment["APP_SANDBOX_CONTAINER_ID"] != nil
-        }
-
-        private var screenResolution: String {
-            #if os(macOS)
-                guard let screen = NSScreen.main else { return "—" }
-                let size = screen.frame.size
-                let scale = screen.backingScaleFactor
-                return "\(Int(size.width))×\(Int(size.height)) @\(Int(scale))x"
-            #elseif os(iOS)
-                // The screen of the foreground window scene (UIScreen.main is deprecated).
-                let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
-                guard let screen = (scenes.first { $0.activationState == .foregroundActive } ?? scenes.first)?.screen
-                else { return "—" }
-                let size = screen.bounds.size
-                let scale = screen.scale
-                return "\(Int(size.width))×\(Int(size.height)) @\(Int(scale))x"
-            #else
-                return "—"
-            #endif
-        }
-
-        private func copyToClipboard() {
-            let info = [
-                "Bundle: \(bundle.bundleIdentifier ?? "—")",
-                "Version: \(bundle.infoDictionary?["CFBundleShortVersionString"] as? String ?? "—")",
-                "Build: \(bundle.infoDictionary?["CFBundleVersion"] as? String ?? "—")",
-                "OS: \(ProcessInfo.processInfo.operatingSystemVersionString)",
-                "Memory: \(String(format: "%.1f MB", metrics.memoryMB))",
-                "PID: \(ProcessInfo.processInfo.processIdentifier)",
-            ].joined(separator: "\n")
-
-            debugDrawerCopyToClipboard(info)
+            .accessibilityElement(children: .combine)
         }
     }
 

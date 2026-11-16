@@ -7,15 +7,6 @@
     /// The phases of one HTTP transaction, taken from `URLSessionTaskTransactionMetrics`.
     public struct NetworkTimingMetrics: Sendable, Equatable {
         public struct Phase: Sendable, Equatable, Identifiable {
-            public enum Kind: String, CaseIterable, Sendable {
-                case dns = "DNS"
-                case connect = "Connect"
-                case tls = "TLS"
-                case request = "Request"
-                case timeToFirstByte = "TTFB"
-                case response = "Response"
-            }
-
             public let kind: Kind
             /// Seconds from the start of the fetch to the start of this phase.
             public let start: TimeInterval
@@ -58,11 +49,11 @@
             self.isCacheHit = isCacheHit
         }
 
-        init(timestamps t: Timestamps, protocolName: String?, isReusedConnection: Bool, isCacheHit: Bool) {
-            let all = [t.fetchStart, t.domainLookupStart, t.domainLookupEnd, t.connectStart,
-                       t.secureConnectionStart, t.secureConnectionEnd, t.connectEnd,
-                       t.requestStart, t.requestEnd, t.responseStart, t.responseEnd]
-            let origin = t.fetchStart ?? all.compactMap { $0 }.min()
+        init(timestamps: Timestamps, protocolName: String?, isReusedConnection: Bool, isCacheHit: Bool) {
+            let all = [timestamps.fetchStart, timestamps.domainLookupStart, timestamps.domainLookupEnd, timestamps.connectStart,
+                       timestamps.secureConnectionStart, timestamps.secureConnectionEnd, timestamps.connectEnd,
+                       timestamps.requestStart, timestamps.requestEnd, timestamps.responseStart, timestamps.responseEnd]
+            let origin = timestamps.fetchStart ?? all.compactMap { $0 }.min()
 
             func phase(_ kind: Phase.Kind, _ start: Date?, _ end: Date?) -> Phase? {
                 guard let origin, let start, let end else { return nil }
@@ -75,12 +66,12 @@
             // where TLS starts so the two don't overlap.
             self.init(
                 phases: [
-                    phase(.dns, t.domainLookupStart, t.domainLookupEnd),
-                    phase(.connect, t.connectStart, t.secureConnectionStart ?? t.connectEnd),
-                    phase(.tls, t.secureConnectionStart, t.secureConnectionEnd),
-                    phase(.request, t.requestStart, t.requestEnd),
-                    phase(.timeToFirstByte, t.requestEnd, t.responseStart),
-                    phase(.response, t.responseStart, t.responseEnd),
+                    phase(.dns, timestamps.domainLookupStart, timestamps.domainLookupEnd),
+                    phase(.connect, timestamps.connectStart, timestamps.secureConnectionStart ?? timestamps.connectEnd),
+                    phase(.tls, timestamps.secureConnectionStart, timestamps.secureConnectionEnd),
+                    phase(.request, timestamps.requestStart, timestamps.requestEnd),
+                    phase(.timeToFirstByte, timestamps.requestEnd, timestamps.responseStart),
+                    phase(.response, timestamps.responseStart, timestamps.responseEnd)
                 ].compactMap { $0 },
                 protocolName: protocolName,
                 isReusedConnection: isReusedConnection,
@@ -121,6 +112,18 @@
         }
     }
 
+    // Declared in an extension so the type nests one level deep, not two.
+    extension NetworkTimingMetrics.Phase {
+        public enum Kind: String, CaseIterable, Sendable {
+            case dns = "DNS"
+            case connect = "Connect"
+            case tls = "TLS"
+            case request = "Request"
+            case timeToFirstByte = "TTFB"
+            case response = "Response"
+        }
+    }
+
     // MARK: - Waterfall view
 
     struct NetworkTimingView: View {
@@ -132,7 +135,7 @@
                 ForEach(metrics.phases) { phase in
                     HStack(spacing: 4) {
                         Text(phase.kind.rawValue)
-                            .font(.system(size: 9, weight: .medium, design: .monospaced))
+                            .font(.system(.caption2, design: .monospaced, weight: .medium))
                             .foregroundStyle(.secondary)
                             .frame(width: 56, alignment: .leading)
                         GeometryReader { geo in
@@ -144,7 +147,7 @@
                         }
                         .frame(height: 6)
                         Text(NetworkTimingMetrics.label(for: phase.duration))
-                            .font(.system(size: 8, design: .monospaced))
+                            .font(.system(.caption2, design: .monospaced))
                             .foregroundStyle(.tertiary)
                             .frame(width: 48, alignment: .trailing)
                     }
@@ -155,7 +158,7 @@
                     Text("Reused connection: \(metrics.isReusedConnection ? "Yes" : "No")")
                     Text("Cache hit: \(metrics.isCacheHit ? "Yes" : "No")")
                 }
-                .font(.system(size: 8, design: .monospaced))
+                .font(.system(.caption2, design: .monospaced))
                 .foregroundStyle(.secondary)
                 .padding(.top, 2)
             }

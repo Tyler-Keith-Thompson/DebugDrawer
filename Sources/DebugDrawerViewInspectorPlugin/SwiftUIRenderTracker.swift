@@ -28,8 +28,8 @@
 
         /// Non-published backing storage — written from the swizzle path
         /// without triggering SwiftUI observation (which would cause recursion).
-        var _counts: [String: Int] = [:]
-        var _times: [String: Date] = [:]
+        var pendingCounts: [String: Int] = [:]
+        var pendingTimes: [String: Date] = [:]
         private var _flushScheduled = false
 
         var activeOverlays: Set<String> = []
@@ -41,8 +41,8 @@
         /// and schedules a batched flush to the published properties.
         public func recordRender(_ id: String) {
             guard isEnabled else { return }
-            _counts[id, default: 0] += 1
-            _times[id] = Date()
+            pendingCounts[id, default: 0] += 1
+            pendingTimes[id] = Date()
 
             if !_flushScheduled {
                 _flushScheduled = true
@@ -55,19 +55,28 @@
 
         private func flushToPublished() {
             _flushScheduled = false
-            renderCounts = _counts
-            lastRenderTimes = _times
+            renderCounts = pendingCounts
+            lastRenderTimes = pendingTimes
         }
 
         public func reset() {
-            _counts.removeAll()
-            _times.removeAll()
+            pendingCounts.removeAll()
+            pendingTimes.removeAll()
             renderCounts.removeAll()
             lastRenderTimes.removeAll()
         }
 
-        public var sortedEntries: [(id: String, count: Int, lastRender: Date)] {
-            renderCounts.map { (id: $0.key, count: $0.value, lastRender: lastRenderTimes[$0.key] ?? .distantPast) }
+        /// A view type's render count and when it last rendered.
+        public struct Entry: Identifiable, Equatable {
+            /// The view type's name.
+            public let id: String
+            public let count: Int
+            public let lastRender: Date
+        }
+
+        /// Every view type seen, most renders first.
+        public var sortedEntries: [Entry] {
+            renderCounts.map { Entry(id: $0.key, count: $0.value, lastRender: lastRenderTimes[$0.key] ?? .distantPast) }
                 .sorted { $0.count > $1.count }
         }
 
@@ -135,7 +144,7 @@
             "_SwiftUI",
             "DisplayList",
             "ViewGraph",
-            "HostingView",
+            "HostingView"
         ]
 
         fileprivate var isSwiftUIView: Bool {
@@ -149,7 +158,7 @@
             "EnvironmentKeyWritingModifier", "DisplayList", "ViewGraph",
             "NSHostingView", "_NSHostingView", "PlatformViewHost",
             "PlatformViewRepresentable", "ViewHost", "HostingView",
-            "any", "Body", "Never", "Content", "Some",
+            "any", "Body", "Never", "Content", "Some"
         ]
 
         fileprivate func extractViewTypeName() -> String? {
@@ -158,7 +167,7 @@
             let patterns = [
                 "(?<=<)[A-Z][A-Za-z]+(?=View[,>])",
                 "(?<=<)[A-Z][A-Za-z]{2,}(?=[,>])",
-                "([A-Z][a-z]+)+(?=>)",
+                "([A-Z][a-z]+)+(?=>)"
             ]
 
             for pattern in patterns {
@@ -166,8 +175,7 @@
                     let match = String(fullName[range])
                     if !match.hasPrefix("Modified"), !match.hasPrefix("_"),
                        !match.hasPrefix("Environment"),
-                       !Self.ignoredNames.contains(match)
-                    {
+                       !Self.ignoredNames.contains(match) {
                         return match
                     }
                 }
@@ -353,7 +361,7 @@
             window.addSubview(overlay)
 
             // Render count badge
-            let count = RenderTracker.shared._counts[viewType] ?? 0
+            let count = RenderTracker.shared.pendingCounts[viewType] ?? 0
             let badge = UILabel()
             badge.tag = 999
             badge.text = " \(count) "
@@ -381,26 +389,4 @@
     }
 
     #endif
-
-    // MARK: - Explicit opt-in modifier
-
-    public struct RenderTrackingModifier: ViewModifier {
-        let label: String
-
-        public init(_ label: String) {
-            self.label = label
-        }
-
-        public func body(content: Content) -> some View {
-            let _ = RenderTracker.shared.recordRender(label)
-            content
-        }
-    }
-
-    public extension View {
-        func trackRenders(_ label: String) -> some View {
-            modifier(RenderTrackingModifier(label))
-        }
-    }
-
 #endif

@@ -106,6 +106,9 @@ docc_site(
     tags = ["manual"],
 )
 
+# SwiftLint's configurations, which `just lint` reads (tools/lint.bzl).
+exports_files([".swiftlint.yml", ".swiftlint-tests.yml"])
+
 # Package.swift must name the same targets with the same dependencies as the Bazel graph, so a
 # commit cannot carry regenerated BUILD.bazel files without the manifest (see tools/swiftpm.bzl).
 # Every library under Sources/ and every test library under Tests/, derived from the layout.

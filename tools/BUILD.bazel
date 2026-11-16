@@ -1,5 +1,18 @@
 # First-party Swift rule wrappers; see swift_rules.bzl.
 
+load(":python_test.bzl", "python_test")
+
+# tools/bazel's daily sweep of stale output bases (tools/sweep-output-bases).
+python_test(
+    name = "sweep_output_bases_test",
+    size = "small",
+    src = "sweep_output_bases_test.py",
+    data = [
+        "bazel",
+        "sweep-output-bases",
+    ],
+)
+
 # Debug builds (the default; `--config=release` builds opt). Modules that generate mocks define
 # MOCKING only under this setting (MOCKING in scripts/modules.py).
 config_setting(

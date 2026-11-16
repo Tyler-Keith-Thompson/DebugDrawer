@@ -79,17 +79,20 @@ struct ExampleContentView_iOS: View {
 
                     Text("Counter: \(counter)")
                         .font(.title2.monospacedDigit())
+                        .accessibilityAddTraits(.isHeader)
                 }
 
                 Section("Inputs") {
                     TextField("Sample text field", text: $text)
+                        .accessibilityLabel("Sample text")
                     Slider(value: .constant(0.5))
+                        .accessibilityLabel("Sample slider")
                     Toggle("Toggle", isOn: .constant(true))
                 }
 
                 Section("Items") {
-                    ForEach(1 ... 20, id: \.self) { i in
-                        Label("Item \(i)", systemImage: "circle.fill")
+                    ForEach(1 ... 20, id: \.self) { item in
+                        Label("Item \(item)", systemImage: "circle.fill")
                     }
                 }
             }

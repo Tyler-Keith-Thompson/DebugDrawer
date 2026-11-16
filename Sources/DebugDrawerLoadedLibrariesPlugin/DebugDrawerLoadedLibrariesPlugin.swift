@@ -22,12 +22,12 @@
         /// Every image dyld has loaded into this process.
         static func loadAll(bundlePath: String = Bundle.main.bundlePath) -> [LoadedLibrary] {
             var result: [LoadedLibrary] = []
-            for i in 0 ..< _dyld_image_count() {
-                guard let cName = _dyld_get_image_name(i) else { continue }
+            for index in 0 ..< _dyld_image_count() {
+                guard let cName = _dyld_get_image_name(index) else { continue }
                 let path = String(cString: cName)
-                let header = _dyld_get_image_header(i)
+                let header = _dyld_get_image_header(index)
                 result.append(LoadedLibrary(
-                    id: i,
+                    id: index,
                     name: (path as NSString).lastPathComponent,
                     path: path,
                     category: categorize(path: path, bundlePath: bundlePath),
@@ -44,7 +44,7 @@
                 "/System/Library/",
                 "/usr/lib/",
                 "/Library/Developer/",
-                "/Applications/Xcode",
+                "/Applications/Xcode"
             ]
             // The app's own bundle first: it decides, wherever the bundle lives.
             let bundle = bundlePath.hasSuffix("/") ? bundlePath : bundlePath + "/"
@@ -149,7 +149,7 @@
                 // Counts
                 HStack {
                     Text("\(libraries.count) libraries loaded")
-                        .font(.system(size: 10, design: .monospaced))
+                        .font(.system(.caption2, design: .monospaced))
                         .foregroundStyle(.secondary)
                     Spacer()
                     Button("Copy") { copyReport() }
@@ -158,17 +158,23 @@
                 }
 
                 // Category filter
-                HStack(spacing: 4) {
-                    categoryButton(nil, label: "All")
-                    ForEach(LibraryCategory.allCases, id: \.self) { cat in
-                        categoryButton(cat, label: cat.rawValue)
+                Picker("Category", selection: $selectedCategory) {
+                    Text("All").tag(LibraryCategory?.none)
+                    ForEach(LibraryCategory.allCases, id: \.self) { category in
+                        Text(category.rawValue).tag(LibraryCategory?.some(category))
                     }
                 }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .controlSize(.mini)
+                .accessibilityLabel("Category")
+                .accessibilityElement(children: .contain)
 
                 // Search
                 TextField("Filter...", text: $searchText)
                     .textFieldStyle(.roundedBorder)
-                    .font(.system(size: 10))
+                    .font(.caption2)
+                    .accessibilityLabel("Filter libraries by name or path")
 
                 Divider()
 
@@ -179,10 +185,13 @@
                             HStack {
                                 Image(systemName: category.icon)
                                     .font(.caption2)
+                                    .accessibilityHidden(true)
                                 Text("\(category.rawValue) (\(libs.count))")
                                     .font(.caption)
                                     .fontWeight(.semibold)
                             }
+                            .accessibilityElement(children: .combine)
+                            .accessibilityAddTraits(.isHeader)
                             .foregroundStyle(.secondary)
                             .padding(.top, 4)
 
@@ -195,13 +204,6 @@
                 .frame(maxHeight: 300)
             }
             .onAppear { loadLibraries() }
-        }
-
-        private func categoryButton(_ cat: LibraryCategory?, label: String) -> some View {
-            Button(label) { selectedCategory = cat }
-                .buttonStyle(.bordered)
-                .controlSize(.mini)
-                .tint(selectedCategory == cat ? .accentColor : .secondary)
         }
 
         private func loadLibraries() {
@@ -229,23 +231,23 @@
             VStack(alignment: .leading, spacing: 1) {
                 HStack(spacing: 4) {
                     Text(library.name)
-                        .font(.system(size: 10, design: .monospaced))
-                        .lineLimit(1)
+                        .font(.system(.caption2, design: .monospaced))
+                        .lineLimit(3)
                     if let version = library.version {
                         Text(version)
-                            .font(.system(size: 8, design: .monospaced))
+                            .font(.system(.caption2, design: .monospaced))
                             .foregroundStyle(.secondary)
                     }
                 }
                 Text(library.path)
-                    .font(.system(size: 8, design: .monospaced))
+                    .font(.system(.caption2, design: .monospaced))
                     .foregroundStyle(.secondary)
-                    .lineLimit(1)
+                    .lineLimit(3)
                     .truncationMode(.middle)
                 Text("\(library.uuid?.uuidString ?? "no UUID") · \(library.loadAddressLabel)")
-                    .font(.system(size: 8, design: .monospaced))
+                    .font(.system(.caption2, design: .monospaced))
                     .foregroundStyle(.tertiary)
-                    .lineLimit(1)
+                    .lineLimit(3)
             }
             .textSelection(.enabled)
         }

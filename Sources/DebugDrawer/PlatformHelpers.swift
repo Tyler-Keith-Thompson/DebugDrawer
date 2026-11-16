@@ -28,6 +28,18 @@
         #endif
     }
 
+    /// Whether the user turned on Reduce Motion in the system's accessibility settings, for code
+    /// outside a view, which can't read `\.accessibilityReduceMotion`.
+    @MainActor var debugDrawerSystemReduceMotion: Bool {
+        #if os(macOS)
+            NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+        #elseif os(iOS)
+            UIAccessibility.isReduceMotionEnabled
+        #else
+            false
+        #endif
+    }
+
     #if os(macOS)
         public typealias PlatformImage = NSImage
         public typealias PlatformColor = NSColor

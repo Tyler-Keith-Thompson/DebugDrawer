@@ -8,6 +8,12 @@ build --host_macos_minimum_os=15.0
 # two different defaults would discard the analysis cache every time you switched between them.
 build --compilation_mode=dbg
 
+# `just lint`: SwiftLint and a11y-check over every first-party target (tools/lint.bzl), as a build
+# of their reports alone. The aspect follows each target's dependencies (for an app, into the iOS
+# modules), and changes no build option, so it keeps the analysis cache.
+build:lint --aspects=//tools:lint.bzl%lint_aspect
+build:lint --output_groups=lint
+
 # Optimized builds, for benchmarks and for checking that tests pass under -O, where
 # copy-on-write and inlining bugs tend to show up.
 build:release --compilation_mode=opt

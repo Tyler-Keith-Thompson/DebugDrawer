@@ -32,11 +32,11 @@
 
         var filteredEntries: [KeychainEntry] {
             guard !searchText.isEmpty else { return entries }
-            let q = searchText.lowercased()
+            let query = searchText.lowercased()
             return entries.filter {
-                $0.account.lowercased().contains(q) ||
-                    $0.service.lowercased().contains(q) ||
-                    ($0.label?.lowercased().contains(q) ?? false)
+                $0.account.lowercased().contains(query) ||
+                    $0.service.lowercased().contains(query) ||
+                    ($0.label?.lowercased().contains(query) ?? false)
             }
         }
 
@@ -53,7 +53,7 @@
                 kSecClass as String: secClass,
                 kSecReturnAttributes as String: true,
                 kSecReturnData as String: true,
-                kSecMatchLimit as String: kSecMatchLimitAll,
+                kSecMatchLimit as String: kSecMatchLimitAll
             ]
 
             var result: AnyObject?
@@ -76,7 +76,7 @@
             let secClass: CFString = entry.itemClass == "Internet" ? kSecClassInternetPassword : kSecClassGenericPassword
             var query: [String: Any] = [
                 kSecClass as String: secClass,
-                kSecAttrAccount as String: entry.account,
+                kSecAttrAccount as String: entry.account
             ]
             if !entry.service.isEmpty {
                 query[kSecAttrService as String] = entry.service
@@ -103,7 +103,6 @@
     struct KeychainPluginView: View {
         @ObservedObject private var store = KeychainStore.shared
         @State private var selectedId: UUID?
-        @State private var confirmDelete: UUID?
         @State private var loaded = false
 
         var body: some View {
@@ -126,11 +125,20 @@
                     TextField("Filter...", text: $store.searchText)
                         .textFieldStyle(.roundedBorder)
                         .controlSize(.small)
+                        .accessibilityLabel("Filter keychain items")
 
                     ScrollView {
                         LazyVStack(alignment: .leading, spacing: 0) {
                             ForEach(store.filteredEntries) { entry in
-                                keychainRow(entry)
+                                KeychainRow(
+                                    entry: entry,
+                                    isSelected: selectedId == entry.id,
+                                    onSelect: { selectedId = selectedId == entry.id ? nil : entry.id },
+                                    onDelete: {
+                                        store.deleteEntry(entry)
+                                        selectedId = nil
+                                    }
+                                )
                             }
                         }
                     }
@@ -140,98 +148,131 @@
                 }
             }
         }
+    }
 
-        private func keychainRow(_ entry: KeychainEntry) -> some View {
-            let isSelected = selectedId == entry.id
-            return VStack(alignment: .leading, spacing: 0) {
-                Button(action: { selectedId = isSelected ? nil : entry.id }) {
-                    HStack(spacing: 6) {
-                        Text(entry.itemClass)
-                            .font(.system(size: 8, weight: .medium, design: .monospaced))
-                            .padding(.horizontal, 3)
-                            .background(entry.itemClass == "Password" ? Color.green.opacity(0.15) : Color.blue.opacity(0.15))
-                            .cornerRadius(2)
+    /// A keychain item's class, account and service; selected, it shows the value, with buttons to
+    /// copy it and to delete the item.
+    struct KeychainRow: View {
+        let entry: KeychainEntry
+        let isSelected: Bool
+        let onSelect: () -> Void
+        let onDelete: () -> Void
 
-                        VStack(alignment: .leading, spacing: 0) {
-                            Text(entry.account)
-                                .font(.system(size: 10, design: .monospaced))
-                                .lineLimit(1)
-                            if !entry.service.isEmpty {
-                                Text(entry.service)
-                                    .font(.system(size: 8, design: .monospaced))
-                                    .foregroundStyle(.tertiary)
-                                    .lineLimit(1)
-                            }
-                        }
-
-                        Spacer()
-                    }
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 3)
-                    .contentShape(Rectangle())
+        var body: some View {
+            VStack(alignment: .leading, spacing: 0) {
+                Button(action: onSelect) {
+                    summary
                 }
                 .buttonStyle(.plain)
+                .accessibilityAddTraits(isSelected ? .isSelected : [])
 
                 if isSelected {
-                    VStack(alignment: .leading, spacing: 4) {
-                        if let label = entry.label {
-                            HStack {
-                                Text("Label:")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                                Text(label)
-                                    .font(.system(size: 10, design: .monospaced))
-                            }
-                        }
-
-                        Text(entry.valuePreview)
-                            .font(.system(size: 10, design: .monospaced))
-                            .textSelection(.enabled)
-                            .padding(4)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .background(Color.primary.opacity(0.05))
-                            .cornerRadius(3)
-
-                        HStack {
-                            Button("Copy Value") {
-                                if let data = entry.data, let str = String(data: data, encoding: .utf8) {
-                                    debugDrawerCopyToClipboard(str)
-                                }
-                            }
-                            .controlSize(.small)
-                            .buttonStyle(.bordered)
-
-                            Spacer()
-
-                            if confirmDelete == entry.id {
-                                Text("Sure?")
-                                    .font(.caption)
-                                    .foregroundStyle(.red)
-                                Button("Yes") {
-                                    store.deleteEntry(entry)
-                                    confirmDelete = nil
-                                    selectedId = nil
-                                }
-                                .controlSize(.small)
-                                .buttonStyle(.borderedProminent)
-                                .tint(.red)
-                                Button("Cancel") { confirmDelete = nil }
-                                    .controlSize(.small)
-                                    .buttonStyle(.bordered)
-                            } else {
-                                Button("Delete") { confirmDelete = entry.id }
-                                    .controlSize(.small)
-                                    .buttonStyle(.bordered)
-                                    .foregroundStyle(.red)
-                            }
-                        }
-                    }
-                    .padding(.horizontal, 6)
-                    .padding(.bottom, 4)
+                    KeychainEntryDetail(entry: entry, onDelete: onDelete)
                 }
 
                 Divider().padding(.leading, 6)
             }
+        }
+
+        private var summary: some View {
+            HStack(spacing: 6) {
+                Text(entry.itemClass)
+                    .font(.system(.caption2, design: .monospaced, weight: .medium))
+                    .padding(.horizontal, 3)
+                    .background(entry.itemClass == "Password" ? Color.green.opacity(0.15) : Color.blue.opacity(0.15))
+                    .cornerRadius(2)
+
+                VStack(alignment: .leading, spacing: 0) {
+                    Text(entry.account)
+                        .font(.system(.caption2, design: .monospaced))
+                        .lineLimit(3)
+                    if !entry.service.isEmpty {
+                        Text(entry.service)
+                            .font(.system(.caption2, design: .monospaced))
+                            .foregroundStyle(.tertiary)
+                            .lineLimit(3)
+                    }
+                }
+
+                Spacer()
+            }
+            .padding(.horizontal, 6)
+            .padding(.vertical, 3)
+            .contentShape(Rectangle())
+        }
+    }
+
+    /// A selected keychain item's label and value, with buttons to copy the value and to delete
+    /// the item, which asks first.
+    struct KeychainEntryDetail: View {
+        let entry: KeychainEntry
+        let onDelete: () -> Void
+        @State private var isConfirmingDelete = false
+
+        var body: some View {
+            VStack(alignment: .leading, spacing: 4) {
+                if let label = entry.label {
+                    HStack {
+                        Text("Label:")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Text(label)
+                            .font(.system(.caption2, design: .monospaced))
+                    }
+                    .accessibilityElement(children: .combine)
+                }
+
+                Text(entry.valuePreview)
+                    .font(.system(.caption2, design: .monospaced))
+                    .textSelection(.enabled)
+                    .padding(4)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Color.primary.opacity(0.05))
+                    .cornerRadius(3)
+
+                HStack {
+                    Button("Copy Value") {
+                        if let data = entry.data, let value = String(data: data, encoding: .utf8) {
+                            debugDrawerCopyToClipboard(value)
+                        }
+                    }
+                    .controlSize(.small)
+                    .buttonStyle(.bordered)
+
+                    Spacer()
+
+                    if isConfirmingDelete {
+                        confirmation
+                    } else {
+                        Button("Delete") { isConfirmingDelete = true }
+                            .controlSize(.small)
+                            .buttonStyle(.bordered)
+                            .foregroundStyle(.red)
+                    }
+                }
+            }
+            .padding(.horizontal, 6)
+            .padding(.bottom, 4)
+        }
+
+        private var confirmation: some View {
+            HStack {
+                Text("Sure?")
+                    .font(.caption)
+                    .foregroundStyle(.red)
+                Button("Yes") {
+                    isConfirmingDelete = false
+                    onDelete()
+                }
+                .controlSize(.small)
+                .buttonStyle(.borderedProminent)
+                .tint(.red)
+                Button("Cancel") { isConfirmingDelete = false }
+                    .controlSize(.small)
+                    .buttonStyle(.bordered)
+            }
+            .accessibilityElement(children: .contain)
+            .accessibilityLabel("Delete \(entry.account)?")
         }
     }
 

@@ -35,7 +35,7 @@
                 // Header
                 HStack {
                     Text("\(cookies.count) cookies")
-                        .font(.system(size: 10, design: .monospaced))
+                        .font(.system(.caption2, design: .monospaced))
                         .foregroundStyle(.secondary)
                     Spacer()
                     Button("Refresh") { loadCookies() }
@@ -53,7 +53,8 @@
                 // Search
                 TextField("Filter by name or domain...", text: $searchText)
                     .textFieldStyle(.roundedBorder)
-                    .font(.system(size: 10))
+                    .font(.caption2)
+                    .accessibilityLabel("Filter cookies by name or domain")
 
                 Divider()
 
@@ -114,61 +115,75 @@
         }
     }
 
-    private struct CookieRow: View {
+    /// A cookie's name and domain, with a button to delete it; tapping the name shows the rest.
+    struct CookieRow: View {
         let cookie: HTTPCookie
         let onDelete: () -> Void
 
         @State private var expanded = false
+        @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
         var body: some View {
             VStack(alignment: .leading, spacing: 2) {
                 HStack {
                     Button {
-                        withAnimation(.easeInOut(duration: 0.15)) { expanded.toggle() }
+                        withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.15)) { expanded.toggle() }
                     } label: {
                         HStack(spacing: 4) {
                             Image(systemName: expanded ? "chevron.down" : "chevron.right")
-                                .font(.system(size: 8))
+                                .font(.caption2)
                                 .foregroundStyle(.secondary)
+                                .accessibilityHidden(true)
                             Text(cookie.name)
-                                .font(.system(size: 10, design: .monospaced))
+                                .font(.system(.caption2, design: .monospaced))
                                 .fontWeight(.medium)
-                                .lineLimit(1)
+                                .lineLimit(3)
                         }
                     }
                     .buttonStyle(.plain)
+                    .accessibilityValue(expanded ? "Expanded" : "Collapsed")
 
                     Spacer()
 
                     Text(cookie.domain)
-                        .font(.system(size: 9, design: .monospaced))
+                        .font(.system(.caption2, design: .monospaced))
                         .foregroundStyle(.secondary)
-                        .lineLimit(1)
+                        .lineLimit(3)
 
                     Button {
                         onDelete()
                     } label: {
                         Image(systemName: "trash")
-                            .font(.system(size: 9))
+                            .font(.caption2)
                             .foregroundStyle(.red)
                     }
                     .buttonStyle(.plain)
+                    .accessibilityLabel("Delete \(cookie.name)")
                 }
 
                 if expanded {
-                    VStack(alignment: .leading, spacing: 2) {
-                        cookieField("Value", cookie.value)
-                        cookieField("Domain", cookie.domain)
-                        cookieField("Path", cookie.path)
-                        cookieField("Secure", cookie.isSecure ? "Yes" : "No")
-                        cookieField("HTTP Only", cookie.isHTTPOnly ? "Yes" : "No")
-                        if let expires = cookie.expiresDate {
-                            cookieField("Expires", formatDate(expires))
-                        } else {
-                            cookieField("Expires", "Session")
-                        }
-                    }
-                    .padding(.leading, 16)
+                    CookieDetails(cookie: cookie)
+                        .padding(.leading, 16)
+                }
+            }
+        }
+    }
+
+    /// A cookie's value, domain, path, flags and expiry, one labeled field each.
+    struct CookieDetails: View {
+        let cookie: HTTPCookie
+
+        var body: some View {
+            VStack(alignment: .leading, spacing: 2) {
+                cookieField("Value", cookie.value)
+                cookieField("Domain", cookie.domain)
+                cookieField("Path", cookie.path)
+                cookieField("Secure", cookie.isSecure ? "Yes" : "No")
+                cookieField("HTTP Only", cookie.isHTTPOnly ? "Yes" : "No")
+                if let expires = cookie.expiresDate {
+                    cookieField("Expires", formatDate(expires))
+                } else {
+                    cookieField("Expires", "Session")
                 }
             }
         }
@@ -176,11 +191,11 @@
         private func cookieField(_ label: String, _ value: String) -> some View {
             HStack(alignment: .top) {
                 Text(label)
-                    .font(.system(size: 9))
+                    .font(.caption2)
                     .foregroundStyle(.secondary)
                     .frame(width: 60, alignment: .leading)
                 Text(value)
-                    .font(.system(size: 9, design: .monospaced))
+                    .font(.system(.caption2, design: .monospaced))
                     .textSelection(.enabled)
                     .lineLimit(3)
             }

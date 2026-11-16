@@ -40,7 +40,7 @@
                 AnyDebugDrawerPlugin(LayoutUncategorized()),
                 AnyDebugDrawerPlugin(LayoutKeychain()),
                 AnyDebugDrawerPlugin(LayoutConsole()),
-                AnyDebugDrawerPlugin(LayoutNetwork()),
+                AnyDebugDrawerPlugin(LayoutNetwork())
             ]
             let expected = ["Logs: Console, Network", "Storage: Keychain", "General: Custom"]
 
@@ -62,7 +62,7 @@
             let plugins = [
                 AnyDebugDrawerPlugin(LayoutConsole()),
                 AnyDebugDrawerPlugin(LayoutNetwork()),
-                AnyDebugDrawerPlugin(LayoutKeychain()),
+                AnyDebugDrawerPlugin(LayoutKeychain())
             ]
             var sut = DrawerLayout()
             let expected = ["Pinned: Keychain, Network", "Logs: Console"]
@@ -90,7 +90,7 @@
             let plugins = [
                 AnyDebugDrawerPlugin(LayoutConsole()),
                 AnyDebugDrawerPlugin(LayoutNetwork()),
-                AnyDebugDrawerPlugin(LayoutKeychain()),
+                AnyDebugDrawerPlugin(LayoutKeychain())
             ]
             var sut = DrawerLayout()
             let expected = ["Network", "Console"]
@@ -134,7 +134,7 @@
             let plugins = [
                 AnyDebugDrawerPlugin(LayoutConsole()),
                 AnyDebugDrawerPlugin(LayoutNetwork()),
-                AnyDebugDrawerPlugin(LayoutKeychain()),
+                AnyDebugDrawerPlugin(LayoutKeychain())
             ]
             var expected = DrawerLayout()
             expected.togglePin("LayoutKeychain")

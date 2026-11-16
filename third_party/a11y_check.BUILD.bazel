@@ -1,0 +1,22 @@
+load("@rules_swift//swift:swift.bzl", "swift_binary", "swift_library")
+
+swift_library(
+    name = "A11yCheckCore",
+    srcs = glob(["Sources/A11yCheckCore/**/*.swift"]),
+    module_name = "A11yCheckCore",
+    deps = [
+        "@swift-syntax//:SwiftParser",
+        "@swift-syntax//:SwiftSyntax",
+        "@yams//:Yams",
+    ],
+)
+
+swift_binary(
+    name = "a11y-check",
+    srcs = glob(["Sources/A11yCheckCLI/**/*.swift"]),
+    visibility = ["//visibility:public"],
+    deps = [
+        ":A11yCheckCore",
+        "@swift_argument_parser//:ArgumentParser",
+    ],
+)

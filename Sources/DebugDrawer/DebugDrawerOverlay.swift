@@ -17,6 +17,7 @@
         @State private var layout = DrawerLayout()
         /// The plugin at the top of the list: set to scroll there, and kept current as the user scrolls.
         @State private var scrolledID: String?
+        @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
         private let drawerWidth: CGFloat = 340
 
@@ -61,10 +62,8 @@
         }
 
         private func loadCollapsedState() {
-            for plugin in allPlugins {
-                if UserDefaults.standard.bool(forKey: plugin.collapsedStateKey) {
-                    collapsedSections.insert(plugin.id)
-                }
+            for plugin in allPlugins where UserDefaults.standard.bool(forKey: plugin.collapsedStateKey) {
+                collapsedSections.insert(plugin.id)
             }
             layout = DrawerLayout(from: .standard)
             // The list isn't on screen yet; it opens at this plugin.
@@ -73,7 +72,7 @@
 
         /// Changes the layout and saves it.
         private func updateLayout(_ change: (inout DrawerLayout) -> Void) {
-            withAnimation(.easeInOut(duration: 0.2)) {
+            withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.2)) {
                 change(&layout)
             }
             layout.save(to: .standard)
@@ -85,14 +84,20 @@
             HStack {
                 Image(systemName: "ladybug")
                     .foregroundStyle(.orange)
+                    .accessibilityHidden(true)
                 Text("Debug")
                     .font(.headline)
+                    .accessibilityAddTraits(.isHeader)
                 Spacer()
-                Button(action: { drawer.toggle() }) {
+                Button {
+                    drawer.toggle()
+                } label: {
                     Image(systemName: "xmark.circle.fill")
                         .foregroundStyle(.secondary)
+                        .accessibilityHidden(true)
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel("Close the debug drawer")
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
@@ -103,6 +108,7 @@
         private var searchField: some View {
             TextField("Search plugins and actions", text: $query)
                 .textFieldStyle(.roundedBorder)
+                .accessibilityLabel("Search plugins and actions")
                 .controlSize(.small)
                 .focused($searchFocused)
                 .onChange(of: query) { highlighted = 0 }
@@ -132,34 +138,12 @@
                 // Offsets, not ids: two actions of one plugin may share a title.
                 ForEach(Array(found.enumerated()), id: \.offset) { index, result in
                     Button { choose(result) } label: {
-                        resultRow(result, isHighlighted: index == highlighted)
+                        SearchResultRow(result: result, isHighlighted: index == highlighted)
                     }
                     .buttonStyle(.plain)
                 }
             }
             .padding(.bottom, 6)
-        }
-
-        private func resultRow(_ result: DrawerSearchResult, isHighlighted: Bool) -> some View {
-            HStack(spacing: 8) {
-                Image(systemName: result.icon)
-                    .frame(width: 20)
-                    .foregroundStyle(.secondary)
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(result.title)
-                        .font(.subheadline)
-                    if let pluginTitle = result.pluginTitle {
-                        Text(pluginTitle)
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                Spacer()
-            }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 4)
-            .background(isHighlighted ? Color.accentColor.opacity(0.15) : .clear)
-            .contentShape(Rectangle())
         }
 
         private func moveHighlight(by step: Int) -> KeyPress.Result {
@@ -182,7 +166,7 @@
             switch result {
             case let .plugin(plugin):
                 expand(plugin)
-                withAnimation(.easeInOut(duration: 0.2)) {
+                withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.2)) {
                     scrolledID = plugin.id
                 }
             case let .action(action, _):
@@ -195,12 +179,12 @@
         private var content: some View {
             ScrollView {
                 if !drawer.hasPlugins {
-                    emptyState
+                    DrawerEmptyState()
                 } else {
                     LazyVStack(spacing: 0) {
                         // Local plugins first — contextual tools take precedence
                         if !drawer.localPlugins.isEmpty {
-                            sectionHeader("Local")
+                            DrawerSectionHeader(title: "Local")
                             ForEach(drawer.localPlugins) { plugin in
                                 pluginSection(plugin, isGlobal: false)
                             }
@@ -208,7 +192,7 @@
 
                         // Global plugins: pinned first, then by category
                         ForEach(layout.sections(for: drawer.globalPlugins)) { section in
-                            sectionHeader(section.title)
+                            DrawerSectionHeader(title: section.title)
                             ForEach(section.plugins) { plugin in
                                 pluginSection(plugin, isGlobal: true)
                             }
@@ -225,32 +209,6 @@
             }
         }
 
-        private func sectionHeader(_ title: String) -> some View {
-            HStack {
-                Text(title)
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.tertiary)
-                    .textCase(.uppercase)
-                Spacer()
-            }
-            .padding(.horizontal, 14)
-            .padding(.top, 10)
-            .padding(.bottom, 4)
-        }
-
-        private var emptyState: some View {
-            VStack(spacing: 8) {
-                Image(systemName: "tray")
-                    .font(.title2)
-                    .foregroundStyle(.tertiary)
-                Text("No plugins registered")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 40)
-        }
-
         private func isExpanded(_ plugin: AnyDebugDrawerPlugin) -> Bool {
             !collapsedSections.contains(plugin.id)
         }
@@ -262,7 +220,7 @@
 
         private func toggleExpanded(_ plugin: AnyDebugDrawerPlugin) {
             updateLayout { $0.lastUsed = plugin.id }
-            withAnimation(.easeInOut(duration: 0.2)) {
+            withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.2)) {
                 let key = plugin.collapsedStateKey
                 if collapsedSections.contains(plugin.id) {
                     collapsedSections.remove(plugin.id)
@@ -281,30 +239,14 @@
             let pinned = layout.pinned.contains(plugin.id)
 
             return VStack(spacing: 0) {
-                Button(action: { toggleExpanded(plugin) }) {
-                    HStack(spacing: 8) {
-                        Image(systemName: plugin.icon)
-                            .frame(width: 20)
-                            .foregroundStyle(.secondary)
-                        Text(plugin.title)
-                            .font(.subheadline.weight(.medium))
-                        if pinned {
-                            Image(systemName: "pin.fill")
-                                .font(.caption2)
-                                .foregroundStyle(.tertiary)
-                                .accessibilityLabel("Pinned")
-                        }
-                        Spacer()
-                        Image(systemName: "chevron.right")
-                            .font(.caption2.weight(.semibold))
-                            .foregroundStyle(.tertiary)
-                            .rotationEffect(.degrees(expanded ? 90 : 0))
-                    }
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 8)
-                    .contentShape(Rectangle())
+                Button {
+                    toggleExpanded(plugin)
+                } label: {
+                    PluginHeaderLabel(plugin: plugin, isExpanded: expanded, isPinned: pinned)
                 }
                 .buttonStyle(.plain)
+                .accessibilityValue(expanded ? "Expanded" : "Collapsed")
+                .accessibilityHint(isGlobal ? "Toggles the section. Its actions pin it or move it." : "Toggles the section.")
                 .contextMenu {
                     if isGlobal {
                         Button(pinned ? "Unpin" : "Pin", systemImage: pinned ? "pin.slash" : "pin") {
@@ -329,109 +271,6 @@
                 Divider().padding(.leading, 14)
             }
             .id(plugin.id)
-        }
-    }
-
-    // MARK: - Root modifier (attach once at app level)
-
-    struct DebugDrawerModifier: ViewModifier {
-        @ObservedObject var drawer = DebugDrawer.shared
-
-        func body(content: Content) -> some View {
-            content
-                .overlay(alignment: .trailing) {
-                    DebugDrawerOverlay(drawer: drawer)
-                        .accessibilityIdentifier(debugDrawerOverlayIdentifier)
-                        .background(DebugDrawerTagView())
-                        .allowsHitTesting(drawer.isOpen)
-                }
-                .animation(.easeInOut(duration: 0.25), value: drawer.isOpen)
-        }
-    }
-
-    // MARK: - Platform view tagger
-
-    /// Tags the nearest platform view with a known tag so the a11y auditor
-    /// can skip the debug drawer subtree without relying on class names.
-    public let debugDrawerViewTag = 0xDDB6 // "DDB" = DebugDrawerBoundary
-
-    #if os(macOS)
-        struct DebugDrawerTagView: NSViewRepresentable {
-            func makeNSView(context _: Context) -> NSView {
-                let v = NSView()
-                v.setAccessibilityIdentifier(debugDrawerOverlayIdentifier)
-                return v
-            }
-
-            func updateNSView(_: NSView, context _: Context) {}
-        }
-    #elseif os(iOS)
-        struct DebugDrawerTagView: UIViewRepresentable {
-            func makeUIView(context _: Context) -> UIView {
-                let v = UIView()
-                v.tag = debugDrawerViewTag
-                v.accessibilityIdentifier = debugDrawerOverlayIdentifier
-                return v
-            }
-
-            func updateUIView(_: UIView, context _: Context) {}
-        }
-    #endif
-
-    // MARK: - Local plugin modifier
-
-    /// Attaches a local plugin to this view's lifecycle.
-    /// The plugin appears in the drawer when this view is on screen
-    /// and is removed when the view disappears — but only if no newer
-    /// view has already replaced the registration.
-    ///
-    /// Re-registers automatically when the plugin's `contentIdentifier` changes,
-    /// so this works regardless of where `.id()` is placed in the chain.
-    struct LocalPluginModifier<P: DebugDrawerPlugin>: ViewModifier {
-        let plugin: P
-        @State private var token: UUID?
-
-        func body(content: Content) -> some View {
-            content
-                .onAppear {
-                    token = DebugDrawer.shared.registerLocal(plugin)
-                }
-                .onDisappear {
-                    if let token {
-                        DebugDrawer.shared.unregisterLocal(id: plugin.id, token: token)
-                    }
-                }
-                .onChange(of: plugin.contentIdentifier) { _, _ in
-                    token = DebugDrawer.shared.registerLocal(plugin)
-                }
-        }
-    }
-
-    // MARK: - Public API
-
-    public extension View {
-        /// Attaches the debug drawer overlay to this view.
-        /// Place once at the root of your view hierarchy. While the drawer is open, Cmd-K focuses its
-        /// search field, which finds plugins and their ``DebugDrawerPlugin/actions``.
-        func debugDrawer() -> some View {
-            modifier(DebugDrawerModifier())
-        }
-
-        /// Registers a local debug plugin that is active while this view is on screen.
-        func debugLocalPlugin<P: DebugDrawerPlugin>(_ plugin: P) -> some View {
-            modifier(LocalPluginModifier(plugin: plugin))
-        }
-    }
-#else
-    import SwiftUI
-
-    public extension View {
-        func debugDrawer() -> some View {
-            self
-        }
-
-        func debugLocalPlugin<P: DebugDrawerPlugin>(_: P) -> some View {
-            self
         }
     }
 #endif

@@ -13,13 +13,26 @@ SWIFT := "env -u TOOLCHAINS xcrun --toolchain default swift"
 [doc('Build everything (default)')]
 all: build
 
-[doc('Build every target')]
-build:
+[doc('Lint, then build every target')]
+build: lint
     {{BAZEL}} build //...
 
-[doc('Run every test')]
-test:
+[doc('Lint, then run every test')]
+test: lint
     {{BAZEL}} test //...
+
+# SwiftPM compiles #filePath as an absolute path, so SnapshotTesting writes each reference beside
+# its test; under Bazel it would land in the test's runfiles. Recording reports every snapshot it
+# wrote as an issue, so the tests fail; run `just test` afterwards to check against them. Then the
+# generator runs, since a target's first __Snapshots__ needs excluding from Package.swift.
+[doc('Re-record every snapshot reference into the workspace, after a change to how a view looks')]
+record-snapshots:
+    -SNAPSHOT_TESTING_RECORD=all {{SWIFT}} test
+    python3 {{PROJECT_ROOT}}/scripts/modules.py
+
+[doc('SwiftLint and a11y-check over every first-party target (tools/lint.bzl)')]
+lint:
+    {{BAZEL}} build //... --config=lint
 
 [doc('Run one test target, e.g. just test-one //Tests/GreetingsTests')]
 test-one target:

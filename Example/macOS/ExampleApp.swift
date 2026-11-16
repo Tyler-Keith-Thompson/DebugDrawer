@@ -132,6 +132,7 @@ struct ExampleContentView: View {
             VStack(spacing: 20) {
                 Text("DebugDrawer Example")
                     .font(.largeTitle)
+                    .accessibilityAddTraits(.isHeader)
 
                 Text("Press Ctrl+D to open the debug drawer")
                     .foregroundStyle(.secondary)
@@ -143,17 +144,22 @@ struct ExampleContentView: View {
                     Button("Print") { print("Counter: \(counter)") }
                     Button("Reset") { counter = 0 }
                 }
+                .accessibilityElement(children: .contain)
+                .accessibilityLabel("Counter actions")
 
                 Text("Counter: \(counter)")
                     .font(.title2.monospacedDigit())
+                    .accessibilityAddTraits(.isHeader)
 
                 HStack {
                     TextField("Sample text field", text: .constant(""))
                         .textFieldStyle(.roundedBorder)
                         .frame(width: 200)
+                        .accessibilityLabel("Sample text")
 
                     Slider(value: .constant(0.5))
                         .frame(width: 150)
+                        .accessibilityLabel("Sample slider")
 
                     Toggle("Toggle", isOn: .constant(true))
                 }

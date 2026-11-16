@@ -191,6 +191,8 @@ Bazel is the development build; SwiftPM is the published package. Both are gener
 | `just verify` | The tests under Bazel and under SwiftPM |
 | `just modules` | Regenerate `Package.swift` and every `BUILD.bazel` |
 | `just docs` | The DocC site into `.build/docs` |
+| `just lint` | SwiftLint and a11y-check over every first-party target |
+| `just record-snapshots` | Every snapshot reference, re-recorded into the workspace |
 | `just generate` | An Xcode project from the Bazel graph |
 | `just run [macOS\|iOS]` | Build and launch the example app |
 

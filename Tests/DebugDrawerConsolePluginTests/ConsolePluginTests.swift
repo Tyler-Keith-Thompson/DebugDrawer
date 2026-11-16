@@ -50,7 +50,7 @@
 
         func testConsolePluginRegistration() {
             let drawer = DebugDrawer.shared
-            for p in drawer.globalPlugins { drawer.unregisterGlobal(id: p.id) }
+            for plugin in drawer.globalPlugins { drawer.unregisterGlobal(id: plugin.id) }
 
             // Register the plugin directly without installing stdout capture
             // (install() redirects stdout which breaks the test runner)

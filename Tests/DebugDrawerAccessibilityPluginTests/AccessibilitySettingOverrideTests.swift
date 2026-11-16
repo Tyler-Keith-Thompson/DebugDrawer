@@ -75,14 +75,13 @@
                     read: { $0.differentiateWithoutColor }),
             Setting(name: "Invert Colors", override: \.invertColors,
                     system: { AnyView($0.environment(\._accessibilityInvertColors, $1)) },
-                    read: { $0.invertColors }),
+                    read: { $0.invertColors })
         ]
 
         /// Hosts a probe under `.debugAccessibilityOverrides()` with `systemValue` applied
         /// above it, and asserts what the probe reads.
         private func assertHostReads(_ expected: Bool, _ setting: Setting, systemValue: Bool,
-                                     _ message: String, line: UInt = #line) async throws
-        {
+                                     _ message: String, line: UInt = #line) async throws {
             let probe = Probe()
             ViewHosting.host(view: setting.system(AnyView(probe.debugAccessibilityOverrides()), systemValue))
             defer { ViewHosting.expel() }

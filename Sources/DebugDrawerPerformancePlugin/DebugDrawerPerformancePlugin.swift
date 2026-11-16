@@ -111,12 +111,17 @@
                 let effectiveRange = range > 0 ? range : 1
 
                 var path = Path()
-                for (i, val) in data.enumerated() {
-                    let x = size.width * CGFloat(i) / CGFloat(data.count - 1)
-                    let normalized = CGFloat((val - minVal) / effectiveRange)
-                    let y = size.height * (1 - normalized)
-                    if i == 0 { path.move(to: .init(x: x, y: y)) }
-                    else { path.addLine(to: .init(x: x, y: y)) }
+                for (index, value) in data.enumerated() {
+                    let normalized = CGFloat((value - minVal) / effectiveRange)
+                    let point = CGPoint(
+                        x: size.width * CGFloat(index) / CGFloat(data.count - 1),
+                        y: size.height * (1 - normalized)
+                    )
+                    if index == 0 {
+                        path.move(to: point)
+                    } else {
+                        path.addLine(to: point)
+                    }
                 }
                 context.stroke(path, with: .color(color), lineWidth: 1.5)
             }
@@ -162,62 +167,84 @@
                 .controlSize(.small)
 
                 if monitor.isMonitoring {
-                    // FPS
-                    VStack(alignment: .leading, spacing: 2) {
-                        HStack {
-                            Text("FPS")
-                                .font(.caption.weight(.medium))
-                            Spacer()
-                            Text("\(monitor.fps)")
-                                .font(.system(size: 14, weight: .bold, design: .monospaced))
-                                .foregroundStyle(fpsColor)
-                        }
-                        if monitor.fpsHistory.count > 1 {
-                            IntSparkline(data: monitor.fpsHistory, color: fpsColor, height: 30)
-                                .background(Color.primary.opacity(0.03))
-                                .cornerRadius(3)
-                        }
-                    }
+                    PerformanceReadout(
+                        fps: monitor.fps,
+                        fpsHistory: monitor.fpsHistory,
+                        memoryMB: monitor.memoryMB,
+                        memoryHistory: monitor.memoryHistory
+                    )
+                }
+            }
+        }
+    }
 
-                    // Memory
-                    VStack(alignment: .leading, spacing: 2) {
-                        HStack {
-                            Text("Memory")
-                                .font(.caption.weight(.medium))
-                            Spacer()
-                            Text(String(format: "%.1f MB", monitor.memoryMB))
-                                .font(.system(size: 12, weight: .medium, design: .monospaced))
-                        }
-                        if monitor.memoryHistory.count > 1 {
-                            Sparkline(data: monitor.memoryHistory, color: .blue, height: 30)
-                                .background(Color.primary.opacity(0.03))
-                                .cornerRadius(3)
-                        }
-                    }
+    /// The frame rate and memory now, their recent history as sparklines, and the minimum and
+    /// average frame rate and peak memory.
+    struct PerformanceReadout: View {
+        let fps: Int
+        /// Frames per second, one sample a second, oldest first.
+        let fpsHistory: [Int]
+        let memoryMB: Double
+        /// Resident memory in megabytes, one sample a second, oldest first.
+        let memoryHistory: [Double]
 
-                    // Stats
-                    HStack(spacing: 12) {
-                        statBadge("Min", "\(monitor.fpsHistory.min() ?? 0)", fpsColor)
-                        statBadge("Avg", "\(monitor.fpsHistory.isEmpty ? 0 : monitor.fpsHistory.reduce(0, +) / monitor.fpsHistory.count)", fpsColor)
-                        statBadge("Mem Peak", String(format: "%.0f", monitor.memoryHistory.max() ?? 0), .blue)
+        var body: some View {
+            VStack(alignment: .leading, spacing: 8) {
+                // FPS
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack {
+                        Text("FPS")
+                            .font(.caption.weight(.medium))
+                        Spacer()
+                        Text("\(fps)")
+                            .font(.system(.title3, design: .monospaced, weight: .bold))
+                            .foregroundStyle(fpsColor)
                     }
+                    if fpsHistory.count > 1 {
+                        IntSparkline(data: fpsHistory, color: fpsColor, height: 30)
+                            .background(Color.primary.opacity(0.03))
+                            .cornerRadius(3)
+                    }
+                }
+
+                // Memory
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack {
+                        Text("Memory")
+                            .font(.caption.weight(.medium))
+                        Spacer()
+                        Text(String(format: "%.1f MB", memoryMB))
+                            .font(.system(.callout, design: .monospaced, weight: .medium))
+                    }
+                    if memoryHistory.count > 1 {
+                        Sparkline(data: memoryHistory, color: .blue, height: 30)
+                            .background(Color.primary.opacity(0.03))
+                            .cornerRadius(3)
+                    }
+                }
+
+                // Stats
+                HStack(spacing: 12) {
+                    statBadge("Min", "\(fpsHistory.min() ?? 0)", fpsColor)
+                    statBadge("Avg", "\(fpsHistory.isEmpty ? 0 : fpsHistory.reduce(0, +) / fpsHistory.count)", fpsColor)
+                    statBadge("Mem Peak", String(format: "%.0f", memoryHistory.max() ?? 0), .blue)
                 }
             }
         }
 
         private var fpsColor: Color {
-            if monitor.fps >= 55 { return .green }
-            if monitor.fps >= 30 { return .yellow }
+            if fps >= 55 { return .green }
+            if fps >= 30 { return .yellow }
             return .red
         }
 
         private func statBadge(_ label: String, _ value: String, _ color: Color) -> some View {
             VStack(spacing: 1) {
                 Text(value)
-                    .font(.system(size: 10, weight: .bold, design: .monospaced))
+                    .font(.system(.caption2, design: .monospaced, weight: .bold))
                     .foregroundStyle(color)
                 Text(label)
-                    .font(.system(size: 8))
+                    .font(.caption2)
                     .foregroundStyle(.tertiary)
             }
         }

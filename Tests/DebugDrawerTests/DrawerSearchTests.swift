@@ -18,7 +18,7 @@
         func partOfATitleFindsThePlugin() {
             let plugins = [
                 AnyDebugDrawerPlugin(SearchFixture(title: "Console")),
-                AnyDebugDrawerPlugin(SearchFixture(title: "Network")),
+                AnyDebugDrawerPlugin(SearchFixture(title: "Network"))
             ]
             let expected = ["Network"]
 
@@ -41,7 +41,7 @@
         func aPrefixRanksBeforeAContainingTitle() {
             let plugins = [
                 AnyDebugDrawerPlugin(SearchFixture(title: "Internet")),
-                AnyDebugDrawerPlugin(SearchFixture(title: "Network")),
+                AnyDebugDrawerPlugin(SearchFixture(title: "Network"))
             ]
             let expected = ["Network", "Internet"]
 
@@ -58,7 +58,7 @@
                 )),
                 AnyDebugDrawerPlugin(SearchFixture(title: "Cookies",
                     actions: [DebugDrawerAction("Log out of every site") {}]
-                )),
+                ))
             ]
             let expected = ["Log out of every site", "Expire token"]
 
@@ -73,7 +73,7 @@
                 AnyDebugDrawerPlugin(SearchFixture(title: "Cache",
                     actions: [DebugDrawerAction("Cache clear") {}]
                 )),
-                AnyDebugDrawerPlugin(SearchFixture(title: "Cached images")),
+                AnyDebugDrawerPlugin(SearchFixture(title: "Cached images"))
             ]
             let expected = ["Cache", "Cache clear", "Cached images"]
 

@@ -2,117 +2,6 @@
     import DebugDrawer
     import SwiftUI
 
-    // MARK: - Conditional environment modifier
-
-    /// Overrides an environment value when `value` is non-nil and leaves the inherited
-    /// (system) value alone when it is nil.
-    ///
-    /// The view tree has the same shape either way: an `if let` here would be a
-    /// conditional branch, so the host's subtree would get a new identity, losing its
-    /// `@State` and navigation, each time an override went between nil and a value.
-    private struct ConditionalEnvironment<V: Sendable>: ViewModifier {
-        let keyPath: WritableKeyPath<EnvironmentValues, V>
-        let value: V?
-
-        init(_ keyPath: WritableKeyPath<EnvironmentValues, V>, value: V?) {
-            self.keyPath = keyPath
-            self.value = value
-        }
-
-        func body(content: Content) -> some View {
-            content.transformEnvironment(keyPath) { [value] current in
-                if let value { current = value }
-            }
-        }
-    }
-
-    // MARK: - Override state
-
-    @MainActor
-    public final class AccessibilityOverrides: ObservableObject {
-        public static let shared = AccessibilityOverrides()
-
-        @Published public var colorScheme: ColorScheme?
-        @Published public var dynamicTypeSize: DynamicTypeSize?
-        @Published public var layoutDirection: LayoutDirection?
-        @Published public var locale: Locale?
-        /// System accessibility settings; nil means the system's value is used.
-        @Published public var reduceMotion: Bool?
-        @Published public var increaseContrast: Bool?
-        @Published public var boldText: Bool?
-        @Published public var reduceTransparency: Bool?
-        @Published public var differentiateWithoutColor: Bool?
-        @Published public var invertColors: Bool?
-
-        /// Available localizations discovered from the app bundle.
-        public let availableLocales: [Locale]
-
-        private init() {
-            let ids = Bundle.main.localizations
-                .filter { $0 != "Base" }
-                .sorted()
-            availableLocales = ids.map { Locale(identifier: $0) }
-        }
-
-        public func reset() {
-            colorScheme = nil
-            dynamicTypeSize = nil
-            layoutDirection = nil
-            locale = nil
-            reduceMotion = nil
-            increaseContrast = nil
-            boldText = nil
-            reduceTransparency = nil
-            differentiateWithoutColor = nil
-            invertColors = nil
-        }
-
-        public var hasOverrides: Bool {
-            colorScheme != nil || dynamicTypeSize != nil ||
-                layoutDirection != nil || locale != nil ||
-                reduceMotion != nil || increaseContrast != nil || boldText != nil ||
-                reduceTransparency != nil || differentiateWithoutColor != nil || invertColors != nil
-        }
-    }
-
-    // MARK: - Environment modifier
-
-    public struct AccessibilityOverridesModifier: ViewModifier {
-        @ObservedObject private var overrides = AccessibilityOverrides.shared
-
-        public init() {}
-
-        public func body(content: Content) -> some View {
-            // Every modifier is always applied, so the host's view tree keeps its shape
-            // (and its state) whether or not an override is set.
-            let modified = content
-                .modifier(ConditionalEnvironment(\.dynamicTypeSize, value: overrides.dynamicTypeSize))
-                .modifier(ConditionalEnvironment(\.layoutDirection, value: overrides.layoutDirection))
-                .modifier(ConditionalEnvironment(\.locale, value: overrides.locale))
-                // The public keys are get-only; SwiftUI reads them from these settable
-                // underscored keys, which are what previews use to force a value.
-                .modifier(ConditionalEnvironment(\._accessibilityReduceMotion, value: overrides.reduceMotion))
-                .modifier(ConditionalEnvironment(\._colorSchemeContrast,
-                                                 value: overrides.increaseContrast.map { $0 ? .increased : .standard }))
-                // legibilityWeight is itself optional: wrap explicitly so "no override"
-                // stays nil instead of becoming an override to nil.
-                .modifier(ConditionalEnvironment(\.legibilityWeight,
-                                                 value: overrides.boldText.map { Optional($0 ? LegibilityWeight.bold : .regular) }))
-                .modifier(ConditionalEnvironment(\._accessibilityReduceTransparency, value: overrides.reduceTransparency))
-                .modifier(ConditionalEnvironment(\._accessibilityDifferentiateWithoutColor,
-                                                 value: overrides.differentiateWithoutColor))
-                .modifier(ConditionalEnvironment(\._accessibilityInvertColors, value: overrides.invertColors))
-                .preferredColorScheme(overrides.colorScheme)
-            return modified
-        }
-    }
-
-    public extension View {
-        func debugAccessibilityOverrides() -> some View {
-            modifier(AccessibilityOverridesModifier())
-        }
-    }
-
     // MARK: - Plugin
 
     public struct AccessibilityPlugin: DebugDrawerPlugin {
@@ -143,20 +32,23 @@
             ("L", .large), ("XL", .xLarge), ("XXL", .xxLarge),
             ("XXXL", .xxxLarge), ("A1", .accessibility1),
             ("A2", .accessibility2), ("A3", .accessibility3),
-            ("A4", .accessibility4), ("A5", .accessibility5),
+            ("A4", .accessibility4), ("A5", .accessibility5)
         ]
 
         var body: some View {
             VStack(alignment: .leading, spacing: 10) {
                 // Color scheme
                 section("Color Scheme") {
-                    Picker(selection: colorSchemeBinding) {
+                    Picker("Color Scheme", selection: colorSchemeBinding) {
                         Text("System").tag(0)
                         Text("Light").tag(1)
                         Text("Dark").tag(2)
-                    } label: { EmptyView() }
-                        .pickerStyle(.segmented)
-                        .controlSize(.small)
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                    .controlSize(.small)
+                    .accessibilityLabel("Color Scheme")
+                    .accessibilityElement(children: .contain)
                 }
 
                 // Dynamic Type
@@ -168,14 +60,16 @@
                             step: 1
                         )
                         .controlSize(.small)
+                        .accessibilityLabel("Dynamic Type size")
+                        .accessibilityValue(currentSizeLabel)
 
                         Text(currentSizeLabel)
-                            .font(.system(size: 10, design: .monospaced))
+                            .font(.system(.caption2, design: .monospaced))
                             .foregroundStyle(.secondary)
                             .frame(width: 30, alignment: .trailing)
 
                         Button("System") { overrides.dynamicTypeSize = nil }
-                            .font(.system(size: 9))
+                            .font(.caption2)
                             .controlSize(.mini)
                             .disabled(overrides.dynamicTypeSize == nil)
                     }
@@ -195,13 +89,16 @@
                 // Layout direction
                 section("Layout Direction") {
                     #if os(macOS)
-                        Picker(selection: layoutBinding) {
+                        Picker("Layout Direction", selection: layoutBinding) {
                             Text("System").tag(0)
                             Text("LTR").tag(1)
                             Text("RTL").tag(2)
-                        } label: { EmptyView() }
-                            .pickerStyle(.segmented)
-                            .controlSize(.small)
+                        }
+                        .pickerStyle(.segmented)
+                        .labelsHidden()
+                        .controlSize(.small)
+                        .accessibilityLabel("Layout Direction")
+                        .accessibilityElement(children: .contain)
                     #else
                         // iOS has a SwiftUI bug where setting .leftToRight explicitly
                         // after .rightToLeft causes a 180-degree flip. Use a toggle instead.
@@ -217,14 +114,16 @@
                 // Locale
                 if !overrides.availableLocales.isEmpty {
                     section("Locale") {
-                        Picker(selection: localeBinding) {
+                        Picker("Locale", selection: localeBinding) {
                             Text("System").tag("")
                             ForEach(overrides.availableLocales, id: \.identifier) { loc in
                                 Text(localeName(loc))
                                     .tag(loc.identifier)
                             }
-                        } label: { EmptyView() }
-                            .controlSize(.small)
+                        }
+                        .labelsHidden()
+                        .controlSize(.small)
+                        .accessibilityLabel("Locale")
                     }
                 }
 
@@ -261,6 +160,7 @@
             VStack(alignment: .leading, spacing: 4) {
                 Text(title)
                     .font(.caption.weight(.medium))
+                    .accessibilityAddTraits(.isHeader)
                 content()
             }
         }
@@ -271,8 +171,7 @@
                     badge(overrides.colorScheme == .dark ? "Dark" : "Light")
                 }
                 if let size = overrides.dynamicTypeSize,
-                   let match = typeSizes.first(where: { $0.1 == size })
-                {
+                   let match = typeSizes.first(where: { $0.1 == size }) {
                     badge(match.0)
                 }
                 if overrides.layoutDirection == .rightToLeft {
@@ -298,7 +197,7 @@
 
         private func badge(_ text: String) -> some View {
             Text(text)
-                .font(.system(size: 8, weight: .semibold, design: .monospaced))
+                .font(.system(.caption2, design: .monospaced, weight: .semibold))
                 .padding(.horizontal, 4)
                 .padding(.vertical, 2)
                 .background(Color.accentColor.opacity(0.15))
@@ -332,7 +231,6 @@
             )
         }
 
-
         private var layoutBinding: Binding<Int> {
             Binding(
                 get: {
@@ -357,8 +255,7 @@
             Binding(
                 get: {
                     if let size = overrides.dynamicTypeSize,
-                       let idx = typeSizes.firstIndex(where: { $0.1 == size })
-                    {
+                       let idx = typeSizes.firstIndex(where: { $0.1 == size }) {
                         return Double(idx)
                     }
                     return 3
@@ -373,8 +270,7 @@
 
         private var currentSizeLabel: String {
             if let size = overrides.dynamicTypeSize,
-               let match = typeSizes.first(where: { $0.1 == size })
-            {
+               let match = typeSizes.first(where: { $0.1 == size }) {
                 return match.0
             }
             return "L"
@@ -390,71 +286,11 @@
         }
     }
 
-    // MARK: - System accessibility settings
-
-    /// A row per system accessibility setting: its name, the system's value, and a System/On/Off override.
-    struct AccessibilitySettingsSection: View {
-        struct SystemValues: Equatable {
-            var reduceMotion = false
-            var increaseContrast = false
-            var boldText = false
-            var reduceTransparency = false
-            var differentiateWithoutColor = false
-            var invertColors = false
-        }
-
-        let system: SystemValues
-        @ObservedObject var overrides = AccessibilityOverrides.shared
-
-        var body: some View {
-            VStack(alignment: .leading, spacing: 4) {
-                row("Reduce Motion", system: system.reduceMotion, override: $overrides.reduceMotion)
-                row("Increase Contrast", system: system.increaseContrast, override: $overrides.increaseContrast)
-                row("Bold Text", system: system.boldText, override: $overrides.boldText)
-                row("Reduce Transparency", system: system.reduceTransparency,
-                    override: $overrides.reduceTransparency)
-                row("Differentiate Without Color", system: system.differentiateWithoutColor,
-                    override: $overrides.differentiateWithoutColor)
-                row("Invert Colors", system: system.invertColors, override: $overrides.invertColors)
-            }
-        }
-
-        private func row(_ title: String, system: Bool, override: Binding<Bool?>) -> some View {
-            HStack(spacing: 6) {
-                VStack(alignment: .leading, spacing: 0) {
-                    Text(title)
-                        .font(.system(size: 10))
-                    Text("System: \(system ? "On" : "Off")")
-                        .font(.system(size: 8, design: .monospaced))
-                        .foregroundStyle(.secondary)
-                }
-                Spacer()
-                Picker(selection: Binding(
-                    get: { override.wrappedValue.map { $0 ? 1 : 2 } ?? 0 },
-                    set: { override.wrappedValue = $0 == 0 ? nil : $0 == 1 }
-                )) {
-                    Text("System").tag(0)
-                    Text("On").tag(1)
-                    Text("Off").tag(2)
-                } label: { EmptyView() }
-                    .pickerStyle(.segmented)
-                    .controlSize(.mini)
-                    .fixedSize()
-            }
-        }
-    }
-
     // MARK: - Convenience installer
 
     public extension DebugDrawer {
         func installAccessibility() {
             registerGlobal(AccessibilityPlugin())
         }
-    }
-#else
-    import SwiftUI
-
-    public extension View {
-        func debugAccessibilityOverrides() -> some View { self }
     }
 #endif

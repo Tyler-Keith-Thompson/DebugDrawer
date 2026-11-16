@@ -38,5 +38,25 @@ use_repo(
     "swift_deps_info",
     "swift_package",
     "swiftpkg_oslogclient",
+    "swiftpkg_swift_snapshot_testing",
     "swiftpkg_viewinspector",
+    "swiftpkg_xctest_dynamic_overlay",
+)
+
+# ── Lint ─────────────────────────────────────────────────────────────
+# `just lint` (tools/lint.bzl): SwiftLint on every first-party target, and a11y-check, which reads
+# SwiftUI code for accessibility mistakes, on every non-test one.
+bazel_dep(name = "swiftlint", version = "0.65.1", repo_name = "SwiftLint")
+bazel_dep(name = "swift-syntax", version = "603.0.2")
+bazel_dep(name = "swift_argument_parser", version = "1.7.1")
+bazel_dep(name = "yams", version = "6.2.2")
+
+http_archive = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
+
+http_archive(
+    name = "a11y_check",
+    build_file = "//third_party:a11y_check.BUILD.bazel",
+    sha256 = "2b100686ea6d0488599d2b887b13e91b8eb49bb9d2845a6e10856631367c2570",
+    strip_prefix = "ios-swiftui-accessibility-techniques-0.7.0/a11y-check",
+    urls = ["https://github.com/cvs-health/ios-swiftui-accessibility-techniques/archive/refs/tags/0.7.0.tar.gz"],
 )

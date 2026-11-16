@@ -23,7 +23,10 @@ Tests/DebugDrawerTestSupport/    Shared test fixtures (data only)
 Example/                         The macOS and iOS example apps (hand-written BUILD.bazel)
 scripts/modules.py               The module graph
 tools/                           Bazel rule wrappers (warnings as errors, Swift 6 mode), DocC rules;
-                                 tools/bazel turns BuildBuddy on when the Keychain holds its key
+                                 tools/bazel turns BuildBuddy on when the Keychain holds its key, and
+                                 on macOS sweeps stale output bases once a day (tools/sweep-output-bases):
+                                 a deleted workspace's, or one idle 7 days
+tools/lint.bzl                   `just lint`: SwiftLint (.swiftlint.yml) and a11y-check over first-party targets
 ```
 
 ### Module graph
@@ -55,7 +58,7 @@ Every shell command gets a timeout. macOS has no `timeout`; use
 
 | Command | Does |
 |---|---|
-| `just build` / `just test` | Build / test everything (debug) |
+| `just build` / `just test` | Lint, then build / test everything (debug) |
 | `bazel test //Tests/XTests` | One test target (`just test-one //Tests/XTests`) |
 | `just filter <pattern>` | Tests whose name matches |
 | `just test-release` | `--config=release`: builds and runs only the `XPerformanceTests` targets |
@@ -68,6 +71,8 @@ Every shell command gets a timeout. macOS has no `timeout`; use
 | `just deploy [patch\|minor\|major]` | Verify, then tag, push the tag and create the GitHub release (the owner's call) |
 | `just buildbuddy-key` | Store the BuildBuddy key in the Keychain (once per Mac; builds then use the remote cache) |
 | `just template-update` | Merge the project template's changes since `.template.json`'s commit; resolve conflicts, then `just modules`, `just test` |
+| `just lint` | SwiftLint and a11y-check over every first-party target; `just test` runs it first |
+| `just record-snapshots` | Re-record every snapshot reference (through SwiftPM) after a change to how a view looks |
 | `bazel query 'rdeps(//Tests/..., //Sources/X)'` | Test targets affected by a change to X |
 
 - Debug is the default configuration. Every test target except the `XPerformanceTests` ones is
@@ -113,6 +118,46 @@ the *default* sections below where they differ:
   (`ViewHosting` and `Inspection`), not an offline `inspect()`.
 - The example apps under `Example/` are not in the module graph; `bazel build //...` builds them,
   and `just run` launches them.
+
+## Views
+
+Every plugin, and the core drawer, holds SwiftUI views. They live in the plugin's own module
+(`AppInfoFactsView` in `DebugDrawerAppInfoPlugin`), built for macOS by Bazel and for macOS and
+iOS by SwiftPM.
+
+- **Debug builds only.** View code sits under `#if DEBUG` with the plugin, and the public API keeps
+  its release stand-in (`## DebugDrawer`). Tests of views sit under `#if os(macOS)`: they run on
+  the Mac. The view-test packages (ViewInspector, SnapshotTesting, IssueReporting) are in
+  `APPLE_ONLY_PACKAGES` and are linked by test targets only.
+- **A view is a function of its input.** It takes values (`AppInfoFactsView(facts:refresh:)` takes
+  an `AppInfoFacts` and a closure), keeps what it changes itself in `@State`, and holds no
+  services: a view that needs one takes a closure or a value from the caller. A plugin's top-level
+  view reads its shared store or monitor and hands values to inner views like that one; tests
+  render the inner views with fixtures. When a view can show several things, its state is one
+  enum with a case per thing (Seams and composition).
+- **View tests** use ViewInspector on the Mac: `inspect()` a value-taking view, act on what it
+  finds (`tap`, `setInput`), then check what it shows. Get-only accessibility environment keys
+  need a hosted probe: a probe view defined in the test target, carrying its own `Inspection`,
+  hosted with `ViewHosting.host` under the modifier being tested. Production views carry no
+  inspection hook.
+- **Snapshot tests** pin how each state renders, in light and dark, with fixture values rather than
+  shared or persisted state: `ImageRenderer` draws the view in the color scheme the test sets, and
+  `assertSnapshot` compares it with the reference in `__Snapshots__` beside the test (Bazel puts
+  them in the test's runfiles). macOS doesn't scale text with Dynamic Type, so the Mac pins no
+  Dynamic Type sizes. `ImageRenderer` draws SwiftUI's own views; an AppKit-backed control (a text
+  field, picker, switch, disclosure group or `NSViewRepresentable`) renders as a placeholder, so
+  host that view in an `NSHostingView` in a window that is never shown, set its `appearance`, and
+  draw it into a bitmap at a fixed 2x scale. A snapshot is worth only what a person reads in it,
+  so look at every recorded image before committing it. After a change to how a view looks,
+  `just record-snapshots`, then review the changed images in `git diff`.
+- **Accessibility**: every control has an `accessibilityLabel`; an image that only decorates is
+  `accessibilityHidden(true)`; rows that read as one item combine (`.accessibilityElement(children:
+  .combine)`); animations respect `accessibilityReduceMotion`; sizes that should grow with text use
+  `@ScaledMetric`, and fonts are text styles (`.title`), never fixed sizes. `just lint` runs
+  a11y-check over the views.
+- `just lint` (SwiftLint, `--strict`, `.swiftlint.yml` plus `.swiftlint-tests.yml` for tests) must
+  pass, and `just build` and `just test` run it first; fix the code rather than disable a rule
+  inline.
 
 ## Building blocks
 
@@ -163,6 +208,7 @@ Watch for these:
 | Any library code | `bazel test` for every target in `bazel query 'rdeps(//Tests/..., //Sources/X)'`, then `just test-release` |
 | `scripts/modules.py` | `just modules`, `just test` (which runs `//:package_swift_test`), `just spm` |
 | A public API the example apps call, or `Example/` | `bazel build //Example/...`, then `just run` (and `just run iOS`) to look at it |
+| A view module, or anything a view draws with | `just test` (lint, view and snapshot tests); `just record-snapshots` if it should look different, then review the images; `just spm-test` |
 
 ### Pushing
 

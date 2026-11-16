@@ -83,6 +83,8 @@
         @State private var scanProgress = ""
         @State private var fileToDelete: String?
         @State private var showDeleteAlert = false
+        /// Where VoiceOver goes when the delete alert closes: the row it came from may be gone.
+        @AccessibilityFocusState private var refreshFocused: Bool
 
         private static let scanQueue = DispatchQueue(label: "com.debugdrawer.filescan", qos: .utility)
 
@@ -96,7 +98,7 @@
                         ProgressView()
                             .controlSize(.small)
                         Text(scanProgress)
-                            .font(.system(size: 9))
+                            .font(.caption2)
                             .foregroundStyle(.tertiary)
                     }
                     Button(roots.isEmpty ? "Scan" : "Refresh") { scan() }
@@ -104,6 +106,7 @@
                         .buttonStyle(.bordered)
                         .controlSize(.small)
                         .disabled(isScanning)
+                        .accessibilityFocused($refreshFocused)
                 }
 
                 if !roots.isEmpty {
@@ -117,15 +120,15 @@
                                         .padding(.vertical, 4)
 
                                     Text(root.node.path)
-                                        .font(.system(size: 8, design: .monospaced))
+                                        .font(.system(.caption2, design: .monospaced))
                                         .foregroundStyle(.tertiary)
-                                        .lineLimit(1)
+                                        .lineLimit(3)
                                         .truncationMode(.head)
                                         .textSelection(.enabled)
 
                                     if let children = root.node.children {
                                         ForEach(children) { child in
-                                            fileRow(child, depth: 0)
+                                            FileRow(node: child, depth: 0, onDelete: askToDelete, onShare: shareFile)
                                         }
                                     }
 
@@ -141,13 +144,18 @@
                 }
             }
             .alert("Delete File", isPresented: $showDeleteAlert) {
-                Button("Cancel", role: .cancel) { fileToDelete = nil }
+                Button("Cancel", role: .cancel) {
+                    fileToDelete = nil
+                    refreshFocused = true
+                }
                 Button("Delete", role: .destructive) {
                     if let path = fileToDelete {
                         deleteFile(at: path)
                     }
                     fileToDelete = nil
+                    refreshFocused = true
                 }
+                .accessibilityLabel("Delete the file")
             } message: {
                 Text("Are you sure you want to delete this file? This cannot be undone.")
             }
@@ -163,8 +171,13 @@
             }
         }
 
-        private func shareFile(at path: String) {
-            let fileURL = URL(fileURLWithPath: path)
+        private func askToDelete(_ node: FSNode) {
+            fileToDelete = node.path
+            showDeleteAlert = true
+        }
+
+        private func shareFile(_ node: FSNode) {
+            let fileURL = URL(fileURLWithPath: node.path)
             #if os(macOS)
                 guard let window = NSApp.keyWindow else { return }
                 let picker = NSSharingServicePicker(items: [fileURL])
@@ -239,60 +252,49 @@
 
             return result
         }
+    }
 
-        private func fileRow(_ node: FSNode, depth: Int) -> AnyView {
-            AnyView(VStack(alignment: .leading, spacing: 0) {
+    /// A file or directory in the tree, a directory with its contents in a disclosure group; a
+    /// file has buttons to delete and share it.
+    struct FileRow: View {
+        let node: FSNode
+        let depth: Int
+        let onDelete: (FSNode) -> Void
+        let onShare: (FSNode) -> Void
+
+        var body: some View {
+            VStack(alignment: .leading, spacing: 0) {
                 if node.isDirectory, let children = node.children, !children.isEmpty {
                     DisclosureGroup {
                         ForEach(children) { child in
-                            fileRow(child, depth: depth + 1)
+                            FileRow(node: child, depth: depth + 1, onDelete: onDelete, onShare: onShare)
                         }
                     } label: {
-                        fileLabel(node)
+                        label
                     }
                 } else {
-                    fileLabel(node)
+                    label
                 }
             }
-            .padding(.leading, CGFloat(depth) * 8))
+            .padding(.leading, CGFloat(depth) * 8)
         }
 
-        private func fileLabel(_ node: FSNode) -> some View {
+        private var label: some View {
             HStack(spacing: 4) {
                 Image(systemName: node.isDirectory ? "folder.fill" : fileIcon(node.name))
-                    .font(.system(size: 9))
+                    .font(.caption2)
                     .foregroundStyle(node.isDirectory ? .blue : .secondary)
                     .frame(width: 14)
+                    .accessibilityHidden(true)
 
                 Text(node.name)
-                    .font(.system(size: 10, design: .monospaced))
-                    .lineLimit(1)
+                    .font(.system(.caption2, design: .monospaced))
+                    .lineLimit(3)
 
                 Spacer()
 
                 if !node.isDirectory {
-                    Text(node.sizeLabel)
-                        .font(.system(size: 8, design: .monospaced))
-                        .foregroundStyle(.tertiary)
-
-                    Button(role: .destructive) {
-                        fileToDelete = node.path
-                        showDeleteAlert = true
-                    } label: {
-                        Image(systemName: "trash")
-                            .font(.system(size: 9))
-                            .foregroundStyle(.red.opacity(0.6))
-                    }
-                    .buttonStyle(.plain)
-
-                    Button {
-                        shareFile(at: node.path)
-                    } label: {
-                        Image(systemName: "square.and.arrow.up")
-                            .font(.system(size: 9))
-                            .foregroundStyle(.secondary)
-                    }
-                    .buttonStyle(.plain)
+                    fileActions
                 }
             }
             .padding(.vertical, 2)
@@ -301,19 +303,44 @@
                     debugDrawerCopyToClipboard(node.path)
                 }
                 if !node.isDirectory {
-                    Button("Share...") {
-                        shareFile(at: node.path)
-                    }
-                    Button("Delete", role: .destructive) {
-                        fileToDelete = node.path
-                        showDeleteAlert = true
-                    }
+                    Button("Share...") { onShare(node) }
+                    Button("Delete", role: .destructive) { onDelete(node) }
+                        .accessibilityLabel("Delete \(node.name)")
                 }
                 #if os(macOS)
                     Button("Reveal in Finder") {
                         NSWorkspace.shared.selectFile(node.path, inFileViewerRootedAtPath: "")
                     }
                 #endif
+            }
+            .accessibilityHint("Its actions copy the path, share, delete or reveal it.")
+        }
+
+        private var fileActions: some View {
+            Group {
+                Text(node.sizeLabel)
+                    .font(.system(.caption2, design: .monospaced))
+                    .foregroundStyle(.tertiary)
+
+                Button(role: .destructive) {
+                    onDelete(node)
+                } label: {
+                    Image(systemName: "trash")
+                        .font(.caption2)
+                        .foregroundStyle(.red.opacity(0.6))
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Delete \(node.name)")
+
+                Button {
+                    onShare(node)
+                } label: {
+                    Image(systemName: "square.and.arrow.up")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Share \(node.name)")
             }
         }
 

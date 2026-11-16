@@ -27,15 +27,26 @@ TEST_SUPPORT = f"{PROJECT}TestSupport"
 PACKAGES = [
     # Console: reads the unified log (os_log) of the host process.
     ("oslogclient", "https://github.com/CheekyGhost-Labs/OSLogClient", "2.0.0"),
-    # Tests only: view inspection.
+    # View tests only: view inspection, snapshots, and the issue reporting snapshot failures go
+    # through (IssueReportingTestSupport routes it to Swift Testing).
     ("viewinspector", "https://github.com/nalexn/ViewInspector", "0.10.5"),
+    ("swift-snapshot-testing", "https://github.com/pointfreeco/swift-snapshot-testing", "1.19.7"),
+    ("swift-custom-dump", "https://github.com/pointfreeco/swift-custom-dump", "exact:1.7.0"),
+    ("xctest-dynamic-overlay", "https://github.com/pointfreeco/xctest-dynamic-overlay", "1.9.0"),
 ]
 
 # Packages that only Apple platforms build (Objective-C, or wrappers of Apple frameworks), by
 # identity. SwiftPM links their products on Apple platforms only and Bazel on macOS only (a
 # `select`), so the same targets still build on Linux, where the code using them is left out by
 # `#if canImport`. //:package_swift_test leaves their products out of its comparison.
-APPLE_ONLY_PACKAGES = []
+# The view tests' packages, which need SwiftUI: Linux builds the view tests without them (empty, as
+# their sources sit under `#if os(macOS)`).
+APPLE_ONLY_PACKAGES = ["viewinspector", "swift-snapshot-testing", "xctest-dynamic-overlay"]
+
+# Test targets with nothing to run off Apple platforms (all their tests under `#if os(macOS)`), by
+# name. Bazel runs them on macOS alone: elsewhere they are incompatible, so `bazel test //...` skips
+# them, where a test binary that ran no tests would fail. SwiftPM still builds them, empty, on Linux.
+APPLE_ONLY_TESTS = []
 
 # The product whose macro generates mocks. A module that depends on it is compiled with the
 # MOCKING condition in debug builds only (SwiftPM's debug configuration, Bazel's
@@ -84,20 +95,23 @@ EXECUTABLES = [
 # holds tests. (name, dependencies)
 TEST_TARGETS = [
     ("DebugDrawerTests", ["DebugDrawer", "viewinspector/ViewInspector"]),
-    ("DebugDrawerConsolePluginTests", ["DebugDrawerConsolePlugin", "DebugDrawer"]),
-    ("DebugDrawerViewInspectorPluginTests", ["DebugDrawerViewInspectorPlugin", "DebugDrawer"]),
-    ("DebugDrawerAccessibilityPluginTests", ["DebugDrawerAccessibilityPlugin", "DebugDrawer", "viewinspector/ViewInspector"]),
-    ("DebugDrawerAppInfoPluginTests", ["DebugDrawerAppInfoPlugin", "DebugDrawer", "viewinspector/ViewInspector"]),
-    ("DebugDrawerUserDefaultsPluginTests", ["DebugDrawerUserDefaultsPlugin", "DebugDrawer"]),
-    ("DebugDrawerPerformancePluginTests", ["DebugDrawerPerformancePlugin", "DebugDrawer"]),
-    ("DebugDrawerNetworkPluginTests", ["DebugDrawerNetworkPlugin", "DebugDrawer", "viewinspector/ViewInspector"]),
-    ("DebugDrawerKeychainPluginTests", ["DebugDrawerKeychainPlugin", "DebugDrawer"]),
-    ("DebugDrawerScreenshotPluginTests", ["DebugDrawerScreenshotPlugin", "DebugDrawer"]),
-    ("DebugDrawerFileBrowserPluginTests", ["DebugDrawerFileBrowserPlugin", "DebugDrawer"]),
-    ("DebugDrawerDiskIOPluginTests", ["DebugDrawerDiskIOPlugin", "DebugDrawer"]),
-    ("DebugDrawerEnergyPluginTests", ["DebugDrawerEnergyPlugin", "DebugDrawer", "viewinspector/ViewInspector"]),
-    ("DebugDrawerLaunchTimePluginTests", ["DebugDrawerLaunchTimePlugin", "DebugDrawer", "viewinspector/ViewInspector"]),
-    ("DebugDrawerLoadedLibrariesPluginTests", ["DebugDrawerLoadedLibrariesPlugin", "DebugDrawer", "viewinspector/ViewInspector"]),
+    ("DebugDrawerConsolePluginTests", ["DebugDrawerConsolePlugin", "DebugDrawer", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
+    ("DebugDrawerViewInspectorPluginTests", ["DebugDrawerViewInspectorPlugin", "DebugDrawer", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
+    ("DebugDrawerAccessibilityPluginTests", ["DebugDrawerAccessibilityPlugin", "DebugDrawer", "viewinspector/ViewInspector", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
+    ("DebugDrawerAppInfoPluginTests", ["DebugDrawerAppInfoPlugin", "DebugDrawer", "viewinspector/ViewInspector", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
+    ("DebugDrawerUserDefaultsPluginTests", ["DebugDrawerUserDefaultsPlugin", "DebugDrawer", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
+    ("DebugDrawerPerformancePluginTests", ["DebugDrawerPerformancePlugin", "DebugDrawer", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
+    ("DebugDrawerNetworkPluginTests", ["DebugDrawerNetworkPlugin", "DebugDrawer", "viewinspector/ViewInspector", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
+    ("DebugDrawerKeychainPluginTests", ["DebugDrawerKeychainPlugin", "DebugDrawer", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
+    ("DebugDrawerScreenshotPluginTests", ["DebugDrawerScreenshotPlugin", "DebugDrawer", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
+    ("DebugDrawerFileBrowserPluginTests", ["DebugDrawerFileBrowserPlugin", "DebugDrawer", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
+    ("DebugDrawerDiskIOPluginTests", ["DebugDrawerDiskIOPlugin", "DebugDrawer", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
+    ("DebugDrawerEnergyPluginTests", ["DebugDrawerEnergyPlugin", "DebugDrawer", "viewinspector/ViewInspector", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
+    ("DebugDrawerLaunchTimePluginTests", ["DebugDrawerLaunchTimePlugin", "DebugDrawer", "viewinspector/ViewInspector", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
+    ("DebugDrawerLoadedLibrariesPluginTests", ["DebugDrawerLoadedLibrariesPlugin", "DebugDrawer", "viewinspector/ViewInspector", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
+    ("DebugDrawerLocationPluginTests", ["DebugDrawerLocationPlugin", "DebugDrawer", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
+    ("DebugDrawerDeepLinkPluginTests", ["DebugDrawerDeepLinkPlugin", "DebugDrawer", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
+    ("DebugDrawerCookiesPluginTests", ["DebugDrawerCookiesPlugin", "DebugDrawer", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
 ]
 
 # The modules the test-support target depends on (fixtures are usually written against the
@@ -142,6 +156,8 @@ def performance_target(name):
 def check():
     names = [m[0] for m in MODULES]
     assert len(names) == len(set(names)), "duplicate module"
+    for name in APPLE_ONLY_TESTS:
+        assert name in dict(TEST_TARGETS), f"APPLE_ONLY_TESTS names unknown test target {name}"
     packages = [p[0] for p in PACKAGES]
     for name, deps in [(m[0], m[3]) for m in MODULES] + [(e[0], e[2]) for e in EXECUTABLES]:
         for d in deps:
@@ -254,7 +270,7 @@ def bazel_label(d):
 
 def excluded(path):
     """Non-source files SwiftPM would otherwise warn about, for the target at `path`."""
-    return [f for f in ("BUILD.bazel", "README.md", "Performance") if os.path.exists(os.path.join(ROOT, path, f))]
+    return [f for f in ("BUILD.bazel", "README.md", "Performance", "__Snapshots__") if os.path.exists(os.path.join(ROOT, path, f))]
 
 
 def exclude_arg(path):
@@ -462,6 +478,16 @@ def test_support_build_bazel():
 def test_targets_bazel(name, deps, size, srcs, tags):
     """One test module: its library, the swift_test that `bazel test` runs, and the Xcode bundle."""
     tags_attr = f"    tags = {tags},\n".replace("'", '"') if tags else ""
+    # SnapshotTesting finds a reference beside the test file through #filePath, which Bazel makes
+    # relative to the workspace, and a test runs from its runfiles: so the references go in them.
+    data_attr = ('    data = glob(["__Snapshots__/**"], allow_empty = True),\n'
+                 if "swift-snapshot-testing/SnapshotTesting" in deps else "")
+    compatible_attr = ('    target_compatible_with = select({\n'
+                       '        # APPLE_ONLY_TESTS in scripts/modules.py: nothing to run elsewhere.\n'
+                       '        "@platforms//os:macos": [],\n'
+                       '        "//conditions:default": ["@platforms//:incompatible"],\n'
+                       '    }),\n'
+                       if name in APPLE_ONLY_TESTS else "")
     return (
         "swift_library(\n"
         f'    name = "{name}Library",\n'
@@ -470,6 +496,7 @@ def test_targets_bazel(name, deps, size, srcs, tags):
         "    # references them by name.\n"
         "    alwayslink = True,\n"
         f"    srcs = {srcs},\n"
+        f"{data_attr}"
         f'    module_name = "{name}",\n'
         f"{tags_attr}"
         "    # Read by //:package_swift_test, which checks Package.swift against the Bazel graph.\n"
@@ -481,6 +508,7 @@ def test_targets_bazel(name, deps, size, srcs, tags):
         f'    name = "{name}",\n'
         f'    size = "{size}",\n'
         f"{tags_attr}"
+        f"{compatible_attr}"
         f'    deps = [":{name}Library"],\n'
         ")\n\n"
         "# The generated Xcode project: a real .xctest bundle (an MH_BUNDLE), which is what Xcode's test\n"

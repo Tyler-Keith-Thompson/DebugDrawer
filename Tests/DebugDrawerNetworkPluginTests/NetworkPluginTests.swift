@@ -73,7 +73,7 @@
                 timestamp: Date(), method: "POST", url: "", host: "", path: "",
                 requestHeaders: [:], requestBody: nil, isComplete: true
             )
-            entry.responseBody = "{\"key\":\"value\"}".data(using: .utf8)
+            entry.responseBody = Data("{\"key\":\"value\"}".utf8)
             XCTAssertNotNil(entry.prettyResponseBody)
             XCTAssertTrue(entry.prettyResponseBody!.contains("key"))
         }

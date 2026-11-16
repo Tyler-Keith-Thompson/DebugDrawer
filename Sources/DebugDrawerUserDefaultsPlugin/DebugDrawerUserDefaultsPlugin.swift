@@ -23,9 +23,9 @@
         var filteredEntries: [DefaultsEntry] {
             var result = showSystemKeys ? entries : entries.filter { !isSystemKey($0.key) }
             if !searchText.isEmpty {
-                let q = searchText.lowercased()
+                let query = searchText.lowercased()
                 result = result.filter {
-                    $0.key.lowercased().contains(q) || $0.value.lowercased().contains(q)
+                    $0.key.lowercased().contains(query) || $0.value.lowercased().contains(query)
                 }
             }
             return result
@@ -34,7 +34,7 @@
         private static let systemPrefixes = [
             "NS", "Apple", "AK", "com.apple.", "WebKit",
             "Country", "AddressBook", "PKLog", "INNext",
-            "METAL_", "MTL", "CTDirtyCount",
+            "METAL_", "MTL", "CTDirtyCount"
         ]
 
         private func isSystemKey(_ key: String) -> Bool {
@@ -71,13 +71,13 @@
 
         private func describeValue(_ value: Any) -> String {
             switch value {
-            case let s as String: return s
-            case let n as NSNumber:
-                if CFBooleanGetTypeID() == CFGetTypeID(n) {
-                    return n.boolValue ? "true" : "false"
+            case let string as String: return string
+            case let number as NSNumber:
+                if CFBooleanGetTypeID() == CFGetTypeID(number) {
+                    return number.boolValue ? "true" : "false"
                 }
-                return n.stringValue
-            case let d as Date: return d.formatted()
+                return number.stringValue
+            case let date as Date: return date.formatted()
             case let data as Data: return "<Data: \(data.count) bytes>"
             case let arr as [Any]: return "[\(arr.count) items]"
             case let dict as [String: Any]: return "{\(dict.count) keys}"
@@ -88,9 +88,9 @@
         private func typeLabel(_ value: Any) -> String {
             switch value {
             case is String: return "String"
-            case let n as NSNumber:
-                if CFBooleanGetTypeID() == CFGetTypeID(n) { return "Bool" }
-                if n === kCFBooleanTrue || n === kCFBooleanFalse { return "Bool" }
+            case let number as NSNumber:
+                if CFBooleanGetTypeID() == CFGetTypeID(number) { return "Bool" }
+                if number === kCFBooleanTrue || number === kCFBooleanFalse { return "Bool" }
                 return "Number"
             case is Date: return "Date"
             case is Data: return "Data"
@@ -118,8 +118,7 @@
     struct UserDefaultsPluginView: View {
         @ObservedObject private var store = UserDefaultsStore.shared
         @State private var selectedKey: String?
-        @State private var editValue = ""
-        @State private var confirmDelete: String?
+        @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
         var body: some View {
             VStack(alignment: .leading, spacing: 6) {
@@ -140,19 +139,32 @@
                 TextField("Filter...", text: $store.searchText)
                     .textFieldStyle(.roundedBorder)
                     .controlSize(.small)
+                    .accessibilityLabel("Filter keys and values")
 
                 ScrollViewReader { proxy in
                     ScrollView {
                         LazyVStack(alignment: .leading, spacing: 0) {
                             ForEach(store.filteredEntries) { entry in
-                                entryRow(entry)
-                                    .id(entry.key)
+                                DefaultsEntryRow(
+                                    entry: entry,
+                                    isSelected: selectedKey == entry.key,
+                                    onSelect: { selectedKey = selectedKey == entry.key ? nil : entry.key },
+                                    onSet: { value in
+                                        store.setValue(entry.key, value)
+                                        selectedKey = nil
+                                    },
+                                    onDelete: {
+                                        store.deleteKey(entry.key)
+                                        selectedKey = nil
+                                    }
+                                )
+                                .id(entry.key)
                             }
                         }
                     }
                     .onChange(of: selectedKey) { _, newKey in
                         if let key = newKey {
-                            withAnimation {
+                            withAnimation(reduceMotion ? nil : .default) {
                                 proxy.scrollTo(key, anchor: .bottom)
                             }
                         }
@@ -163,68 +175,60 @@
                 .clipShape(RoundedRectangle(cornerRadius: 4))
             }
         }
+    }
 
-        private func entryRow(_ entry: DefaultsEntry) -> some View {
-            let isSelected = selectedKey == entry.key
-            return VStack(alignment: .leading, spacing: 2) {
-                Button(action: {
-                    selectedKey = isSelected ? nil : entry.key
-                    editValue = entry.value
-                }) {
-                    HStack(spacing: 4) {
-                        Text(entry.key)
-                            .font(.system(size: 10, design: .monospaced))
-                            .lineLimit(1)
-                            .truncationMode(.middle)
+    /// A key and its value's type; selected, it shows the value, controls to change it (Bool,
+    /// String and Number values) and a button to delete the key, which asks first.
+    struct DefaultsEntryRow: View {
+        let entry: DefaultsEntry
+        let isSelected: Bool
+        let onSelect: () -> Void
+        let onSet: (Any) -> Void
+        let onDelete: () -> Void
+        @State private var editValue: String
+        @State private var isConfirmingDelete = false
 
-                        Spacer()
+        init(
+            entry: DefaultsEntry,
+            isSelected: Bool,
+            onSelect: @escaping () -> Void,
+            onSet: @escaping (Any) -> Void,
+            onDelete: @escaping () -> Void
+        ) {
+            self.entry = entry
+            self.isSelected = isSelected
+            self.onSelect = onSelect
+            self.onSet = onSet
+            self.onDelete = onDelete
+            _editValue = State(initialValue: entry.value)
+        }
 
-                        Text(entry.type)
-                            .font(.system(size: 8, weight: .medium, design: .monospaced))
-                            .padding(.horizontal, 3)
-                            .background(typeColor(entry.type).opacity(0.15))
-                            .cornerRadius(2)
-                    }
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 3)
-                    .contentShape(Rectangle())
+        var body: some View {
+            VStack(alignment: .leading, spacing: 2) {
+                Button(action: onSelect) {
+                    summary
                 }
                 .buttonStyle(.plain)
+                .accessibilityAddTraits(isSelected ? .isSelected : [])
 
                 if isSelected {
                     VStack(alignment: .leading, spacing: 4) {
-                        // Current value
                         Text(entry.value)
-                            .font(.system(size: 10, design: .monospaced))
+                            .font(.system(.caption2, design: .monospaced))
                             .textSelection(.enabled)
                             .padding(4)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .background(Color.primary.opacity(0.05))
                             .cornerRadius(3)
 
-                        // Edit controls
-                        editControls(entry)
+                        editControls
 
-                        // Delete
                         HStack {
                             Spacer()
-                            if confirmDelete == entry.key {
-                                Text("Sure?")
-                                    .font(.caption)
-                                    .foregroundStyle(.red)
-                                Button("Yes") {
-                                    store.deleteKey(entry.key)
-                                    confirmDelete = nil
-                                    selectedKey = nil
-                                }
-                                .controlSize(.small)
-                                .buttonStyle(.borderedProminent)
-                                .tint(.red)
-                                Button("Cancel") { confirmDelete = nil }
-                                    .controlSize(.small)
-                                    .buttonStyle(.bordered)
+                            if isConfirmingDelete {
+                                deleteConfirmation
                             } else {
-                                Button("Delete") { confirmDelete = entry.key }
+                                Button("Delete") { isConfirmingDelete = true }
                                     .controlSize(.small)
                                     .buttonStyle(.bordered)
                                     .foregroundStyle(.red)
@@ -237,53 +241,96 @@
 
                 Divider().padding(.leading, 6)
             }
+            .onChange(of: isSelected) {
+                if isSelected { editValue = entry.value }
+            }
+        }
+
+        private var summary: some View {
+            HStack(spacing: 4) {
+                Text(entry.key)
+                    .font(.system(.caption2, design: .monospaced))
+                    .lineLimit(3)
+                    .truncationMode(.middle)
+
+                Spacer()
+
+                Text(entry.type)
+                    .font(.system(.caption2, design: .monospaced, weight: .medium))
+                    .padding(.horizontal, 3)
+                    .background(typeColor(entry.type).opacity(0.15))
+                    .cornerRadius(2)
+            }
+            .padding(.horizontal, 6)
+            .padding(.vertical, 3)
+            .contentShape(Rectangle())
+        }
+
+        private var deleteConfirmation: some View {
+            HStack {
+                Text("Sure?")
+                    .font(.caption)
+                    .foregroundStyle(.red)
+                Button("Yes") {
+                    isConfirmingDelete = false
+                    onDelete()
+                }
+                .controlSize(.small)
+                .buttonStyle(.borderedProminent)
+                .tint(.red)
+                Button("Cancel") { isConfirmingDelete = false }
+                    .controlSize(.small)
+                    .buttonStyle(.bordered)
+            }
+            .accessibilityElement(children: .contain)
+            .accessibilityLabel("Delete \(entry.key)?")
         }
 
         @ViewBuilder
-        private func editControls(_ entry: DefaultsEntry) -> some View {
+        private var editControls: some View {
             switch entry.type {
             case "Bool":
                 HStack {
                     Text("Value:")
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                    Picker(selection: boolBinding(for: entry.key, current: entry.rawValue as? NSNumber)) {
+                    Picker("Value", selection: Binding(
+                        get: { (entry.rawValue as? NSNumber)?.boolValue ?? false },
+                        set: { onSet($0) }
+                    )) {
                         Text("true").tag(true)
                         Text("false").tag(false)
-                    } label: { EmptyView() }
-                        .pickerStyle(.segmented)
-                        .controlSize(.small)
-                        .frame(width: 120)
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                    .controlSize(.small)
+                    .frame(width: 120)
+                    .accessibilityLabel("Value of \(entry.key)")
+                    .accessibilityElement(children: .contain)
                 }
 
             case "String":
                 HStack {
-                    TextField("New value", text: $editValue)
-                        .textFieldStyle(.roundedBorder)
+                    valueField
+                    Button("Set") { onSet(editValue) }
                         .controlSize(.small)
-                    Button("Set") {
-                        store.setValue(entry.key, editValue)
-                        selectedKey = nil
-                    }
-                    .controlSize(.small)
-                    .buttonStyle(.bordered)
+                        .buttonStyle(.bordered)
+                        .accessibilityLabel("Set \(entry.key)")
                 }
 
             case "Number":
                 HStack {
-                    TextField("New value", text: $editValue)
-                        .textFieldStyle(.roundedBorder)
-                        .controlSize(.small)
+                    valueField
                     Button("Set") {
-                        if let d = Double(editValue) {
-                            store.setValue(entry.key, d)
-                        } else if let i = Int(editValue) {
-                            store.setValue(entry.key, i)
+                        if let number = Double(editValue) {
+                            onSet(number)
+                        } else if let integer = Int(editValue) {
+                            onSet(integer)
                         }
-                        selectedKey = nil
                     }
                     .controlSize(.small)
                     .buttonStyle(.bordered)
+                    .accessibilityLabel("Set \(entry.key)")
                 }
 
             default:
@@ -293,11 +340,11 @@
             }
         }
 
-        private func boolBinding(for key: String, current: NSNumber?) -> Binding<Bool> {
-            Binding(
-                get: { current?.boolValue ?? false },
-                set: { store.setValue(key, $0) }
-            )
+        private var valueField: some View {
+            TextField("New value", text: $editValue)
+                .textFieldStyle(.roundedBorder)
+                .controlSize(.small)
+                .accessibilityLabel("New value for \(entry.key)")
         }
 
         private func typeColor(_ type: String) -> Color {

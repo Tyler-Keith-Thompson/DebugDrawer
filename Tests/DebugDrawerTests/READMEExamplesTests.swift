@@ -26,7 +26,7 @@
             [
                 DebugDrawerAction("Expire token", keywords: ["auth", "logout"]) {
                     UserDefaults.standard.removeObject(forKey: "authToken")
-                },
+                }
             ]
         }
     }

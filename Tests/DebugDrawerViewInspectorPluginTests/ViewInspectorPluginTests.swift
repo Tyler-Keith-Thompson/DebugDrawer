@@ -36,13 +36,13 @@
             tracker.recordRender("TestView")
             tracker.recordRender("OtherView")
 
-            // Counts are in backing storage (_counts), published values flush async
-            XCTAssertEqual(tracker._counts["TestView"], 2)
-            XCTAssertEqual(tracker._counts["OtherView"], 1)
+            // Counts are in backing storage (pendingCounts), published values flush async
+            XCTAssertEqual(tracker.pendingCounts["TestView"], 2)
+            XCTAssertEqual(tracker.pendingCounts["OtherView"], 1)
 
             tracker.reset()
             tracker.isEnabled = false
-            XCTAssertEqual(tracker._counts.count, 0)
+            XCTAssertEqual(tracker.pendingCounts.count, 0)
         }
 
         func testRenderTrackerDisabledSkips() {
