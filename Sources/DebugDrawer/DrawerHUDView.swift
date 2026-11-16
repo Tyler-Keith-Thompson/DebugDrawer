@@ -41,10 +41,16 @@
         private var card: some View {
             VStack(alignment: .leading, spacing: 6) {
                 ForEach(readouts) { plugin in
-                    plugin.hud
-                        .contextMenu {
-                            Button("Remove \(plugin.title) from HUD") { unpin(plugin.id) }
-                        }
+                    // watchOS deprecates context menus, so there a readout leaves the HUD only
+                    // through DebugDrawer.toggleHUD(forPlugin:).
+                    #if os(watchOS)
+                        plugin.hud
+                    #else
+                        plugin.hud
+                            .contextMenu {
+                                Button("Remove \(plugin.title) from HUD") { unpin(plugin.id) }
+                            }
+                    #endif
                 }
             }
             .padding(8)

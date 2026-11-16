@@ -98,6 +98,8 @@ EXTRA_PLATFORMS = {
     "visionOS": ("1.0", ["DebugDrawer"]),
     # tvOS 17 shipped with iOS 17's SwiftUI.
     "tvOS": ("17.0", ["DebugDrawer"]),
+    # watchOS 10 shipped with iOS 17's SwiftUI.
+    "watchOS": ("10.0", ["DebugDrawer"]),
 }
 
 # Executables: (name, description, dependencies). Each is an `.executableTarget` and product in
@@ -157,7 +159,7 @@ PERFORMANCE_TEST_SIZE = "medium"
 RELEASE_EXCLUDED_TAG = "debug-only"
 
 # Keep in step with .bazelrc's --macos_minimum_os, IOS_MINIMUM and EXTRA_PLATFORMS.
-PLATFORMS = '[.macOS(.v15), .iOS(.v17), .visionOS(.v1), .tvOS(.v17)]'
+PLATFORMS = '[.macOS(.v15), .iOS(.v17), .visionOS(.v1), .tvOS(.v17), .watchOS(.v10)]'
 MACOS_MINIMUM = "15.0"
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))

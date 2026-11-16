@@ -76,6 +76,8 @@
                 "visionOS"
             #elseif os(tvOS)
                 "tvOS"
+            #elseif os(watchOS)
+                "watchOS"
             #else
                 "iOS"
             #endif

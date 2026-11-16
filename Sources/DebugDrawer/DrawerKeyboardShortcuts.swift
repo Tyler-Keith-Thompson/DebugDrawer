@@ -1,4 +1,5 @@
-#if DEBUG
+// watchOS has no keyboard shortcuts, and its drawer is a navigation list (DrawerWatchList).
+#if DEBUG && !os(watchOS)
     import SwiftUI
 
     /// The open drawer's keyboard shortcuts, as hidden buttons. The drawer shows them only while it

@@ -61,11 +61,12 @@ test-release:
 resolve:
     cd {{PROJECT_ROOT}}/swift && {{SWIFT}} package resolve
 
-[doc('Build via SwiftPM too, to verify the published package (the Mac, then the visionOS and tvOS modules)')]
+[doc('Build via SwiftPM too, to verify the published package (the Mac, then the visionOS, tvOS and watchOS modules)')]
 spm:
     {{SWIFT}} build
     just spm-visionos
     just spm-tvos
+    just spm-watchos
 
 # `swift build` builds for the host only, so xcodebuild builds the modules ported to another
 # platform (EXTRA_PLATFORMS in scripts/modules.py) for its simulator, from the same Package.swift.
@@ -83,6 +84,9 @@ spm-visionos: (spm-platform "visionOS")
 
 [doc('Build the tvOS modules through SwiftPM for the tvOS simulator')]
 spm-tvos: (spm-platform "tvOS")
+
+[doc('Build the watchOS modules through SwiftPM for the watchOS simulator')]
+spm-watchos: (spm-platform "watchOS")
 
 [doc('Run the tests via SwiftPM')]
 spm-test *args="":
@@ -113,11 +117,12 @@ generate *args="":
 release:
     {{BAZEL_RELEASE}} build --config=release //...
 
-# The simulators `just run visionOS` and `just run tvOS` boot, by name.
+# The simulators `just run visionOS`, `just run tvOS` and `just run watchOS` boot, by name.
 VISIONOS_DEVICE := env("VISIONOS_DEVICE", "Apple Vision Pro")
 TVOS_DEVICE := env("TVOS_DEVICE", "Apple TV 4K (4th generation)")
+WATCHOS_DEVICE := env("WATCHOS_DEVICE", "Apple Watch Series 12 (46mm)")
 
-[doc('Build and launch an example app: just run, just run iOS, just run visionOS or just run tvOS')]
+[doc('Build and launch an example app: just run, just run iOS, just run visionOS, just run tvOS or just run watchOS')]
 run target="macOS" *args="":
     #!/usr/bin/env bash
     set -euo pipefail
@@ -130,10 +135,12 @@ run target="macOS" *args="":
         mkdir -p "$run_dir"
         {{BAZEL}} build "//Example:$target"
         local output
-        output=$({{BAZEL}} cquery "//Example:$target" --output=files 2>/dev/null | grep -E '\.(app|ipa)$')
-        # rules_apple hands visionOS a bundle and tvOS an .ipa, whose Payload holds the bundle.
+        output=$({{BAZEL}} cquery "//Example:$target" --output=files 2>/dev/null | grep -E '\.(app|ipa|zip)$')
+        # rules_apple hands visionOS a bundle, tvOS an .ipa, whose Payload holds the bundle, and
+        # watchOS a .zip of the bundle.
         case "$output" in
             *.ipa) unzip -qo "$output" -d "$run_dir" && mv "$run_dir/Payload/"*.app "$run_dir/" ;;
+            *.zip) unzip -qo "$output" -d "$run_dir" ;;
             *) cp -RL "$output" "$run_dir/" ;;
         esac
         chmod -R u+w "$run_dir"
@@ -163,8 +170,12 @@ run target="macOS" *args="":
             run_in_simulator ExampleApp_tvOS "{{TVOS_DEVICE}}" com.debugdrawer.example.tvos \
                 /tmp/debugdrawer-example-tvos
             ;;
+        watchOS|watchos)
+            run_in_simulator ExampleApp_watchOS "{{WATCHOS_DEVICE}}" com.debugdrawer.example.watchos \
+                /tmp/debugdrawer-example-watchos
+            ;;
         *)
-            echo "Unknown target: {{target}}. Use 'macOS', 'iOS', 'visionOS' or 'tvOS'"
+            echo "Unknown target: {{target}}. Use 'macOS', 'iOS', 'visionOS', 'tvOS' or 'watchOS'"
             exit 1
             ;;
     esac

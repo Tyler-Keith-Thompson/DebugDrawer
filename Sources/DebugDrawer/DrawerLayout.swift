@@ -44,12 +44,21 @@
                 .map(\.element)
             let categories = Set(unpinned.map(\.category)).sorted(by: DrawerSection.categoryPrecedes)
             let grouped = categories.map { category in
-                DrawerSection(isPinned: false, title: category, plugins: unpinned.filter { $0.category == category })
+                DrawerSection(kind: .category, title: category, plugins: unpinned.filter { $0.category == category })
             }
             let pinnedSection = pinnedPlugins.isEmpty
                 ? []
-                : [DrawerSection(isPinned: true, title: "Pinned", plugins: pinnedPlugins)]
+                : [DrawerSection(kind: .pinned, title: "Pinned", plugins: pinnedPlugins)]
             return pinnedSection + grouped
+        }
+
+        /// Every plugin the drawer lists, grouped as it shows them: the `local` plugins first, in
+        /// their order, under Local, then the `global` ones as ``sections(for:)`` groups them.
+        ///
+        /// - Complexity: O(*n* log *n*) in the number of plugins.
+        func sections(local: [AnyDebugDrawerPlugin], global: [AnyDebugDrawerPlugin]) -> [DrawerSection] {
+            let localSection = local.isEmpty ? [] : [DrawerSection(kind: .local, title: "Local", plugins: local)]
+            return localSection + sections(for: global)
         }
 
         /// Pins the plugin at the end of the pinned group, or unpins it.
@@ -72,24 +81,39 @@
             let to = min(max(from + offset, 0), ids.count - 1)
             guard from != to else { return }
             ids.insert(ids.remove(at: from), at: to)
-            if section.isPinned {
+            if section.kind == .pinned {
                 pinned = ids
             } else {
-                order = sections.filter { !$0.isPinned }
+                order = sections.filter { $0.kind == .category }
                     .flatMap { $0.id == section.id ? ids : $0.plugins.map(\.id) }
             }
         }
     }
 
-    /// One group of the drawer's global plugins.
+    /// One group of the drawer's plugins.
     struct DrawerSection: Identifiable {
-        /// The pinned plugins' group rather than a category.
-        let isPinned: Bool
+        /// What groups the plugins.
+        enum Kind: Equatable {
+            /// The local plugins, registered by the views on screen.
+            case local
+            /// The global plugins the user pinned.
+            case pinned
+            /// The unpinned global plugins of one category, the section's title.
+            case category
+        }
+
+        let kind: Kind
         let title: String
         let plugins: [AnyDebugDrawerPlugin]
 
-        // A category may be titled "Pinned" too.
-        var id: String { isPinned ? "pinned" : "category:\(title)" }
+        // A category may be titled "Pinned" or "Local" too.
+        var id: String {
+            switch kind {
+            case .local: "local"
+            case .pinned: "pinned"
+            case .category: "category:\(title)"
+            }
+        }
     }
 
     extension DrawerLayout {

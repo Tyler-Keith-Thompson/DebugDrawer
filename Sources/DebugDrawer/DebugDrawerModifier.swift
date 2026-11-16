@@ -22,12 +22,7 @@
                         .opacity(drawer.isHUDHidden ? 0 : 1)
                     }
                 }
-                .drawerPresentation(isOpen: drawer.isOpen) {
-                    DebugDrawerOverlay(drawer: drawer)
-                        .accessibilityIdentifier(debugDrawerOverlayIdentifier)
-                        .background(DebugDrawerTagView())
-                        .allowsHitTesting(drawer.isOpen)
-                }
+                .drawerPresentation(drawer: drawer)
                 .overlay(alignment: .topTrailing) {
                     // A toast exists only while the drawer is closed; opening it is the toast's job.
                     if !drawer.isOpen, let toast = drawer.toast {
@@ -48,23 +43,62 @@
     // MARK: - Presentation
 
     extension View {
-        /// Places the drawer's panel: an overlay along the window's trailing edge, or on visionOS an
-        /// ornament beside the window.
+        /// Places the drawer: a panel in an overlay along the window's trailing edge, on visionOS
+        /// in an ornament beside the window, and on watchOS a full-screen list of the plugins.
         @ViewBuilder
-        fileprivate func drawerPresentation(isOpen: Bool, @ViewBuilder panel: () -> some View) -> some View {
-            #if os(visionOS)
-                // An ornament, not a separate window: it needs no scene from the host (a window
-                // would need a WindowGroup the app declares and an openWindow call), it moves with
-                // the app's window and stays beside it instead of floating wherever the system puts
-                // a new window, and it covers none of the app, which an overlay on a spatial window
-                // would. It takes the window's height, so the plugin list scrolls as it does in the
-                // overlay.
-                modifier(DrawerOrnament(isOpen: isOpen, panel: panel()))
+        fileprivate func drawerPresentation(drawer: DebugDrawer) -> some View {
+            #if os(watchOS)
+                // A watch has no room beside the app, so the drawer covers it, as a navigation
+                // list (DrawerWatchList). Its Close button closes the drawer, and a dismissal by the
+                // system closes it too (isOpenBinding).
+                fullScreenCover(isPresented: drawer.isOpenBinding) {
+                    DrawerWatchList(drawer: drawer)
+                        .accessibilityIdentifier(debugDrawerOverlayIdentifier)
+                }
             #else
-                overlay(alignment: .trailing, content: panel)
+                drawerPanel(isOpen: drawer.isOpen) {
+                    DebugDrawerOverlay(drawer: drawer)
+                        .accessibilityIdentifier(debugDrawerOverlayIdentifier)
+                        .background(DebugDrawerTagView())
+                        .allowsHitTesting(drawer.isOpen)
+                }
             #endif
         }
+
+        #if !os(watchOS)
+            /// The drawer's panel: an overlay along the window's trailing edge, or on visionOS an
+            /// ornament beside the window.
+            @ViewBuilder
+            private func drawerPanel(isOpen: Bool, @ViewBuilder panel: () -> some View) -> some View {
+                #if os(visionOS)
+                    // An ornament, not a separate window: it needs no scene from the host (a window
+                    // would need a WindowGroup the app declares and an openWindow call), it moves
+                    // with the app's window and stays beside it instead of floating wherever the
+                    // system puts a new window, and it covers none of the app, which an overlay on a
+                    // spatial window would. It takes the window's height, so the plugin list scrolls
+                    // as it does in the overlay.
+                    modifier(DrawerOrnament(isOpen: isOpen, panel: panel()))
+                #else
+                    overlay(alignment: .trailing, content: panel)
+                #endif
+            }
+        #endif
     }
+
+    #if os(watchOS)
+        extension DebugDrawer {
+            /// Whether the drawer is open, for a presentation the system can also dismiss: the
+            /// system's dismissal closes the drawer through ``toggle()``.
+            fileprivate var isOpenBinding: Binding<Bool> {
+                Binding(
+                    get: { self.isOpen },
+                    set: { isPresented in
+                        if isPresented != self.isOpen { self.toggle() }
+                    }
+                )
+            }
+        }
+    #endif
 
     #if os(visionOS)
         /// The drawer's panel in an ornament on the window's trailing edge, as tall as the window.
@@ -100,6 +134,7 @@
             func updateNSView(_: NSView, context _: Context) {}
         }
     #elseif os(iOS) || os(visionOS) || os(tvOS)
+        // watchOS has no UIView to tag, and its drawer is a SwiftUI list (DrawerWatchList).
         struct DebugDrawerTagView: UIViewRepresentable {
             func makeUIView(context _: Context) -> UIView {
                 let view = UIView()

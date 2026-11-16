@@ -9,8 +9,9 @@ to a no-op outside `DEBUG`, so builds that ship to end users carry none of it.
 DebugDrawer requires Swift 6.3 and supports macOS 15 and iOS 17 or later. The core module,
 `DebugDrawer` (the drawer, the plugin protocol and the shared views), also builds for visionOS 1
 or later, where the drawer opens in an ornament beside the window rather than over it, and for
-tvOS 17 or later, where the remote's focus moves through it (Apple TV, below). The shipped plugins
-build for macOS and iOS only so far, so a visionOS or tvOS app registers plugins of its own.
+tvOS 17 or later, where the remote's focus moves through it (Apple TV, below), and for watchOS 10
+or later, where it is a list of the plugins (Apple Watch, below). The shipped plugins build for
+macOS and iOS only so far, so a visionOS, tvOS or watchOS app registers plugins of its own.
 
 ```swift
 dependencies: [
@@ -316,6 +317,20 @@ tvOS has no pasteboard and no share sheet, so `DebugDrawerCopyButton` draws noth
 bug report names the zip's full path in the app's container instead of offering to share it. The
 HUD stays at its corner, since tvOS has no drag.
 
+### Apple Watch
+
+On watchOS the drawer covers the app, since a watch has no room beside it: `toggle()` opens a
+full-screen list of the plugins, grouped as elsewhere (Local, Pinned, then each category, with
+the pinned plugins and order the drawer saved), and a row opens that plugin's view, which the
+Digital Crown scrolls. The Close button closes it, and opening a toast goes straight to its
+plugin. The library binds no gesture, so the app opens the drawer from its own interface, such as
+a button.
+
+The watch list has no search, collapsing, pinning or Create a bug report; `createReport(in:)` is
+still there to call. watchOS has no pasteboard, so `DebugDrawerCopyButton` draws nothing there,
+and a HUD readout leaves the HUD through `toggleHUD(forPlugin:)`, since watchOS has no context
+menus.
+
 ### Optional modifiers
 
 ```swift
@@ -365,7 +380,7 @@ Bazel is the development build; SwiftPM is the published package. Both are gener
 | `just lint` | SwiftLint and a11y-check over every first-party target |
 | `just record-snapshots` | Every snapshot reference, re-recorded into the workspace |
 | `just generate` | An Xcode project from the Bazel graph |
-| `just run [macOS\|iOS\|visionOS\|tvOS]` | Build and launch the example app |
+| `just run [macOS\|iOS\|visionOS\|tvOS\|watchOS]` | Build and launch the example app |
 
 `AGENTS.md` describes the layout, the workflow and the house rules in full.
 

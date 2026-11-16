@@ -1,4 +1,5 @@
-#if DEBUG
+// watchOS shows the plugins as a navigation list instead (DrawerWatchList).
+#if DEBUG && !os(watchOS)
     import SwiftUI
 
     // MARK: - Drawer overlay view
@@ -166,20 +167,13 @@
                 if !drawer.hasPlugins {
                     DrawerEmptyState()
                 } else {
+                    // Local plugins first (contextual tools take precedence), then the global ones:
+                    // pinned first, then by category.
                     LazyVStack(spacing: 0) {
-                        // Local plugins first — contextual tools take precedence
-                        if !drawer.localPlugins.isEmpty {
-                            DrawerSectionHeader(title: "Local")
-                            ForEach(drawer.localPlugins) { plugin in
-                                pluginSection(plugin, isGlobal: false)
-                            }
-                        }
-
-                        // Global plugins: pinned first, then by category
-                        ForEach(layout.sections(for: drawer.globalPlugins)) { section in
+                        ForEach(sections) { section in
                             DrawerSectionHeader(title: section.title)
                             ForEach(section.plugins) { plugin in
-                                pluginSection(plugin, isGlobal: true)
+                                pluginSection(plugin, isGlobal: section.kind != .local)
                             }
                         }
                     }
@@ -194,9 +188,13 @@
             }
         }
 
+        private var sections: [DrawerSection] {
+            layout.sections(local: drawer.localPlugins, global: drawer.globalPlugins)
+        }
+
         /// The plugins in the order the list shows them.
         private var listedPluginIDs: [String] {
-            drawer.localPlugins.map(\.id) + layout.sections(for: drawer.globalPlugins).flatMap { $0.plugins.map(\.id) }
+            sections.flatMap { $0.plugins.map(\.id) }
         }
 
         /// Scrolls the list to the plugin `step` places from the one at its top, and moves keyboard

@@ -181,5 +181,72 @@
 
             #expect(actual.isEmpty)
         }
+
+        @Test("Local plugins come first, in their order, under Local, then the pinned and categorized global ones")
+        func localPluginsComeFirst() {
+            let local = [AnyDebugDrawerPlugin(LayoutUncategorized()), AnyDebugDrawerPlugin(LayoutKeychain())]
+            let global = [AnyDebugDrawerPlugin(LayoutConsole()), AnyDebugDrawerPlugin(LayoutNetwork())]
+            var sut = DrawerLayout()
+            sut.togglePin("LayoutNetwork")
+            let expected = ["local Local: Custom, Keychain", "pinned Pinned: Network", "category:Logs Logs: Console"]
+
+            let actual = sut.sections(local: local, global: global)
+                .map { "\($0.id) \($0.title): " + $0.plugins.map(\.title).joined(separator: ", ") }
+
+            #expect(actual == expected)
+        }
+
+        @Test("Without local plugins the list has no Local group, only the global ones'")
+        func noLocalPluginsGiveNoLocalGroup() {
+            let global = [AnyDebugDrawerPlugin(LayoutConsole()), AnyDebugDrawerPlugin(LayoutKeychain())]
+            let sut = DrawerLayout()
+            let expected = sut.sections(for: global).map(\.id)
+
+            let actual = sut.sections(local: [], global: global).map(\.id)
+
+            #expect(actual == expected)
+        }
+
+        @Test("Local plugins alone give one Local group")
+        func localPluginsAloneGiveOneGroup() {
+            let local = [AnyDebugDrawerPlugin(LayoutConsole())]
+            let expected: [DrawerSection.Kind] = [.local]
+
+            let actual = DrawerLayout().sections(local: local, global: []).map(\.kind)
+
+            #expect(actual == expected)
+        }
+
+        @Test("A category titled Local or Pinned keeps an ID apart from the Local and Pinned groups")
+        func categoryIDsStayApartFromLocalAndPinned() {
+            struct LocalCategory: DebugDrawerPlugin {
+                var title = "Local Tool"
+                var icon = "gear"
+                var category = "Local"
+                var body: some View { EmptyView() }
+            }
+            struct PinnedCategory: DebugDrawerPlugin {
+                var title = "Pinned Tool"
+                var icon = "gear"
+                var category = "Pinned"
+                var body: some View { EmptyView() }
+            }
+            var sut = DrawerLayout()
+            sut.togglePin("LayoutConsole")
+            let local = [AnyDebugDrawerPlugin(LayoutKeychain())]
+            let global = [AnyDebugDrawerPlugin(LayoutConsole()), AnyDebugDrawerPlugin(LocalCategory()), AnyDebugDrawerPlugin(PinnedCategory())]
+            let expected = ["local", "pinned", "category:Local", "category:Pinned"]
+
+            let actual = sut.sections(local: local, global: global).map(\.id)
+
+            #expect(actual == expected)
+        }
+
+        @Test("No plugins at all give no groups")
+        func noLocalOrGlobalPluginsGiveNoGroups() {
+            let actual = DrawerLayout().sections(local: [], global: [])
+
+            #expect(actual.isEmpty)
+        }
     }
 #endif

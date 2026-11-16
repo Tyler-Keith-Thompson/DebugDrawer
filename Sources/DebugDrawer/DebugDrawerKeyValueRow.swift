@@ -42,8 +42,14 @@ public struct DebugDrawerKeyValueRow: View {
 
 #if DEBUG
     extension DebugDrawerKeyValueRow {
+        /// The label sits above the value at accessibility sizes, and always on a watch, whose
+        /// screen leaves a value beside a label column too little room.
         private var isStacked: Bool {
-            dynamicTypeSize.isAccessibilitySize
+            #if os(watchOS)
+                true
+            #else
+                dynamicTypeSize.isAccessibilitySize
+            #endif
         }
 
         private var content: some View {

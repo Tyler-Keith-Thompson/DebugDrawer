@@ -19,15 +19,19 @@ extension CGFloat {
 
     #if os(macOS)
         import AppKit
-    #elseif os(iOS) || os(visionOS) || os(tvOS)
+    #elseif canImport(UIKit)
         import UIKit
+    #endif
+    #if os(watchOS)
+        import WatchKit
     #endif
 
     /// Cross-platform clipboard helper.
     ///
-    /// Unavailable on tvOS, which has no pasteboard: a call there fails to compile rather than
-    /// silently copying nothing.
+    /// Unavailable on tvOS and watchOS, which have no pasteboard: a call there fails to compile
+    /// rather than silently copying nothing.
     @available(tvOS, unavailable)
+    @available(watchOS, unavailable)
     public func debugDrawerCopyToClipboard(_ string: String) {
         #if os(macOS)
             NSPasteboard.general.clearContents()
@@ -39,8 +43,9 @@ extension CGFloat {
 
     /// Cross-platform image copy.
     ///
-    /// Unavailable on tvOS, which has no pasteboard.
+    /// Unavailable on tvOS and watchOS, which have no pasteboard.
     @available(tvOS, unavailable)
+    @available(watchOS, unavailable)
     public func debugDrawerCopyImageToClipboard(_ image: PlatformImage) {
         #if os(macOS)
             let pb = NSPasteboard.general
@@ -58,28 +63,30 @@ extension CGFloat {
             NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
         #elseif os(iOS) || os(visionOS) || os(tvOS)
             UIAccessibility.isReduceMotionEnabled
+        #elseif os(watchOS)
+            WKAccessibilityIsReduceMotionEnabled()
         #else
             false
         #endif
     }
 
     extension View {
-        /// Lets the user select and copy the text, where the platform can: tvOS has neither text
-        /// selection nor a pasteboard, so there the text is only shown.
+        /// Lets the user select and copy the text, where the platform can: tvOS and watchOS have
+        /// neither text selection nor a pasteboard, so there the text is only shown.
         @ViewBuilder
         func debugDrawerTextSelection() -> some View {
-            #if os(tvOS)
+            #if os(tvOS) || os(watchOS)
                 self
             #else
                 textSelection(.enabled)
             #endif
         }
 
-        /// The drawer's text field look: a small rounded border, or on tvOS the system's own field,
-        /// which grows when focused and edits in a full-screen keyboard.
+        /// The drawer's text field look: a small rounded border, or on tvOS and watchOS the system's
+        /// own field, which edits in a full-screen keyboard (or dictation and Scribble on the watch).
         @ViewBuilder
         func debugDrawerTextFieldStyle() -> some View {
-            #if os(tvOS)
+            #if os(tvOS) || os(watchOS)
                 self
             #else
                 textFieldStyle(.roundedBorder).controlSize(.small)
@@ -91,7 +98,7 @@ extension CGFloat {
         public typealias PlatformImage = NSImage
         public typealias PlatformColor = NSColor
         public typealias PlatformFont = NSFont
-    #elseif os(iOS) || os(visionOS) || os(tvOS)
+    #elseif os(iOS) || os(visionOS) || os(tvOS) || os(watchOS)
         public typealias PlatformImage = UIImage
         public typealias PlatformColor = UIColor
         public typealias PlatformFont = UIFont
