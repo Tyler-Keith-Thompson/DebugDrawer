@@ -22,12 +22,13 @@ public struct DebugDrawerKeyValueRow: View {
     ///   - redacted: What to show until revealed, such as ``DebugDrawerRedaction/mask``; `nil`
     ///     for a value that isn't sensitive.
     ///   - labelWidth: The width of the label column, in points at the default text size; it grows
-    ///     with the text. Rows that line up share one width.
+    ///     with the text, and on tvOS, whose text is about twice as large, it doubles. Rows that
+    ///     line up share one width.
     public init(_ label: String, value: String, redacted: String? = nil, labelWidth: CGFloat = 80) {
         self.label = label
         self.value = value
         self.redacted = redacted ?? value
-        _labelWidth = ScaledMetric(wrappedValue: labelWidth, relativeTo: .caption)
+        _labelWidth = ScaledMetric(wrappedValue: labelWidth * .debugDrawerTextScale, relativeTo: .caption)
     }
 
     public var body: some View {

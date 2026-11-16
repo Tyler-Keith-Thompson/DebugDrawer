@@ -32,6 +32,12 @@
             // The buttons' 44 pt targets supply the header's height and trailing margin.
             .padding(.leading, 14)
             .padding(.trailing, 2)
+            #if os(tvOS)
+                // A focused button grows and lifts on a platter; the space keeps it inside the
+                // panel and off the search field.
+                .padding(.horizontal, 12)
+                .padding(.vertical, 14)
+            #endif
         }
 
         private var title: some View {

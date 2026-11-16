@@ -20,7 +20,7 @@ Sources/DebugDrawer<Name>Plugin/ One module per shipped plugin
 Tests/<Module>Tests/             One test target per module; Performance/ holds speed-reliant tests
 Tests/DebugDrawerTests/          The core's tests and the README examples, verbatim
 Tests/DebugDrawerTestSupport/    Shared test fixtures (data only)
-Example/                         The macOS, iOS and visionOS example apps (hand-written BUILD.bazel)
+Example/                         The macOS, iOS, visionOS and tvOS example apps (hand-written BUILD.bazel)
 scripts/modules.py               The module graph
 tools/                           Bazel rule wrappers (warnings as errors, Swift 6 mode), DocC rules;
                                  tools/bazel turns BuildBuddy on when the Keychain holds its key, and
@@ -67,7 +67,7 @@ Every shell command gets a timeout. macOS has no `timeout`; use
 | `just resolve` | Re-resolve Bazel's SwiftPM dependencies after editing `PACKAGES` |
 | `just docs` | Combined DocC site into `.build/docs` |
 | `just generate` | Xcode project from the Bazel graph |
-| `just run [macOS\|iOS\|visionOS]` | Build and launch an example app |
+| `just run [macOS\|iOS\|visionOS\|tvOS]` | Build and launch an example app |
 | `just deploy [patch\|minor\|major]` | Verify, then tag, push the tag and create the GitHub release (the owner's call) |
 | `just buildbuddy-key` | Store the BuildBuddy key in the Keychain (once per Mac; builds then use the remote cache) |
 | `just template-update` | Merge the project template's changes since `.template.json`'s commit; resolve conflicts, then `just modules`, `just test` |
@@ -114,8 +114,9 @@ the *default* sections below where they differ:
   window capture, hosting the drawer in an AppKit- or UIKit-only app).
 - **Platforms.** A plugin works on every supported platform where its API exists; macOS and iOS
   are the platforms built today (`PLATFORMS` in `scripts/modules.py`). Core also builds for
-  visionOS (`VISIONOS_MODULES`): a plugin ported there joins that list, and `just build` and
-  `just build-spm` then build it for the visionOS simulator.
+  visionOS and tvOS (`EXTRA_PLATFORMS`): a plugin ported to one joins its list, and `just build`
+  and `just build-spm` then build it for that platform's simulator. On tvOS a view is driven by
+  focus: no pasteboard, keyboard shortcuts or drag, and Menu (`onExitCommand`) closes what is open.
 - View tests use ViewInspector. Get-only accessibility environment keys need a hosted probe
   (`ViewHosting` and `Inspection`), not an offline `inspect()`.
 - The example apps under `Example/` are not in the module graph; `bazel build //...` builds them,

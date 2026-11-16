@@ -23,7 +23,7 @@
         @State private var reportState: DrawerReportResult.State?
         @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-        private let drawerWidth: CGFloat = 340
+        private let drawerWidth: CGFloat = 340 * .debugDrawerTextScale
 
         var body: some View {
             #if os(visionOS)
@@ -93,6 +93,23 @@
                     close: { drawer.toggle() }
                 )
             }
+            #if os(tvOS)
+                // The focus engine moves into the panel as one region, and the remote's Menu button
+                // clears the search, then closes the drawer, as Escape does elsewhere. Both apply only
+                // while focus is in the open drawer, so neither takes a button from the app (N2).
+                .focusSection()
+                .onExitCommand {
+                    if query.isEmpty {
+                        drawer.toggle()
+                    } else {
+                        query = ""
+                    }
+                }
+                // Opened from the app, focus would stay on the app's control behind the panel, so
+                // it moves to the plugin the list opens at (the last one used), or the first.
+                .defaultFocus($focusedPlugin, scrolledID ?? listedPluginIDs.first)
+                .onAppear { focusedPlugin = scrolledID ?? listedPluginIDs.first }
+            #endif
         }
 
         private var allPlugins: [AnyDebugDrawerPlugin] {
@@ -281,12 +298,14 @@
     extension DebugDrawerOverlay {
         private var searchField: some View {
             TextField("Search plugins and actions", text: $query)
-                .textFieldStyle(.roundedBorder)
+                .debugDrawerTextFieldStyle()
                 .accessibilityLabel("Search plugins and actions")
-                .controlSize(.small)
                 .focused($searchFocused)
                 .onChange(of: query) { highlighted = 0 }
                 .onSubmit { chooseHighlighted() }
+            // On tvOS the arrows are how focus leaves the field, to the results (buttons the focus
+            // engine reaches) and the plugins, and Menu clears the search (onExitCommand above).
+            #if !os(tvOS)
                 .onKeyPress(.downArrow) { moveHighlight(by: 1) }
                 .onKeyPress(.upArrow) { moveHighlight(by: -1) }
                 .onKeyPress(.escape) {
@@ -294,6 +313,7 @@
                     query = ""
                     return .handled
                 }
+            #endif
                 .padding(.horizontal, 14)
                 .padding(.bottom, 8)
         }

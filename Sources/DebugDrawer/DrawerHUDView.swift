@@ -23,6 +23,8 @@
                 card
                     .onGeometryChange(for: CGSize.self, of: \.size) { cardSize = $0 }
                     .offset(x: corner.x + drag.width, y: corner.y + drag.height)
+                // tvOS has no drag gesture, so there the card stays at its corner.
+                #if !os(tvOS)
                     .gesture(
                         DragGesture()
                             .onChanged { drag = $0.translation }
@@ -32,6 +34,7 @@
                                 move(end.kept(showing: cardSize, in: container.size))
                             }
                     )
+                #endif
             }
         }
 

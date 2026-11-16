@@ -1,7 +1,7 @@
 import DebugDrawer
 import SwiftUI
 
-// No shipped plugin builds for visionOS yet (VISIONOS_MODULES in scripts/modules.py), so the
+// No shipped plugin builds for visionOS yet (EXTRA_PLATFORMS in scripts/modules.py), so the
 // example registers plugins of its own, written against core alone as a host app's would be.
 @main
 struct DebugDrawerExampleVisionOSApp: App {

@@ -24,17 +24,20 @@
                 HStack(spacing: 8) {
                     statusRow
                     Spacer()
-                    if case let .ready(url) = state {
-                        ShareLink(item: url) {
-                            Image(systemName: "square.and.arrow.up")
-                                .accessibilityHidden(true)
-                                .frame(minWidth: DrawerCloseButton.minimumTapSize, minHeight: DrawerCloseButton.minimumTapSize)
-                                .contentShape(Rectangle())
+                    // tvOS has no share sheet; the detail line names the zip's full path instead.
+                    #if !os(tvOS)
+                        if case let .ready(url) = state {
+                            ShareLink(item: url) {
+                                Image(systemName: "square.and.arrow.up")
+                                    .accessibilityHidden(true)
+                                    .frame(minWidth: DrawerCloseButton.minimumTapSize, minHeight: DrawerCloseButton.minimumTapSize)
+                                    .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                            .foregroundStyle(Color.accentColor)
+                            .accessibilityLabel("Share the report")
                         }
-                        .buttonStyle(.plain)
-                        .foregroundStyle(Color.accentColor)
-                        .accessibilityLabel("Share the report")
-                    }
+                    #endif
                     if state != .creating {
                         Button(action: dismiss) {
                             Image(systemName: "xmark")
@@ -55,7 +58,7 @@
                     Text(detail)
                         .font(.system(.caption2, design: .monospaced))
                         .foregroundStyle(.secondary)
-                        .textSelection(.enabled)
+                        .debugDrawerTextSelection()
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.trailing, 14)
                         .padding(.bottom, 6)
@@ -88,11 +91,16 @@
             }
         }
 
-        /// The zip's file name, or why the report failed.
+        /// The zip's file name (on tvOS, which can't share it, its full path, to fetch from the
+        /// app's container), or why the report failed.
         private var detail: String? {
             switch state {
             case .creating: nil
-            case let .ready(url): url.lastPathComponent
+            #if os(tvOS)
+                case let .ready(url): url.path
+            #else
+                case let .ready(url): url.lastPathComponent
+            #endif
             case let .failed(reason): reason
             }
         }

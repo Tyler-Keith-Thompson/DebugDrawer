@@ -13,11 +13,17 @@
         let close: () -> Void
 
         var body: some View {
-            ForEach(commands, id: \.self) { command in
-                Button(command.title) { perform(command) }
-                    .keyboardShortcut(command.shortcut)
-                    .hidden()
-            }
+            #if os(tvOS)
+                // tvOS has no keyboard shortcuts: the focus engine moves between plugin headers, and
+                // the remote's Menu button closes the drawer (onExitCommand in DebugDrawerOverlay).
+                EmptyView()
+            #else
+                ForEach(commands, id: \.self) { command in
+                    Button(command.title) { perform(command) }
+                        .keyboardShortcut(command.shortcut)
+                        .hidden()
+                }
+            #endif
         }
 
         private var commands: [Command] {
@@ -58,16 +64,18 @@
                 }
             }
 
-            /// Cmd-Option with the arrows moves between plugins: apps rarely bind it, while Cmd-[ and
-            /// Cmd-] are Back and Forward in many. Escape is the cancel action.
-            var shortcut: KeyboardShortcut {
-                switch self {
-                case .search: KeyboardShortcut("k", modifiers: .command)
-                case .nextPlugin: KeyboardShortcut(.downArrow, modifiers: [.command, .option])
-                case .previousPlugin: KeyboardShortcut(.upArrow, modifiers: [.command, .option])
-                case .close: .cancelAction
+            #if !os(tvOS)
+                /// Cmd-Option with the arrows moves between plugins: apps rarely bind it, while Cmd-[
+                /// and Cmd-] are Back and Forward in many. Escape is the cancel action.
+                var shortcut: KeyboardShortcut {
+                    switch self {
+                    case .search: KeyboardShortcut("k", modifiers: .command)
+                    case .nextPlugin: KeyboardShortcut(.downArrow, modifiers: [.command, .option])
+                    case .previousPlugin: KeyboardShortcut(.upArrow, modifiers: [.command, .option])
+                    case .close: .cancelAction
+                    }
                 }
-            }
+            #endif
         }
     }
 #endif

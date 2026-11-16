@@ -8,8 +8,9 @@ to a no-op outside `DEBUG`, so builds that ship to end users carry none of it.
 
 DebugDrawer requires Swift 6.3 and supports macOS 15 and iOS 17 or later. The core module,
 `DebugDrawer` (the drawer, the plugin protocol and the shared views), also builds for visionOS 1
-or later, where the drawer opens in an ornament beside the window rather than over it; the shipped
-plugins build for macOS and iOS only so far, so a visionOS app registers plugins of its own.
+or later, where the drawer opens in an ornament beside the window rather than over it, and for
+tvOS 17 or later, where the remote's focus moves through it (Apple TV, below). The shipped plugins
+build for macOS and iOS only so far, so a visionOS or tvOS app registers plugins of its own.
 
 ```swift
 dependencies: [
@@ -275,6 +276,11 @@ override func motionEnded(_ motion: UIEvent.EventSubtype, with event: UIEvent?) 
 
 // Triple-tap (iOS)
 .onTapGesture(count: 3) { DebugDrawer.shared.toggle() }
+
+// Play/Pause on the Siri Remote (tvOS), attached outside .debugDrawer() so it also closes it
+ContentView()
+    .debugDrawer()
+    .onPlayPauseCommand { DebugDrawer.shared.toggle() }
 ```
 
 ### Keyboard
@@ -291,6 +297,24 @@ is closed, so they never open it or take a key from the app:
 
 With keyboard navigation turned on (Full Keyboard Access on iOS, Keyboard navigation in macOS's
 settings), Tab reaches every section header, and Space expands or collapses the section.
+
+### Apple TV
+
+On tvOS the library binds no remote button, so the app opens the drawer: from a button in its own
+interface, or from a remote command it attaches, such as `.onPlayPauseCommand` or a long press
+(`.onLongPressGesture`) on one of its views. Once open, the drawer takes focus, starting at the
+plugin last used:
+
+- Swiping or the arrows move focus through the header's buttons, the search field, each plugin's
+  header and the controls inside an expanded plugin.
+- Select on a plugin's header expands or collapses it; a long press shows its Pin, Move Up and
+  Move Down actions.
+- Select on the search field opens the keyboard; the results below the field are buttons.
+- Menu clears the search if it holds text, otherwise closes the drawer, while focus is in it.
+
+tvOS has no pasteboard and no share sheet, so `DebugDrawerCopyButton` draws nothing there and a
+bug report names the zip's full path in the app's container instead of offering to share it. The
+HUD stays at its corner, since tvOS has no drag.
 
 ### Optional modifiers
 
@@ -341,7 +365,7 @@ Bazel is the development build; SwiftPM is the published package. Both are gener
 | `just lint` | SwiftLint and a11y-check over every first-party target |
 | `just record-snapshots` | Every snapshot reference, re-recorded into the workspace |
 | `just generate` | An Xcode project from the Bazel graph |
-| `just run [macOS\|iOS\|visionOS]` | Build and launch the example app |
+| `just run [macOS\|iOS\|visionOS\|tvOS]` | Build and launch the example app |
 
 `AGENTS.md` describes the layout, the workflow and the house rules in full.
 

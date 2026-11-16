@@ -85,15 +85,20 @@ MODULES = [
 IOS_MODULES = []
 IOS_MINIMUM = "17.0"
 
-# Modules that also build for visionOS, by name; the rest build for macOS and iOS only, until a
-# port adds them here. SwiftPM's `platforms:` covers the whole package, so Package.swift declares
-# visionOS (PLATFORMS) and `just build-spm` builds these modules' schemes for the visionOS
-# simulator. Bazel builds each for the visionOS simulator through a `visionos_build_test` beside
-# its library, so `bazel build //...` (`just build`) compiles it there too. A module listed here
-# depends only on modules listed here.
-VISIONOS_MODULES = ["DebugDrawer"]
-# Keep in step with `.visionOS(...)` in PLATFORMS: visionOS 1 shipped with iOS 17's SwiftUI.
-VISIONOS_MINIMUM = "1.0"
+# Platforms beyond macOS and iOS, each with its minimum and the modules that also build for it, by
+# name; the rest build for macOS and iOS only, until a port adds them. A platform's name is spelled
+# as `os(...)` spells it, and rules_apple's rule for it is the lowercased name (`tvos_build_test`
+# in `tvos.bzl`). SwiftPM's `platforms:` covers the whole package, so Package.swift declares each
+# platform (PLATFORMS) and `just build-spm` builds the listed modules' schemes for its simulator.
+# Bazel builds each for the simulator through a `<platform>_build_test` beside its library, so
+# `bazel build //...` (`just build`) compiles it there too. A module listed for a platform depends
+# only on modules listed for it.
+EXTRA_PLATFORMS = {
+    # visionOS 1 shipped with iOS 17's SwiftUI.
+    "visionOS": ("1.0", ["DebugDrawer"]),
+    # tvOS 17 shipped with iOS 17's SwiftUI.
+    "tvOS": ("17.0", ["DebugDrawer"]),
+}
 
 # Executables: (name, description, dependencies). Each is an `.executableTarget` and product in
 # Package.swift and a swift_binary in Bazel (`bazel run //Sources/<name>`). Keep them thin: the
@@ -151,8 +156,8 @@ PERFORMANCE_TEST_SIZE = "medium"
 # The tag .bazelrc's release config filters out of builds and tests (see PERFORMANCE_TESTS).
 RELEASE_EXCLUDED_TAG = "debug-only"
 
-# Keep in step with .bazelrc's --macos_minimum_os.
-PLATFORMS = '[.macOS(.v15), .iOS(.v17), .visionOS(.v1)]'
+# Keep in step with .bazelrc's --macos_minimum_os, IOS_MINIMUM and EXTRA_PLATFORMS.
+PLATFORMS = '[.macOS(.v15), .iOS(.v17), .visionOS(.v1), .tvOS(.v17)]'
 MACOS_MINIMUM = "15.0"
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -192,11 +197,14 @@ def check():
         assert not simulator_test(name), f"{name} runs in the simulator, which PERFORMANCE_TESTS doesn't support"
     for name in IOS_MODULES:
         assert name in names, f"IOS_MODULES names unknown module {name}"
-    for name in VISIONOS_MODULES:
-        assert name in names, f"VISIONOS_MODULES names unknown module {name}"
-        assert name not in IOS_MODULES, f"{name} is in IOS_MODULES, so it can't build for visionOS"
-        for d in dict((m[0], m[3]) for m in MODULES)[name]:
-            assert "/" in d or d in VISIONOS_MODULES, f"{name} builds for visionOS, so its dependency {d} must be in VISIONOS_MODULES"
+    for platform, (minimum, modules) in EXTRA_PLATFORMS.items():
+        declared = f".{platform}(.v{minimum.split('.')[0]})"
+        assert declared in PLATFORMS, f"PLATFORMS must declare {declared}, as EXTRA_PLATFORMS does"
+        for name in modules:
+            assert name in names, f"EXTRA_PLATFORMS[{platform!r}] names unknown module {name}"
+            assert name not in IOS_MODULES, f"{name} is in IOS_MODULES, so it can't build for {platform}"
+            for d in dict((m[0], m[3]) for m in MODULES)[name]:
+                assert "/" in d or d in modules, f"{name} builds for {platform}, so its dependency {d} must be listed for it"
     for name, _, _, deps in MODULES:
         if name not in IOS_MODULES:
             for d in deps:
@@ -430,21 +438,26 @@ def build_bazel(name, description, deps):
             '    visibility = ["//visibility:public"],\n'
             ")\n"
         )
-    visionos_load = 'load("@rules_apple//apple:visionos.bzl", "visionos_build_test")\n' if name in VISIONOS_MODULES else ""
-    visionos_attr = (
-        "\n# Builds the library for the visionOS simulator, so `bazel build //...` checks it compiles\n"
-        "# there (VISIONOS_MODULES in scripts/modules.py).\n"
-        "visionos_build_test(\n"
-        f'    name = "{name}_visionOS",\n'
-        f'    minimum_os_version = "{VISIONOS_MINIMUM}",\n'
+    platforms = [(p, minimum) for p, (minimum, modules) in EXTRA_PLATFORMS.items() if name in modules]
+    # Sorted by file, as buildifier orders loads.
+    platform_loads = "".join(
+        f'load("@rules_apple//apple:{p.lower()}.bzl", "{p.lower()}_build_test")\n' for p, _ in sorted(platforms, key=lambda p: p[0].lower())
+    )
+    platform_build_tests = "".join(
+        f"\n# Builds the library for the {p} simulator, so `bazel build //...` checks it compiles\n"
+        "# there (EXTRA_PLATFORMS in scripts/modules.py).\n"
+        f"{p.lower()}_build_test(\n"
+        f'    name = "{name}_{p}",\n'
+        f'    minimum_os_version = "{minimum}",\n'
         f'    targets = [":{name}"],\n'
         ")\n"
-    ) if name in VISIONOS_MODULES else ""
+        for p, minimum in platforms
+    )
     doc_deps = "".join(f'        "{bazel_label(d)}:{d}Documentation",\n' for d in deps if "/" not in d)
     doc_deps_attr = f"    deps = [\n{doc_deps}    ],\n" if doc_deps else ""
     return (
         "# GENERATED by scripts/modules.py — edit the table there, then run `just modules`.\n\n"
-        f"{visionos_load}"
+        f"{platform_loads}"
         'load("//tools:docc.bzl", "docc_archive")\n'
         'load("//tools:swift_rules.bzl", "swift_library")\n\n'
         f"# {description}\n"
@@ -465,7 +478,7 @@ def build_bazel(name, description, deps):
         '    tags = ["manual"],\n'
         '    visibility = ["//visibility:public"],\n'
         ")\n"
-        f"{visionos_attr}"
+        f"{platform_build_tests}"
     )
 
 
@@ -689,8 +702,9 @@ def main():
 
 if __name__ == "__main__":
     import sys
-    # `just build-spm` asks which schemes to build for visionOS.
-    if sys.argv[1:] == ["visionos-modules"]:
-        print("\n".join(VISIONOS_MODULES))
+    # `just build-spm` asks which schemes to build for each platform in EXTRA_PLATFORMS:
+    # `modules.py platform-modules tvOS`.
+    if sys.argv[1:2] == ["platform-modules"]:
+        print("\n".join(EXTRA_PLATFORMS[sys.argv[2]][1]))
     else:
         main()

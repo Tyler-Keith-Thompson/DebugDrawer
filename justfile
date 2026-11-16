@@ -61,23 +61,28 @@ test-release:
 resolve:
     cd {{PROJECT_ROOT}}/swift && {{SWIFT}} package resolve
 
-[doc('Build via SwiftPM too, to verify the published package (the Mac, then the visionOS modules)')]
+[doc('Build via SwiftPM too, to verify the published package (the Mac, then the visionOS and tvOS modules)')]
 spm:
     {{SWIFT}} build
     just spm-visionos
+    just spm-tvos
 
-# `swift build` builds for the host only, so xcodebuild builds the modules ported to visionOS
-# (VISIONOS_MODULES in scripts/modules.py) for its simulator, from the same Package.swift.
-VISIONOS_BUILD_DESTINATION := "generic/platform=visionOS Simulator"
-
-[doc('Build the visionOS modules through SwiftPM for the visionOS simulator')]
-spm-visionos:
+# `swift build` builds for the host only, so xcodebuild builds the modules ported to another
+# platform (EXTRA_PLATFORMS in scripts/modules.py) for its simulator, from the same Package.swift.
+[doc('Build the modules ported to a platform through SwiftPM for its simulator, e.g. just spm-platform tvOS')]
+spm-platform platform:
     #!/usr/bin/env bash
     set -euo pipefail
-    for module in $(python3 {{PROJECT_ROOT}}/scripts/modules.py visionos-modules); do
-        xcodebuild build -quiet -scheme "$module" -destination '{{VISIONOS_BUILD_DESTINATION}}' \
-            -derivedDataPath {{PROJECT_ROOT}}/.build/xcode-visionos SWIFT_TREAT_WARNINGS_AS_ERRORS=YES
+    for module in $(python3 {{PROJECT_ROOT}}/scripts/modules.py platform-modules {{platform}}); do
+        xcodebuild build -quiet -scheme "$module" -destination 'generic/platform={{platform}} Simulator' \
+            -derivedDataPath {{PROJECT_ROOT}}/.build/xcode-{{lowercase(platform)}} SWIFT_TREAT_WARNINGS_AS_ERRORS=YES
     done
+
+[doc('Build the visionOS modules through SwiftPM for the visionOS simulator')]
+spm-visionos: (spm-platform "visionOS")
+
+[doc('Build the tvOS modules through SwiftPM for the tvOS simulator')]
+spm-tvos: (spm-platform "tvOS")
 
 [doc('Run the tests via SwiftPM')]
 spm-test *args="":
@@ -108,13 +113,35 @@ generate *args="":
 release:
     {{BAZEL_RELEASE}} build --config=release //...
 
-# The simulator `just run visionOS` boots, by name.
+# The simulators `just run visionOS` and `just run tvOS` boot, by name.
 VISIONOS_DEVICE := env("VISIONOS_DEVICE", "Apple Vision Pro")
+TVOS_DEVICE := env("TVOS_DEVICE", "Apple TV 4K (4th generation)")
 
-[doc('Build and launch an example app: just run, just run iOS or just run visionOS')]
+[doc('Build and launch an example app: just run, just run iOS, just run visionOS or just run tvOS')]
 run target="macOS" *args="":
     #!/usr/bin/env bash
     set -euo pipefail
+    # Builds an example app for a simulator, installs it from a writable copy (the simulator can't
+    # copy Bazel's read-only bundle) and launches it. Extra arguments go to the app;
+    # -OpenDebugDrawer opens the drawer at launch.
+    run_in_simulator() {
+        local target="$1" device="$2" bundle_id="$3" run_dir="$4"
+        rm -rf "$run_dir"
+        mkdir -p "$run_dir"
+        {{BAZEL}} build "//Example:$target"
+        local output
+        output=$({{BAZEL}} cquery "//Example:$target" --output=files 2>/dev/null | grep -E '\.(app|ipa)$')
+        # rules_apple hands visionOS a bundle and tvOS an .ipa, whose Payload holds the bundle.
+        case "$output" in
+            *.ipa) unzip -qo "$output" -d "$run_dir" && mv "$run_dir/Payload/"*.app "$run_dir/" ;;
+            *) cp -RL "$output" "$run_dir/" ;;
+        esac
+        chmod -R u+w "$run_dir"
+        xcrun simctl boot "$device" 2>/dev/null || true
+        xcrun simctl bootstatus "$device" -b
+        xcrun simctl install "$device" "$run_dir/DebugDrawerExample.app"
+        xcrun simctl launch "$device" "$bundle_id" {{args}}
+    }
     case "{{target}}" in
         macOS|macos)
             RUN_DIR="/tmp/debugdrawer-example"
@@ -129,22 +156,15 @@ run target="macOS" *args="":
             {{BAZEL}} run //Example:ExampleApp_iOS
             ;;
         visionOS|visionos)
-            # Installed from a writable copy: the simulator can't copy Bazel's read-only bundle.
-            # Extra arguments go to the app; -OpenDebugDrawer opens the drawer at launch.
-            RUN_DIR="/tmp/debugdrawer-example-visionos"
-            rm -rf "$RUN_DIR"
-            mkdir -p "$RUN_DIR"
-            {{BAZEL}} build //Example:ExampleApp_visionOS
-            APP=$({{BAZEL}} cquery //Example:ExampleApp_visionOS --output=files 2>/dev/null | grep '\.app$')
-            cp -RL "$APP" "$RUN_DIR/"
-            chmod -R u+w "$RUN_DIR"
-            xcrun simctl boot "{{VISIONOS_DEVICE}}" 2>/dev/null || true
-            xcrun simctl bootstatus "{{VISIONOS_DEVICE}}" -b
-            xcrun simctl install "{{VISIONOS_DEVICE}}" "$RUN_DIR/DebugDrawerExample.app"
-            xcrun simctl launch "{{VISIONOS_DEVICE}}" com.debugdrawer.example.visionos {{args}}
+            run_in_simulator ExampleApp_visionOS "{{VISIONOS_DEVICE}}" com.debugdrawer.example.visionos \
+                /tmp/debugdrawer-example-visionos
+            ;;
+        tvOS|tvos)
+            run_in_simulator ExampleApp_tvOS "{{TVOS_DEVICE}}" com.debugdrawer.example.tvos \
+                /tmp/debugdrawer-example-tvos
             ;;
         *)
-            echo "Unknown target: {{target}}. Use 'macOS', 'iOS' or 'visionOS'"
+            echo "Unknown target: {{target}}. Use 'macOS', 'iOS', 'visionOS' or 'tvOS'"
             exit 1
             ;;
     esac

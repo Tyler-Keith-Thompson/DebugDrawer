@@ -29,11 +29,11 @@
         private var content: some View {
             if value == redacted {
                 Text(value)
-                    .textSelection(.enabled)
+                    .debugDrawerTextSelection()
             } else {
                 HStack(alignment: .firstTextBaseline, spacing: 4) {
                     Text(isRevealed ? value : redacted)
-                        .textSelection(.enabled)
+                        .debugDrawerTextSelection()
                     Button {
                         isRevealed.toggle()
                     } label: {

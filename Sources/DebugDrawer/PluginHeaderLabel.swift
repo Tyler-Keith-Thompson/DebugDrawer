@@ -13,7 +13,7 @@
         var badge: Int?
         /// The icon's column, which grows with the icon at larger text sizes so the title never
         /// slides under it.
-        @ScaledMetric private var iconWidth: CGFloat = 20
+        @ScaledMetric private var iconWidth: CGFloat = 20 * .debugDrawerTextScale
         @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
         var body: some View {

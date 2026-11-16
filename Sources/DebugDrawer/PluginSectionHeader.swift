@@ -18,6 +18,11 @@
                 PluginHeaderLabel(plugin: plugin, isExpanded: isExpanded, isPinned: isPinned, badge: badge)
             }
             .buttonStyle(.plain)
+            #if os(tvOS)
+                // The focused header grows and lifts on a platter; the space keeps it off the
+                // rows above and below.
+                .padding(.vertical, 14)
+            #endif
             .accessibilityLabel(plugin.title)
             .accessibilityValue(state)
             .accessibilityHint(isMovable ? "Toggles the section. Its actions pin it or move it." : "Toggles the section.")

@@ -7,7 +7,9 @@ import SwiftUI
 /// ``DebugDrawerRedaction`` first.
 ///
 /// The type exists in every build so a plugin's body compiles unchanged in release, where it
-/// draws nothing.
+/// draws nothing. On tvOS, which has no pasteboard, it draws nothing as well: a button there would
+/// take focus and copy nothing, so a plugin's body compiles for tvOS unchanged and loses only the
+/// button.
 public struct DebugDrawerCopyButton: View {
     let title: String
     let value: @MainActor () -> String?
@@ -22,7 +24,7 @@ public struct DebugDrawerCopyButton: View {
     }
 
     public var body: some View {
-        #if DEBUG
+        #if DEBUG && !os(tvOS)
             content
         #else
             EmptyView()
@@ -30,7 +32,7 @@ public struct DebugDrawerCopyButton: View {
     }
 }
 
-#if DEBUG
+#if DEBUG && !os(tvOS)
     extension DebugDrawerCopyButton {
         private var content: some View {
             Button(title) {

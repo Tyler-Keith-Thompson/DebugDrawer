@@ -9,7 +9,7 @@
         let isHighlighted: Bool
         /// The icon's column, which grows with the icon at larger text sizes so the title never
         /// slides under it.
-        @ScaledMetric private var iconWidth: CGFloat = 20
+        @ScaledMetric private var iconWidth: CGFloat = 20 * .debugDrawerTextScale
 
         var body: some View {
             HStack(spacing: 8) {

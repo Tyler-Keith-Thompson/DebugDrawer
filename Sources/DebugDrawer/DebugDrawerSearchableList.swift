@@ -49,8 +49,7 @@ public struct DebugDrawerSearchableList<Content: View>: View {
         private var list: some View {
             VStack(alignment: .leading, spacing: 6) {
                 TextField(prompt, text: text)
-                    .textFieldStyle(.roundedBorder)
-                    .controlSize(.small)
+                    .debugDrawerTextFieldStyle()
                     .accessibilityLabel(fieldLabel)
 
                 ScrollView {

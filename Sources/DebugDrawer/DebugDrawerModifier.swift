@@ -99,7 +99,7 @@
 
             func updateNSView(_: NSView, context _: Context) {}
         }
-    #elseif os(iOS) || os(visionOS)
+    #elseif os(iOS) || os(visionOS) || os(tvOS)
         struct DebugDrawerTagView: UIViewRepresentable {
             func makeUIView(context _: Context) -> UIView {
                 let view = UIView()
