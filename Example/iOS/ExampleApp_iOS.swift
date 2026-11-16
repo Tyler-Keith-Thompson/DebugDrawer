@@ -49,7 +49,12 @@ struct DebugDrawerExampleiOSApp: App {
                 .debugGrid()
                 .debugDrawer()
                 .background {
-                    Button("") { DebugDrawer.shared.toggle() }
+                    Button("") {
+                        // The drawer exists in debug builds only.
+                        #if DEBUG
+                            DebugDrawer.shared.toggle()
+                        #endif
+                    }
                         .keyboardShortcut("d", modifiers: .control)
                         .hidden()
                 }

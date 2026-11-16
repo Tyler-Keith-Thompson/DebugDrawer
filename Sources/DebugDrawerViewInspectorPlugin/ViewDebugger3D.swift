@@ -83,13 +83,12 @@
         nonisolated static func diffImage(_ image: NSImage, against background: NSImage?) -> NSImage? {
             guard let tiff = image.tiffRepresentation,
                   let rep = NSBitmapImageRep(data: tiff),
-                  let pixels = rep.bitmapData
+                  rep.bitmapData != nil
             else { return image }
 
             let w = rep.pixelsWide
             let h = rep.pixelsHigh
             let bpp = rep.bitsPerPixel / 8
-            let rowBytes = rep.bytesPerRow
             guard w > 0, h > 0, bpp >= 3 else { return image }
 
             // Get background pixel data if available

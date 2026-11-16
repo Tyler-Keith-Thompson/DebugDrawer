@@ -1,11 +1,126 @@
-load("@rules_xcodeproj//xcodeproj:defs.bzl", "top_level_target", "xcodeproj")
+# DebugDrawer: a plugin-based debug drawer for apps on Apple platforms, a library per tool.
 
+load("@rules_xcodeproj//xcodeproj:defs.bzl", "xcodeproj", "xcschemes")
+load("//tools:docc.bzl", "docc_site")
+load("//tools:executables.bzl", "EXECUTABLE_PACKAGES")
+load("//tools:performance_tests.bzl", "PERFORMANCE_TEST_PACKAGES")
+load("//tools:swiftpm.bzl", "swiftpm_manifest_test")
+
+# Nothing here builds for iOS only (IOS_MODULES in scripts/modules.py, which writes tools/ios.bzl
+# for an app), and no tests run in the simulator.
+IOS_PACKAGES = []
+
+SIMULATOR_TEST_PACKAGES = []
+
+# The example apps (Example/BUILD.bazel), each launchable from a scheme of its own.
+APP_TARGETS = [
+    "//Example:ExampleApp_macOS",
+    "//Example:ExampleApp_iOS",
+]
+
+# Test bundles are derived from the directory layout rather than listed: a directory under
+# `Tests/` with a BUILD.bazel holding a swift_test is a test bundle. Listing them by hand means a
+# new suite is invisible in Xcode until somebody remembers to come back here.
+#
+# DebugDrawerTestSupport lives under Tests/ too, but it is a library, so it is excluded by name.
+TEST_PACKAGES = sorted([
+    package
+    for package in subpackages(include = ["Tests/*"])
+    if package != "Tests/DebugDrawerTestSupport"
+])
+
+# Xcode runs each package's .xctest bundle target; `bazel test` runs its swift_test (see
+# scripts/modules.py). A package in PERFORMANCE_TEST_PACKAGES holds a second test module, its
+# speed-reliant tests, named with `Performance` before `Tests`.
+TEST_MODULES = {
+    package: [package.removeprefix("Tests/")] + (
+        [package.removeprefix("Tests/").removesuffix("Tests") + "PerformanceTests"] if package in PERFORMANCE_TEST_PACKAGES else []
+    )
+    for package in TEST_PACKAGES
+}
+
+# A simulator test package's ios_unit_test is already a bundle Xcode runs.
+TEST_BUNDLES = {
+    package: (["//" + package] if package in SIMULATOR_TEST_PACKAGES else [
+        "//" + package + ":" + module + "Bundle"
+        for module in TEST_MODULES[package]
+    ])
+    for package in TEST_PACKAGES
+}
+
+TEST_TARGETS = [bundle for package in TEST_PACKAGES for bundle in TEST_BUNDLES[package]]
+
+# The executables (EXECUTABLES in scripts/modules.py), each launchable from a scheme of its own.
+EXECUTABLE_TARGETS = ["//" + package for package in EXECUTABLE_PACKAGES]
+
+# The project's top-level targets are its test bundles and executables. Every library reaches the
+# project as a dependency of one of them.
 xcodeproj(
     name = "xcodeproj",
     project_name = "DebugDrawer",
-    top_level_targets = [
-        top_level_target("//Example:ExampleApp_macOS", target_environments = ["device"]),
-        top_level_target("//Example:ExampleApp_iOS", target_environments = ["simulator"]),
-        top_level_target("//Tests/DebugDrawerTests:DebugDrawerTests", target_environments = ["simulator"]),
+    scheme_autogeneration_mode = "none",
+    top_level_targets = TEST_TARGETS + EXECUTABLE_TARGETS + APP_TARGETS,
+    xcschemes = [
+        xcschemes.scheme(
+            name = "All tests",
+            test = xcschemes.test(
+                test_targets = [xcschemes.test_target(target) for target in TEST_TARGETS],
+            ),
+        ),
+    ] + [
+        # One scheme per test package (its tests and any performance tests), since a module's
+        # suites are usually worked on alone.
+        xcschemes.scheme(
+            name = package.removeprefix("Tests/"),
+            test = xcschemes.test(
+                test_targets = [xcschemes.test_target(bundle) for bundle in TEST_BUNDLES[package]],
+            ),
+        )
+        for package in TEST_PACKAGES
+    ] + [
+        xcschemes.scheme(
+            name = target.split("/")[-1],
+            run = xcschemes.run(launch_target = xcschemes.launch_target(target), args = ["serve"]),
+        )
+        for target in EXECUTABLE_TARGETS
+    ] + [
+        xcschemes.scheme(
+            name = target.split("/")[-1],
+            run = xcschemes.run(launch_target = xcschemes.launch_target(target)),
+        )
+        for target in APP_TARGETS
+    ],
+)
+
+# The combined DocC site (`just docs`): every module's archive
+# (see scripts/modules.py) merged under one landing page. Derived from the directory layout, like
+# the test bundles above.
+docc_site(
+    name = "docs",
+    archives = [
+        "//" + package + ":" + package.removeprefix("Sources/") + "Documentation"
+        for package in sorted(subpackages(include = ["Sources/*"]))
+        if package not in EXECUTABLE_PACKAGES and package not in IOS_PACKAGES
+    ],
+    landing_page_name = "DebugDrawer",
+    tags = ["manual"],
+)
+
+# Package.swift must name the same targets with the same dependencies as the Bazel graph, so a
+# commit cannot carry regenerated BUILD.bazel files without the manifest (see tools/swiftpm.bzl).
+# Every library under Sources/ and every test library under Tests/, derived from the layout.
+swiftpm_manifest_test(
+    name = "package_swift_test",
+    size = "small",
+    manifest = "Package.swift",
+    modules = [
+        "//" + package
+        for package in sorted(subpackages(include = ["Sources/*"]))
+        if package not in IOS_PACKAGES
+    ] + ["//Tests/DebugDrawerTestSupport"] + [
+        "//" + package + ":" + module + "Library"
+        for package in TEST_PACKAGES
+        if package not in SIMULATOR_TEST_PACKAGES
+        for module in TEST_MODULES[package]
     ],
 )

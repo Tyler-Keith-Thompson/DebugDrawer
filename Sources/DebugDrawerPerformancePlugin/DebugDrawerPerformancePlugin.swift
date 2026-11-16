@@ -21,11 +21,7 @@
         @Published var fpsHistory: [Int] = []
         @Published var isMonitoring = false
 
-        #if os(macOS)
-            private var displayLink: CVDisplayLink?
-        #elseif os(iOS)
-            private var displayLink: CADisplayLink?
-        #endif
+        private var displayLink: CADisplayLink?
         private var frameCount = 0
         private var lastFPSTime: CFTimeInterval = 0
         private var cancellable: AnyCancellable?
@@ -42,28 +38,15 @@
                 .autoconnect()
                 .sink { [weak self] _ in self?.sample() }
 
+            // FPS: a display link on the main run loop, so frameCount is only touched on the main actor.
             #if os(macOS)
-                // FPS via CVDisplayLink
-                var link: CVDisplayLink?
-                CVDisplayLinkCreateWithActiveCGDisplays(&link)
-                guard let link else { return }
-                displayLink = link
-
-                let callback: CVDisplayLinkOutputCallback = { _, _, _, _, _, userInfo -> CVReturn in
-                    let monitor = Unmanaged<PerformanceMonitor>.fromOpaque(userInfo!).takeUnretainedValue()
-                    monitor.frameCount += 1
-                    return kCVReturnSuccess
-                }
-
-                let selfPtr = Unmanaged.passUnretained(self).toOpaque()
-                CVDisplayLinkSetOutputCallback(link, callback, selfPtr)
-                CVDisplayLinkStart(link)
-            #elseif os(iOS)
-                // FPS via CADisplayLink
+                guard let screen = NSScreen.main else { return }
+                let link = screen.displayLink(target: self, selector: #selector(displayLinkFired))
+            #else
                 let link = CADisplayLink(target: self, selector: #selector(displayLinkFired))
-                link.add(to: .main, forMode: .common)
-                displayLink = link
             #endif
+            link.add(to: .main, forMode: .common)
+            displayLink = link
             lastFPSTime = CACurrentMediaTime()
         }
 
@@ -72,22 +55,13 @@
             isMonitoring = false
             cancellable?.cancel()
             cancellable = nil
-            #if os(macOS)
-                if let link = displayLink {
-                    CVDisplayLinkStop(link)
-                    displayLink = nil
-                }
-            #elseif os(iOS)
-                displayLink?.invalidate()
-                displayLink = nil
-            #endif
+            displayLink?.invalidate()
+            displayLink = nil
         }
 
-        #if os(iOS)
-            @objc private func displayLinkFired() {
-                frameCount += 1
-            }
-        #endif
+        @objc private func displayLinkFired() {
+            frameCount += 1
+        }
 
         private func sample() {
             // FPS

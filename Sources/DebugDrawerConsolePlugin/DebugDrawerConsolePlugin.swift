@@ -471,7 +471,8 @@
                     self.isFollowing = isFollowing
                 }
 
-                @objc func scrollViewDidScroll(_: Notification) {
+                // Posted by the clip view, on the main thread.
+                @MainActor @objc func scrollViewDidScroll(_: Notification) {
                     guard !isProgrammaticScroll, let scrollView else { return }
                     let clipView = scrollView.contentView
                     let contentHeight = scrollView.documentView?.frame.height ?? 0
@@ -508,7 +509,7 @@
             }
 
             func updateUIView(_ textView: UITextView, context: Context) {
-                guard let storage = textView.textStorage as? NSTextStorage else { return }
+                let storage = textView.textStorage
 
                 let newCount = lines.count
                 let prevCount = context.coordinator.renderedLineCount

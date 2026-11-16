@@ -25,8 +25,8 @@ public protocol DebugDrawerPlugin: Identifiable {
     /// SF Symbol name for the section header icon.
     var icon: String { get }
 
-    /// The view content rendered inside the section.
-    @ViewBuilder var body: Body { get }
+    /// The view content rendered inside the section, built on the main actor like `View.body`.
+    @ViewBuilder @MainActor var body: Body { get }
 
     /// A value that changes when the plugin's content should be re-registered.
     /// The local plugin modifier watches this to detect changes.
@@ -56,16 +56,16 @@ public extension DebugDrawerPlugin {
         public let id: String
         public let title: String
         public let icon: String
-        private let _body: () -> AnyView
+        private let _body: @MainActor () -> AnyView
 
-        public init<P: DebugDrawerPlugin>(_ plugin: P) {
+        @MainActor public init<P: DebugDrawerPlugin>(_ plugin: P) {
             id = plugin.id
             title = plugin.title
             icon = plugin.icon
             _body = { AnyView(plugin.body) }
         }
 
-        public var body: AnyView {
+        @MainActor public var body: AnyView {
             _body()
         }
     }

@@ -20,7 +20,8 @@ import DebugDrawerLaunchTimePlugin
 import SwiftUI
 
 @main
-class AppDelegate: NSObject, NSApplicationDelegate {
+@MainActor
+final class AppDelegate: NSObject, NSApplicationDelegate {
     private var mainWindow: NSWindow?
 
     static func main() {
@@ -145,7 +146,12 @@ struct ExampleContentView: View {
         .debugGrid()
         .debugDrawer()
         .background {
-            Button("") { DebugDrawer.shared.toggle() }
+            Button("") {
+                // The drawer exists in debug builds only.
+                #if DEBUG
+                    DebugDrawer.shared.toggle()
+                #endif
+            }
                 .keyboardShortcut("d", modifiers: .control)
                 .hidden()
         }

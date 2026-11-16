@@ -64,10 +64,11 @@
                 object: nil,
                 queue: .main
             ) { [weak self] notification in
-                guard let view = notification.object as? NSView,
-                      view.window == NSApp?.keyWindow else { return }
-                Task { @MainActor [weak self] in
-                    guard let self, self.isBordersEnabled else { return }
+                // Delivered on the main queue (`queue: .main` above), so the view never leaves it.
+                let view = notification.object as? NSView
+                MainActor.assumeIsolated {
+                    guard let view, view.window == NSApp?.keyWindow,
+                          let self, self.isBordersEnabled else { return }
                     self.applyBorders()
                 }
             }
@@ -853,7 +854,8 @@
                 ripple.animator().alphaValue = 0
                 ripple.animator().frame = ripple.frame.insetBy(dx: -10, dy: -10)
             } completionHandler: {
-                ripple.removeFromSuperview()
+                // AppKit calls the completion handler on the main thread.
+                MainActor.assumeIsolated { ripple.removeFromSuperview() }
             }
         }
     }

@@ -1,59 +1,72 @@
 # DebugDrawer
 
-A plugin-based debug drawer for macOS and iOS apps. Slide-in panel with modular debugging tools — pick only what you need.
-
-Built for SwiftUI. Everything compiles to no-ops in release builds.
+A plugin-based debug drawer for macOS and iOS apps: a slide-in panel of debugging tools, each its
+own library, so an app links only the tools it wants. Built for SwiftUI. Every entry point compiles
+to a no-op outside `DEBUG`, so builds that ship to end users carry none of it.
 
 ## Installation
 
-Add DebugDrawer to your `Package.swift`:
+DebugDrawer requires Swift 6.3 and supports macOS 15 and iOS 17 or later.
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/user/DebugDrawer", from: "0.0.1"),
-]
+    .package(url: "https://github.com/Tyler-Keith-Thompson/DebugDrawer", from: "0.0.4"),
+],
 ```
 
-Then add only the plugins you want to your target:
+Then add the core and only the plugins you want to your target. Each plugin is a separate library:
 
 ```swift
 .target(name: "MyApp", dependencies: [
     .product(name: "DebugDrawer", package: "DebugDrawer"),
     .product(name: "DebugDrawerConsolePlugin", package: "DebugDrawer"),
     .product(name: "DebugDrawerPerformancePlugin", package: "DebugDrawer"),
-    // ... add as many or as few as you need
-])
+    // ... as many or as few as you need (Modules, below)
+]),
 ```
 
-Each plugin is a separate library. No transitive dependency conflicts — you only pull in what you use.
+## Usage
 
-## Setup
+Every example here is a test in `Tests/DebugDrawerTests`, so it cannot drift from the code.
 
-### 1. Register plugins at app startup
-
-Here's every plugin — copy what you want:
+A plugin is a title, an SF Symbol and a SwiftUI body. Register it globally, or attach it to the
+view it belongs to, attach the drawer once to the root view, and open it from your own trigger:
 
 ```swift
 import DebugDrawer
-import DebugDrawerConsolePlugin
-import DebugDrawerViewInspectorPlugin
-import DebugDrawerAccessibilityPlugin
-import DebugDrawerPerformancePlugin
-import DebugDrawerEnergyPlugin
-import DebugDrawerNetworkPlugin
-import DebugDrawerDiskIOPlugin
-import DebugDrawerScreenshotPlugin
-import DebugDrawerAppInfoPlugin
-import DebugDrawerUserDefaultsPlugin
-import DebugDrawerKeychainPlugin
-import DebugDrawerFileBrowserPlugin
-import DebugDrawerLocationPlugin
-import DebugDrawerLoadedLibrariesPlugin
-import DebugDrawerDeepLinkPlugin
-import DebugDrawerCookiesPlugin
-import DebugDrawerLaunchTimePlugin
+import SwiftUI
 
-// In your app's init or applicationDidFinishLaunching:
+struct CachePlugin: DebugDrawerPlugin {
+    var title = "Cache"
+    var icon = "trash" // an SF Symbol
+
+    var body: some View {
+        Button("Clear URL cache") { URLCache.shared.removeAllCachedResponses() }
+    }
+}
+
+// Global: registered once at startup, always in the drawer.
+DebugDrawer.shared.registerGlobal(CachePlugin())
+
+// The drawer, attached once to the root view.
+let root = Text("Home").debugDrawer()
+
+// Local: in the drawer while its view is on screen.
+let settings = Text("Settings").debugLocalPlugin(CachePlugin())
+
+// Open or close it from whatever trigger suits the app.
+DebugDrawer.shared.toggle()
+```
+
+`DebugDrawer.shared` and the plugins' `install*()` calls exist in debug builds only, so wrap them
+in `#if DEBUG`. The `DebugDrawerPlugin` protocol exists in every configuration, so conformances
+compile in release, and `.debugDrawer()` and `.debugLocalPlugin()` do nothing there.
+
+### Installing the shipped plugins
+
+Each plugin installs itself with one call at startup. All of them:
+
+```swift
 #if DEBUG
 DebugDrawer.shared.installConsole()
 DebugDrawer.shared.installViewInspector()
@@ -75,42 +88,12 @@ DebugDrawer.shared.installLaunchTime()
 #endif
 ```
 
-And the matching SPM dependencies (copy all or pick what you need):
+Each call needs its plugin's module imported (`import DebugDrawerConsolePlugin`, and so on).
 
-```swift
-.product(name: "DebugDrawer", package: "DebugDrawer"),
-.product(name: "DebugDrawerConsolePlugin", package: "DebugDrawer"),
-.product(name: "DebugDrawerViewInspectorPlugin", package: "DebugDrawer"),
-.product(name: "DebugDrawerAccessibilityPlugin", package: "DebugDrawer"),
-.product(name: "DebugDrawerPerformancePlugin", package: "DebugDrawer"),
-.product(name: "DebugDrawerEnergyPlugin", package: "DebugDrawer"),
-.product(name: "DebugDrawerNetworkPlugin", package: "DebugDrawer"),
-.product(name: "DebugDrawerDiskIOPlugin", package: "DebugDrawer"),
-.product(name: "DebugDrawerScreenshotPlugin", package: "DebugDrawer"),
-.product(name: "DebugDrawerAppInfoPlugin", package: "DebugDrawer"),
-.product(name: "DebugDrawerUserDefaultsPlugin", package: "DebugDrawer"),
-.product(name: "DebugDrawerKeychainPlugin", package: "DebugDrawer"),
-.product(name: "DebugDrawerFileBrowserPlugin", package: "DebugDrawer"),
-.product(name: "DebugDrawerLocationPlugin", package: "DebugDrawer"),
-.product(name: "DebugDrawerLoadedLibrariesPlugin", package: "DebugDrawer"),
-.product(name: "DebugDrawerDeepLinkPlugin", package: "DebugDrawer"),
-.product(name: "DebugDrawerCookiesPlugin", package: "DebugDrawer"),
-.product(name: "DebugDrawerLaunchTimePlugin", package: "DebugDrawer"),
-```
+### Opening the drawer
 
-Or just grab a few — each one is independent.
-```
-
-### 2. Attach the drawer to your root view
-
-```swift
-ContentView()
-    .debugDrawer()
-```
-
-### 3. Wire up your own trigger
-
-The drawer doesn't assume how you want to open it. Call `DebugDrawer.shared.toggle()` from whatever trigger makes sense for your app:
+The drawer doesn't decide how it opens. Call `DebugDrawer.shared.toggle()` from whatever trigger
+makes sense for your app:
 
 ```swift
 // Keyboard shortcut (Ctrl+D)
@@ -127,141 +110,59 @@ override func motionEnded(_ motion: UIEvent.EventSubtype, with event: UIEvent?) 
 
 // Triple-tap (iOS)
 .onTapGesture(count: 3) { DebugDrawer.shared.toggle() }
-
-// Menu item, button, whatever you want
-Button("Debug") { DebugDrawer.shared.toggle() }
 ```
 
-## Available Plugins
+### Optional modifiers
 
-### Console
-`DebugDrawerConsolePlugin` — captures os_log entries (stdout/stderr on macOS). Level filtering, search, auto-follow, multi-line text selection, copy all.
-
-### View Inspector
-`DebugDrawerViewInspectorPlugin` — view borders with depth coloring, alignment grid (color/opacity/spacing), click indicators, animation speed control, SwiftUI render tracking, view hierarchy snapshot.
-
-### Accessibility
-`DebugDrawerAccessibilityPlugin` — runtime environment overrides: color scheme, dynamic type, layout direction, locale, and the system accessibility settings SwiftUI exposes (Reduce Motion, Increase Contrast, Bold Text, Reduce Transparency, Differentiate Without Color, Invert Colors), each shown next to the system's current value.
-
-### Performance
-`DebugDrawerPerformancePlugin` — live FPS and memory usage with sparkline graphs.
-
-### Energy
-`DebugDrawerEnergyPlugin` — battery level/charging (IOKit on macOS, UIDevice on iOS), CPU usage, thermal state, energy impact rating.
-
-### Network
-`DebugDrawerNetworkPlugin` — URLProtocol-based HTTP interception. Logs requests with method, URL, status, timing, headers, body. JSON pretty-printing, cURL export, stats summary.
-
-### Disk I/O
-`DebugDrawerDiskIOPlugin` — FileManager swizzling to track reads, writes, deletes, directory listings. Flags main-thread I/O.
-
-### App Info
-`DebugDrawerAppInfoPlugin` — bundle ID, version, build, OS version, memory, uptime, PID, architecture, screen resolution, network reachability, launch time.
-
-### UserDefaults
-`DebugDrawerUserDefaultsPlugin` — browse, search, edit (string/bool/number), and delete UserDefaults keys.
-
-### Keychain
-`DebugDrawerKeychainPlugin` — browse generic and internet passwords. Copy values, delete entries.
-
-### Screenshot
-`DebugDrawerScreenshotPlugin` — capture the app window to desktop or clipboard. Optional "hide drawer" toggle.
-
-### File Browser
-`DebugDrawerFileBrowserPlugin` — browse App Support and Caches directories. Delete and share files.
-
-### Location Simulator
-`DebugDrawerLocationPlugin` — spoof CLLocationManager coordinates. Preset locations, custom lat/lon input.
-
-### Loaded Libraries
-`DebugDrawerLoadedLibrariesPlugin` — list all dynamically loaded dylibs grouped by App/Third-Party/System.
-
-### Deep Link Tester
-`DebugDrawerDeepLinkPlugin` — test URL schemes with history and preset templates.
-
-### HTTP Cookies
-`DebugDrawerCookiesPlugin` — browse, search, and delete HTTP cookies.
-
-### Launch Time
-`DebugDrawerLaunchTimePlugin` — measure app startup time with pre-main/main-to-first-frame breakdown.
-
-## Plugin Types
-
-### Global Plugins
-Registered once at startup, always visible:
-
-```swift
-DebugDrawer.shared.installConsole()
-```
-
-### Local Plugins
-Tied to a view's lifecycle — appear when the view is on screen:
-
-```swift
-struct CachePlugin: DebugDrawerPlugin {
-    var title = "Cache"
-    var icon = "paintbrush"
-    var body: some View {
-        Button("Clear") { MyCache.shared.clear() }
-    }
-}
-
-MyView()
-    .debugLocalPlugin(CachePlugin())
-```
-
-## Writing Custom Plugins
-
-```swift
-import DebugDrawer
-
-struct MyPlugin: DebugDrawerPlugin {
-    var title = "My Tool"
-    var icon = "wrench"  // SF Symbol name
-
-    var body: some View {
-        VStack {
-            Text("Hello from debug drawer")
-            Button("Do Thing") { /* ... */ }
-        }
-    }
-}
-
-// Register globally
-DebugDrawer.shared.registerGlobal(MyPlugin())
-
-// Or attach locally to a view
-.debugLocalPlugin(MyPlugin())
-```
-
-The `DebugDrawerPlugin` protocol exists in all build configurations so conformances compile in release. `.debugDrawer()` and `.debugLocalPlugin()` are no-ops outside `#if DEBUG`.
-
-## Optional Modifiers
-
-### Environment Overrides
 ```swift
 import DebugDrawerAccessibilityPlugin
-
-ContentView()
-    .debugAccessibilityOverrides()  // must be above .debugDrawer()
-    .debugDrawer()
-```
-
-### Grid Overlay
-```swift
 import DebugDrawerViewInspectorPlugin
 
 ContentView()
-    .debugGrid()  // controlled from View Inspector plugin
+    .debugAccessibilityOverrides()  // environment overrides; must be above .debugDrawer()
+    .debugGrid()                    // alignment grid, controlled from the View Inspector plugin
     .debugDrawer()
 ```
 
+## Modules
+
+| Module | Holds |
+|---|---|
+| `DebugDrawer` | The drawer: its window, the plugin protocol and registry, and release-build stand-ins |
+| `DebugDrawerConsolePlugin` | `os_log` entries (stdout and stderr on macOS): level filter, search, auto-follow, copy |
+| `DebugDrawerViewInspectorPlugin` | View borders by depth, alignment grid, click indicators, animation speed, SwiftUI render tracking, hierarchy snapshot |
+| `DebugDrawerAccessibilityPlugin` | Runtime overrides of color scheme, Dynamic Type, layout direction, locale and the system accessibility settings SwiftUI exposes, each beside the system's value |
+| `DebugDrawerPerformancePlugin` | Live FPS and memory with sparkline graphs |
+| `DebugDrawerEnergyPlugin` | Battery level and charging, CPU load and thermal state |
+| `DebugDrawerNetworkPlugin` | URLProtocol HTTP interception: method, URL, status, timing, headers, body, cURL export |
+| `DebugDrawerDiskIOPlugin` | FileManager reads, writes, deletes and listings, flagging main-thread I/O |
+| `DebugDrawerAppInfoPlugin` | Bundle, version, OS, memory, uptime, process, debugger, screen and reachability facts |
+| `DebugDrawerUserDefaultsPlugin` | Browse, search, edit and delete UserDefaults keys |
+| `DebugDrawerKeychainPlugin` | Generic and internet passwords: copy and delete entries |
+| `DebugDrawerScreenshotPlugin` | The app window captured to a file or the clipboard, optionally without the drawer |
+| `DebugDrawerFileBrowserPlugin` | The app's Application Support and Caches directories: delete and share files |
+| `DebugDrawerLocationPlugin` | Spoofed CLLocationManager coordinates: presets and a custom latitude and longitude |
+| `DebugDrawerLoadedLibrariesPlugin` | Every loaded image, grouped as app, third-party and system, with UUIDs and load addresses |
+| `DebugDrawerDeepLinkPlugin` | Opens deep links and keeps a history of them |
+| `DebugDrawerCookiesPlugin` | Browse, search and delete HTTPCookieStorage cookies |
+| `DebugDrawerLaunchTimePlugin` | Pre-main, app-init-to-first-frame and total launch time |
+
 ## Development
 
-Uses [just](https://github.com/casey/just) as a task runner. Run `just --list` to see available commands.
+Bazel is the development build; SwiftPM is the published package. Both are generated from
+`scripts/modules.py`.
 
-Requires Bazel 9.3.1, macOS 15.0+ / iOS 17.0+, Swift 6.
+| Command | Does |
+|---|---|
+| `just test` | Build and run every test |
+| `just verify` | The tests under Bazel and under SwiftPM |
+| `just modules` | Regenerate `Package.swift` and every `BUILD.bazel` |
+| `just docs` | The DocC site into `.build/docs` |
+| `just generate` | An Xcode project from the Bazel graph |
+| `just run [macOS\|iOS]` | Build and launch the example app |
+
+`AGENTS.md` describes the layout, the workflow and the house rules in full.
 
 ## License
 
-MIT
+MIT. See `LICENSE`.

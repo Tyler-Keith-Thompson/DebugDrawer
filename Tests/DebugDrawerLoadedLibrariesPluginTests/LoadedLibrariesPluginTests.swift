@@ -52,7 +52,7 @@
             var info = Dl_info()
             #expect(dladdr(#dsohandle, &info) != 0)
             let path = String(cString: try #require(info.dli_fname))
-            let base = UInt(bitPattern: try #require(info.dli_fbase))
+            let base = UInt(bitPattern: info.dli_fbase)
 
             let libraries = LoadedLibrary.loadAll()
             let image = try #require(libraries.first { $0.path == path }, "\(path) not listed")

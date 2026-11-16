@@ -273,10 +273,13 @@
                 ctx.timingFunction = CAMediaTimingFunction(name: .easeOut)
                 overlay.animator().alphaValue = 0
             } completionHandler: { [weak self, weak overlay] in
-                overlay?.removeFromSuperview()
-                if self?.currentOverlay === overlay {
-                    self?.currentOverlay = nil
-                    self?.currentBadge = nil
+                // AppKit calls the completion handler on the main thread.
+                MainActor.assumeIsolated {
+                    overlay?.removeFromSuperview()
+                    if self?.currentOverlay === overlay {
+                        self?.currentOverlay = nil
+                        self?.currentBadge = nil
+                    }
                 }
             }
         }

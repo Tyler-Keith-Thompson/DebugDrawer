@@ -1,0 +1,24 @@
+{
+  "originHash" : "1ec946fdfd32409e3aa17b16c99e4bc1436c17d14fce2c1cd8becdcc8c4353ef",
+  "pins" : [
+    {
+      "identity" : "oslogclient",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/CheekyGhost-Labs/OSLogClient",
+      "state" : {
+        "revision" : "062e71717391a8a2c3c10d773654b4e537e5777c",
+        "version" : "2.0.1"
+      }
+    },
+    {
+      "identity" : "viewinspector",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/nalexn/ViewInspector",
+      "state" : {
+        "revision" : "2dacb6e514be19379c605a5a11564d0f3fea89d9",
+        "version" : "0.10.5"
+      }
+    }
+  ],
+  "version" : 3
+}

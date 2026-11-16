@@ -1,7 +1,7 @@
 #if DEBUG
     @testable import DebugDrawer
     import SwiftUI
-    import XCTest
+    import Testing
 
     struct TestPlugin: DebugDrawerPlugin {
         var title: String
@@ -9,78 +9,92 @@
         var body: some View { Text("test") }
     }
 
+    // Serialized: every test works on the one shared drawer.
     @MainActor
-    final class DebugDrawerTests: XCTestCase {
-        override func setUp() {
-            // Reset shared state
+    @Suite("DebugDrawer registry", .serialized)
+    struct DebugDrawerTests {
+        init() {
             let drawer = DebugDrawer.shared
             for plugin in drawer.globalPlugins {
                 drawer.unregisterGlobal(id: plugin.id)
             }
         }
 
-        func testRegisterGlobalPlugin() {
-            let drawer = DebugDrawer.shared
-            XCTAssertEqual(drawer.globalPlugins.count, 0)
+        @Test("Registering a global plugin lists it")
+        func registerGlobalPlugin() {
+            let sut = DebugDrawer.shared
+            #expect(sut.globalPlugins.isEmpty)
 
-            drawer.registerGlobal(TestPlugin(title: "A"))
-            XCTAssertEqual(drawer.globalPlugins.count, 1)
-            XCTAssertEqual(drawer.globalPlugins[0].title, "A")
+            sut.registerGlobal(TestPlugin(title: "A"))
+
+            #expect(sut.globalPlugins.count == 1)
+            #expect(sut.globalPlugins.first?.title == "A")
         }
 
-        func testDuplicateGlobalIgnored() {
-            let drawer = DebugDrawer.shared
-            drawer.registerGlobal(TestPlugin(title: "A"))
-            drawer.registerGlobal(TestPlugin(title: "A")) // same ID (type name)
-            XCTAssertEqual(drawer.globalPlugins.count, 1)
+        @Test("A second global plugin with the same ID is ignored")
+        func duplicateGlobalIgnored() {
+            let sut = DebugDrawer.shared
+
+            sut.registerGlobal(TestPlugin(title: "A"))
+            sut.registerGlobal(TestPlugin(title: "A")) // same ID (type name)
+
+            #expect(sut.globalPlugins.count == 1)
         }
 
-        func testUnregisterGlobal() {
-            let drawer = DebugDrawer.shared
-            drawer.registerGlobal(TestPlugin(title: "A"))
-            drawer.unregisterGlobal(id: "TestPlugin")
-            XCTAssertEqual(drawer.globalPlugins.count, 0)
+        @Test("Unregistering a global plugin removes it")
+        func unregisterGlobal() {
+            let sut = DebugDrawer.shared
+            sut.registerGlobal(TestPlugin(title: "A"))
+
+            sut.unregisterGlobal(id: "TestPlugin")
+
+            #expect(sut.globalPlugins.isEmpty)
         }
 
-        func testLocalPluginToken() {
-            let drawer = DebugDrawer.shared
-            let token = drawer.registerLocal(TestPlugin(title: "Local"))
-            XCTAssertEqual(drawer.localPlugins.count, 1)
+        @Test("A local plugin is removed by the token its registration returned")
+        func localPluginToken() {
+            let sut = DebugDrawer.shared
+            let token = sut.registerLocal(TestPlugin(title: "Local"))
+            #expect(sut.localPlugins.count == 1)
 
-            // Unregister with correct token
-            drawer.unregisterLocal(id: "TestPlugin", token: token)
-            XCTAssertEqual(drawer.localPlugins.count, 0)
+            sut.unregisterLocal(id: "TestPlugin", token: token)
+
+            #expect(sut.localPlugins.isEmpty)
         }
 
-        func testStaleTokenNoOp() {
-            let drawer = DebugDrawer.shared
-            let oldToken = drawer.registerLocal(TestPlugin(title: "Local"))
-            let newToken = drawer.registerLocal(TestPlugin(title: "Updated"))
+        @Test("A stale token does not remove a newer registration of the same plugin")
+        func staleTokenNoOp() {
+            let sut = DebugDrawer.shared
+            let oldToken = sut.registerLocal(TestPlugin(title: "Local"))
+            let newToken = sut.registerLocal(TestPlugin(title: "Updated"))
 
-            // Old token should not remove the new registration
-            drawer.unregisterLocal(id: "TestPlugin", token: oldToken)
-            XCTAssertEqual(drawer.localPlugins.count, 1)
+            sut.unregisterLocal(id: "TestPlugin", token: oldToken)
+            #expect(sut.localPlugins.count == 1)
 
-            // New token should work
-            drawer.unregisterLocal(id: "TestPlugin", token: newToken)
-            XCTAssertEqual(drawer.localPlugins.count, 0)
+            sut.unregisterLocal(id: "TestPlugin", token: newToken)
+            #expect(sut.localPlugins.isEmpty)
         }
 
-        func testHasPlugins() {
-            let drawer = DebugDrawer.shared
-            XCTAssertFalse(drawer.hasPlugins)
+        @Test("The drawer has plugins once one is registered")
+        func hasPlugins() {
+            let sut = DebugDrawer.shared
+            #expect(!sut.hasPlugins)
 
-            drawer.registerGlobal(TestPlugin(title: "A"))
-            XCTAssertTrue(drawer.hasPlugins)
+            sut.registerGlobal(TestPlugin(title: "A"))
+
+            #expect(sut.hasPlugins)
         }
 
-        func testToggle() {
-            let drawer = DebugDrawer.shared
-            XCTAssertFalse(drawer.isOpen)
-            drawer.toggle()
-            XCTAssertTrue(drawer.isOpen)
-            drawer.toggle()
-            XCTAssertFalse(drawer.isOpen)
+        @Test("Toggling opens a closed drawer and closes an open one")
+        func toggle() {
+            let sut = DebugDrawer.shared
+            #expect(!sut.isOpen)
+
+            sut.toggle()
+            #expect(sut.isOpen)
+
+            sut.toggle()
+            #expect(!sut.isOpen)
         }
     }
 #endif
