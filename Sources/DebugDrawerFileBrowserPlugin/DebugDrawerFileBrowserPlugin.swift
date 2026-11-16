@@ -261,6 +261,8 @@
         let depth: Int
         let onDelete: (FSNode) -> Void
         let onShare: (FSNode) -> Void
+        @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+        @ScaledMetric(relativeTo: .caption2) private var iconWidth = 14
 
         var body: some View {
             VStack(alignment: .leading, spacing: 0) {
@@ -280,21 +282,32 @@
         }
 
         private var label: some View {
-            HStack(spacing: 4) {
-                Image(systemName: node.isDirectory ? "folder.fill" : fileIcon(node.name))
-                    .font(.caption2)
-                    .foregroundStyle(node.isDirectory ? .blue : .secondary)
-                    .frame(width: 14)
-                    .accessibilityHidden(true)
-
-                Text(node.name)
-                    .font(.system(.caption2, design: .monospaced))
-                    .lineLimit(3)
-
-                Spacer()
-
-                if !node.isDirectory {
-                    fileActions
+            Group {
+                // At accessibility text sizes the size and actions leave the name too little
+                // width, so they take a line of their own under it.
+                if dynamicTypeSize.isAccessibilitySize {
+                    VStack(alignment: .leading, spacing: 2) {
+                        HStack(spacing: 4) {
+                            icon
+                            name
+                            Spacer()
+                        }
+                        if !node.isDirectory {
+                            HStack(spacing: 8) {
+                                fileActions
+                            }
+                            .padding(.leading, iconWidth + 4)
+                        }
+                    }
+                } else {
+                    HStack(spacing: 4) {
+                        icon
+                        name
+                        Spacer()
+                        if !node.isDirectory {
+                            fileActions
+                        }
+                    }
                 }
             }
             .padding(.vertical, 2)
@@ -314,6 +327,20 @@
                 #endif
             }
             .accessibilityHint("Its actions copy the path, share, delete or reveal it.")
+        }
+
+        private var icon: some View {
+            Image(systemName: node.isDirectory ? "folder.fill" : fileIcon(node.name))
+                .font(.caption2)
+                .foregroundStyle(node.isDirectory ? .blue : .secondary)
+                .frame(width: iconWidth)
+                .accessibilityHidden(true)
+        }
+
+        private var name: some View {
+            Text(node.name)
+                .font(.system(.caption2, design: .monospaced))
+                .lineLimit(3)
         }
 
         private var fileActions: some View {

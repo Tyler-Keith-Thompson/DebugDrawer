@@ -113,6 +113,7 @@
 
     struct LaunchTimePluginView: View {
         @ObservedObject var tracker = LaunchTimeTracker.shared
+        @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
         var body: some View {
             VStack(alignment: .leading, spacing: 6) {
@@ -180,15 +181,21 @@
             }
         }
 
+        // At accessibility text sizes a label no longer fits its column, so it sits above the value.
         private func infoRow(_ label: String, _ value: String) -> some View {
-            HStack {
+            let layout = dynamicTypeSize.isAccessibilitySize
+                ? AnyLayout(VStackLayout(alignment: .leading, spacing: 0))
+                : AnyLayout(HStackLayout())
+            return layout {
                 Text(label)
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                    .frame(width: 90, alignment: .leading)
+                    .frame(width: dynamicTypeSize.isAccessibilitySize ? nil : 90, alignment: .leading)
                 Text(value)
                     .font(.system(.caption2, design: .monospaced))
-                Spacer()
+                if !dynamicTypeSize.isAccessibilitySize {
+                    Spacer()
+                }
             }
         }
 

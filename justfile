@@ -28,7 +28,18 @@ test: lint
 [doc('Re-record every snapshot reference into the workspace, after a change to how a view looks')]
 record-snapshots:
     -SNAPSHOT_TESTING_RECORD=all {{SWIFT}} test
+    -just test-ios TEST_RUNNER_SNAPSHOT_TESTING_RECORD=all
     python3 {{PROJECT_ROOT}}/scripts/modules.py
+
+# macOS doesn't scale text with Dynamic Type, so the large-text snapshots (under #if os(iOS)) run
+# on an iOS simulator through xcodebuild. xcodebuild hands the test process only the variables
+# prefixed TEST_RUNNER_, which is how record-snapshots asks it to record. The renderer draws at a
+# fixed width and scale, so any simulator gives the same references.
+IOS_DESTINATION := env("IOS_DESTINATION", "platform=iOS Simulator,name=iPad Pro 13-inch (M5)")
+
+[doc('Run the SwiftPM tests on an iOS simulator (the Dynamic Type snapshots)')]
+test-ios *env="":
+    env {{env}} xcodebuild test -quiet -scheme DebugDrawer-Package -destination '{{IOS_DESTINATION}}' -derivedDataPath {{PROJECT_ROOT}}/.build/xcode-ios
 
 [doc('SwiftLint and a11y-check over every first-party target (tools/lint.bzl)')]
 lint:

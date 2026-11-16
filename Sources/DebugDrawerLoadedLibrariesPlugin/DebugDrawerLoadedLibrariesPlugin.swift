@@ -226,6 +226,7 @@
 
     struct LoadedLibraryRow: View {
         let library: LoadedLibrary
+        @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
         var body: some View {
             VStack(alignment: .leading, spacing: 1) {
@@ -247,7 +248,9 @@
                 Text("\(library.uuid?.uuidString ?? "no UUID") · \(library.loadAddressLabel)")
                     .font(.system(.caption2, design: .monospaced))
                     .foregroundStyle(.tertiary)
-                    .lineLimit(3)
+                    // At accessibility text sizes the UUID alone fills three lines, which would
+                    // cut off the load address.
+                    .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 3)
             }
             .textSelection(.enabled)
         }

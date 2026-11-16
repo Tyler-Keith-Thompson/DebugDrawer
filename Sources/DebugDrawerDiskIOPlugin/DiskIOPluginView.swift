@@ -125,49 +125,33 @@
     /// last components, its size (or item count for a listing) and how long it took.
     struct IOEventRow: View {
         let event: IOEvent
+        @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+        @ScaledMetric(relativeTo: .caption2) private var badgeWidth = 14
 
         var body: some View {
             VStack(spacing: 0) {
-                HStack(spacing: 6) {
-                    // Operation badge
-                    Text(event.operation.rawValue)
-                        .font(.system(.caption2, design: .monospaced, weight: .bold))
-                        .frame(width: 14)
-                        .foregroundStyle(event.operation.color)
-
-                    // Main thread warning
-                    if event.isMainThread {
-                        Image(systemName: "exclamationmark.triangle.fill")
-                            .font(.caption2)
-                            .foregroundStyle(.red)
-                            .accessibilityLabel("On the main thread")
+                Group {
+                    // At accessibility text sizes the path has no room beside the size and
+                    // duration, so it takes a line of its own.
+                    if dynamicTypeSize.isAccessibilitySize {
+                        VStack(alignment: .leading, spacing: 0) {
+                            HStack(spacing: 6) {
+                                operationBadge
+                                mainThreadWarning
+                                Spacer()
+                                measurements
+                            }
+                            path
+                        }
+                    } else {
+                        HStack(spacing: 6) {
+                            operationBadge
+                            mainThreadWarning
+                            path
+                            Spacer()
+                            measurements
+                        }
                     }
-
-                    // Path (last 2 components)
-                    Text(event.shortPath)
-                        .font(.system(.caption2, design: .monospaced))
-                        .lineLimit(3)
-                        .truncationMode(.head)
-
-                    Spacer()
-
-                    // Size
-                    if event.size > 0 && event.operation != .list {
-                        Text(event.size.byteLabel)
-                            .font(.system(.caption2, design: .monospaced))
-                            .foregroundStyle(.secondary)
-                    }
-
-                    if event.operation == .list {
-                        Text("\(event.size) items")
-                            .font(.system(.caption2, design: .monospaced))
-                            .foregroundStyle(.secondary)
-                    }
-
-                    // Duration
-                    Text(event.durationLabel)
-                        .font(.system(.caption2, design: .monospaced))
-                        .foregroundStyle(event.duration > 0.01 ? Color.orange : Color.secondary)
                 }
                 .padding(.horizontal, 4)
                 .padding(.vertical, 2)
@@ -175,6 +159,49 @@
 
                 Divider().padding(.leading, 24)
             }
+        }
+
+        private var operationBadge: some View {
+            Text(event.operation.rawValue)
+                .font(.system(.caption2, design: .monospaced, weight: .bold))
+                .frame(width: badgeWidth)
+                .foregroundStyle(event.operation.color)
+        }
+
+        @ViewBuilder private var mainThreadWarning: some View {
+            if event.isMainThread {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .font(.caption2)
+                    .foregroundStyle(.red)
+                    .accessibilityLabel("On the main thread")
+            }
+        }
+
+        // The last two components.
+        private var path: some View {
+            Text(event.shortPath)
+                .font(.system(.caption2, design: .monospaced))
+                .lineLimit(3)
+                .truncationMode(.head)
+        }
+
+        // The size (or item count for a listing), then the duration.
+        @ViewBuilder private var measurements: some View {
+            if event.size > 0 && event.operation != .list {
+                Text(event.size.byteLabel)
+                    .font(.system(.caption2, design: .monospaced))
+                    .foregroundStyle(.secondary)
+            }
+
+            if event.operation == .list {
+                Text("\(event.size) items")
+                    .font(.system(.caption2, design: .monospaced))
+                    .foregroundStyle(.secondary)
+            }
+
+            Text(event.durationLabel)
+                .font(.system(.caption2, design: .monospaced))
+                .foregroundStyle(event.duration > 0.01 ? Color.orange : Color.secondary)
         }
     }
 

@@ -101,6 +101,7 @@
         let history: [String]
         let onOpen: (URL) -> Void
         let onClear: () -> Void
+        @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
         var body: some View {
             VStack(alignment: .leading, spacing: 6) {
@@ -144,19 +145,29 @@
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
+                // At accessibility text sizes a preset's name leaves its URL too little width, so
+                // the URL sits below the name.
+                let presetLayout = dynamicTypeSize.isAccessibilitySize
+                    ? AnyLayout(VStackLayout(alignment: .leading, spacing: 0))
+                    : AnyLayout(HStackLayout())
                 ForEach(presets, id: \.url) { preset in
                     Button {
                         urlText = preset.url
                     } label: {
-                        HStack {
+                        presetLayout {
                             Text(preset.label)
                                 .font(.caption2)
-                            Spacer()
+                            if !dynamicTypeSize.isAccessibilitySize {
+                                Spacer()
+                            }
                             Text(preset.url)
                                 .font(.system(.caption2, design: .monospaced))
                                 .foregroundStyle(.secondary)
                                 .lineLimit(3)
                                 .truncationMode(.middle)
+                                // Stacked, the URL is otherwise offered one line's height and
+                                // truncates rather than wrapping.
+                                .fixedSize(horizontal: false, vertical: dynamicTypeSize.isAccessibilitySize)
                         }
                     }
                     .buttonStyle(.plain)

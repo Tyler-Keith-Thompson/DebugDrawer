@@ -230,6 +230,8 @@
         let active: Coordinate?
         let presets: [LocationSimulator.PresetLocation]
         let onPreset: (LocationSimulator.PresetLocation) -> Void
+        // Grows with the text, so "Lat" and "Lon" keep fitting their column at large sizes.
+        @ScaledMetric(relativeTo: .caption) private var labelWidth = 24
 
         var body: some View {
             VStack(alignment: .leading, spacing: 6) {
@@ -277,7 +279,7 @@
                 Text(shortName)
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                    .frame(width: 24, alignment: .leading)
+                    .frame(width: labelWidth, alignment: .leading)
                 TextField(name, text: text)
                     .textFieldStyle(.roundedBorder)
                     .font(.system(.caption2, design: .monospaced))

@@ -164,6 +164,7 @@
     struct CookieDetails: View {
         let cookie: HTTPCookie
         let redaction: DebugDrawerRedaction
+        @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
         var body: some View {
             VStack(alignment: .leading, spacing: 2) {
@@ -180,12 +181,16 @@
             }
         }
 
+        // At accessibility text sizes a label no longer fits its column, so it sits above the value.
         private func cookieField(_ label: String, _ value: String, redacted: String? = nil) -> some View {
-            HStack(alignment: .top) {
+            let layout = dynamicTypeSize.isAccessibilitySize
+                ? AnyLayout(VStackLayout(alignment: .leading, spacing: 0))
+                : AnyLayout(HStackLayout(alignment: .top))
+            return layout {
                 Text(label)
                     .font(.caption2)
                     .foregroundStyle(.secondary)
-                    .frame(width: 60, alignment: .leading)
+                    .frame(width: dynamicTypeSize.isAccessibilitySize ? nil : 60, alignment: .leading)
                 RedactedText(value, redacted: redacted ?? value)
                     .font(.system(.caption2, design: .monospaced))
                     .lineLimit(3)

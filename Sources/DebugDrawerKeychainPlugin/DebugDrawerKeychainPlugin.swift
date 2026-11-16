@@ -173,6 +173,7 @@
         let isSelected: Bool
         let onSelect: () -> Void
         let onDelete: () -> Void
+        @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
         var body: some View {
             VStack(alignment: .leading, spacing: 0) {
@@ -190,8 +191,13 @@
             }
         }
 
+        // At accessibility text sizes the class badge leaves the account and service too little
+        // width, so it sits above them.
         private var summary: some View {
-            HStack(spacing: 6) {
+            let layout = dynamicTypeSize.isAccessibilitySize
+                ? AnyLayout(VStackLayout(alignment: .leading, spacing: 2))
+                : AnyLayout(HStackLayout(spacing: 6))
+            return layout {
                 Text(entry.itemClass)
                     .font(.system(.caption2, design: .monospaced, weight: .medium))
                     .padding(.horizontal, 3)
@@ -210,8 +216,11 @@
                     }
                 }
 
-                Spacer()
+                if !dynamicTypeSize.isAccessibilitySize {
+                    Spacer()
+                }
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 6)
             .padding(.vertical, 3)
             .contentShape(Rectangle())

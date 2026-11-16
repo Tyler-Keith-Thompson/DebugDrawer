@@ -16,6 +16,7 @@
 
         let system: SystemValues
         @ObservedObject var overrides = AccessibilityOverrides.shared
+        @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
         var body: some View {
             VStack(alignment: .leading, spacing: 4) {
@@ -30,8 +31,13 @@
             }
         }
 
+        // At accessibility text sizes the name and the picker don't fit side by side, so the
+        // picker sits below the name.
         private func row(_ title: String, system: Bool, override: Binding<Bool?>) -> some View {
-            HStack(spacing: 6) {
+            let layout = dynamicTypeSize.isAccessibilitySize
+                ? AnyLayout(VStackLayout(alignment: .leading, spacing: 4))
+                : AnyLayout(HStackLayout(spacing: 6))
+            return layout {
                 VStack(alignment: .leading, spacing: 0) {
                     Text(title)
                         .font(.caption2)
@@ -39,7 +45,9 @@
                         .font(.system(.caption2, design: .monospaced))
                         .foregroundStyle(.secondary)
                 }
-                Spacer()
+                if !dynamicTypeSize.isAccessibilitySize {
+                    Spacer()
+                }
                 Picker(title, selection: Binding(
                     get: { override.wrappedValue.map { $0 ? 1 : 2 } ?? 0 },
                     set: { override.wrappedValue = $0 == 0 ? nil : $0 == 1 }

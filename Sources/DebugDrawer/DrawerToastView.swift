@@ -9,6 +9,7 @@
         let plugin: AnyDebugDrawerPlugin?
         let open: () -> Void
         let dismiss: () -> Void
+        @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
         var body: some View {
             HStack(alignment: .top, spacing: 8) {
@@ -22,7 +23,9 @@
                                 .font(.caption.weight(.semibold))
                             Text(toast.message)
                                 .font(.caption)
-                                .lineLimit(3)
+                                // Three lines hold only a few words at accessibility text
+                                // sizes; six keep a typical message whole.
+                                .lineLimit(dynamicTypeSize.isAccessibilitySize ? 6 : 3)
                         }
                         Spacer(minLength: 0)
                         if toast.count > 1 {

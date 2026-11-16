@@ -47,6 +47,8 @@
 
         // MARK: UUID and load address
 
+        // dwarfdump is the independent reference, and only the Mac can start it.
+        #if os(macOS)
         @Test func eachImageHasItsLoadAddressAndUUID() throws {
             // The image holding this test: dladdr gives its path and header address independently of dyld's list.
             var info = Dl_info()
@@ -84,6 +86,8 @@
                 line.split(separator: " ").dropFirst().first.flatMap { UUID(uuidString: String($0)) }
             })
         }
+
+        #endif
 
         @Test func rowShowsUUIDLoadAddressAndVersion() throws {
             let uuid = UUID()

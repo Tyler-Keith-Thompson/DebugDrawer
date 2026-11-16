@@ -104,44 +104,33 @@
         let redaction: DebugDrawerRedaction
         let isSelected: Bool
         let onSelect: () -> Void
+        @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
         var body: some View {
             VStack(alignment: .leading, spacing: 0) {
                 Button(action: onSelect) {
-                    HStack(spacing: 6) {
-                        // Method badge
-                        Text(entry.method)
-                            .font(.system(.caption2, design: .monospaced, weight: .bold))
-                            .padding(.horizontal, 3)
-                            .background(methodColor(entry.method).opacity(0.15))
-                            .cornerRadius(2)
-
-                        // Status
-                        if let code = entry.statusCode {
-                            Text("\(code)")
-                                .font(.system(.caption2, design: .monospaced, weight: .bold))
-                                .foregroundStyle(entry.statusColor)
-                        } else if !entry.isComplete {
-                            ProgressView()
-                                .controlSize(.mini)
+                    Group {
+                        // At accessibility text sizes the path has no room beside the method,
+                        // status and duration, so it takes a line of its own.
+                        if dynamicTypeSize.isAccessibilitySize {
+                            VStack(alignment: .leading, spacing: 1) {
+                                HStack(spacing: 6) {
+                                    methodBadge
+                                    status
+                                    Spacer()
+                                    duration
+                                }
+                                path
+                            }
                         } else {
-                            Text("ERR")
-                                .font(.system(.caption2, design: .monospaced, weight: .bold))
-                                .foregroundStyle(.red)
+                            HStack(spacing: 6) {
+                                methodBadge
+                                status
+                                path
+                                Spacer()
+                                duration
+                            }
                         }
-
-                        // Path
-                        Text(entry.path)
-                            .font(.system(.caption2, design: .monospaced))
-                            .lineLimit(3)
-                            .truncationMode(.middle)
-
-                        Spacer()
-
-                        // Duration
-                        Text(entry.durationLabel)
-                            .font(.system(.caption2, design: .monospaced))
-                            .foregroundStyle(.tertiary)
                     }
                     .padding(.horizontal, 6)
                     .padding(.vertical, 3)
@@ -158,6 +147,42 @@
 
                 Divider().padding(.leading, 6)
             }
+        }
+
+        private var methodBadge: some View {
+            Text(entry.method)
+                .font(.system(.caption2, design: .monospaced, weight: .bold))
+                .padding(.horizontal, 3)
+                .background(methodColor(entry.method).opacity(0.15))
+                .cornerRadius(2)
+        }
+
+        @ViewBuilder private var status: some View {
+            if let code = entry.statusCode {
+                Text("\(code)")
+                    .font(.system(.caption2, design: .monospaced, weight: .bold))
+                    .foregroundStyle(entry.statusColor)
+            } else if !entry.isComplete {
+                ProgressView()
+                    .controlSize(.mini)
+            } else {
+                Text("ERR")
+                    .font(.system(.caption2, design: .monospaced, weight: .bold))
+                    .foregroundStyle(.red)
+            }
+        }
+
+        private var path: some View {
+            Text(entry.path)
+                .font(.system(.caption2, design: .monospaced))
+                .lineLimit(3)
+                .truncationMode(.middle)
+        }
+
+        private var duration: some View {
+            Text(entry.durationLabel)
+                .font(.system(.caption2, design: .monospaced))
+                .foregroundStyle(.tertiary)
         }
 
         private func methodColor(_ method: String) -> Color {
@@ -177,6 +202,7 @@
     struct NetworkRequestDetail: View {
         let entry: NetworkEntry
         let redaction: DebugDrawerRedaction
+        @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
         var body: some View {
             VStack(alignment: .leading, spacing: 6) {
@@ -185,15 +211,23 @@
                     .font(.system(.caption2, design: .monospaced))
                     .foregroundStyle(.secondary)
 
-                // Timing + size + actions
-                HStack(spacing: 12) {
-                    detailBadge("Time", entry.durationLabel)
-                    detailBadge("Size", entry.responseSizeLabel)
-                    if let code = entry.statusCode {
-                        detailBadge("Status", "\(code)")
+                // Timing + size + actions. At accessibility text sizes the badges and the button
+                // don't fit one line, so the button goes below the badges.
+                let summaryLayout = dynamicTypeSize.isAccessibilitySize
+                    ? AnyLayout(VStackLayout(alignment: .leading, spacing: 6))
+                    : AnyLayout(HStackLayout(spacing: 12))
+                summaryLayout {
+                    HStack(spacing: 12) {
+                        detailBadge("Time", entry.durationLabel)
+                        detailBadge("Size", entry.responseSizeLabel)
+                        if let code = entry.statusCode {
+                            detailBadge("Status", "\(code)")
+                        }
                     }
 
-                    Spacer()
+                    if !dynamicTypeSize.isAccessibilitySize {
+                        Spacer()
+                    }
 
                     Button("Copy cURL") {
                         debugDrawerCopyToClipboard(entry.curl(redaction: redaction))

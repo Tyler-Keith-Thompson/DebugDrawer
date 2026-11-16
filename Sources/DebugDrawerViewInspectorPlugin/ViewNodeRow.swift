@@ -15,6 +15,7 @@
         let depth: Int
         /// Matched against class names, accessibility labels and roles; empty matches everything.
         let filter: String
+        @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
         var body: some View {
             if subtreeMatchesFilter(node) {
@@ -29,9 +30,19 @@
             }
         }
 
+        // At accessibility text sizes a row of flags squeezes each one to a few letters per line,
+        // so each flag takes a line of its own.
+        private func flagLayout(spacing: CGFloat) -> AnyLayout {
+            dynamicTypeSize.isAccessibilitySize
+                ? AnyLayout(VStackLayout(alignment: .leading, spacing: 1))
+                : AnyLayout(HStackLayout(spacing: spacing))
+        }
+
         private var label: some View {
-            VStack(alignment: .leading, spacing: 1) {
-                HStack(spacing: 4) {
+            let classLayout = flagLayout(spacing: 4)
+            let detailLayout = flagLayout(spacing: 6)
+            return VStack(alignment: .leading, spacing: 1) {
+                classLayout {
                     Text(node.className)
                         .font(.system(.caption2, design: .monospaced))
                         .foregroundStyle(node.accessibilityLabel != nil ? Color.accentColor : .primary)
@@ -55,7 +66,7 @@
                     }
                 }
 
-                HStack(spacing: 6) {
+                detailLayout {
                     Text("\(Int(node.frame.width))x\(Int(node.frame.height))")
                         .font(.system(.caption2, design: .monospaced))
                         .foregroundStyle(.tertiary)
