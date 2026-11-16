@@ -141,7 +141,7 @@ Button("Debug") { DebugDrawer.shared.toggle() }
 `DebugDrawerViewInspectorPlugin` — view borders with depth coloring, alignment grid (color/opacity/spacing), click indicators, animation speed control, SwiftUI render tracking, view hierarchy snapshot.
 
 ### Accessibility
-`DebugDrawerAccessibilityPlugin` — runtime environment overrides: color scheme, dynamic type, layout direction, locale.
+`DebugDrawerAccessibilityPlugin` — runtime environment overrides: color scheme, dynamic type, layout direction, locale, and the system accessibility settings SwiftUI exposes (Reduce Motion, Increase Contrast, Bold Text, Reduce Transparency, Differentiate Without Color, Invert Colors), each shown next to the system's current value.
 
 ### Performance
 `DebugDrawerPerformancePlugin` — live FPS and memory usage with sparkline graphs.

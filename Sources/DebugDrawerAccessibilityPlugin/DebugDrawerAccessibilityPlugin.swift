@@ -48,6 +48,13 @@
         @Published public var dynamicTypeSize: DynamicTypeSize?
         @Published public var layoutDirection: LayoutDirection?
         @Published public var locale: Locale?
+        /// System accessibility settings; nil means the system's value is used.
+        @Published public var reduceMotion: Bool?
+        @Published public var increaseContrast: Bool?
+        @Published public var boldText: Bool?
+        @Published public var reduceTransparency: Bool?
+        @Published public var differentiateWithoutColor: Bool?
+        @Published public var invertColors: Bool?
 
         /// Available localizations discovered from the app bundle.
         public let availableLocales: [Locale]
@@ -64,11 +71,19 @@
             dynamicTypeSize = nil
             layoutDirection = nil
             locale = nil
+            reduceMotion = nil
+            increaseContrast = nil
+            boldText = nil
+            reduceTransparency = nil
+            differentiateWithoutColor = nil
+            invertColors = nil
         }
 
         public var hasOverrides: Bool {
             colorScheme != nil || dynamicTypeSize != nil ||
-                layoutDirection != nil || locale != nil
+                layoutDirection != nil || locale != nil ||
+                reduceMotion != nil || increaseContrast != nil || boldText != nil ||
+                reduceTransparency != nil || differentiateWithoutColor != nil || invertColors != nil
         }
     }
 
@@ -88,6 +103,19 @@
                 .modifier(ConditionalEnvironment(\.dynamicTypeSize, value: overrides.dynamicTypeSize))
                 .modifier(ConditionalEnvironment(\.layoutDirection, value: overrides.layoutDirection))
                 .modifier(ConditionalEnvironment(\.locale, value: overrides.locale))
+                // The public keys are get-only; SwiftUI reads them from these settable
+                // underscored keys, which are what previews use to force a value.
+                .modifier(ConditionalEnvironment(\._accessibilityReduceMotion, value: overrides.reduceMotion))
+                .modifier(ConditionalEnvironment(\._colorSchemeContrast,
+                                                 value: overrides.increaseContrast.map { $0 ? .increased : .standard }))
+                // legibilityWeight is itself optional: wrap explicitly so "no override"
+                // stays nil instead of becoming an override to nil.
+                .modifier(ConditionalEnvironment(\.legibilityWeight,
+                                                 value: overrides.boldText.map { Optional($0 ? LegibilityWeight.bold : .regular) }))
+                .modifier(ConditionalEnvironment(\._accessibilityReduceTransparency, value: overrides.reduceTransparency))
+                .modifier(ConditionalEnvironment(\._accessibilityDifferentiateWithoutColor,
+                                                 value: overrides.differentiateWithoutColor))
+                .modifier(ConditionalEnvironment(\._accessibilityInvertColors, value: overrides.invertColors))
                 .preferredColorScheme(overrides.colorScheme)
             return modified
         }
@@ -114,6 +142,14 @@
 
     struct AccessibilityPluginView: View {
         @ObservedObject private var overrides = AccessibilityOverrides.shared
+
+        // The drawer sits outside `.debugAccessibilityOverrides()`, so these are the system's values.
+        @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
+        @Environment(\.colorSchemeContrast) private var systemContrast
+        @Environment(\.legibilityWeight) private var systemLegibilityWeight
+        @Environment(\.accessibilityReduceTransparency) private var systemReduceTransparency
+        @Environment(\.accessibilityDifferentiateWithoutColor) private var systemDifferentiateWithoutColor
+        @Environment(\.accessibilityInvertColors) private var systemInvertColors
 
         private let typeSizes: [(String, DynamicTypeSize)] = [
             ("XS", .xSmall), ("S", .small), ("M", .medium),
@@ -200,6 +236,17 @@
                     }
                 }
 
+                section("Accessibility Settings") {
+                    AccessibilitySettingsSection(system: .init(
+                        reduceMotion: systemReduceMotion,
+                        increaseContrast: systemContrast == .increased,
+                        boldText: systemLegibilityWeight == .bold,
+                        reduceTransparency: systemReduceTransparency,
+                        differentiateWithoutColor: systemDifferentiateWithoutColor,
+                        invertColors: systemInvertColors
+                    ))
+                }
+
                 if overrides.hasOverrides {
                     Divider()
 
@@ -245,7 +292,16 @@
                 if let loc = overrides.locale {
                     badge(loc.identifier)
                 }
+                ForEach(settingBadges, id: \.self) { badge($0) }
             }
+        }
+
+        /// Short labels for the overridden accessibility settings, such as "Motion: On".
+        private var settingBadges: [String] {
+            [("Motion", overrides.reduceMotion), ("Contrast", overrides.increaseContrast),
+             ("Bold", overrides.boldText), ("Transparency", overrides.reduceTransparency),
+             ("No Color", overrides.differentiateWithoutColor), ("Invert", overrides.invertColors)]
+                .compactMap { name, value in value.map { "\(name): \($0 ? "On" : "Off")" } }
         }
 
         private func badge(_ text: String) -> some View {
@@ -339,6 +395,60 @@
                     overrides.locale = $0.isEmpty ? nil : Locale(identifier: $0)
                 }
             )
+        }
+    }
+
+    // MARK: - System accessibility settings
+
+    /// A row per system accessibility setting: its name, the system's value, and a System/On/Off override.
+    struct AccessibilitySettingsSection: View {
+        struct SystemValues: Equatable {
+            var reduceMotion = false
+            var increaseContrast = false
+            var boldText = false
+            var reduceTransparency = false
+            var differentiateWithoutColor = false
+            var invertColors = false
+        }
+
+        let system: SystemValues
+        @ObservedObject var overrides = AccessibilityOverrides.shared
+
+        var body: some View {
+            VStack(alignment: .leading, spacing: 4) {
+                row("Reduce Motion", system: system.reduceMotion, override: $overrides.reduceMotion)
+                row("Increase Contrast", system: system.increaseContrast, override: $overrides.increaseContrast)
+                row("Bold Text", system: system.boldText, override: $overrides.boldText)
+                row("Reduce Transparency", system: system.reduceTransparency,
+                    override: $overrides.reduceTransparency)
+                row("Differentiate Without Color", system: system.differentiateWithoutColor,
+                    override: $overrides.differentiateWithoutColor)
+                row("Invert Colors", system: system.invertColors, override: $overrides.invertColors)
+            }
+        }
+
+        private func row(_ title: String, system: Bool, override: Binding<Bool?>) -> some View {
+            HStack(spacing: 6) {
+                VStack(alignment: .leading, spacing: 0) {
+                    Text(title)
+                        .font(.system(size: 10))
+                    Text("System: \(system ? "On" : "Off")")
+                        .font(.system(size: 8, design: .monospaced))
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+                Picker(selection: Binding(
+                    get: { override.wrappedValue.map { $0 ? 1 : 2 } ?? 0 },
+                    set: { override.wrappedValue = $0 == 0 ? nil : $0 == 1 }
+                )) {
+                    Text("System").tag(0)
+                    Text("On").tag(1)
+                    Text("Off").tag(2)
+                } label: { EmptyView() }
+                    .pickerStyle(.segmented)
+                    .controlSize(.mini)
+                    .fixedSize()
+            }
         }
     }
 

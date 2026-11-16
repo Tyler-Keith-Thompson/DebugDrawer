@@ -101,7 +101,7 @@ let package = Package(
                     path: "Tests/DebugDrawerViewInspectorPluginTests"),
         .testTarget(name: "DebugDrawerAccessibilityPluginTests",
                     dependencies: ["DebugDrawerAccessibilityPlugin", "DebugDrawer",
-],
+                                   .product(name: "ViewInspector", package: "ViewInspector")],
                     path: "Tests/DebugDrawerAccessibilityPluginTests"),
         .testTarget(name: "DebugDrawerAppInfoPluginTests",
                     dependencies: ["DebugDrawerAppInfoPlugin", "DebugDrawer"],
