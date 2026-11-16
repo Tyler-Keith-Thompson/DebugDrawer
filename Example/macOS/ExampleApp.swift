@@ -67,7 +67,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         window.contentViewController = NSHostingController(rootView: ExampleContentView())
         window.setFrameAutosaveName("DebugDrawerExample")
         window.makeKeyAndOrderFront(nil)
-        NSApp.activate(ignoringOtherApps: true)
         mainWindow = window
     }
 
@@ -80,8 +79,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         appMenuItem.submenu = appMenu
         mainMenu.addItem(appMenuItem)
 
+        // The drawer exists in debug builds only. A menu item, unlike a hidden button, is listed
+        // in the menu bar and reachable through accessibility.
+        #if DEBUG
+            let debugMenuItem = NSMenuItem()
+            let debugMenu = NSMenu(title: "Debug")
+            let toggle = debugMenu.addItem(
+                withTitle: "Toggle Debug Drawer",
+                action: #selector(toggleDebugDrawer),
+                keyEquivalent: "d"
+            )
+            toggle.keyEquivalentModifierMask = .control
+            toggle.target = self
+            debugMenuItem.submenu = debugMenu
+            mainMenu.addItem(debugMenuItem)
+        #endif
+
         NSApp.mainMenu = mainMenu
     }
+
+    #if DEBUG
+        @objc private func toggleDebugDrawer() {
+            DebugDrawer.shared.toggle()
+        }
+    #endif
 
     func applicationShouldTerminateAfterLastWindowClosed(_: NSApplication) -> Bool { true }
 }
@@ -145,15 +166,5 @@ struct ExampleContentView: View {
         .debugAccessibilityOverrides()
         .debugGrid()
         .debugDrawer()
-        .background {
-            Button("") {
-                // The drawer exists in debug builds only.
-                #if DEBUG
-                    DebugDrawer.shared.toggle()
-                #endif
-            }
-                .keyboardShortcut("d", modifiers: .control)
-                .hidden()
-        }
     }
 }
