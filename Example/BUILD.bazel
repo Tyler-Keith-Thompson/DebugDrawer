@@ -27,6 +27,7 @@ _SHARED_DEPS = [
     "//Sources/DebugDrawerLaunchTimePlugin",
     "//Sources/DebugDrawerTweaksPlugin",
     "//Sources/DebugDrawerFeatureFlagsPlugin",
+    "//Sources/DebugDrawerCrashReportsPlugin",
 ]
 
 # ── macOS ────────────────────────────────────────────────────────────

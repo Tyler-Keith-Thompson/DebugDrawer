@@ -19,6 +19,7 @@ import DebugDrawerCookiesPlugin
 import DebugDrawerLaunchTimePlugin
 import DebugDrawerTweaksPlugin
 import DebugDrawerFeatureFlagsPlugin
+import DebugDrawerCrashReportsPlugin
 import SwiftUI
 
 /// Demonstrates Send Report without a server: "sends" each report by copying it into the app's
@@ -48,6 +49,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationDidFinishLaunching(_: Notification) {
+        // First, so a crash in the rest of startup is recorded. It compiles in release, where it
+        // installs nothing; launched with -CrashOnLaunch, the app crashes right after it.
+        CrashReports.install()
+        if ProcessInfo.processInfo.arguments.contains(ExampleCrash.launchArgument) {
+            ExampleCrash.crash()
+        }
         #if DEBUG
             DebugDrawer.shared.installConsole()
             DebugDrawer.shared.installNetwork()
@@ -186,6 +193,9 @@ struct ExampleContentView: View {
 
                 ExampleTweaksBanner()
                 ExampleFeatureFlagsSummary()
+
+                // Crash Reports shows the crash on the next launch.
+                Button("Crash the App", role: .destructive) { ExampleCrash.crash() }
 
                 HStack {
                     TextField("Sample text field", text: .constant(""))

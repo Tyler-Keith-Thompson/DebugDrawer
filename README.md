@@ -290,8 +290,8 @@ DebugDrawer.shared.installLaunchTime()
 ```
 
 Each call needs its plugin's module imported (`import DebugDrawerConsolePlugin`, and so on).
-Tweaks takes the settings it shows and Feature Flags the adapter it reads, so each has a section
-of its own, next.
+Tweaks takes the settings it shows and Feature Flags the adapter it reads, and Crash Reports
+installs outside `#if DEBUG`, so each has a section of its own, next.
 
 ### Tweaks: the app's own debug settings
 
@@ -423,6 +423,41 @@ it shows the plugin and when Refresh is pressed. `FeatureFlagProvider`, `Feature
 `FeatureFlagValue` and the storage types exist in every configuration, so an adapter compiles in
 release, where nothing calls it and the app reads its service's live values.
 
+### Crash Reports: the last crash, on the next launch
+
+After a crash on a test device there is nothing on screen to say why. Crash Reports records each
+crash as it happens and shows it the next time the app starts:
+
+```swift
+import DebugDrawerCrashReportsPlugin
+
+// At startup, after any crash SDK has installed its own handlers:
+CrashReports.install()
+```
+
+`CrashReports` exists in every configuration, so the call needs no `#if DEBUG`: in release it
+installs nothing. In debug builds it catches uncaught Objective-C exceptions (with
+`NSSetUncaughtExceptionHandler`) and the fatal signals `SIGABRT`, `SIGSEGV`, `SIGBUS`, `SIGILL`,
+`SIGFPE` and `SIGTRAP`, which is how Swift's runtime failures (a force unwrap of `nil`, an index
+out of range, `fatalError`) arrive on arm64. Each handler writes a short report (what crashed,
+when, the app's version, the crashed thread's frames, named by `backtrace_symbols_fd`) and then
+calls the handler that was installed before it, so a crash SDK the app also uses still records
+the crash; install after the SDK for that. The signal handler runs on an alternate stack, so a
+stack overflow on the thread that installed is recorded too. Where MetricKit exists (iOS, macOS,
+visionOS), the `MXCrashDiagnostic`s the system delivers, often a day later, are kept as reports
+as well.
+
+On the next launch the plugin keeps the report with the others (the newest ten, in the app's
+Application Support directory; `install(directory:)` takes another), puts a badge on its header
+for each report not yet opened and posts a toast. The drawer lists them newest first; opening one
+shows its stack trace, selectable, with a button that copies the whole report, and marks it seen.
+Mark All Seen clears the badge, and each report can be deleted, or all of them. A bug report
+carries every report as a text file.
+
+On macOS, AppKit catches an exception raised on the main thread while it handles an event, logs
+it and carries on, so no uncaught exception reaches the handler; set the
+`NSApplicationCrashOnExceptions` default to `true` to have the app crash, and be recorded, instead.
+
 ### Opening the drawer
 
 The drawer doesn't decide how it opens. Call `DebugDrawer.shared.toggle()` from whatever trigger
@@ -533,6 +568,7 @@ ContentView()
 | `DebugDrawerLaunchTimePlugin` | Pre-main, app-init-to-first-frame and total launch time |
 | `DebugDrawerTweaksPlugin` | The app's own debug settings: toggles, pickers, text fields, steppers and actions, in sections, read through typed accessors |
 | `DebugDrawerFeatureFlagsPlugin` | The app's feature flags through an adapter to its flag service: live values, local overrides that persist, search, an overridden-only filter and Reset All |
+| `DebugDrawerCrashReportsPlugin` | Uncaught exceptions and fatal signals, handed on to the app's other crash handlers, shown on the next launch with a badge and stack trace; MetricKit crash diagnostics too |
 
 ## Development
 

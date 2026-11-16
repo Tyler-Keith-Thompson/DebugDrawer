@@ -18,6 +18,7 @@ import DebugDrawerCookiesPlugin
 import DebugDrawerLaunchTimePlugin
 import DebugDrawerTweaksPlugin
 import DebugDrawerFeatureFlagsPlugin
+import DebugDrawerCrashReportsPlugin
 import SwiftUI
 
 /// Demonstrates Send Report without a server: "sends" each report by copying it into the app's
@@ -37,6 +38,12 @@ struct FolderReportUploader: DebugDrawerReportUploader {
 @main
 struct DebugDrawerExampleiOSApp: App {
     init() {
+        // First, so a crash in the rest of startup is recorded. It compiles in release, where it
+        // installs nothing; launched with -CrashOnLaunch, the app crashes right after it.
+        CrashReports.install()
+        if ProcessInfo.processInfo.arguments.contains(ExampleCrash.launchArgument) {
+            ExampleCrash.crash()
+        }
         #if DEBUG
             DebugDrawer.shared.installConsole()
             DebugDrawer.shared.installNetwork()
@@ -108,6 +115,8 @@ struct ExampleContentView_iOS: View {
                     .buttonStyle(.bordered)
 
                     Button("Show Sheet") { isShowingSheet = true }
+                    // Crash Reports shows the crash on the next launch.
+                    Button("Crash the App", role: .destructive) { ExampleCrash.crash() }
 
                     Text("Counter: \(counter)")
                         .font(.title2.monospacedDigit())

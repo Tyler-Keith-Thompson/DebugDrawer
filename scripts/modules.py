@@ -78,6 +78,7 @@ MODULES = [
     ("DebugDrawerLaunchTimePlugin", "Plugins", "Pre-main, app-init-to-first-frame and total launch time.", ["DebugDrawer"]),
     ("DebugDrawerTweaksPlugin", "Plugins", "The host's own debug settings: toggles, pickers, text fields, steppers and actions, in sections.", ["DebugDrawer"]),
     ("DebugDrawerFeatureFlagsPlugin", "Plugins", "The app's feature flags through an adapter to its flag service: live values, local overrides that persist, search and reset.", ["DebugDrawer"]),
+    ("DebugDrawerCrashReportsPlugin", "Plugins", "Uncaught exceptions and fatal signals, chained to the app's other crash handlers, shown on the next launch with a badge; MetricKit crash diagnostics too.", ["DebugDrawer"]),
 ]
 
 # Modules only iOS builds: SwiftUI views and what they draw with. Bazel builds them for the
@@ -142,6 +143,7 @@ TEST_TARGETS = [
     ("DebugDrawerCookiesPluginTests", ["DebugDrawerCookiesPlugin", "DebugDrawer", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
     ("DebugDrawerTweaksPluginTests", ["DebugDrawerTweaksPlugin", "DebugDrawer", "viewinspector/ViewInspector", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
     ("DebugDrawerFeatureFlagsPluginTests", ["DebugDrawerFeatureFlagsPlugin", "DebugDrawer", "viewinspector/ViewInspector", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
+    ("DebugDrawerCrashReportsPluginTests", ["DebugDrawerCrashReportsPlugin", "DebugDrawer", "viewinspector/ViewInspector", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
 ]
 
 # The modules the test-support target depends on (fixtures are usually written against the
