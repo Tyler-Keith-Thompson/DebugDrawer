@@ -9,7 +9,7 @@
             let metrics = AppMetrics.shared
             metrics.refresh()
             XCTAssertGreaterThan(metrics.memoryMB, 0)
-            XCTAssertGreaterThanOrEqual(metrics.uptime, 0)
+            XCTAssertGreaterThan(try XCTUnwrap(metrics.uptime), 0)
         }
 
         func testPluginConformance() {
