@@ -32,6 +32,7 @@ _SHARED_DEPS = [
     "//Sources/DebugDrawerLeakDetectorPlugin",
     "//Sources/DebugDrawerMetricKitPlugin",
     "//Sources/DebugDrawerPermissionsPlugin",
+    "//Sources/DebugDrawerNotificationsPlugin",
 ]
 
 # ── macOS ────────────────────────────────────────────────────────────
@@ -71,6 +72,7 @@ ios_application(
     families = ["iphone", "ipad"],
     infoplists = ["iOS/Info.plist"],
     minimum_os_version = "17.0",
+    entitlements = "iOS/ExampleApp_iOS.entitlements",
     deps = [":ExampleAppLib_iOS"],
     visibility = ["//visibility:public"],
 )

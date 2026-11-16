@@ -7,4 +7,5 @@ PERFORMANCE_TEST_PACKAGES = [
     "Tests/DebugDrawerLeakDetectorPluginTests",
     "Tests/DebugDrawerMetricKitPluginTests",
     "Tests/DebugDrawerPermissionsPluginTests",
+    "Tests/DebugDrawerNotificationsPluginTests",
 ]

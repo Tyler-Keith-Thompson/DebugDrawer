@@ -291,8 +291,8 @@ DebugDrawer.shared.installLaunchTime()
 
 Each call needs its plugin's module imported (`import DebugDrawerConsolePlugin`, and so on).
 Tweaks takes the settings it shows and Feature Flags the adapter it reads, and Crash Reports,
-Hangs, Leaks, MetricKit and Permissions install outside `#if DEBUG`, so each has a section of its
-own, next.
+Hangs, Leaks, MetricKit, Permissions and Notifications install outside `#if DEBUG`, so each has a
+section of its own, next.
 
 ### Tweaks: the app's own debug settings
 
@@ -625,6 +625,61 @@ when-in-use key) names the key instead. Open Settings opens the app's page in Se
 in System Settings on macOS. A bug report carries `permissions.txt`: each permission, its status
 and its keys.
 
+### Notifications: the device token and a push without a server
+
+The Notifications plugin shows the APNs device token, the app's notification settings, its pending
+and delivered notifications, and sends a pasted APNs payload as a local notification, so the app's
+handlers can be exercised without a push server. The app passes the token on from its delegate:
+
+```swift
+import DebugDrawerNotificationsPlugin
+
+// At startup:
+PushNotifications.install()
+
+// In application(_:didRegisterForRemoteNotificationsWithDeviceToken:):
+PushNotifications.didRegisterForRemoteNotifications(withDeviceToken: deviceToken)
+
+// In application(_:didFailToRegisterForRemoteNotificationsWithError:):
+PushNotifications.didFailToRegisterForRemoteNotifications(withError: error)
+```
+
+A SwiftUI app gets those delegate methods through `@UIApplicationDelegateAdaptor` (or
+`@NSApplicationDelegateAdaptor`). `PushNotifications` exists in every configuration, so the calls
+need no `#if DEBUG`: in release they do nothing, and the plugin references nothing of User
+Notifications. In debug builds the plugin shows:
+
+- **APNs Device Token**: the token as hexadecimal with Copy Token, or why registering failed. It
+  is a device identifier, so it is masked under the drawer's redaction rules (the standard rules
+  mask any key containing `token`) until the eye button reveals it, and in bug reports; Copy Token
+  copies the token itself, for pasting into a push tool. The simulator gives a token to an app
+  whose entitlements declare `aps-environment`; on the Mac that entitlement needs a provisioning
+  profile.
+- **Authorization**: the status (Allowed, Denied, Provisional, Not Asked and so on), each
+  presentation setting (alerts, sounds, badges, lock screen, Notification Center, critical, time
+  sensitive, alert style, previews), Request while the user hasn't decided, and Refresh.
+- **Send a Payload**: an editor for an APNs payload, checked as it is typed, and a delay (now, 5 or
+  30 seconds, long enough to put the app in the background). `aps` gives the alert (a string, or a
+  dictionary with `title`, `subtitle` and `body`), `badge`, `sound` (`default`, a file name, or a
+  critical sound dictionary), `category`, `thread-id`, `target-content-id`, `interruption-level`
+  and `relevance-score`; the whole payload, `aps` and every key beside it, becomes the
+  notification's `userInfo`, as the app's handlers would get it from APNs. Notes say what a local
+  notification does differently: localization keys show as the keys themselves,
+  `content-available` doesn't wake the app in the background, `mutable-content` doesn't run a
+  notification service extension, and a payload over 4 KB would be refused by APNs. Sending asks
+  for authorization first if the user hasn't decided.
+- **Pending** and **Delivered**: each request and notification with its title, subtitle, body,
+  identifier, trigger (after an interval, on a date, at a location) or delivery time, category,
+  thread, badge and `userInfo`, each removable, and Remove All.
+
+While the app is in front, the system shows a notification only if the app's
+`UNUserNotificationCenterDelegate` asks for a banner in `userNotificationCenter(_:willPresent:)`;
+the plugin never takes the delegate, which stays the app's. It reads the center when installed,
+each time the app becomes active, after each of its own actions and on Refresh; nothing polls. To
+send a real remote notification to the simulator from the Mac instead, `xcrun simctl push
+<device> <bundle id> payload.json` takes the same JSON. A bug report carries `notifications.txt`:
+the token (masked), the settings, and every pending and delivered notification.
+
 ### Opening the drawer
 
 The drawer doesn't decide how it opens. Call `DebugDrawer.shared.toggle()` from whatever trigger
@@ -740,6 +795,7 @@ ContentView()
 | `DebugDrawerLeakDetectorPlugin` | View controllers still alive a run-loop turn after their screen was dismissed, and opted-in classes with more live instances than allowed, by class with a count, a toast and a badge |
 | `DebugDrawerMetricKitPlugin` | MetricKit's metric and diagnostic payloads, kept across launches and listed by date with a summary, each open as formatted JSON to copy or export; a toast and a badge for new ones |
 | `DebugDrawerPermissionsPlugin` | Every privacy permission the app declares in its Info.plist, with its live status, a button that asks when it is undecided and one that opens Settings |
+| `DebugDrawerNotificationsPlugin` | The APNs device token to copy, notification authorization and settings, pending and delivered notifications to inspect and remove, and a pasted APNs payload sent as a local notification |
 
 ## Development
 

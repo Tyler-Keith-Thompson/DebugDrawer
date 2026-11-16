@@ -24,6 +24,7 @@ import DebugDrawerHangDetectorPlugin
 import DebugDrawerLeakDetectorPlugin
 import DebugDrawerMetricKitPlugin
 import DebugDrawerPermissionsPlugin
+import DebugDrawerNotificationsPlugin
 import SwiftUI
 
 /// Demonstrates Send Report without a server: "sends" each report by copying it into the app's
@@ -81,6 +82,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Compiles in release too, where it does nothing and references no permission framework.
         // The Info.plist declares a few usage descriptions, so the plugin has rows to show.
         PrivacyPermissions.install()
+        // Compiles in release too, where it does nothing. The delegate methods below forward the
+        // device token, or why registering failed.
+        PushNotifications.install()
+        ExamplePushNotifications.register()
         #if DEBUG
             DebugDrawer.shared.installConsole()
             DebugDrawer.shared.installNetwork()
@@ -106,6 +111,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         setupMenuBar()
         createMainWindow()
+    }
+
+    func application(_: NSApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
+        PushNotifications.didRegisterForRemoteNotifications(withDeviceToken: deviceToken)
+    }
+
+    func application(_: NSApplication, didFailToRegisterForRemoteNotificationsWithError error: any Error) {
+        PushNotifications.didFailToRegisterForRemoteNotifications(withError: error)
     }
 
     private func createMainWindow() {

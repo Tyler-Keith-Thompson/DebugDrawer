@@ -23,6 +23,7 @@ import DebugDrawerHangDetectorPlugin
 import DebugDrawerLeakDetectorPlugin
 import DebugDrawerMetricKitPlugin
 import DebugDrawerPermissionsPlugin
+import DebugDrawerNotificationsPlugin
 import SwiftUI
 
 /// Demonstrates Send Report without a server: "sends" each report by copying it into the app's
@@ -41,6 +42,12 @@ struct FolderReportUploader: DebugDrawerReportUploader {
 
 @main
 struct DebugDrawerExampleiOSApp: App {
+    // Registers for remote notifications and forwards the token to the Notifications plugin.
+    // `bazel build //...` also compiles this app for the Mac, where UIKit doesn't exist.
+    #if canImport(UIKit)
+        @UIApplicationDelegateAdaptor(ExampleAppDelegate.self) private var appDelegate
+    #endif
+
     init() {
         // First, so a crash in the rest of startup is recorded. It compiles in release, where it
         // installs nothing; launched with -CrashOnLaunch, the app crashes right after it.
@@ -70,6 +77,9 @@ struct DebugDrawerExampleiOSApp: App {
         // Compiles in release too, where it does nothing and references no permission framework.
         // The Info.plist declares a few usage descriptions, so the plugin has rows to show.
         PrivacyPermissions.install()
+        // Compiles in release too, where it does nothing. The app delegate forwards the device
+        // token.
+        PushNotifications.install()
         #if DEBUG
             DebugDrawer.shared.installConsole()
             DebugDrawer.shared.installNetwork()

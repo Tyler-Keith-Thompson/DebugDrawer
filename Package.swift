@@ -40,6 +40,7 @@ let products: [Product] = [
     .library(name: "DebugDrawerLeakDetectorPlugin", targets: ["DebugDrawerLeakDetectorPlugin"]),
     .library(name: "DebugDrawerMetricKitPlugin", targets: ["DebugDrawerMetricKitPlugin"]),
     .library(name: "DebugDrawerPermissionsPlugin", targets: ["DebugDrawerPermissionsPlugin"]),
+    .library(name: "DebugDrawerNotificationsPlugin", targets: ["DebugDrawerNotificationsPlugin"]),
 ]
 
 let dependencies: [Package.Dependency] = [
@@ -78,6 +79,7 @@ let targets: [Target] = [
     .target(name: "DebugDrawerLeakDetectorPlugin", dependencies: ["DebugDrawer"], exclude: bazelFiles),
     .target(name: "DebugDrawerMetricKitPlugin", dependencies: ["DebugDrawer"], exclude: bazelFiles),
     .target(name: "DebugDrawerPermissionsPlugin", dependencies: ["DebugDrawer"], exclude: bazelFiles),
+    .target(name: "DebugDrawerNotificationsPlugin", dependencies: ["DebugDrawer"], exclude: bazelFiles),
 
     // Shared fixtures (data only) for every test target.
     .target(name: "DebugDrawerTestSupport", path: "Tests/DebugDrawerTestSupport", exclude: bazelFiles),
@@ -107,12 +109,14 @@ let targets: [Target] = [
     .testTarget(name: "DebugDrawerLeakDetectorPluginTests", dependencies: ["DebugDrawerLeakDetectorPlugin", "DebugDrawer", .product(name: "ViewInspector", package: "viewinspector", condition: .when(platforms: applePlatforms)), .product(name: "SnapshotTesting", package: "swift-snapshot-testing", condition: .when(platforms: applePlatforms)), .product(name: "IssueReportingTestSupport", package: "xctest-dynamic-overlay", condition: .when(platforms: applePlatforms))], exclude: ["BUILD.bazel", "Performance", "__Snapshots__"]),
     .testTarget(name: "DebugDrawerMetricKitPluginTests", dependencies: ["DebugDrawerMetricKitPlugin", "DebugDrawer", .product(name: "ViewInspector", package: "viewinspector", condition: .when(platforms: applePlatforms)), .product(name: "SnapshotTesting", package: "swift-snapshot-testing", condition: .when(platforms: applePlatforms)), .product(name: "IssueReportingTestSupport", package: "xctest-dynamic-overlay", condition: .when(platforms: applePlatforms))], exclude: ["BUILD.bazel", "Performance", "__Snapshots__"]),
     .testTarget(name: "DebugDrawerPermissionsPluginTests", dependencies: ["DebugDrawerPermissionsPlugin", "DebugDrawer", .product(name: "ViewInspector", package: "viewinspector", condition: .when(platforms: applePlatforms)), .product(name: "SnapshotTesting", package: "swift-snapshot-testing", condition: .when(platforms: applePlatforms)), .product(name: "IssueReportingTestSupport", package: "xctest-dynamic-overlay", condition: .when(platforms: applePlatforms))], exclude: ["BUILD.bazel", "Performance", "__Snapshots__"]),
+    .testTarget(name: "DebugDrawerNotificationsPluginTests", dependencies: ["DebugDrawerNotificationsPlugin", "DebugDrawer", .product(name: "ViewInspector", package: "viewinspector", condition: .when(platforms: applePlatforms)), .product(name: "SnapshotTesting", package: "swift-snapshot-testing", condition: .when(platforms: applePlatforms)), .product(name: "IssueReportingTestSupport", package: "xctest-dynamic-overlay", condition: .when(platforms: applePlatforms))], exclude: ["BUILD.bazel", "Performance", "__Snapshots__"]),
 
     // Speed-reliant tests, split from the target of the same module (PERFORMANCE_TESTS in scripts/modules.py).
     .testTarget(name: "DebugDrawerHangDetectorPluginPerformanceTests", dependencies: ["DebugDrawerHangDetectorPlugin", "DebugDrawer", .product(name: "ViewInspector", package: "viewinspector", condition: .when(platforms: applePlatforms)), .product(name: "SnapshotTesting", package: "swift-snapshot-testing", condition: .when(platforms: applePlatforms)), .product(name: "IssueReportingTestSupport", package: "xctest-dynamic-overlay", condition: .when(platforms: applePlatforms))], path: "Tests/DebugDrawerHangDetectorPluginTests/Performance"),
     .testTarget(name: "DebugDrawerLeakDetectorPluginPerformanceTests", dependencies: ["DebugDrawerLeakDetectorPlugin", "DebugDrawer", .product(name: "ViewInspector", package: "viewinspector", condition: .when(platforms: applePlatforms)), .product(name: "SnapshotTesting", package: "swift-snapshot-testing", condition: .when(platforms: applePlatforms)), .product(name: "IssueReportingTestSupport", package: "xctest-dynamic-overlay", condition: .when(platforms: applePlatforms))], path: "Tests/DebugDrawerLeakDetectorPluginTests/Performance"),
     .testTarget(name: "DebugDrawerMetricKitPluginPerformanceTests", dependencies: ["DebugDrawerMetricKitPlugin", "DebugDrawer", .product(name: "ViewInspector", package: "viewinspector", condition: .when(platforms: applePlatforms)), .product(name: "SnapshotTesting", package: "swift-snapshot-testing", condition: .when(platforms: applePlatforms)), .product(name: "IssueReportingTestSupport", package: "xctest-dynamic-overlay", condition: .when(platforms: applePlatforms))], path: "Tests/DebugDrawerMetricKitPluginTests/Performance"),
     .testTarget(name: "DebugDrawerPermissionsPluginPerformanceTests", dependencies: ["DebugDrawerPermissionsPlugin", "DebugDrawer", .product(name: "ViewInspector", package: "viewinspector", condition: .when(platforms: applePlatforms)), .product(name: "SnapshotTesting", package: "swift-snapshot-testing", condition: .when(platforms: applePlatforms)), .product(name: "IssueReportingTestSupport", package: "xctest-dynamic-overlay", condition: .when(platforms: applePlatforms))], path: "Tests/DebugDrawerPermissionsPluginTests/Performance"),
+    .testTarget(name: "DebugDrawerNotificationsPluginPerformanceTests", dependencies: ["DebugDrawerNotificationsPlugin", "DebugDrawer", .product(name: "ViewInspector", package: "viewinspector", condition: .when(platforms: applePlatforms)), .product(name: "SnapshotTesting", package: "swift-snapshot-testing", condition: .when(platforms: applePlatforms)), .product(name: "IssueReportingTestSupport", package: "xctest-dynamic-overlay", condition: .when(platforms: applePlatforms))], path: "Tests/DebugDrawerNotificationsPluginTests/Performance"),
 ]
 
 let package = Package(
