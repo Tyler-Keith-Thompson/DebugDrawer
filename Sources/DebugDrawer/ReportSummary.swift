@@ -72,6 +72,9 @@
         fileprivate static var operatingSystemName: String {
             #if os(macOS)
                 "macOS"
+            #elseif targetEnvironment(macCatalyst)
+                // ProcessInfo reports the Mac's macOS version, not an iOS one, under Catalyst.
+                "macOS (Mac Catalyst)"
             #elseif os(visionOS)
                 "visionOS"
             #elseif os(tvOS)
@@ -86,7 +89,8 @@
         /// The hardware model identifier (`Mac15,3`, `iPad16,6`); in the simulator, the
         /// simulated device's.
         fileprivate static func deviceModel(process: ProcessInfo) -> String {
-            #if os(macOS)
+            // Under Mac Catalyst, uname's machine is only the CPU (`arm64`); hw.model names the Mac.
+            #if os(macOS) || targetEnvironment(macCatalyst)
                 var size = 0
                 guard sysctlbyname("hw.model", nil, &size, nil, 0) == 0, size > 0 else { return "—" }
                 var model = [CChar](repeating: 0, count: size)

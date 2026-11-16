@@ -61,12 +61,13 @@ test-release:
 resolve:
     cd {{PROJECT_ROOT}}/swift && {{SWIFT}} package resolve
 
-[doc('Build via SwiftPM too, to verify the published package (the Mac, then the visionOS, tvOS and watchOS modules)')]
+[doc('Build via SwiftPM too, to verify the published package (the Mac, then the visionOS, tvOS, watchOS and Mac Catalyst modules)')]
 spm:
     {{SWIFT}} build
     just spm-visionos
     just spm-tvos
     just spm-watchos
+    just spm-catalyst
 
 # `swift build` builds for the host only, so xcodebuild builds the modules ported to another
 # platform (EXTRA_PLATFORMS in scripts/modules.py) for its simulator, from the same Package.swift.
@@ -87,6 +88,16 @@ spm-tvos: (spm-platform "tvOS")
 
 [doc('Build the watchOS modules through SwiftPM for the watchOS simulator')]
 spm-watchos: (spm-platform "watchOS")
+
+# Package.swift's `.iOS` covers Mac Catalyst, so it is a destination rather than a platform.
+[doc('Build the Mac Catalyst modules (CATALYST_MODULES in scripts/modules.py) through SwiftPM')]
+spm-catalyst:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    for module in $(python3 {{PROJECT_ROOT}}/scripts/modules.py catalyst-modules); do
+        xcodebuild build -quiet -scheme "$module" -destination 'generic/platform=macOS,variant=Mac Catalyst' \
+            -derivedDataPath {{PROJECT_ROOT}}/.build/xcode-catalyst SWIFT_TREAT_WARNINGS_AS_ERRORS=YES
+    done
 
 [doc('Run the tests via SwiftPM')]
 spm-test *args="":
@@ -122,7 +133,7 @@ VISIONOS_DEVICE := env("VISIONOS_DEVICE", "Apple Vision Pro")
 TVOS_DEVICE := env("TVOS_DEVICE", "Apple TV 4K (4th generation)")
 WATCHOS_DEVICE := env("WATCHOS_DEVICE", "Apple Watch Series 12 (46mm)")
 
-[doc('Build and launch an example app: just run, just run iOS, just run visionOS, just run tvOS or just run watchOS')]
+[doc('Build and launch an example app: just run, just run iOS, just run catalyst, just run visionOS, just run tvOS or just run watchOS')]
 run target="macOS" *args="":
     #!/usr/bin/env bash
     set -euo pipefail
@@ -162,6 +173,10 @@ run target="macOS" *args="":
         iOS|ios)
             {{BAZEL}} run //Example:ExampleApp_iOS
             ;;
+        catalyst|Catalyst)
+            # The iOS example as a Mac Catalyst app, built through SwiftPM (Bazel has no Catalyst).
+            bash {{PROJECT_ROOT}}/scripts/run-catalyst-example.sh {{args}}
+            ;;
         visionOS|visionos)
             run_in_simulator ExampleApp_visionOS "{{VISIONOS_DEVICE}}" com.debugdrawer.example.visionos \
                 /tmp/debugdrawer-example-visionos
@@ -175,7 +190,7 @@ run target="macOS" *args="":
                 /tmp/debugdrawer-example-watchos
             ;;
         *)
-            echo "Unknown target: {{target}}. Use 'macOS', 'iOS', 'visionOS', 'tvOS' or 'watchOS'"
+            echo "Unknown target: {{target}}. Use 'macOS', 'iOS', 'catalyst', 'visionOS', 'tvOS' or 'watchOS'"
             exit 1
             ;;
     esac

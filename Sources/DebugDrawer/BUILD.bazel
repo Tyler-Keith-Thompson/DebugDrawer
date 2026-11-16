@@ -3,6 +3,7 @@
 load("@rules_apple//apple:tvos.bzl", "tvos_build_test")
 load("@rules_apple//apple:visionos.bzl", "visionos_build_test")
 load("@rules_apple//apple:watchos.bzl", "watchos_build_test")
+load("//tools:catalyst.bzl", "catalyst_build_test")
 load("//tools:docc.bzl", "docc_archive")
 load("//tools:swift_rules.bzl", "swift_library")
 
@@ -44,5 +45,13 @@ tvos_build_test(
 watchos_build_test(
     name = "DebugDrawer_watchOS",
     minimum_os_version = "10.0",
+    targets = [":DebugDrawer"],
+)
+
+# Compiles the library for Mac Catalyst, so `bazel build //...` checks it compiles
+# there (CATALYST_MODULES in scripts/modules.py).
+catalyst_build_test(
+    name = "DebugDrawer_catalyst",
+    minimum_os_version = "17.0",
     targets = [":DebugDrawer"],
 )

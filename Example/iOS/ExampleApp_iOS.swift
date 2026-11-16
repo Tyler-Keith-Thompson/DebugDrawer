@@ -48,6 +48,15 @@ struct DebugDrawerExampleiOSApp: App {
                 .debugAccessibilityOverrides()
                 .debugGrid()
                 .debugDrawer()
+                // Launched with -OpenDebugDrawer, the window opens with the drawer open, so it can
+                // be checked without a hand, in the simulator or as a Mac Catalyst app.
+                .onAppear {
+                    #if DEBUG
+                        if ProcessInfo.processInfo.arguments.contains("-OpenDebugDrawer"), !DebugDrawer.shared.isOpen {
+                            DebugDrawer.shared.toggle()
+                        }
+                    #endif
+                }
                 .background {
                     Button("") {
                         // The drawer exists in debug builds only.

@@ -20,6 +20,7 @@ extension CGFloat {
     #if os(macOS)
         import AppKit
     #elseif canImport(UIKit)
+        // Mac Catalyst takes this branch too: a Catalyst app is a UIKit app and can't import AppKit.
         import UIKit
     #endif
     #if os(watchOS)
@@ -37,6 +38,7 @@ extension CGFloat {
             NSPasteboard.general.clearContents()
             NSPasteboard.general.setString(string, forType: .string)
         #elseif os(iOS) || os(visionOS)
+            // Under Mac Catalyst, UIPasteboard.general is the Mac's general pasteboard.
             UIPasteboard.general.string = string
         #endif
     }
@@ -52,6 +54,7 @@ extension CGFloat {
             pb.clearContents()
             pb.writeObjects([image])
         #elseif os(iOS) || os(visionOS)
+            // Under Mac Catalyst this puts the image on the Mac's general pasteboard.
             UIPasteboard.general.image = image
         #endif
     }
@@ -62,6 +65,7 @@ extension CGFloat {
         #if os(macOS)
             NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
         #elseif os(iOS) || os(visionOS) || os(tvOS)
+            // Under Mac Catalyst, UIAccessibility reads the Mac's Reduce Motion setting.
             UIAccessibility.isReduceMotionEnabled
         #elseif os(watchOS)
             WKAccessibilityIsReduceMotionEnabled()
@@ -99,6 +103,7 @@ extension CGFloat {
         public typealias PlatformColor = NSColor
         public typealias PlatformFont = NSFont
     #elseif os(iOS) || os(visionOS) || os(tvOS) || os(watchOS)
+        // UIKit's types on Mac Catalyst too, whose views and pasteboard are UIKit's.
         public typealias PlatformImage = UIImage
         public typealias PlatformColor = UIColor
         public typealias PlatformFont = UIFont

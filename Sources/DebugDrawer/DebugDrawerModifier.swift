@@ -134,7 +134,8 @@
             func updateNSView(_: NSView, context _: Context) {}
         }
     #elseif os(iOS) || os(visionOS) || os(tvOS)
-        // watchOS has no UIView to tag, and its drawer is a SwiftUI list (DrawerWatchList).
+        // watchOS has no UIView to tag, and its drawer is a SwiftUI list (DrawerWatchList). Mac
+        // Catalyst hosts SwiftUI in UIViews, so the tag works there as on iOS.
         struct DebugDrawerTagView: UIViewRepresentable {
             func makeUIView(context _: Context) -> UIView {
                 let view = UIView()

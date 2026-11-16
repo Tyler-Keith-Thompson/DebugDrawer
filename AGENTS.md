@@ -67,7 +67,7 @@ Every shell command gets a timeout. macOS has no `timeout`; use
 | `just resolve` | Re-resolve Bazel's SwiftPM dependencies after editing `PACKAGES` |
 | `just docs` | Combined DocC site into `.build/docs` |
 | `just generate` | Xcode project from the Bazel graph |
-| `just run [macOS\|iOS\|visionOS\|tvOS\|watchOS]` | Build and launch an example app |
+| `just run [macOS\|iOS\|catalyst\|visionOS\|tvOS\|watchOS]` | Build and launch an example app (`catalyst`: the iOS one as a Mac Catalyst app, through SwiftPM) |
 | `just deploy [patch\|minor\|major]` | Verify, then tag, push the tag and create the GitHub release (the owner's call) |
 | `just buildbuddy-key` | Store the BuildBuddy key in the Keychain (once per Mac; builds then use the remote cache) |
 | `just template-update` | Merge the project template's changes since `.template.json`'s commit; resolve conflicts, then `just modules`, `just test` |
@@ -119,7 +119,9 @@ the *default* sections below where they differ:
   driven by focus: no pasteboard, keyboard shortcuts or drag, and Menu (`onExitCommand`) closes
   what is open. On watchOS the drawer is a full-screen list that navigates to each plugin's view
   (`DrawerWatchList`), so a plugin's body is a short column; there is no pasteboard, keyboard,
-  context menu or text selection.
+  context menu or text selection. Core also builds for Mac Catalyst (`CATALYST_MODULES`), where
+  `os(iOS)` holds in a Mac window: an `os(iOS)` branch either adds a
+  `targetEnvironment(macCatalyst)` case or says in a comment why the iOS path is right there.
 - View tests use ViewInspector. Get-only accessibility environment keys need a hosted probe
   (`ViewHosting` and `Inspection`), not an offline `inspect()`.
 - The example apps under `Example/` are not in the module graph; `bazel build //...` builds them,
