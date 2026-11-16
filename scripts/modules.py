@@ -83,7 +83,7 @@ EXECUTABLES = [
 # Test targets. SwiftPM rejects a target with no sources, so list a target only once its directory
 # holds tests. (name, dependencies)
 TEST_TARGETS = [
-    ("DebugDrawerTests", ["DebugDrawer"]),
+    ("DebugDrawerTests", ["DebugDrawer", "viewinspector/ViewInspector"]),
     ("DebugDrawerConsolePluginTests", ["DebugDrawerConsolePlugin", "DebugDrawer"]),
     ("DebugDrawerViewInspectorPluginTests", ["DebugDrawerViewInspectorPlugin", "DebugDrawer"]),
     ("DebugDrawerAccessibilityPluginTests", ["DebugDrawerAccessibilityPlugin", "DebugDrawer", "viewinspector/ViewInspector"]),

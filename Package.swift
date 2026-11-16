@@ -62,7 +62,7 @@ let targets: [Target] = [
     // Shared fixtures (data only) for every test target.
     .target(name: "DebugDrawerTestSupport", path: "Tests/DebugDrawerTestSupport", exclude: bazelFiles),
 
-    .testTarget(name: "DebugDrawerTests", dependencies: ["DebugDrawer"], exclude: bazelFiles),
+    .testTarget(name: "DebugDrawerTests", dependencies: ["DebugDrawer", .product(name: "ViewInspector", package: "viewinspector")], exclude: bazelFiles),
     .testTarget(name: "DebugDrawerConsolePluginTests", dependencies: ["DebugDrawerConsolePlugin", "DebugDrawer"], exclude: bazelFiles),
     .testTarget(name: "DebugDrawerViewInspectorPluginTests", dependencies: ["DebugDrawerViewInspectorPlugin", "DebugDrawer"], exclude: bazelFiles),
     .testTarget(name: "DebugDrawerAccessibilityPluginTests", dependencies: ["DebugDrawerAccessibilityPlugin", "DebugDrawer", .product(name: "ViewInspector", package: "viewinspector")], exclude: bazelFiles),

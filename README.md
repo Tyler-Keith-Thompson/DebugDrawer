@@ -62,6 +62,32 @@ DebugDrawer.shared.toggle()
 in `#if DEBUG`. The `DebugDrawerPlugin` protocol exists in every configuration, so conformances
 compile in release, and `.debugDrawer()` and `.debugLocalPlugin()` do nothing there.
 
+### Searching plugins and actions
+
+The open drawer has a search field that finds plugins by title and runs the actions they declare.
+Cmd-K focuses it while the drawer is open; it never opens the drawer. The arrow keys move through
+the results and Return picks one: a plugin is scrolled to and expanded, an action runs. A plugin
+declares actions, each found by its title or its keywords; it declares none unless it says so:
+
+```swift
+struct SessionPlugin: DebugDrawerPlugin {
+    var title = "Session"
+    var icon = "person.crop.circle"
+
+    var body: some View {
+        Text("Signed in")
+    }
+
+    var actions: [DebugDrawerAction] {
+        [
+            DebugDrawerAction("Expire token", keywords: ["auth", "logout"]) {
+                UserDefaults.standard.removeObject(forKey: "authToken")
+            },
+        ]
+    }
+}
+```
+
 ### Installing the shipped plugins
 
 Each plugin installs itself with one call at startup. All of them:

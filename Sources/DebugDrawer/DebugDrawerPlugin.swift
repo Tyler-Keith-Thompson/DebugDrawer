@@ -33,6 +33,9 @@ public protocol DebugDrawerPlugin: Identifiable {
     /// Defaults to `id` (static). Override for plugins with dynamic data
     /// (e.g., a file path that changes as the user navigates).
     var contentIdentifier: String { get }
+
+    /// Actions the drawer's search field offers, run when the user picks one. Defaults to none.
+    var actions: [DebugDrawerAction] { get }
 }
 
 public extension DebugDrawerPlugin {
@@ -45,6 +48,11 @@ public extension DebugDrawerPlugin {
     var contentIdentifier: String {
         id
     }
+
+    /// No actions: the search field finds the plugin by its title only.
+    var actions: [DebugDrawerAction] {
+        []
+    }
 }
 
 #if DEBUG
@@ -56,12 +64,14 @@ public extension DebugDrawerPlugin {
         public let id: String
         public let title: String
         public let icon: String
+        public let actions: [DebugDrawerAction]
         private let _body: @MainActor () -> AnyView
 
         @MainActor public init<P: DebugDrawerPlugin>(_ plugin: P) {
             id = plugin.id
             title = plugin.title
             icon = plugin.icon
+            actions = plugin.actions
             _body = { AnyView(plugin.body) }
         }
 

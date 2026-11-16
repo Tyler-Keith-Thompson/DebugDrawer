@@ -19,6 +19,7 @@ swift_library(
     visibility = ["//:__pkg__"],
     deps = [
         "//Sources/DebugDrawer",
+        "@swiftpkg_viewinspector//:ViewInspector",
     ],
 )
 

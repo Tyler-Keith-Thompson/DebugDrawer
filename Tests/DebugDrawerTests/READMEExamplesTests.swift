@@ -14,6 +14,23 @@
         }
     }
 
+    struct SessionPlugin: DebugDrawerPlugin {
+        var title = "Session"
+        var icon = "person.crop.circle"
+
+        var body: some View {
+            Text("Signed in")
+        }
+
+        var actions: [DebugDrawerAction] {
+            [
+                DebugDrawerAction("Expire token", keywords: ["auth", "logout"]) {
+                    UserDefaults.standard.removeObject(forKey: "authToken")
+                },
+            ]
+        }
+    }
+
     @MainActor
     @Suite("README examples")
     struct READMEExamplesTests {
@@ -40,6 +57,16 @@
             // Leave the shared drawer as the other suites expect it, within this one main-actor turn.
             DebugDrawer.shared.toggle()
             DebugDrawer.shared.unregisterGlobal(id: CachePlugin().id)
+        }
+
+        @Test("Searching plugins and actions")
+        func searchingPluginsAndActions() {
+            let expectedTitles = ["Expire token"]
+
+            let actual = AnyDebugDrawerPlugin(SessionPlugin()).actions.map(\.title)
+
+            #expect(actual == expectedTitles)
+            #expect(AnyDebugDrawerPlugin(CachePlugin()).actions.isEmpty)
         }
     }
 #endif

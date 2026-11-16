@@ -8,6 +8,11 @@
         @ObservedObject var drawer: DebugDrawer
         /// Tracks which plugins the user has *collapsed*. Everything starts expanded.
         @State private var collapsedSections: Set<String> = []
+        /// What the search field holds; results show while it isn't empty.
+        @State private var query = ""
+        /// The result Return runs, moved by the arrow keys.
+        @State private var highlighted = 0
+        @FocusState private var searchFocused: Bool
 
         private let drawerWidth: CGFloat = 340
         private let defaultsPrefix = "com.debugdrawer.collapsed."
@@ -18,10 +23,22 @@
                     Spacer()
 
                     if drawer.isOpen {
-                        VStack(spacing: 0) {
-                            header
-                            Divider()
-                            content
+                        ScrollViewReader { proxy in
+                            VStack(spacing: 0) {
+                                header
+                                searchField(proxy)
+                                if !query.isEmpty {
+                                    searchResults(proxy)
+                                }
+                                Divider()
+                                content
+                            }
+                        }
+                        // Cmd-K exists only inside the open drawer, so it never opens it (N2).
+                        .background {
+                            Button("Search Plugins") { searchFocused = true }
+                                .keyboardShortcut("k", modifiers: .command)
+                                .hidden()
                         }
                         .frame(width: drawerWidth)
                         .background(.ultraThickMaterial)
@@ -38,8 +55,11 @@
             .onAppear { loadCollapsedState() }
         }
 
+        private var allPlugins: [AnyDebugDrawerPlugin] {
+            drawer.localPlugins + drawer.globalPlugins
+        }
+
         private func loadCollapsedState() {
-            let allPlugins = drawer.localPlugins + drawer.globalPlugins
             for plugin in allPlugins {
                 if UserDefaults.standard.bool(forKey: defaultsPrefix + plugin.id) {
                     collapsedSections.insert(plugin.id)
@@ -64,6 +84,98 @@
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
+        }
+
+        // MARK: - Search
+
+        private func searchField(_ proxy: ScrollViewProxy) -> some View {
+            TextField("Search plugins and actions", text: $query)
+                .textFieldStyle(.roundedBorder)
+                .controlSize(.small)
+                .focused($searchFocused)
+                .onChange(of: query) { highlighted = 0 }
+                .onSubmit { chooseHighlighted(proxy) }
+                .onKeyPress(.downArrow) { moveHighlight(by: 1) }
+                .onKeyPress(.upArrow) { moveHighlight(by: -1) }
+                .onKeyPress(.escape) {
+                    guard !query.isEmpty else { return .ignored }
+                    query = ""
+                    return .handled
+                }
+                .padding(.horizontal, 14)
+                .padding(.bottom, 8)
+        }
+
+        private func searchResults(_ proxy: ScrollViewProxy) -> some View {
+            let found = DrawerSearchResult.matches(query, in: allPlugins)
+            return VStack(spacing: 0) {
+                if found.isEmpty {
+                    Text("No matches")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 6)
+                }
+                // Offsets, not ids: two actions of one plugin may share a title.
+                ForEach(Array(found.enumerated()), id: \.offset) { index, result in
+                    Button { choose(result, proxy) } label: {
+                        resultRow(result, isHighlighted: index == highlighted)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.bottom, 6)
+        }
+
+        private func resultRow(_ result: DrawerSearchResult, isHighlighted: Bool) -> some View {
+            HStack(spacing: 8) {
+                Image(systemName: result.icon)
+                    .frame(width: 20)
+                    .foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(result.title)
+                        .font(.subheadline)
+                    if let pluginTitle = result.pluginTitle {
+                        Text(pluginTitle)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                Spacer()
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 4)
+            .background(isHighlighted ? Color.accentColor.opacity(0.15) : .clear)
+            .contentShape(Rectangle())
+        }
+
+        private func moveHighlight(by step: Int) -> KeyPress.Result {
+            let count = DrawerSearchResult.matches(query, in: allPlugins).count
+            guard count > 0 else { return .ignored }
+            highlighted = min(max(highlighted + step, 0), count - 1)
+            return .handled
+        }
+
+        private func chooseHighlighted(_ proxy: ScrollViewProxy) {
+            let found = DrawerSearchResult.matches(query, in: allPlugins)
+            guard found.indices.contains(highlighted) else { return }
+            choose(found[highlighted], proxy)
+        }
+
+        /// Jumps to and expands a plugin, or runs an action, and clears the search.
+        private func choose(_ result: DrawerSearchResult, _ proxy: ScrollViewProxy) {
+            query = ""
+            searchFocused = false
+            switch result {
+            case let .plugin(plugin):
+                expand(plugin)
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    proxy.scrollTo(plugin.id, anchor: .top)
+                }
+            case let .action(action, _):
+                action.perform()
+            }
         }
 
         // MARK: - Plugin list
@@ -124,6 +236,11 @@
             !collapsedSections.contains(plugin.id)
         }
 
+        private func expand(_ plugin: AnyDebugDrawerPlugin) {
+            guard collapsedSections.contains(plugin.id) else { return }
+            toggleExpanded(plugin)
+        }
+
         private func toggleExpanded(_ plugin: AnyDebugDrawerPlugin) {
             withAnimation(.easeInOut(duration: 0.2)) {
                 let key = defaultsPrefix + plugin.id
@@ -169,6 +286,7 @@
 
                 Divider().padding(.leading, 14)
             }
+            .id(plugin.id)
         }
     }
 
@@ -251,7 +369,8 @@
 
     public extension View {
         /// Attaches the debug drawer overlay to this view.
-        /// Place once at the root of your view hierarchy. Toggle with Ctrl+D.
+        /// Place once at the root of your view hierarchy. While the drawer is open, Cmd-K focuses its
+        /// search field, which finds plugins and their ``DebugDrawerPlugin/actions``.
         func debugDrawer() -> some View {
             modifier(DebugDrawerModifier())
         }
