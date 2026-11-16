@@ -19,6 +19,7 @@ import DebugDrawerLaunchTimePlugin
 import DebugDrawerTweaksPlugin
 import DebugDrawerFeatureFlagsPlugin
 import DebugDrawerCrashReportsPlugin
+import DebugDrawerHangDetectorPlugin
 import SwiftUI
 
 /// Demonstrates Send Report without a server: "sends" each report by copying it into the app's
@@ -43,6 +44,12 @@ struct DebugDrawerExampleiOSApp: App {
         CrashReports.install()
         if ProcessInfo.processInfo.arguments.contains(ExampleCrash.launchArgument) {
             ExampleCrash.crash()
+        }
+        // Compiles in release too, where it starts nothing; launched with -HangOnLaunch, the app
+        // blocks its main thread for 500 ms once it first goes idle.
+        HangDetector.install()
+        if ProcessInfo.processInfo.arguments.contains(ExampleHang.launchArgument) {
+            ExampleHang.blockAfterLaunch()
         }
         #if DEBUG
             DebugDrawer.shared.installConsole()
@@ -117,6 +124,8 @@ struct ExampleContentView_iOS: View {
                     Button("Show Sheet") { isShowingSheet = true }
                     // Crash Reports shows the crash on the next launch.
                     Button("Crash the App", role: .destructive) { ExampleCrash.crash() }
+                    // Hangs reports the stall with its stack and a toast.
+                    Button("Block the Main Thread for 500 ms") { ExampleHang.blockMainThread() }
 
                     Text("Counter: \(counter)")
                         .font(.title2.monospacedDigit())

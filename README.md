@@ -291,7 +291,7 @@ DebugDrawer.shared.installLaunchTime()
 
 Each call needs its plugin's module imported (`import DebugDrawerConsolePlugin`, and so on).
 Tweaks takes the settings it shows and Feature Flags the adapter it reads, and Crash Reports
-installs outside `#if DEBUG`, so each has a section of its own, next.
+and Hangs install outside `#if DEBUG`, so each has a section of its own, next.
 
 ### Tweaks: the app's own debug settings
 
@@ -458,6 +458,42 @@ On macOS, AppKit catches an exception raised on the main thread while it handles
 it and carries on, so no uncaught exception reaches the handler; set the
 `NSApplicationCrashOnExceptions` default to `true` to have the app crash, and be recorded, instead.
 
+### Hangs: the main thread, stuck
+
+A hang is the main thread going too long without turning its run loop, so the app can't draw or
+take a tap. The Hangs plugin catches each one as it happens, with the stack the thread was stuck
+on:
+
+```swift
+import DebugDrawerHangDetectorPlugin
+
+// At startup; a stall of the main thread over 250 ms is a hang.
+HangDetector.install()
+
+// Or with a threshold of the app's own, which the drawer can change later.
+HangDetector.install(threshold: .milliseconds(100))
+```
+
+`HangDetector` exists in every configuration, so the call needs no `#if DEBUG`: in release it
+starts nothing. In debug builds it adds an observer to the main run loop, which notes the time
+at each turn, and starts a watcher thread that wakes four times per threshold. When the main
+thread has been busy since its last turn for longer than the threshold, the watcher suspends it,
+reads its registers, walks its frame records into a buffer allocated in advance and resumes it,
+once per hang. When the main thread turns its run loop again, the plugin names the frames with
+`dladdr`, lists the hang with how long it lasted, raises the plugin's badge and posts a toast
+("Main thread hung for 612 ms"). A hang that ends before the watcher's next wake is listed
+without a stack. The launch, before the main run loop first waits, isn't counted, and neither is
+time the whole process spent stopped, at a debugger's breakpoint or suspended in the background.
+Where MetricKit exists (iOS, macOS, visionOS), the `MXHangDiagnostic`s the system delivers are
+listed as well.
+
+With no hang, the cost is a clock read and an uncontended lock on each turn of the main run loop,
+and a watcher wake four times per threshold that does the same; `HangDetectorOverheadTests`
+measures both. The drawer lists the hangs of this run newest first (the newest fifty); opening one
+shows its stack, selectable, with a button that copies it, and marks it seen. Its Threshold picker
+changes the threshold while the app runs. Mark All Seen clears the badge, Clear All forgets them,
+and a bug report carries them all in `hangs.txt`.
+
 ### Opening the drawer
 
 The drawer doesn't decide how it opens. Call `DebugDrawer.shared.toggle()` from whatever trigger
@@ -569,6 +605,7 @@ ContentView()
 | `DebugDrawerTweaksPlugin` | The app's own debug settings: toggles, pickers, text fields, steppers and actions, in sections, read through typed accessors |
 | `DebugDrawerFeatureFlagsPlugin` | The app's feature flags through an adapter to its flag service: live values, local overrides that persist, search, an overridden-only filter and Reset All |
 | `DebugDrawerCrashReportsPlugin` | Uncaught exceptions and fatal signals, handed on to the app's other crash handlers, shown on the next launch with a badge and stack trace; MetricKit crash diagnostics too |
+| `DebugDrawerHangDetectorPlugin` | Main-thread hangs over a threshold the drawer can change, each with its duration and the stack it was stuck on, a toast and a badge; MetricKit hang diagnostics too |
 
 ## Development
 

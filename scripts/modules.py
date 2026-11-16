@@ -79,6 +79,7 @@ MODULES = [
     ("DebugDrawerTweaksPlugin", "Plugins", "The host's own debug settings: toggles, pickers, text fields, steppers and actions, in sections.", ["DebugDrawer"]),
     ("DebugDrawerFeatureFlagsPlugin", "Plugins", "The app's feature flags through an adapter to its flag service: live values, local overrides that persist, search and reset.", ["DebugDrawer"]),
     ("DebugDrawerCrashReportsPlugin", "Plugins", "Uncaught exceptions and fatal signals, chained to the app's other crash handlers, shown on the next launch with a badge; MetricKit crash diagnostics too.", ["DebugDrawer"]),
+    ("DebugDrawerHangDetectorPlugin", "Plugins", "Main-thread hangs over a threshold the drawer can change, each with its duration and the stack it was stuck on, a toast and a badge; MetricKit hang diagnostics too.", ["DebugDrawer"]),
 ]
 
 # Modules only iOS builds: SwiftUI views and what they draw with. Bazel builds them for the
@@ -144,6 +145,7 @@ TEST_TARGETS = [
     ("DebugDrawerTweaksPluginTests", ["DebugDrawerTweaksPlugin", "DebugDrawer", "viewinspector/ViewInspector", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
     ("DebugDrawerFeatureFlagsPluginTests", ["DebugDrawerFeatureFlagsPlugin", "DebugDrawer", "viewinspector/ViewInspector", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
     ("DebugDrawerCrashReportsPluginTests", ["DebugDrawerCrashReportsPlugin", "DebugDrawer", "viewinspector/ViewInspector", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
+    ("DebugDrawerHangDetectorPluginTests", ["DebugDrawerHangDetectorPlugin", "DebugDrawer", "viewinspector/ViewInspector", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
 ]
 
 # The modules the test-support target depends on (fixtures are usually written against the
@@ -165,6 +167,7 @@ TEST_SIZES = {name: "medium" for name in [
 # out under release. Debug runs both. A `.timeLimit` that only guards a small input against a hang
 # does not make a test speed-reliant.
 PERFORMANCE_TESTS = [
+    "DebugDrawerHangDetectorPluginTests",
 ]
 
 # Performance tests run up to their one-minute limits each, so their targets get "medium" (300 s).
