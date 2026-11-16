@@ -95,6 +95,31 @@ struct SessionPlugin: DebugDrawerPlugin {
 }
 ```
 
+### Badges and toasts
+
+A plugin can raise a problem while the drawer is closed. A badge puts a count on the plugin's
+section header until the plugin clears it. A toast appears in the window's corner while the drawer
+is closed; tapping it opens the drawer with that plugin expanded and scrolled into view, and its
+close button dismisses it. Posts from one plugin coalesce into one toast that shows the latest
+message and how many posts it stands for; a post while the drawer is open is dropped. In release
+builds these calls compile and do nothing.
+
+```swift
+struct UploadsPlugin: DebugDrawerPlugin {
+    var title = "Uploads"
+    var icon = "arrow.up.circle"
+
+    var body: some View {
+        Text("No uploads")
+    }
+}
+
+let uploads = UploadsPlugin()
+uploads.setBadge(2)
+uploads.postToast("Upload of report.pdf failed")
+uploads.clearBadge()
+```
+
 ### Installing the shipped plugins
 
 Each plugin installs itself with one call at startup. All of them:

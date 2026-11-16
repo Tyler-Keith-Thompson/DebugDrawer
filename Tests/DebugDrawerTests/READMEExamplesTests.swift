@@ -31,6 +31,15 @@
         }
     }
 
+    struct UploadsPlugin: DebugDrawerPlugin {
+        var title = "Uploads"
+        var icon = "arrow.up.circle"
+
+        var body: some View {
+            Text("No uploads")
+        }
+    }
+
     @MainActor
     @Suite("README examples")
     struct READMEExamplesTests {
@@ -57,6 +66,27 @@
             // Leave the shared drawer as the other suites expect it, within this one main-actor turn.
             DebugDrawer.shared.toggle()
             DebugDrawer.shared.unregisterGlobal(id: CachePlugin().id)
+        }
+
+        @Test("Badges and toasts")
+        func badgesAndToasts() {
+            let wasOpen = DebugDrawer.shared.isOpen
+            DebugDrawer.shared.isOpen = false
+
+            let uploads = UploadsPlugin()
+            uploads.setBadge(2)
+            uploads.postToast("Upload of report.pdf failed")
+            let badge = DebugDrawer.shared.badges["UploadsPlugin"]
+            let toast = DebugDrawer.shared.toast
+            uploads.clearBadge()
+
+            // Leave the shared drawer as the other suites expect it, within this one main-actor turn.
+            DebugDrawer.shared.dismissToast()
+            DebugDrawer.shared.isOpen = wasOpen
+            #expect(badge == 2)
+            #expect(toast?.pluginID == "UploadsPlugin")
+            #expect(toast?.message == "Upload of report.pdf failed")
+            #expect(DebugDrawer.shared.badges["UploadsPlugin"] == nil)
         }
 
         @Test("Searching plugins and actions")

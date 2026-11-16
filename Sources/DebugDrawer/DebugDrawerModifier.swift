@@ -15,7 +15,20 @@
                         .background(DebugDrawerTagView())
                         .allowsHitTesting(drawer.isOpen)
                 }
+                .overlay(alignment: .topTrailing) {
+                    // A toast exists only while the drawer is closed; opening it is the toast's job.
+                    if !drawer.isOpen, let toast = drawer.toast {
+                        DrawerToastView(
+                            toast: toast,
+                            plugin: (drawer.localPlugins + drawer.globalPlugins).first { $0.id == toast.pluginID },
+                            open: { drawer.openToast() },
+                            dismiss: { drawer.dismissToast() }
+                        )
+                        .transition(.move(edge: .top).combined(with: .opacity))
+                    }
+                }
                 .animation(reduceMotion ? nil : .easeInOut(duration: 0.25), value: drawer.isOpen)
+                .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: drawer.toast)
         }
     }
 

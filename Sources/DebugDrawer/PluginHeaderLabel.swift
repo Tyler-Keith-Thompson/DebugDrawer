@@ -7,6 +7,8 @@
         let plugin: AnyDebugDrawerPlugin
         let isExpanded: Bool
         let isPinned: Bool
+        /// The plugin's badge count, if it has one.
+        var badge: Int?
 
         var body: some View {
             HStack(spacing: 8) {
@@ -23,6 +25,16 @@
                         .accessibilityLabel("Pinned")
                 }
                 Spacer()
+                if let badge {
+                    Text(badge, format: .number)
+                        .font(.caption2.weight(.semibold))
+                        .monospacedDigit()
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 1)
+                        .background(Capsule().fill(.red))
+                        .accessibilityLabel("\(badge) new")
+                }
                 Image(systemName: "chevron.right")
                     .font(.caption2.weight(.semibold))
                     .foregroundStyle(.tertiary)

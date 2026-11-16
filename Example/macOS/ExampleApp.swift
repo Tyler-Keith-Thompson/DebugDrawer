@@ -91,6 +91,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             )
             toggle.keyEquivalentModifierMask = .control
             toggle.target = self
+            let notice = debugMenu.addItem(
+                withTitle: "Post Sample Notice",
+                action: #selector(postSampleNotice),
+                keyEquivalent: ""
+            )
+            notice.target = self
             debugMenuItem.submenu = debugMenu
             mainMenu.addItem(debugMenuItem)
         #endif
@@ -101,6 +107,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     #if DEBUG
         @objc private func toggleDebugDrawer() {
             DebugDrawer.shared.toggle()
+        }
+
+        // Shows what a plugin's notice looks like: a badge on Network and a toast that opens it.
+        @objc private func postSampleNotice() {
+            let network = NetworkPlugin()
+            network.setBadge(1)
+            network.postToast("GET /api/orders failed with 500")
         }
     #endif
 

@@ -108,6 +108,16 @@ struct ExampleContentView_iOS: View {
                             Label("Debug Drawer", systemImage: "ladybug")
                         }
                     }
+                    // Shows what a plugin's notice looks like: a badge on Network and a toast that opens it.
+                    ToolbarItem(placement: .secondaryAction) {
+                        Button {
+                            let network = NetworkPlugin()
+                            network.setBadge(1)
+                            network.postToast("GET /api/orders failed with 500")
+                        } label: {
+                            Label("Post Sample Notice", systemImage: "bell.badge")
+                        }
+                    }
                 #endif
             }
         }

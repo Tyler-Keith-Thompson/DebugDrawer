@@ -177,6 +177,17 @@
         // MARK: - Plugin list
 
         private var content: some View {
+            ScrollViewReader { proxy in
+                pluginList
+                    // A toast opens the drawer and asks for its plugin in the same turn; the list can
+                    // scroll only once it is on screen, and while it is open a request scrolls at once.
+                    // The proxy scrolls even when scrolledID already names the plugin.
+                    .onAppear { reveal(using: proxy) }
+                    .onChange(of: drawer.revealRequest) { reveal(using: proxy) }
+            }
+        }
+
+        private var pluginList: some View {
             ScrollView {
                 if !drawer.hasPlugins {
                     DrawerEmptyState()
@@ -213,6 +224,17 @@
             !collapsedSections.contains(plugin.id)
         }
 
+        /// Expands the plugin a toast asked for and scrolls the list to it.
+        private func reveal(using proxy: ScrollViewProxy) {
+            guard let id = drawer.revealRequest else { return }
+            drawer.revealRequest = nil
+            guard let plugin = allPlugins.first(where: { $0.id == id }) else { return }
+            expand(plugin)
+            withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.2)) {
+                proxy.scrollTo(id, anchor: .top)
+            }
+        }
+
         private func expand(_ plugin: AnyDebugDrawerPlugin) {
             guard collapsedSections.contains(plugin.id) else { return }
             toggleExpanded(plugin)
@@ -242,7 +264,7 @@
                 Button {
                     toggleExpanded(plugin)
                 } label: {
-                    PluginHeaderLabel(plugin: plugin, isExpanded: expanded, isPinned: pinned)
+                    PluginHeaderLabel(plugin: plugin, isExpanded: expanded, isPinned: pinned, badge: drawer.badges[plugin.id])
                 }
                 .buttonStyle(.plain)
                 .accessibilityValue(expanded ? "Expanded" : "Collapsed")

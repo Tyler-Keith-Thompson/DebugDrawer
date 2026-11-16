@@ -107,5 +107,48 @@
         public var hasPlugins: Bool {
             !globalPlugins.isEmpty || !localPlugins.isEmpty
         }
+
+        // MARK: - Badges and toasts
+
+        /// Badge counts shown on plugins' section headers, by plugin ID.
+        @Published public private(set) var badges: [String: Int] = [:]
+
+        /// The notice shown while the drawer is closed, if a plugin has raised one.
+        @Published public private(set) var toast: DebugDrawerToast?
+
+        /// A plugin the overlay should expand and scroll to the next time it can.
+        @Published var revealRequest: String?
+
+        /// Shows `count` on the plugin's section header; zero or less clears it.
+        public func setBadge(_ count: Int, forPlugin id: String) {
+            if count > 0 {
+                badges[id] = count
+            } else {
+                badges.removeValue(forKey: id)
+            }
+        }
+
+        /// Raises a toast for the plugin while the drawer is closed. A post from the plugin that
+        /// already has the toast replaces its message and adds to its count, so a burst shows as
+        /// one toast; a post from another plugin replaces the toast. While the drawer is open the
+        /// post is dropped: the drawer is on screen, and a badge is the lasting signal.
+        public func postToast(_ message: String, fromPlugin id: String) {
+            guard !isOpen else { return }
+            let count = toast.map { $0.pluginID == id ? $0.count + 1 : 1 } ?? 1
+            toast = DebugDrawerToast(pluginID: id, message: message, count: count)
+        }
+
+        /// Removes the toast without opening the drawer.
+        public func dismissToast() {
+            toast = nil
+        }
+
+        /// Opens the drawer at the toast's plugin, expanded and scrolled into view, and removes the toast.
+        public func openToast() {
+            guard let toast else { return }
+            self.toast = nil
+            revealRequest = toast.pluginID
+            if !isOpen { toggle() }
+        }
     }
 #endif
