@@ -47,6 +47,39 @@
             assertSnapshot(of: actual, as: .image(perceptualPrecision: 0.98), named: "accessibility3")
         }
 
+        @Test("Lines already shown restyle when the text size changes")
+        func shownLinesRestyleOnATextSizeChange() throws {
+            let lines = [LogLine(timestamp: Date(timeIntervalSince1970: 0), text: "App launched", source: .stdout, level: .info)]
+            func console(_ size: DynamicTypeSize) -> AnyView {
+                AnyView(ConsoleTextView(lines: lines, isFollowing: .constant(false))
+                    .frame(width: 320, height: 120)
+                    .environment(\.dynamicTypeSize, size))
+            }
+            func textView(in view: UIView) -> UITextView? {
+                view as? UITextView ?? view.subviews.lazy.compactMap(textView(in:)).first
+            }
+            func shownFontSize(_ controller: UIHostingController<AnyView>) throws -> CGFloat {
+                controller.view.layoutIfNeeded()
+                let storage = try #require(textView(in: controller.view)?.textStorage)
+                // The last character is the line's text, after the timestamp.
+                let font = try #require(storage.attribute(.font, at: storage.length - 1, effectiveRange: nil) as? UIFont)
+                return font.pointSize
+            }
+            let controller = UIHostingController(rootView: console(.large))
+            let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 320, height: 120))
+            window.rootViewController = controller
+            window.isHidden = false
+            let before = try shownFontSize(controller)
+            let expected = ConsoleFonts(dynamicTypeSize: .accessibility3).text.pointSize
+
+            controller.rootView = console(.accessibility3)
+            let actual = try shownFontSize(controller)
+            window.isHidden = true
+
+            #expect(before == 10)
+            #expect(actual == expected)
+        }
+
         @Test("The console's fonts are 10, 9 and 8 pt at the default text size")
         func fontsAtTheDefaultSize() {
             let expected: [CGFloat] = [10, 9, 8]
