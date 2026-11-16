@@ -14,6 +14,18 @@
         /// - Returns: `.saved` with the file's URL, or `.needsLocation` when the write was refused
         ///   for lack of permission.
         /// - Throws: Any other error writing throws, such as a directory that doesn't exist.
+        /// A capture's filename: the app's name, `-Debug-`, the time in ISO 8601 with `-` for
+        /// `:` (filesystems that reserve `:`), and `.png`.
+        static func filename(appName: String, at date: Date) -> String {
+            let timestamp = ISO8601DateFormatter().string(from: date).replacingOccurrences(of: ":", with: "-")
+            return "\(appName)-Debug-\(timestamp).png"
+        }
+
+        /// The running app's name, from its bundle, or the process name when it has none.
+        static var appName: String {
+            Bundle.main.object(forInfoDictionaryKey: "CFBundleName") as? String ?? ProcessInfo.processInfo.processName
+        }
+
         static func save(
             _ png: Data,
             as filename: String,

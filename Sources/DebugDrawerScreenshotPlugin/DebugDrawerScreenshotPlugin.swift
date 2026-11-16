@@ -4,7 +4,6 @@
 
     #if os(macOS)
     import AppKit
-    @preconcurrency import ScreenCaptureKit
     import UniformTypeIdentifiers
     #elseif os(iOS)
     import UIKit
@@ -24,19 +23,32 @@
         }
     }
 
-    struct ScreenshotPluginView: View {
-        @State private var lastPath: String?
-        @State private var isCapturing = false
-        @State private var hideDrawer = true
+    /// What the plugin shows between captures. It outlives the plugin's view, which the drawer
+    /// removes while it hides for a capture, so a result reported then is still there after.
+    @MainActor
+    final class ScreenshotStore: ObservableObject {
+        static let shared = ScreenshotStore()
+
+        @Published var lastPath: String?
+        @Published var isCapturing = false
+        /// The last capture, shown small so the developer sees what was taken.
+        @Published var lastCapture: PlatformImage?
+        @Published var hideDrawer = true
         #if os(macOS)
         /// A capture the Desktop refused (a sandboxed host), waiting for the user to pick where it goes.
-        @State private var refusedCapture: PNGDocument?
-        @State private var refusedFilename = ""
+        @Published var refusedCapture: PNGDocument?
+        @Published var refusedFilename = ""
         #endif
+
+        private init() {}
+    }
+
+    struct ScreenshotPluginView: View {
+        @ObservedObject private var store = ScreenshotStore.shared
 
         var body: some View {
             VStack(alignment: .leading, spacing: 8) {
-                Toggle("Hide drawer for screenshot", isOn: $hideDrawer)
+                Toggle("Hide drawer for screenshot", isOn: $store.hideDrawer)
                     .toggleStyle(.switch)
                     .controlSize(.small)
 
@@ -47,25 +59,25 @@
                     }
                     .buttonStyle(.borderedProminent)
                     .controlSize(.small)
-                    .disabled(isCapturing)
+                    .disabled(store.isCapturing)
 
                     Button("To Clipboard") {
                         capture(to: .clipboard)
                     }
                     .buttonStyle(.bordered)
                     .controlSize(.small)
-                    .disabled(isCapturing)
+                    .disabled(store.isCapturing)
                     #elseif os(iOS)
                     Button("Capture") {
                         capture(to: .clipboard)
                     }
                     .buttonStyle(.borderedProminent)
                     .controlSize(.small)
-                    .disabled(isCapturing)
+                    .disabled(store.isCapturing)
                     #endif
                 }
 
-                if isCapturing {
+                if store.isCapturing {
                     HStack(spacing: 4) {
                         ProgressView().controlSize(.small)
                         Text("Capturing...")
@@ -74,7 +86,7 @@
                     }
                 }
 
-                if let path = lastPath {
+                if let path = store.lastPath {
                     HStack(spacing: 4) {
                         Image(systemName: "checkmark.circle.fill")
                             .foregroundStyle(.green)
@@ -88,17 +100,27 @@
                     }
                     .accessibilityElement(children: .combine)
                 }
+
+                if let lastCapture = store.lastCapture {
+                    Image(platformImage: lastCapture)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(maxHeight: 120)
+                        .clipShape(RoundedRectangle(cornerRadius: 4))
+                        .overlay(RoundedRectangle(cornerRadius: 4).stroke(.separator))
+                        .accessibilityLabel("Last capture")
+                }
             }
             #if os(macOS)
             .fileExporter(
-                isPresented: Binding(get: { refusedCapture != nil }, set: { if !$0 { refusedCapture = nil } }),
-                document: refusedCapture,
+                isPresented: Binding(get: { store.refusedCapture != nil }, set: { if !$0 { store.refusedCapture = nil } }),
+                document: store.refusedCapture,
                 contentType: .png,
-                defaultFilename: refusedFilename
+                defaultFilename: store.refusedFilename
             ) { result in
                 switch result {
-                case let .success(url): lastPath = url.path
-                case let .failure(error): lastPath = "Error: \(error.localizedDescription)"
+                case let .success(url): store.lastPath = url.path
+                case let .failure(error): store.lastPath = "Error: \(error.localizedDescription)"
                 }
             }
             #endif
@@ -107,131 +129,84 @@
         private enum Destination { case desktop, clipboard }
 
         private func capture(to destination: Destination) {
-            isCapturing = true
-            lastPath = nil
+            store.isCapturing = true
+            store.lastPath = nil
+            store.lastCapture = nil
 
             let doCapture: @MainActor () async -> Void = {
                 await performCapture(destination: destination)
             }
 
             // The HUD is always left out of the capture; the drawer only when asked.
-            DebugDrawer.shared.performWhileHidden(drawer: hideDrawer, doCapture)
+            DebugDrawer.shared.performWhileHidden(drawer: store.hideDrawer, doCapture)
         }
 
         #if os(macOS)
         private func performCapture(destination: Destination) async {
-            guard let window = NSApp?.keyWindow else {
-                isCapturing = false
-                return
-            }
-
             do {
-                let image = try await captureWindow(window)
+                guard let window = NSApp?.keyWindow else { throw ScreenshotError.noWindow }
+                guard let bitmap = WindowCapture.bitmap(of: window),
+                      let png = bitmap.representation(using: .png, properties: [:])
+                else { throw ScreenshotError.encodingFailed }
+                let image = NSImage(size: bitmap.size)
+                image.addRepresentation(bitmap)
+                store.lastCapture = image
 
                 switch destination {
                 case .desktop:
-                    let (png, filename) = try pngFile(image)
+                    let filename = ScreenshotFile.filename(appName: ScreenshotFile.appName, at: Date())
                     guard let desktop = FileManager.default.urls(for: .desktopDirectory, in: .userDomainMask).first else {
                         throw ScreenshotError.noDesktop
                     }
                     switch try ScreenshotFile.save(png, as: filename, in: desktop) {
                     case let .saved(url):
-                        lastPath = url.path
-                        NSSound.beep()
+                        store.lastPath = url.path
                     case .needsLocation:
-                        refusedFilename = filename
-                        refusedCapture = PNGDocument(data: png)
+                        store.refusedFilename = filename
+                        store.refusedCapture = PNGDocument(data: png)
                     }
 
                 case .clipboard:
-                    copyToClipboard(image)
-                    lastPath = "Copied to clipboard"
+                    let pasteboard = NSPasteboard.general
+                    pasteboard.clearContents()
+                    pasteboard.writeObjects([image])
+                    store.lastPath = "Copied to clipboard"
                 }
             } catch {
-                lastPath = "Error: \(error.localizedDescription)"
+                store.lastPath = "Error: \(error.localizedDescription)"
             }
 
-            isCapturing = false
-        }
-
-        private func captureWindow(_ window: NSWindow) async throws -> NSImage {
-            let windowID = CGWindowID(window.windowNumber)
-            let windowFrame = window.frame
-            let scale = window.screen?.backingScaleFactor ?? 2
-
-            let content = try await SCShareableContent.current
-            guard let scWindow = content.windows.first(where: { $0.windowID == windowID }) else {
-                throw ScreenshotError.windowNotFound
-            }
-
-            let filter = SCContentFilter(desktopIndependentWindow: scWindow)
-            let config = SCStreamConfiguration()
-            config.width = Int(windowFrame.width * scale)
-            config.height = Int(windowFrame.height * scale)
-            config.showsCursor = false
-
-            let cgImage = try await SCScreenshotManager.captureImage(contentFilter: filter, configuration: config)
-            return NSImage(cgImage: cgImage, size: windowFrame.size)
-        }
-
-        /// The capture as PNG data, with a timestamped filename.
-        private func pngFile(_ image: NSImage) throws -> (Data, String) {
-            guard let tiff = image.tiffRepresentation,
-                  let bitmap = NSBitmapImageRep(data: tiff),
-                  let pngData = bitmap.representation(using: .png, properties: [:])
-            else {
-                throw ScreenshotError.encodingFailed
-            }
-
-            let timestamp = ISO8601DateFormatter().string(from: Date())
-                .replacingOccurrences(of: ":", with: "-")
-            return (pngData, "MergeWard-Debug-\(timestamp).png")
-        }
-
-        private func copyToClipboard(_ image: NSImage) {
-            let pb = NSPasteboard.general
-            pb.clearContents()
-            pb.writeObjects([image])
+            store.isCapturing = false
         }
         #elseif os(iOS)
-        private func performCapture(destination: Destination) async {
-            guard let windowScene = UIApplication.shared.connectedScenes
+        private func performCapture(destination _: Destination) async {
+            guard let window = UIApplication.shared.connectedScenes
                 .compactMap({ $0 as? UIWindowScene })
-                .first(where: { $0.activationState == .foregroundActive }),
-                let window = windowScene.windows.first(where: { $0.isKeyWindow }),
-                let rootView = window.rootViewController?.view
+                .first(where: { $0.activationState == .foregroundActive })?
+                .windows.first(where: \.isKeyWindow)
             else {
-                isCapturing = false
+                store.lastPath = "Error: \(ScreenshotError.noWindow.localizedDescription)"
+                store.isCapturing = false
                 return
             }
 
-            let renderer = UIGraphicsImageRenderer(bounds: rootView.bounds)
-            let image = renderer.image { _ in
-                rootView.drawHierarchy(in: rootView.bounds, afterScreenUpdates: true)
-            }
-
-            switch destination {
-            case .desktop:
-                // No desktop on iOS — fall through to clipboard
-                UIPasteboard.general.image = image
-                lastPath = "Copied to clipboard"
-            case .clipboard:
-                UIPasteboard.general.image = image
-                lastPath = "Copied to clipboard"
-            }
-
-            isCapturing = false
+            // iOS has no Desktop; every capture goes to the clipboard.
+            let image = WindowCapture.image(of: window)
+            UIPasteboard.general.image = image
+            store.lastCapture = image
+            store.lastPath = "Copied to clipboard"
+            store.isCapturing = false
         }
         #endif
 
         enum ScreenshotError: LocalizedError {
-            case windowNotFound
+            case noWindow
             case encodingFailed
             case noDesktop
 
             var errorDescription: String? {
                 switch self {
-                case .windowNotFound: "Could not find window for capture"
+                case .noWindow: "No key window to capture"
                 case .encodingFailed: "Failed to encode screenshot as PNG"
                 case .noDesktop: "Could not locate Desktop directory"
                 }
@@ -256,6 +231,17 @@
         }
     }
     #endif
+
+    extension Image {
+        /// A SwiftUI image of an AppKit or UIKit image.
+        fileprivate init(platformImage: PlatformImage) {
+            #if os(macOS)
+            self.init(nsImage: platformImage)
+            #else
+            self.init(uiImage: platformImage)
+            #endif
+        }
+    }
 
     // MARK: - Convenience installer
 

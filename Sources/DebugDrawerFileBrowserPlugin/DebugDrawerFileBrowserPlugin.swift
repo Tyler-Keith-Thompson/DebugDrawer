@@ -233,7 +233,7 @@
         private static func buildLocations() -> [ScanLocation] {
             var result: [ScanLocation] = []
             let fm = FileManager.default
-            let bundleId = Bundle.main.bundleIdentifier ?? "com.mergeward.app"
+            let bundleId = Bundle.main.bundleIdentifier ?? ProcessInfo.processInfo.processName
 
             // Only scan app-specific directories, not broad system locations.
             if let appSupport = fm.urls(for: .applicationSupportDirectory, in: .userDomainMask).first {

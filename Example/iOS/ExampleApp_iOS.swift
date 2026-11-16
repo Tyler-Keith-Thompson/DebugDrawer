@@ -65,6 +65,7 @@ struct DebugDrawerExampleiOSApp: App {
 struct ExampleContentView_iOS: View {
     @State private var counter = 0
     @State private var text = ""
+    @State private var isShowingSheet = false
 
     var body: some View {
         NavigationStack {
@@ -76,6 +77,8 @@ struct ExampleContentView_iOS: View {
                         Button("Reset") { counter = 0 }
                     }
                     .buttonStyle(.bordered)
+
+                    Button("Show Sheet") { isShowingSheet = true }
 
                     Text("Counter: \(counter)")
                         .font(.title2.monospacedDigit())
@@ -97,6 +100,9 @@ struct ExampleContentView_iOS: View {
                 }
             }
             .navigationTitle("DebugDrawer Example")
+            .sheet(isPresented: $isShowingSheet) {
+                ExampleSheet_iOS()
+            }
             .toolbar {
                 // The drawer exists in debug builds only. A device without a keyboard has no
                 // Ctrl+D, so the example opens it from here.
@@ -121,5 +127,34 @@ struct ExampleContentView_iOS: View {
                 #endif
             }
         }
+    }
+}
+
+/// A presented sheet with a drawer of its own, as a host adds one to each sheet's root: opened
+/// over the sheet, the drawer's capture includes it.
+struct ExampleSheet_iOS: View {
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            Text("Sample Sheet")
+                .font(.largeTitle)
+                .navigationTitle("Sheet")
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Done") { dismiss() }
+                    }
+                    #if DEBUG
+                        ToolbarItem(placement: .primaryAction) {
+                            Button {
+                                DebugDrawer.shared.toggle()
+                            } label: {
+                                Label("Debug Drawer", systemImage: "ladybug")
+                            }
+                        }
+                    #endif
+                }
+        }
+        .debugDrawer()
     }
 }

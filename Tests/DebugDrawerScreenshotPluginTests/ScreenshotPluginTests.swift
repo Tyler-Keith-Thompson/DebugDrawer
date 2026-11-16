@@ -13,6 +13,15 @@
             #expect(sut.icon == "camera")
         }
 
+        @Test func aCaptureIsNamedForTheAppAndTheTimeWithNoColons() {
+            let date = Date(timeIntervalSince1970: 1_800_000_000)
+            let expected = "Orders-Debug-2027-01-15T08-00-00Z.png"
+
+            let actual = ScreenshotFile.filename(appName: "Orders", at: date)
+
+            #expect(actual == expected)
+        }
+
         @Test func aWritableDirectoryGetsTheFileAndItsURLIsReported() throws {
             let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
