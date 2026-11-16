@@ -17,6 +17,7 @@ import DebugDrawerLoadedLibrariesPlugin
 import DebugDrawerDeepLinkPlugin
 import DebugDrawerCookiesPlugin
 import DebugDrawerLaunchTimePlugin
+import DebugDrawerTweaksPlugin
 import SwiftUI
 
 /// Demonstrates Send Report without a server: "sends" each report by copying it into the app's
@@ -64,6 +65,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             DebugDrawer.shared.installDeepLink()
             DebugDrawer.shared.installCookies()
             DebugDrawer.shared.installLaunchTime()
+            ExampleTweaks.install()
             DebugDrawer.shared.reportUploader = FolderReportUploader()
         #endif
 
@@ -139,7 +141,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
 struct ExampleContentView: View {
     @State private var selectedItem: String?
-    @State private var counter = 0
+    // Kept in the defaults, so the Tweaks plugin's Reset counter action can clear it.
+    @AppStorage(ExampleTweaks.counterKey) private var counter = 0
 
     var body: some View {
         NavigationSplitView {
@@ -168,7 +171,7 @@ struct ExampleContentView: View {
                 Divider()
 
                 HStack(spacing: 16) {
-                    Button("Increment") { counter += 1 }
+                    Button("Increment") { counter += ExampleTweaks.counterStep.value }
                     Button("Print") { print("Counter: \(counter)") }
                     Button("Reset") { counter = 0 }
                 }
@@ -178,6 +181,8 @@ struct ExampleContentView: View {
                 Text("Counter: \(counter)")
                     .font(.title2.monospacedDigit())
                     .accessibilityAddTraits(.isHeader)
+
+                ExampleTweaksBanner()
 
                 HStack {
                     TextField("Sample text field", text: .constant(""))

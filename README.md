@@ -290,6 +290,77 @@ DebugDrawer.shared.installLaunchTime()
 ```
 
 Each call needs its plugin's module imported (`import DebugDrawerConsolePlugin`, and so on).
+Tweaks takes the settings it shows, so it has a section of its own, next.
+
+### Tweaks: the app's own debug settings
+
+The Tweaks plugin shows the settings the app declares: toggles, pickers over an enumeration or a
+list of strings, text fields, steppers and actions, in sections. Declare each tweak once, list
+it in a section, and read it anywhere through `value`, typed as declared:
+
+```swift
+import DebugDrawerTweaksPlugin
+
+enum Backend: String, CaseIterable {
+    case production, staging, local
+}
+
+enum AppTweaks {
+    static let newCheckout = Tweak.toggle("New checkout", key: "newCheckout", default: false)
+    static let backend = Tweak.picker("Backend", key: "backend", default: Backend.production)
+    static let greeting = Tweak.text("Greeting", key: "greeting", default: "Welcome")
+    static let timeout = Tweak.stepper("Timeout (s)", key: "timeout", default: 30, in: 5 ... 120, step: 5)
+}
+
+#if DEBUG
+DebugDrawer.shared.installTweaks {
+    TweakSection("Features") {
+        AppTweaks.newCheckout
+        AppTweaks.greeting
+    }
+    TweakSection("Server") {
+        AppTweaks.backend
+        AppTweaks.timeout
+    }
+    TweakSection("Session") {
+        TweakAction("Reset onboarding") {
+            UserDefaults.standard.removeObject(forKey: "hasSeenOnboarding")
+        }
+    }
+}
+#endif
+
+// Anywhere in the app, in every build:
+let url = switch AppTweaks.backend.value {
+case .production: "https://api.example.com"
+case .staging: "https://staging.example.com"
+case .local: "http://localhost:8080"
+}
+```
+
+Values persist across launches in the standard `UserDefaults`, each key behind the prefix
+`com.debugdrawer.tweaks.`; pass `installTweaks(storage:)` a `UserDefaultsTweakStorage` with other
+defaults or another prefix, or a `TweakStorage` of your own, to keep them elsewhere. A changed
+tweak has a button that resets it, and Reset All resets them all. A stored value that is no longer
+one of a tweak's values (a removed case, a number outside a stepper's range) reads as the default,
+or the nearest bound. The drawer's search finds each action too. To follow a tweak as it changes,
+subscribe to its `publisher`, which sends the current value first:
+
+```swift
+struct CheckoutButton: View {
+    @State private var isNewCheckout = AppTweaks.newCheckout.value
+
+    var body: some View {
+        Button(isNewCheckout ? "Check out (new)" : "Check out") {}
+            .onReceive(AppTweaks.newCheckout.publisher) { isNewCheckout = $0 }
+    }
+}
+```
+
+`Tweak`, `TweakSection` and `TweakAction` exist in every configuration. In release there is no
+drawer and nothing is stored: `value` is always the declared default and `publisher` sends only
+that. Mark a tweak `.productionSafe()` to say it may be offered outside debug builds; the drawer
+shows it the same either way.
 
 ### Opening the drawer
 
@@ -399,6 +470,7 @@ ContentView()
 | `DebugDrawerDeepLinkPlugin` | Opens deep links and keeps a history of them |
 | `DebugDrawerCookiesPlugin` | Browse, search and delete HTTPCookieStorage cookies |
 | `DebugDrawerLaunchTimePlugin` | Pre-main, app-init-to-first-frame and total launch time |
+| `DebugDrawerTweaksPlugin` | The app's own debug settings: toggles, pickers, text fields, steppers and actions, in sections, read through typed accessors |
 
 ## Development
 
