@@ -94,6 +94,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if ProcessInfo.processInfo.arguments.contains(ExampleAnalytics.launchArgument) {
             ExampleAnalytics.trackAllSamples()
         }
+        // Installs the Databases plugin, which compiles in release too and does nothing there;
+        // launched with -SeedSampleDatabase, the app first writes its sample stores.
+        ExampleDatabase.install()
         #if DEBUG
             DebugDrawer.shared.installConsole()
             DebugDrawer.shared.installNetwork()

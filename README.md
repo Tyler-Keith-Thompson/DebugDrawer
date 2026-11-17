@@ -305,7 +305,7 @@ DebugDrawer.shared.installLaunchTime()
 
 Each call needs its plugin's module imported (`import DebugDrawerConsolePlugin`, and so on).
 Tweaks takes the settings it shows and Feature Flags the adapter it reads, and Crash Reports,
-Hangs, Leaks, MetricKit, Permissions, Notifications, Background Tasks and Analytics install outside `#if DEBUG`, so each has a
+Hangs, Leaks, MetricKit, Permissions, Notifications, Background Tasks, Analytics and Databases install outside `#if DEBUG`, so each has a
 section of its own, next.
 
 ### Tweaks: the app's own debug settings
@@ -788,6 +788,42 @@ and the bug report, which carries every event as `analytics.json`. The plugin ru
 platform the drawer does; tvOS and watchOS have no pasteboard or share sheet, so there it offers
 no Copy JSON or Export All.
 
+### Databases: what the app actually saved
+
+The Databases plugin finds the app's SQLite, Core Data and SwiftData stores and opens them read-only,
+so a developer can check what the app wrote without copying the file off the device:
+
+```swift
+import DebugDrawerDatabaseBrowserPlugin
+
+// At startup:
+DatabaseBrowser.install()
+
+// Or with folders of the app's own as well:
+DatabaseBrowser.install(additionalDirectories: [URL.cachesDirectory.appending(path: "Databases")])
+```
+
+`DatabaseBrowser` exists in every configuration and does nothing in release, so the call needs no
+`#if DEBUG`. The plugin looks in Application Support, Documents and the containers of the app
+groups the app's entitlements name (and in `additionalDirectories`), for `.sqlite`, `.sqlite3`,
+`.db` and `.store` files that begin with SQLite's header; `-wal`, `-shm` and `-journal` files belong
+to their store and aren't listed apart. A Mac app outside the sandbox has only its own folder of
+Application Support searched, and no Documents. Each store shows its path, size, journal mode and
+kind; a Core Data or SwiftData store (one with `Z_METADATA` and `Z_PRIMARYKEY`) lists its tables
+by entity name, with the `Z` table beneath, and its model's version hash. Opening a table pages its
+rows fifty at a time in a grid that scrolls sideways, with a search over its text columns; NULLs,
+numbers, text and blobs (size and first bytes) are each drawn their own way, and tapping a cell
+shows its whole value. The query editor runs one `SELECT` (or a pragma that describes a table),
+reading up to 200 rows; the page and the result copy as CSV.
+
+The browser only reads. It opens a store with `SQLITE_OPEN_READONLY`, sets `query_only`, and an
+authorizer refuses anything but reading, so `INSERT`, `UPDATE`, `DELETE`, `ATTACH`, pragmas that
+change the store and a second statement show as inline errors. A connection is open only while a
+read runs, so the app's own writes and checkpoints are never held up for long, and a store the app
+holds locked shows "Store busy, try again". Reading a WAL store needs to write its `-shm` file; the
+browser says when it can't. The bug report carries `databases.txt`: each store with its tables and
+row counts, never their rows. tvOS and watchOS have no pasteboard, so there it offers no copy.
+
 ### Opening the drawer
 
 The drawer doesn't decide how it opens. Call `DebugDrawer.shared.toggle()` from whatever trigger
@@ -906,6 +942,7 @@ ContentView()
 | `DebugDrawerNotificationsPlugin` | The APNs device token to copy, notification authorization and settings, pending and delivered notifications to inspect and remove, and a pasted APNs payload sent as a local notification |
 | `DebugDrawerBackgroundTasksPlugin` | The BGTaskScheduler identifiers the Info.plist permits and the pending task requests, with their kind and earliest begin date, each cancellable; a request scheduled on demand, and the LLDB commands that simulate a launch or an expiration |
 | `DebugDrawerAnalyticsPlugin` | The analytics events the app records, live, newest first, with their time and properties: search by name, key or value, each open as inspector rows and JSON to copy, all exported as a JSON file |
+| `DebugDrawerDatabaseBrowserPlugin` | The app's SQLite, Core Data and SwiftData stores, opened read-only: tables or entities with row counts, rows paged and searched in a grid, and read-only SELECT queries, copied as CSV |
 
 ## Development
 
