@@ -167,6 +167,10 @@
         private let driver = ConsoleLogDriver()
         /// Original stdout fd, used to write diagnostics without triggering capture loop.
         private var originalStdoutFd: Int32 = -1
+        /// The pipes stdout and stderr are redirected into, held for as long as the store lives: a
+        /// pipe released closes its reading end, and the app's next write to either stream would
+        /// then raise SIGPIPE.
+        private var capturePipes: [Pipe] = []
         /// Subject that receives individual log lines, throttled before publishing to `lines`.
         private let lineSubject = PassthroughSubject<LogLine, Never>()
         private var cancellable: AnyCancellable?
@@ -327,6 +331,7 @@
 
         private func redirectStream(source: LogLine.Source, fd: Int32) {
             let pipe = Pipe()
+            capturePipes.append(pipe)
             let originalFd = dup(fd)
             dup2(pipe.fileHandleForWriting.fileDescriptor, fd)
 

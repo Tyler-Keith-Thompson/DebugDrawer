@@ -30,3 +30,8 @@ __pycache__/
 
 # Xcode builds of the example apps
 DerivedData/
+
+# Benchmark baselines: `main` (just bench-baseline, gated by just bench-check) is shared; other
+# names are local before/after comparisons.
+Benchmarks/.benchmarkBaselines/*/*
+!Benchmarks/.benchmarkBaselines/*/main/

@@ -57,6 +57,42 @@ filter pattern:
 test-release:
     {{BAZEL_RELEASE}} test --config=release //...
 
+# The interception the benchmarks measure is DEBUG-only, so they build optimized (the plugin's
+# release configuration) with DEBUG defined for every module; each benchmark source refuses to
+# compile without it. --disable-sandbox: the Network benchmarks listen on the loopback interface
+# and the DiskIO ones write to the temporary directory, which the plugin sandbox forbids.
+BENCH := "cd " + PROJECT_ROOT + "/Benchmarks && " + SWIFT + " package --disable-sandbox -Xswiftc -DDEBUG benchmark"
+
+[doc('Run the interception benchmarks (Benchmarks/), installed against not installed, e.g. just bench, or just bench --target DebugDrawerNetworkPluginBenchmarks')]
+bench *args="":
+    {{BENCH}} {{args}}
+
+[doc('Record the benchmarks as the committed main baseline, which just bench-check gates against')]
+bench-baseline *args="":
+    {{BENCH}} baseline update main --no-progress {{args}}
+
+[doc('Run the benchmarks and show how they differ from the main baseline')]
+bench-compare *args="":
+    {{BENCH}} baseline compare main --no-progress {{args}}
+
+# `swift package` exits 1 whenever ordo-one's `baseline check` fails, which it does on a regression
+# past a benchmark's thresholds (benchmarkThresholdRegression) and also when it finds only
+# improvements (benchmarkThresholdImprovement). An improvement passes the gate; re-record with
+# bench-baseline to keep it.
+[doc('The regression gate: run the benchmarks and fail when one regresses past its threshold against the main baseline (Benchmarks/README.md); for CI')]
+bench-check *args="":
+    #!/usr/bin/env bash
+    set -uo pipefail
+    log=$(mktemp)
+    trap 'rm -f "$log"' EXIT
+    {{BENCH}} baseline check main --no-progress {{args}} 2>&1 | tee "$log"
+    status=${PIPESTATUS[0]}
+    if [ "$status" -ne 0 ] && grep -q "error: benchmarkThresholdImprovement" "$log"; then
+        echo "Only improvements against the main baseline; re-record it with just bench-baseline to keep them."
+        exit 0
+    fi
+    exit "$status"
+
 [doc('Re-resolve SwiftPM dependencies for Bazel after editing PACKAGES in scripts/modules.py')]
 resolve:
     cd {{PROJECT_ROOT}}/swift && {{SWIFT}} package resolve
@@ -290,7 +326,7 @@ template-update *args="":
 clean:
     {{BAZEL}} clean
     {{BAZEL_RELEASE}} clean || true
-    rm -rf {{PROJECT_ROOT}}/.build
+    rm -rf {{PROJECT_ROOT}}/.build {{PROJECT_ROOT}}/Benchmarks/.build
 
 [doc('Print the dependency graph of a target')]
 deps target="//Sources/DebugDrawer":

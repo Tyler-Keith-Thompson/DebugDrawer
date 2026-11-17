@@ -15,3 +15,6 @@ bazel-testlogs
 
 # Overlays the bootstrap script copies over the template (server and embedded types); not built in place.
 templates
+
+# The benchmark package: SwiftPM only (ordo-one/benchmark's plugin), and its checkouts hold BUILD files.
+Benchmarks
