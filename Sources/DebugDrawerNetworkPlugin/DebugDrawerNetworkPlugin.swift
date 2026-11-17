@@ -112,26 +112,37 @@
             Self.connections(shownWebSockets, matching: filterStatus, text: filterText)
         }
 
-        /// The WebSocket connections the log shows: the captured ones, none while an imported
-        /// file shows.
+        /// The WebSocket connections the log shows: the captured ones, none while an earlier
+        /// session or an imported file shows, whose connections are listed as their handshakes.
         var shownWebSockets: [NetworkWebSocketConnection] {
-            source == .imported ? [] : webSockets
+            source == .captured ? webSockets : []
         }
 
         /// The WebSocket connections the app opened, the latest first, with their frames.
         @Published private(set) var webSockets: [NetworkWebSocketConnection] = []
 
-        /// Which requests the log shows: the captured ones, or the imported file's while
-        /// `source` is `.imported`.
+        /// Which requests the log shows: the captured ones, the earlier session's while `source`
+        /// is `.previous`, or the imported file's while it is `.imported`.
         var shownEntries: [NetworkEntry] {
-            source == .imported ? importedLog?.entries ?? [] : entries
+            switch source {
+            case .captured: entries
+            case .previous: previousLog?.entries ?? []
+            case .imported: importedLog?.entries ?? []
+            }
         }
 
         /// The requests a HAR file held, while one is imported.
         @Published private(set) var importedLog: NetworkImportedLog?
-        /// Whether the log shows the captured requests or the imported ones; it is `.captured`
-        /// whenever nothing is imported.
+        /// The session an earlier launch kept that shows under Previous, once one is read.
+        @Published private(set) var previousLog: NetworkSessionLog?
+        /// Whether the log shows the captured requests, an earlier session's or the imported
+        /// ones; it is `.captured` whenever there is nothing else to show.
         @Published var source = NetworkLogSource.captured
+        /// Writes each request as it completes, and each WebSocket connection as it ends, to the
+        /// current session on disk; `nil` until `installNetwork()` starts one.
+        private(set) var recorder: NetworkSessionRecorder?
+        /// The connections written already, so each is written once, when it ends.
+        private var recordedWebSockets: Set<NetworkWebSocketConnection.ID> = []
         /// The last file that couldn't be imported, until another is imported or the log cleared.
         @Published private(set) var importIssue: NetworkImportIssue?
 
@@ -182,9 +193,37 @@
             return result
         }
 
-        /// Shows `connections` as the WebSocket connections the app opened.
+        /// Shows `connections` as the WebSocket connections the app opened, and writes each that
+        /// has ended to the current session, once.
         func showWebSockets(_ connections: [NetworkWebSocketConnection]) {
             webSockets = connections
+            guard let recorder else { return }
+            let redaction = DebugDrawer.shared.redaction
+            for connection in connections where connection.state != .open && !recordedWebSockets.contains(connection.id) {
+                recorder.record(connection, redaction: redaction)
+            }
+            // Only the connections still listed can end later, so the set stays as small as the list.
+            recordedWebSockets = Set(connections.filter { $0.state != .open }.map(\.id))
+        }
+
+        /// Writes each request from now on to the current session of `recorder`, as it completes.
+        func persist(to recorder: NetworkSessionRecorder) {
+            self.recorder = recorder
+        }
+
+        /// Shows the requests of `log`, a session an earlier launch kept, read-only, in place of
+        /// the captured ones.
+        func showPrevious(_ log: NetworkSessionLog) {
+            previousLog = log
+            source = .previous
+        }
+
+        /// Stops showing the earlier session; the log shows the captured requests again.
+        func hidePrevious() {
+            previousLog = nil
+            if source == .previous {
+                source = .captured
+            }
         }
 
         /// Reads the HAR file at `url` and shows its requests in the log in place of the captured
@@ -200,13 +239,16 @@
             }
         }
 
-        /// Clears the requests the log shows: the captured ones, or the imported file, after which
-        /// the log shows the captured ones again.
+        /// Clears the requests the log shows: the captured ones, the earlier session (from the
+        /// log; the caller deletes it from disk), or the imported file, after which the log shows
+        /// the captured ones again.
         func clearShown() {
             importIssue = nil
             switch source {
             case .captured:
                 clear()
+            case .previous:
+                hidePrevious()
             case .imported:
                 importedLog = nil
                 source = .captured
@@ -233,6 +275,10 @@
             if entries.count > capacity {
                 entries.removeLast(entries.count - capacity)
             }
+            // A mock's answer is recorded complete in one step.
+            if entry.isComplete {
+                persist(entry)
+            }
         }
 
         func recordCompletion(id: UUID, _ completion: NetworkCompletion) {
@@ -243,6 +289,15 @@
             entries[idx].duration = completion.duration
             entries[idx].error = completion.error
             entries[idx].isComplete = true
+            persist(entries[idx])
+        }
+
+        /// Writes `entry`, complete, to the current session, masked by the drawer's rules as they
+        /// are now, with the request it resends when the log still holds it.
+        private func persist(_ entry: NetworkEntry) {
+            guard let recorder else { return }
+            let original = entry.replayOf.flatMap { id in entries.first { $0.id == id } }
+            recorder.record(entry, original: original, redaction: DebugDrawer.shared.redaction)
         }
 
         func recordMetrics(id: UUID, metrics: NetworkTimingMetrics) {
@@ -294,9 +349,23 @@
         ///   - mocks: Rules to add to the saved ones, at the end; one whose id is saved already is
         ///     skipped, so the drawer's edits to it last from launch to launch.
         ///   - conditions: Profiles to add to the saved ones, at the end, by id as `mocks` are.
-        func installNetwork(mocks: [NetworkMockRule] = [], conditions: [NetworkConditionProfile] = []) {
+        ///   - sessions: How many earlier launches' requests are kept on disk, in how many bytes,
+        ///     and where; each request is written, redacted, as it completes, and the log shows
+        ///     the earlier sessions under Previous. ``NetworkSessionPersistence/off`` writes none.
+        func installNetwork(
+            mocks: [NetworkMockRule] = [],
+            conditions: [NetworkConditionProfile] = [],
+            sessions: NetworkSessionPersistence = .standard
+        ) {
             NetworkMocksModel.shared.load(adding: mocks)
             NetworkConditionsModel.shared.load(adding: conditions)
+            // Started before the URL protocol is registered, so the first request is written too,
+            // and once a launch, so a second install doesn't start a second session.
+            if NetworkStore.shared.recorder == nil {
+                let recorder = NetworkSessionRecorder(sessions)
+                NetworkStore.shared.persist(to: recorder)
+                Task { await NetworkSessionsModel.shared.start(recorder) }
+            }
             NetworkStore.shared.install()
             registerGlobal(NetworkPlugin())
         }

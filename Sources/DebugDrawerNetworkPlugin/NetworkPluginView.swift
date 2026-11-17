@@ -4,8 +4,8 @@
     import UniformTypeIdentifiers
 
     /// The plugin's body: the request log, the WebSocket connections, the Mocks section and the Conditions section, or the
-    /// editor of one mock or condition while it is open. The log shows the captured requests, or
-    /// those of an imported HAR file, read-only, until it is cleared.
+    /// editor of one mock or condition while it is open. The log shows the captured requests, or,
+    /// read-only, those of a session an earlier launch kept or of an imported HAR file.
     struct NetworkPluginView: View {
         /// What the plugin shows: the log and its sections, or one editor in their place until it
         /// is saved or cancelled.
@@ -21,6 +21,9 @@
         @ObservedObject private var conditions = NetworkConditionsModel.shared
         @ObservedObject private var replays = NetworkReplayModel.shared
         @ObservedObject private var drawer = DebugDrawer.shared
+        @ObservedObject private var sessions = NetworkSessionsModel.shared
+        @Environment(\.locale) private var locale
+        @Environment(\.timeZone) private var timeZone
         @State private var selectedId: UUID?
         @State private var selectedWebSocket: NetworkWebSocketConnection.ID?
         @State private var selectedRule: NetworkMockRule.ID?
@@ -80,15 +83,40 @@
                     DebugDrawerKeyValueRow("Average", value: stats.averageTime)
                 }
 
-                if let imported = store.importedLog {
-                    NetworkLogSourcePicker(source: $store.source, fileName: imported.fileName, count: imported.entries.count)
+                let sources = shownSources
+                if sources.count > 1 {
+                    NetworkLogSourcePicker(
+                        source: $store.source,
+                        fileName: store.importedLog?.fileName ?? "",
+                        count: store.importedLog?.entries.count ?? 0,
+                        sources: sources
+                    )
+                }
+                if store.source == .previous {
+                    NetworkPreviousSessionPicker(
+                        sessions: sessions.sessions,
+                        shown: store.previousLog,
+                        select: { id in Task { await showPrevious(id) } },
+                        deleteAll: { Task { await deletePrevious(sessions.sessions.map(\.id)) } }
+                    )
+                    if let unreadable = sessions.unreadable {
+                        DebugDrawerIssueRow("Not read", severity: .error) {
+                            Text("The session of \(unreadable.title(locale: locale, timeZone: timeZone)) couldn't be read.")
+                        }
+                    }
                 }
 
                 let filtered = store.filteredEntries
                 let webSockets = store.filteredWebSockets
                 NetworkToolbar(
                     filterStatus: $store.filterStatus,
-                    clear: { store.clearShown() },
+                    clear: {
+                        if store.source == .previous, let shown = store.previousLog {
+                            Task { await deletePrevious([shown.summary.id]) }
+                        } else {
+                            store.clearShown()
+                        }
+                    },
                     export: NetworkArchiveFile(entries: filtered, redaction: drawer.redaction, webSockets: webSockets),
                     isFiltered: filtered.count < shown.count || webSockets.count < store.shownWebSockets.count,
                     importArchive: { isImporting = true },
@@ -107,22 +135,22 @@
                     accessibilityLabel: "Filter requests by URL, method or response",
                     maxHeight: 300
                 ) {
-                    // Imported requests are read-only: they can be mocked, but not resent, since
-                    // an archive's credentials are usually masked and a replay belongs with the
-                    // captured requests, apart from its original.
-                    let isImported = store.source == .imported
+                    // An earlier session's and an imported file's requests are read-only: they can
+                    // be mocked, but not resent, since their credentials are masked and a replay
+                    // belongs with the captured requests, apart from its original.
+                    let isReadOnly = store.source.isReadOnly
                     ForEach(filtered) { entry in
                         let isSelected = selectedId == entry.id
                         NetworkRequestRow(
                             entry: entry, redaction: drawer.redaction, isSelected: isSelected,
                             onSelect: { selectedId = isSelected ? nil : entry.id },
                             onMock: { screen = .mock(NetworkMockDraft(mocks.rule(mocking: $0), isNew: true)) },
-                            onResend: isImported ? nil : { entry in Task { await replays.resend(entry) } },
-                            onEditAndResend: isImported ? nil : { screen = .resend(NetworkReplayDraft($0)) },
+                            onResend: isReadOnly ? nil : { entry in Task { await replays.resend(entry) } },
+                            onEditAndResend: isReadOnly ? nil : { screen = .resend(NetworkReplayDraft($0)) },
                             onShow: { selectedId = $0 },
                             // Only the open detail shows the links, so only its are worked out.
-                            links: isSelected && !isImported ? NetworkReplayLinks(of: entry, in: store.entries) : .none,
-                            replayStatus: isImported ? nil : replays.statuses[entry.id]
+                            links: isSelected && !isReadOnly ? NetworkReplayLinks(of: entry, in: store.entries) : .none,
+                            replayStatus: isReadOnly ? nil : replays.statuses[entry.id]
                         )
                     }
                 }
@@ -130,6 +158,18 @@
                     if case let .success(url) = result {
                         store.importArchive(from: url)
                     }
+                }
+                // Listed again each time the plugin shows: writing the current session may have
+                // deleted the oldest for room.
+                .task { await sessions.reload() }
+                // Previous shows the newest session until another is picked.
+                .task(id: store.source) {
+                    if store.source == .previous, store.previousLog == nil, let newest = sessions.sessions.first {
+                        await showPrevious(newest.id)
+                    }
+                }
+                .onChange(of: sessions.sessions) { _, kept in
+                    if kept.isEmpty { store.hidePrevious() }
                 }
 
                 // WebSocket traffic bypasses the URL protocol, so its connections are listed
@@ -158,6 +198,37 @@
                     move: { conditions.move($0, by: $1) },
                     delete: { conditions.delete($0) }
                 )
+            }
+        }
+
+        /// The segments the source picker offers: Captured, then Previous while an earlier launch's
+        /// session is kept, and Imported while a file is.
+        private var shownSources: [NetworkLogSource] {
+            NetworkLogSource.allCases.filter { source in
+                switch source {
+                case .captured: true
+                case .previous: !sessions.sessions.isEmpty
+                case .imported: store.importedLog != nil
+                }
+            }
+        }
+
+        /// Reads the earlier session with `id` and shows its requests.
+        private func showPrevious(_ id: NetworkSessionSummary.ID) async {
+            if let log = await sessions.log(of: id) {
+                selectedId = nil
+                store.showPrevious(log)
+            }
+        }
+
+        /// Deletes the earlier sessions with `ids`, then shows the newest left, or the captured
+        /// requests when none is.
+        private func deletePrevious(_ ids: [NetworkSessionSummary.ID]) async {
+            await sessions.delete(ids)
+            if let newest = sessions.sessions.first {
+                await showPrevious(newest.id)
+            } else {
+                store.hidePrevious()
             }
         }
     }

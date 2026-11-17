@@ -164,7 +164,7 @@
     extension HTTPArchive.Entry {
         /// - Parameter original: The request `entry` resends, when it is a replay and the
         ///   original is in the archive.
-        fileprivate init(_ entry: NetworkEntry, original: NetworkEntry?, redaction: DebugDrawerRedaction) {
+        init(_ entry: NetworkEntry, original: NetworkEntry?, redaction: DebugDrawerRedaction) {
             let url = redaction.redacting(url: entry.url)
             let httpVersion = entry.metrics?.protocolName.map(HTTPArchive.httpVersion) ?? "HTTP/1.1"
             let requestCookies = HTTPArchive.requestCookies(in: entry.requestHeaders)

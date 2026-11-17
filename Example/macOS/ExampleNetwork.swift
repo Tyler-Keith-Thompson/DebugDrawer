@@ -17,6 +17,9 @@ enum ExampleNetwork {
     /// and one, off, that fails the greeting with no connection, and pins Network to the HUD, so
     /// conditioning can be checked without a hand.
     static let conditionArgument = "-SeedNetworkCondition"
+    /// Launched with this argument and a number, `-NetworkSessionsKept 2`, the app keeps that many
+    /// earlier launches' requests rather than five, so pruning can be checked by relaunching.
+    static let sessionsArgument = "-NetworkSessionsKept"
     /// `api.example.com` doesn't resolve, so without a mock the request fails.
     static let greeting = "https://api.example.com/v1/greeting"
     /// A real page, which reaches the network unless a mock matches it.
@@ -62,15 +65,19 @@ enum ExampleNetwork {
         ]
     #endif
 
-    /// Installs the Network plugin, with the greeting's mock and the profiles when launched with
-    /// their arguments.
+    /// Installs the Network plugin, with the greeting's mock, the profiles and the number of
+    /// sessions kept when launched with their arguments.
     @MainActor
     static func install() {
         #if DEBUG
             let arguments = ProcessInfo.processInfo.arguments
             let mocks = arguments.contains(launchArgument) ? [greetingMock, orderMock] : []
             let conditions = arguments.contains(conditionArgument) ? conditionSeeds : []
-            DebugDrawer.shared.installNetwork(mocks: mocks, conditions: conditions)
+            let kept = arguments.firstIndex(of: sessionsArgument)
+                .flatMap { arguments.indices.contains($0 + 1) ? Int(arguments[$0 + 1]) : nil }
+                .map { max($0, 0) }
+            let sessions = kept.map { NetworkSessionPersistence(maxSessions: $0) } ?? .standard
+            DebugDrawer.shared.installNetwork(mocks: mocks, conditions: conditions, sessions: sessions)
             if !conditions.isEmpty, !DebugDrawer.shared.hudLayout.pinned.contains(NetworkPlugin().id) {
                 DebugDrawer.shared.toggleHUD(forPlugin: NetworkPlugin().id)
             }

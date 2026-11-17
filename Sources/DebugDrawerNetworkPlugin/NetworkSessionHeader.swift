@@ -1,0 +1,41 @@
+#if DEBUG
+    import Foundation
+
+    /// The first line of a session's file: which format the lines after it are in, when the
+    /// session started, and which build of the app it was.
+    ///
+    /// A session file is JSON Lines: this header, then one HAR 1.2 entry (``HTTPArchive/Entry``)
+    /// per line, a request as it completed or a WebSocket connection as it ended, redacted.
+    struct NetworkSessionHeader: Codable, Equatable {
+        /// The format of the lines this header heads; a reader skips a file of a later one.
+        static let currentFormat = 1
+
+        /// The format of the lines after it, in the key that marks the line as a header.
+        var format = Self.currentFormat
+        /// When the session started, in HAR's ISO 8601 with milliseconds.
+        var started: String
+        /// The app's name.
+        var app: String
+        /// The app's version and build, `1.4 (212)`; empty when the bundle names neither.
+        var appVersion: String
+
+        enum CodingKeys: String, CodingKey {
+            case format = "debugDrawerNetworkSession"
+            case started, app, appVersion
+        }
+    }
+
+    extension NetworkSessionHeader {
+        /// The header of a session of the app `bundle` that started at `started`.
+        init(started: Date, bundle: Bundle) {
+            let info = bundle.infoDictionary ?? [:]
+            let version = info["CFBundleShortVersionString"] as? String
+            let build = info["CFBundleVersion"] as? String
+            self.init(
+                started: HTTPArchive.dateStyle.format(started),
+                app: info["CFBundleName"] as? String ?? ProcessInfo.processInfo.processName,
+                appVersion: [version, build.map { "(\($0))" }].compactMap(\.self).joined(separator: " ")
+            )
+        }
+    }
+#endif

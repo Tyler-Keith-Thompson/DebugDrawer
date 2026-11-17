@@ -428,7 +428,8 @@ and fields of their own are ignored. Imported requests are read-only: their deta
 and Mock This, which makes a mock that answers like the archive's response, but not Resend. Clear
 removes the imported file and shows the captured requests again. A file that isn't a HAR 1.x
 archive is refused with the reason under the buttons ("The file isn't JSON.") and leaves the log as
-it was. The bug report's `network.har` holds the captured requests and WebSocket connections only.
+it was. The bug report's `network.har` holds the captured requests and WebSocket connections only;
+an earlier launch's are in `network-previous.har` (Network sessions, below).
 
 ### Network WebSockets: frames sent and received
 
@@ -448,6 +449,40 @@ its first 16 KB. Copy Frames and the HAR export (Chrome DevTools' `_webSocketMes
 URL's query items and JSON text frames as the redaction rules say; a text frame larger than 16 KB
 is copied and exported without its text, which can't be masked. There is nothing to install
 beyond `installNetwork()`; socket libraries that don't use `URLSessionWebSocketTask` aren't seen.
+
+### Network sessions: requests from earlier launches
+
+The requests made during launch, or just before a crash, are kept on disk, so the next launch can
+show them. Each request is written as it completes, and each WebSocket connection as it ends, with
+the redaction rules applied first, so a masked header, query item or JSON value never reaches the
+disk. A launch's session is a file of JSON Lines in Application Support, in the app's folder under
+`DebugDrawer/NetworkSessions`: a header with the start and the app's version, then one HAR 1.2
+entry per line, appended as it comes, so a crash mid-write costs at most the line being written,
+which is skipped on reading. Writing happens on a queue of its own, never in the URL protocol's
+callbacks or on the main actor. By default 5 earlier sessions are kept in at most 20 MB; both are
+set at install:
+
+```swift
+import DebugDrawerNetworkPlugin
+
+#if DEBUG
+DebugDrawer.shared.installNetwork(sessions: NetworkSessionPersistence(maxSessions: 3, maxBytes: 5_000_000))
+#endif
+```
+
+At launch the oldest sessions beyond `maxSessions` are deleted, then the oldest until the rest fit
+in `maxBytes`, which is checked again as the current session grows. The current session is never
+deleted; a request that would take it alone past `maxBytes` isn't written. `NetworkSessionPersistence.off`
+writes nothing and deletes what earlier launches kept. To keep sessions somewhere else, pass a
+`storage` of your own, a `NetworkSessionStorage` (append, list, read and delete).
+
+While an earlier session is kept, the log offers Captured and Previous (and Imported, while a file
+is). Previous shows the newest earlier session, with a menu of the others by start and size, the
+app version that wrote it and how many requests it holds. Its requests are read-only, as imported
+ones are: Copy cURL and Mock This, but not Resend. Export All exports it as a HAR file, Delete
+deletes it and Delete All Sessions deletes every earlier one. The bug report adds the newest
+earlier session as `network-previous.har`. Reset App State keeps the sessions unless DebugDrawer's
+own settings are included, as it keeps the mocks.
 
 ### Tweaks: the app's own debug settings
 
@@ -1336,7 +1371,7 @@ ContentView()
 | `DebugDrawerAccessibilityPlugin` | Runtime overrides of color scheme, Dynamic Type, layout direction, locale and the system accessibility settings SwiftUI exposes, each beside the system's value |
 | `DebugDrawerPerformancePlugin` | Live FPS and memory with sparkline graphs |
 | `DebugDrawerEnergyPlugin` | Battery level and charging, CPU load and thermal state |
-| `DebugDrawerNetworkPlugin` | URLProtocol HTTP interception: method, URL, status, timing, headers, body, cURL export, mock responses by rule, slow and failing networks per host, replay and edit-and-resend, HAR export and import, WebSocket frames |
+| `DebugDrawerNetworkPlugin` | URLProtocol HTTP interception: method, URL, status, timing, headers, body, cURL export, mock responses by rule, slow and failing networks per host, replay and edit-and-resend, HAR export and import, WebSocket frames, requests kept across launches |
 | `DebugDrawerDiskIOPlugin` | FileManager reads, writes, deletes and listings, flagging main-thread I/O |
 | `DebugDrawerAppInfoPlugin` | Bundle, version, OS, memory, uptime, process, debugger, screen and reachability facts |
 | `DebugDrawerUserDefaultsPlugin` | Browse, search, edit, copy and delete UserDefaults keys |

@@ -14,7 +14,7 @@
         var isFiltered = false
         /// Opens the file importer for a HAR file; `nil` offers no import.
         var importArchive: (() -> Void)?
-        /// What the trailing button clears.
+        /// What the trailing button clears, or for an earlier session, deletes.
         var source = NetworkLogSource.captured
 
         var body: some View {
@@ -39,10 +39,20 @@
                             .accessibilityHint("Shows the requests in a HAR file, read-only, in place of the captured ones")
                     }
                 } trailing: {
-                    Button("Clear", role: .destructive, action: clear)
+                    Button(source == .previous ? "Delete" : "Clear", role: .destructive, action: clear)
                         .debugDrawerButtonStyle(.destructive)
-                        .accessibilityLabel(source == .imported ? "Clear imported requests" : "Clear requests")
+                        .accessibilityLabel(clearLabel)
                 }
+            }
+        }
+
+        /// What the trailing button does to the requests shown: clears the captured ones or the
+        /// imported file from the log, or deletes the earlier session from disk.
+        private var clearLabel: String {
+            switch source {
+            case .captured: "Clear requests"
+            case .previous: "Delete this session"
+            case .imported: "Clear imported requests"
             }
         }
 
