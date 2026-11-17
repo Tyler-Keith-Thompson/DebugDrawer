@@ -484,6 +484,31 @@ deletes it and Delete All Sessions deletes every earlier one. The bug report add
 earlier session as `network-previous.har`. Reset App State keeps the sessions unless DebugDrawer's
 own settings are included, as it keeps the mocks.
 
+### Network noise and GraphQL: ignored hosts and operation names
+
+Analytics and image-CDN requests can bury an app's own API calls, so the log can ignore hosts. A
+request's detail offers Ignore and its host, or for a host with parent domains a menu of each
+(`cdn.img.example.com`, `img.example.com`, `example.com`); the Ignored hosts section, at the
+bottom, lists them with Remove and takes one typed (a host, `host:port`, an IP address or a URL,
+of which the host is kept; a `*` is refused, as a domain already covers its subdomains). A domain
+hides its own requests and its subdomains', matched on whole labels and ignoring case, so
+`example.com` hides `cdn.example.com` but not `badexample.com`; an IP address hides only itself.
+Ignored requests and WebSocket connections are only left out of the list, in Captured, Previous and
+Imported alike: they are still captured, written to the session and put in the bug report, and a
+note under the log says how many are hidden ("12 hidden by ignore list") with Show, which lists
+them until Hide. Export Shown exports what the list shows. The list is kept in `ignored.json` beside
+the mock rules and loaded by `installNetwork()`, and `installNetwork(ignoring:)` adds hosts of the
+app's own choosing, such as `["analytics.example.com"]`, at each launch.
+
+Every GraphQL request has the same path, so the log names its operation: `GetUser` on a line of
+its own under the row's method and path, and Operation in the detail, and the filter text
+matches it. The name is a POST's JSON
+`operationName`, or else the first named `query`, `mutation` or `subscription` in its `query`,
+past comments and fragments; a batch shows its first two names and how many more
+(`GetUser, GetPosts +1`). A GET, as a persisted query sends, is named by its `operationName`
+parameter. An anonymous operation, a body that isn't JSON and one over 1 MB show no name. There is
+nothing to install beyond `installNetwork()`.
+
 ### Tweaks: the app's own debug settings
 
 The Tweaks plugin shows the settings the app declares: toggles, pickers over an enumeration or a
@@ -1371,7 +1396,7 @@ ContentView()
 | `DebugDrawerAccessibilityPlugin` | Runtime overrides of color scheme, Dynamic Type, layout direction, locale and the system accessibility settings SwiftUI exposes, each beside the system's value |
 | `DebugDrawerPerformancePlugin` | Live FPS and memory with sparkline graphs |
 | `DebugDrawerEnergyPlugin` | Battery level and charging, CPU load and thermal state |
-| `DebugDrawerNetworkPlugin` | URLProtocol HTTP interception: method, URL, status, timing, headers, body, cURL export, mock responses by rule, slow and failing networks per host, replay and edit-and-resend, HAR export and import, WebSocket frames, requests kept across launches |
+| `DebugDrawerNetworkPlugin` | URLProtocol HTTP interception: method, URL, status, timing, headers, body, cURL export, mock responses by rule, slow and failing networks per host, replay and edit-and-resend, HAR export and import, WebSocket frames, requests kept across launches, ignored hosts, GraphQL operation names |
 | `DebugDrawerDiskIOPlugin` | FileManager reads, writes, deletes and listings, flagging main-thread I/O |
 | `DebugDrawerAppInfoPlugin` | Bundle, version, OS, memory, uptime, process, debugger, screen and reachability facts |
 | `DebugDrawerUserDefaultsPlugin` | Browse, search, edit, copy and delete UserDefaults keys |

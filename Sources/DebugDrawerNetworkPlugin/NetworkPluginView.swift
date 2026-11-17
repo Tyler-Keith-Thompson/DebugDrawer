@@ -3,9 +3,10 @@
     import SwiftUI
     import UniformTypeIdentifiers
 
-    /// The plugin's body: the request log, the WebSocket connections, the Mocks section and the Conditions section, or the
-    /// editor of one mock or condition while it is open. The log shows the captured requests, or,
-    /// read-only, those of a session an earlier launch kept or of an imported HAR file.
+    /// The plugin's body: the request log, the WebSocket connections, the Mocks, Conditions and
+    /// Ignored hosts sections, or the editor of one mock or condition while it is open. The log
+    /// shows the captured requests, or, read-only, those of a session an earlier launch kept or of
+    /// an imported HAR file, without those to an ignored host until a note under it shows them.
     struct NetworkPluginView: View {
         /// What the plugin shows: the log and its sections, or one editor in their place until it
         /// is saved or cancelled.
@@ -132,7 +133,7 @@
                 DebugDrawerSearchableList(
                     "Filter URL...",
                     text: $store.filterText,
-                    accessibilityLabel: "Filter requests by URL, method or response",
+                    accessibilityLabel: "Filter requests by URL, method, GraphQL operation or response",
                     maxHeight: 300
                 ) {
                     // An earlier session's and an imported file's requests are read-only: they can
@@ -150,7 +151,9 @@
                             onShow: { selectedId = $0 },
                             // Only the open detail shows the links, so only its are worked out.
                             links: isSelected && !isReadOnly ? NetworkReplayLinks(of: entry, in: store.entries) : .none,
-                            replayStatus: isReadOnly ? nil : replays.statuses[entry.id]
+                            replayStatus: isReadOnly ? nil : replays.statuses[entry.id],
+                            // A host the list ignores already, shown with Show, has nothing to add.
+                            onIgnore: isSelected && !store.ignoredDomains.ignores(host: entry.host) ? { store.ignore($0) } : nil
                         )
                     }
                 }
@@ -170,6 +173,10 @@
                 }
                 .onChange(of: sessions.sessions) { _, kept in
                     if kept.isEmpty { store.hidePrevious() }
+                }
+
+                NetworkIgnoredHint(count: store.ignoredCount, isShowing: store.showsIgnored) {
+                    store.showsIgnored.toggle()
                 }
 
                 // WebSocket traffic bypasses the URL protocol, so its connections are listed
@@ -197,6 +204,13 @@
                     edit: { screen = .condition(NetworkConditionDraft($0, isNew: false)) },
                     move: { conditions.move($0, by: $1) },
                     delete: { conditions.delete($0) }
+                )
+
+                NetworkIgnoreListSection(
+                    domains: store.ignoredDomains,
+                    issue: store.ignoreIssue,
+                    add: { store.ignore($0) },
+                    remove: { store.stopIgnoring($0) }
                 )
             }
         }
@@ -233,31 +247,8 @@
         }
     }
 
-    /// The totals above the request list: how many requests, the share of completed ones that
-    /// succeeded (2xx) and their mean duration.
-    struct NetworkStats: Equatable {
-        var total: Int
-        var successRate: String
-        var averageTime: String
-
-        init(_ entries: [NetworkEntry]) {
-            total = entries.count
-            let completed = entries.filter(\.isComplete)
-            let successes = completed.filter { (200 ..< 300).contains($0.statusCode ?? 0) }
-            successRate = completed.isEmpty
-                ? "—" : String(format: "%.0f%%", Double(successes.count) / Double(completed.count) * 100)
-            let durations = completed.compactMap(\.duration)
-            if durations.isEmpty {
-                averageTime = "—"
-            } else {
-                let mean = durations.reduce(0, +) / Double(durations.count)
-                averageTime = mean < 1 ? String(format: "%.0fms", mean * 1000) : String(format: "%.2fs", mean)
-            }
-        }
-    }
-
-    /// A request's method, status, path and duration, after an error glyph when it failed;
-    /// selected, it shows the request's detail.
+    /// A request's method, status, path and duration, after an error glyph when it failed, and a
+    /// GraphQL request's operation below them; selected, it shows the request's detail.
     struct NetworkRequestRow: View {
         let entry: NetworkEntry
         let redaction: DebugDrawerRedaction
@@ -275,41 +266,58 @@
         var links = NetworkReplayLinks.none
         /// Where the last resend of this request stands, if one hasn't got its answer.
         var replayStatus: NetworkReplayStatus?
+        /// Adds the request's host, or a parent domain, to the ignore list; `nil` offers no Ignore.
+        var onIgnore: ((NetworkIgnoredDomain) -> Void)?
         @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
         var body: some View {
             VStack(alignment: .leading, spacing: 0) {
                 Button(action: onSelect) {
-                    // At accessibility text sizes the path and the duration have no room beside
-                    // the method and status, so each takes a line of its own.
-                    let layout = dynamicTypeSize.isAccessibilitySize
-                        ? AnyLayout(VStackLayout(alignment: .leading, spacing: 1))
-                        : AnyLayout(HStackLayout(alignment: .firstTextBaseline))
-                    layout {
-                        VStack(alignment: .leading, spacing: 1) {
-                            HStack(alignment: .firstTextBaseline) {
-                                glyph
-                                Text(entry.method)
-                                    .debugDrawerFont(.code)
-                                    .debugDrawerForegroundStyle(.secondary)
-                                status
-                                if !badgesOnOwnLine {
-                                    badges
+                    VStack(alignment: .leading, spacing: 1) {
+                        // At accessibility text sizes the path and the duration have no room beside
+                        // the method and status, so each takes a line of its own.
+                        let layout = dynamicTypeSize.isAccessibilitySize
+                            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 1))
+                            : AnyLayout(HStackLayout(alignment: .firstTextBaseline))
+                        layout {
+                            VStack(alignment: .leading, spacing: 1) {
+                                HStack(alignment: .firstTextBaseline) {
+                                    glyph
+                                    Text(entry.method)
+                                        .debugDrawerFont(.code)
+                                        .debugDrawerForegroundStyle(.secondary)
+                                    status
+                                    if !badgesOnOwnLine {
+                                        badges
+                                    }
+                                }
+                                if badgesOnOwnLine, badgeCount > 0 {
+                                    HStack { badges }
                                 }
                             }
-                            if badgesOnOwnLine, badgeCount > 0 {
-                                HStack { badges }
+                            // A few short words that never wrap: the path gives way to them instead.
+                            .fixedSize(horizontal: true, vertical: false)
+                            Text(entry.path)
+                                .debugDrawerFont(.code)
+                                .debugDrawerForegroundStyle(.primary)
+                                .lineLimit(3)
+                                .truncationMode(.middle)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                            duration
+                        }
+                        // Every GraphQL request has the same path, so its operation names it, on
+                        // a line of its own: beside the method, status and badges it would get a
+                        // few letters' width in an iPad's drawer and lose its middle.
+                        if let operation = entry.graphQLOperationName {
+                            HStack(alignment: .firstTextBaseline) {
+                                glyph.hidden()
+                                Text(operation)
+                                    .debugDrawerFont(.code)
+                                    .debugDrawerForegroundStyle(.primary)
+                                    .lineLimit(2)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
                             }
                         }
-                        // A few short words that never wrap: the path gives way to them instead.
-                        .fixedSize(horizontal: true, vertical: false)
-                        Text(entry.path)
-                            .debugDrawerFont(.code)
-                            .debugDrawerForegroundStyle(.primary)
-                            .lineLimit(3)
-                            .truncationMode(.middle)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                        duration
                     }
                     .debugDrawerRowPadding()
                     .contentShape(Rectangle())
@@ -320,7 +328,7 @@
                 if isSelected {
                     NetworkRequestDetail(
                         entry: entry, redaction: redaction, onMock: onMock, onResend: onResend, onEditAndResend: onEditAndResend,
-                        onShow: onShow, links: links, replayStatus: replayStatus
+                        onShow: onShow, links: links, replayStatus: replayStatus, onIgnore: onIgnore
                     )
                 }
             }

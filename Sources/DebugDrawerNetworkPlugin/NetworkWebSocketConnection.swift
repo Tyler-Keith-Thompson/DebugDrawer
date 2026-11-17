@@ -45,6 +45,11 @@
             if case .failed = state { true } else { false }
         }
 
+        /// The host the connection is to, which the ignore list matches; empty when the URL has none.
+        var host: String {
+            URLComponents(string: url)?.host ?? ""
+        }
+
         var path: String {
             URLComponents(string: url).map { $0.path.isEmpty ? "/" : $0.path } ?? url
         }

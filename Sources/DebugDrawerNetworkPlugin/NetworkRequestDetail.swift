@@ -11,6 +11,9 @@
     /// is sent again. A replay names its original, and a request that was resent says how often,
     /// each with a button that selects the other.
     ///
+    /// A GraphQL request names its operation. Ignore offers the request's host and its parent
+    /// domains for the ignore list.
+    ///
     /// It keeps whether the question before a resend is open.
     struct NetworkRequestDetail: View {
         let entry: NetworkEntry
@@ -27,6 +30,9 @@
         var links = NetworkReplayLinks.none
         /// Where the last resend of this request stands, if one hasn't got its answer.
         var replayStatus: NetworkReplayStatus?
+        /// Adds the request's host, or a parent domain, to the ignore list; `nil` offers no
+        /// Ignore, as for a host the list ignores already.
+        var onIgnore: ((NetworkIgnoredDomain) -> Void)?
         @State var isConfirming = false
         let inspection = Inspection<Self>()
 
@@ -41,6 +47,10 @@
                 DebugDrawerKeyValueRow("Size", value: entry.responseSizeLabel)
                 if let code = entry.statusCode {
                     DebugDrawerKeyValueRow("Status", value: String(code))
+                }
+                if let operation = entry.graphQLOperationName {
+                    DebugDrawerKeyValueRow("Operation", value: operation)
+                        .debugDrawerValueStyle(.code)
                 }
                 if let rule = entry.mockRuleName {
                     DebugDrawerKeyValueRow("Mocked by", value: rule)
@@ -103,6 +113,9 @@
                         Button("Edit and Resend…") { onEditAndResend(entry) }
                             .accessibilityLabel("Edit and Resend…")
                             .accessibilityHint("Opens the request to change its method, URL, headers or body before sending it again")
+                    }
+                    if let onIgnore {
+                        NetworkIgnoreHostButton(host: entry.host, ignore: onIgnore)
                     }
                 }
                 if isConfirming, let onResend {

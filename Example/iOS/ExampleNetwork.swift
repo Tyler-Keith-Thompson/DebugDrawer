@@ -7,11 +7,12 @@ import SwiftUI
 // share no code.
 
 /// The example's network calls: a greeting from an API that doesn't exist, which only a mock can
-/// answer, example.com, which the network answers unless a mock is made for it, and an order
-/// POSTed to the same API, whose resend asks before it is sent.
+/// answer, example.com, which the network answers unless a mock is made for it, an order
+/// POSTed to the same API, whose resend asks before it is sent, GraphQL queries to the same API,
+/// which the log names by operation, and a burst of analytics events, noise to ignore.
 enum ExampleNetwork {
-    /// Launched with this argument, the app adds mocks that answer the greeting and the order, so
-    /// mocking can be checked without a hand.
+    /// Launched with this argument, the app adds mocks that answer the greeting, the order, the
+    /// GraphQL queries and the analytics events, so mocking can be checked without a hand.
     static let launchArgument = "-SeedNetworkMock"
     /// Launched with this argument, the app adds a profile that slows example.com by two seconds,
     /// and one, off, that fails the greeting with no connection, and pins Network to the HUD, so
@@ -26,6 +27,12 @@ enum ExampleNetwork {
     static let page = "https://example.com/"
     /// Orders are POSTed to the API that doesn't exist, so without a mock the request fails.
     static let orders = "https://api.example.com/v1/orders"
+    /// GraphQL requests are POSTed to the same API, so without a mock they fail; the log names
+    /// each by its operation either way.
+    static let graphQL = "https://api.example.com/graphql"
+    /// An analytics collector that doesn't exist, standing in for the SDKs whose events bury an
+    /// app's own requests; a mock answers it.
+    static let analytics = "https://collect.analytics.example.net/v1/events"
 
     #if DEBUG
         /// The mock the launch argument adds. Its id is fixed, so it is added once and the drawer's
@@ -43,6 +50,22 @@ enum ExampleNetwork {
             name: "Place order",
             matcher: .init(methods: ["POST"], host: .exact("api.example.com"), path: .exact("/v1/orders")),
             response: .init(status: 201, body: .text(#"{"id":7,"status":"placed"}"#), contentType: "application/json")
+        )
+
+        /// The mock the launch argument adds for GraphQL: every POST to /graphql gets a user.
+        static let graphQLMock = NetworkMockRule(
+            id: UUID(uuidString: "3D8F1B6A-5C2E-4A97-B0D4-7E9A1C3F5B28") ?? UUID(),
+            name: "GraphQL",
+            matcher: .init(methods: ["POST"], host: .exact("api.example.com"), path: .exact("/graphql")),
+            response: .init(status: 200, body: .text(#"{"data":{"user":{"id":"1","name":"Ada"}}}"#), contentType: "application/json")
+        )
+
+        /// The mock the launch argument adds for the analytics events, which it accepts.
+        static let analyticsMock = NetworkMockRule(
+            id: UUID(uuidString: "C61E2A94-7B3F-4D85-9A0C-2F4E6B8D1A73") ?? UUID(),
+            name: "Analytics",
+            matcher: .init(methods: ["POST"], host: .wildcard("*.analytics.example.net")),
+            response: .init(status: 202, body: .text(#"{"accepted":true}"#), contentType: "application/json")
         )
 
         /// The profiles the condition argument adds, with fixed ids, so they are added once and the
@@ -71,7 +94,7 @@ enum ExampleNetwork {
     static func install() {
         #if DEBUG
             let arguments = ProcessInfo.processInfo.arguments
-            let mocks = arguments.contains(launchArgument) ? [greetingMock, orderMock] : []
+            let mocks = arguments.contains(launchArgument) ? [greetingMock, orderMock, graphQLMock, analyticsMock] : []
             let conditions = arguments.contains(conditionArgument) ? conditionSeeds : []
             let kept = arguments.firstIndex(of: sessionsArgument)
                 .flatMap { arguments.indices.contains($0 + 1) ? Int(arguments[$0 + 1]) : nil }
@@ -104,6 +127,36 @@ enum ExampleNetwork {
         return await send(request)
     }
 
+    /// Runs two GraphQL operations: GetUser, named by `operationName`, and UpdateUser, a mutation
+    /// named only in its query. Returns the first's answer, or why it failed.
+    static func runGraphQL() async -> String {
+        let getUser = #"{"operationName":"GetUser","query":"query GetUser($id: ID!) { user(id: $id) { name } }","variables":{"id":"1"}}"#
+        let updateUser = #"{"query":"mutation UpdateUser($name: String!) { updateUser(name: $name) { id } }","variables":{"name":"Ada"}}"#
+        let answer = await post(getUser, to: graphQL)
+        _ = await post(updateUser, to: graphQL)
+        return answer
+    }
+
+    /// POSTs three analytics events, the noise an SDK sends, and returns the last answer, or why it
+    /// failed.
+    static func sendAnalytics() async -> String {
+        let events = ["app_open", "screen_view", "button_tap"]
+        var answer = ""
+        for event in events {
+            answer = await post(#"{"event":"\#(event)"}"#, to: analytics)
+        }
+        return answer
+    }
+
+    private static func post(_ body: String, to address: String) async -> String {
+        guard let url = URL(string: address) else { return "Not a URL" }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = Data(body.utf8)
+        return await send(request)
+    }
+
     private static func send(_ request: URLRequest) async -> String {
         let clock = ContinuousClock()
         let start = clock.now
@@ -125,11 +178,14 @@ enum ExampleNetwork {
     }
 }
 
-/// Buttons that fetch the greeting and example.com and place an order, each with what came back.
+/// Buttons that fetch the greeting and example.com, place an order, run GraphQL queries and send
+/// analytics events, each with what came back.
 struct ExampleNetworkRequests: View {
     @State private var greeting = "Not fetched"
     @State private var page = "Not fetched"
     @State private var order = "Not placed"
+    @State private var graphQL = "Not run"
+    @State private var analytics = "Not sent"
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -152,6 +208,19 @@ struct ExampleNetworkRequests: View {
             Text(order)
                 .foregroundStyle(.secondary)
                 .accessibilityLabel("Order response: \(order)")
+            Button("Run GraphQL Queries") {
+                Task { graphQL = await ExampleNetwork.runGraphQL() }
+            }
+            Text(graphQL)
+                .foregroundStyle(.secondary)
+                .lineLimit(2)
+                .accessibilityLabel("GraphQL response: \(graphQL)")
+            Button("Send Analytics Events") {
+                Task { analytics = await ExampleNetwork.sendAnalytics() }
+            }
+            Text(analytics)
+                .foregroundStyle(.secondary)
+                .accessibilityLabel("Analytics response: \(analytics)")
         }
         .accessibilityElement(children: .contain)
     }

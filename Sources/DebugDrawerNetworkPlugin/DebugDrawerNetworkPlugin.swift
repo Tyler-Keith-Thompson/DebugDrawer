@@ -2,89 +2,14 @@
     import Combine
     import DebugDrawer
     import Foundation
+    import os
     import SwiftUI
-
-    // MARK: - Network request model
-
-    public struct NetworkEntry: Identifiable, Sendable {
-        public let id = UUID()
-        public let timestamp: Date
-        public let method: String
-        public let url: String
-        public let host: String
-        public let path: String
-        public let requestHeaders: [String: String]
-        public let requestBody: Data?
-        public var statusCode: Int?
-        public var responseHeaders: [String: String]?
-        public var responseBody: Data?
-        public var duration: TimeInterval?
-        public var error: String?
-        public var isComplete: Bool
-        /// Timing of the request's last transaction, from `URLSessionTaskMetrics`.
-        public var metrics: NetworkTimingMetrics?
-        /// The name of the mock rule that answered the request, or `nil` when the network did.
-        public var mockRuleName: String?
-        /// What a conditioning profile did to the request, or `nil` when none applied.
-        public var conditionEffect: NetworkConditionEffect?
-        /// The id of the captured request this one resends, when the drawer's Resend or Edit and
-        /// Resend sent it; `nil` for a request the app made.
-        public var replayOf: UUID?
-
-        /// Whether the request failed: the server answered with a status of 400 or more, or the
-        /// request never got an answer (a transport error).
-        var isFailure: Bool {
-            error != nil || (statusCode ?? 0) >= 400
-        }
-
-        public var responseSizeLabel: String {
-            guard let data = responseBody else { return "—" }
-            if data.count < 1024 { return "\(data.count) B" }
-            if data.count < 1024 * 1024 { return "\(data.count / 1024) KB" }
-            return String(format: "%.1f MB", Double(data.count) / (1024 * 1024))
-        }
-
-        public var durationLabel: String {
-            guard let duration else { return "..." }
-            if duration < 1 { return String(format: "%.0fms", duration * 1000) }
-            return String(format: "%.2fs", duration)
-        }
-
-        public var prettyResponseBody: String? {
-            responseBody?.prettyBody
-        }
-
-        public var prettyRequestBody: String? {
-            requestBody?.prettyBody
-        }
-    }
-
-    extension Data {
-        /// This body as pretty-printed JSON with sorted keys, or as UTF-8 text when it isn't JSON.
-        var prettyBody: String? {
-            if let json = try? JSONSerialization.jsonObject(with: self),
-               let pretty = try? JSONSerialization.data(withJSONObject: json, options: [.prettyPrinted, .sortedKeys]),
-               let text = String(data: pretty, encoding: .utf8) {
-                return text
-            }
-            return String(data: self, encoding: .utf8)
-        }
-    }
-
-    /// How a request ended: what came back and how long it took, or why it failed.
-    struct NetworkCompletion {
-        var statusCode: Int?
-        var headers: [String: String]?
-        var body: Data?
-        var duration: TimeInterval?
-        var error: String?
-    }
-
-    // MARK: - Network store
 
     @MainActor
     public final class NetworkStore: ObservableObject {
-        public static let shared = NetworkStore()
+        /// The store `installNetwork()` fills and the plugin shows, its ignore list in the app's
+        /// storage beside the mock rules.
+        public static let shared = NetworkStore(ignoreStorage: _NetworkIgnoreListStorage(directory: _NetworkMockStorage.defaultDirectory))
 
         @Published public private(set) var entries: [NetworkEntry] = []
         @Published public var filterText = ""
@@ -100,17 +25,31 @@
             case errors = "Errors"
         }
 
-        /// The requests the log shows that pass the status filter and the filter text: the
-        /// captured ones, or the imported ones while they show.
+        /// The requests the log shows that pass the status filter and the filter text, without
+        /// those to an ignored host unless `showsIgnored`: the captured ones, or the earlier
+        /// session's or the imported ones while they show.
         public var filteredEntries: [NetworkEntry] {
-            Self.entries(shownEntries, matching: filterStatus, text: filterText)
+            Self.entries(shownEntries, matching: filterStatus, text: filterText, ignoring: showsIgnored ? [] : ignoredDomains)
         }
 
         /// The WebSocket connections the log shows that pass the status filter and the filter
-        /// text: the captured ones, none while an imported file shows.
+        /// text, without those to an ignored host unless `showsIgnored`: the captured ones, none
+        /// while an imported file shows.
         var filteredWebSockets: [NetworkWebSocketConnection] {
-            Self.connections(shownWebSockets, matching: filterStatus, text: filterText)
+            Self.connections(shownWebSockets, matching: filterStatus, text: filterText, ignoring: showsIgnored ? [] : ignoredDomains)
         }
+
+        /// The hosts and domains whose requests and connections the log hides, with their
+        /// subdomains, in the order they were added. They are still captured, written to the
+        /// session and put in the bug report; only the list leaves them out.
+        @Published private(set) var ignoredDomains: [NetworkIgnoredDomain] = []
+        /// Whether the log lists the requests the ignore list hides, for now: it is off at each
+        /// launch, so the list is quiet again.
+        @Published var showsIgnored = false
+        /// What went wrong reading or saving the ignore list, if anything.
+        @Published private(set) var ignoreIssue: NetworkMocksIssue?
+        /// Where the ignore list is kept between launches.
+        let ignoreStorage: any NetworkIgnoreListStorage
 
         /// The WebSocket connections the log shows: the captured ones, none while an earlier
         /// session or an imported file shows, whose connections are listed as their handshakes.
@@ -146,11 +85,16 @@
         /// The last file that couldn't be imported, until another is imported or the log cleared.
         @Published private(set) var importIssue: NetworkImportIssue?
 
-        /// The requests in `entries` that pass the status filter `status` and contain `text`
-        /// (ignoring case) in the URL, the method or the response body. Empty text matches every
-        /// request.
-        nonisolated static func entries(_ entries: [NetworkEntry], matching status: StatusFilter, text: String) -> [NetworkEntry] {
-            var result = entries
+        /// The requests in `entries` to a host none of `ignored` matches that pass the status
+        /// filter `status` and contain `text` (ignoring case) in the URL, the method, the GraphQL
+        /// operation name or the response body. Empty text matches every request.
+        nonisolated static func entries(
+            _ entries: [NetworkEntry],
+            matching status: StatusFilter,
+            text: String,
+            ignoring ignored: [NetworkIgnoredDomain] = []
+        ) -> [NetworkEntry] {
+            var result = ignored.isEmpty ? entries : entries.filter { !ignored.ignores(host: $0.host) }
             switch status {
             case .all: break
             case .success: result = result.filter { ($0.statusCode ?? 0) >= 200 && ($0.statusCode ?? 0) < 300 }
@@ -163,21 +107,24 @@
                 result = result.filter {
                     $0.url.lowercased().contains(query) ||
                         $0.method.lowercased().contains(query) ||
+                        ($0.graphQLOperationName?.lowercased().contains(query) ?? false) ||
                         ($0.prettyResponseBody?.lowercased().contains(query) ?? false)
                 }
             }
             return result
         }
 
-        /// The connections in `connections` that pass the status filter `status` and contain
-        /// `text` (ignoring case) in the URL, the method ("WS") or a text frame. A connection has
-        /// no HTTP status, so All shows every one, Errors those that failed, and the others none.
+        /// The connections in `connections` to a host none of `ignored` matches that pass the
+        /// status filter `status` and contain `text` (ignoring case) in the URL, the method ("WS")
+        /// or a text frame. A connection has no HTTP status, so All shows every one, Errors those
+        /// that failed, and the others none.
         nonisolated static func connections(
             _ connections: [NetworkWebSocketConnection],
             matching status: StatusFilter,
-            text: String
+            text: String,
+            ignoring ignored: [NetworkIgnoredDomain] = []
         ) -> [NetworkWebSocketConnection] {
-            var result = connections
+            var result = ignored.isEmpty ? connections : connections.filter { !ignored.ignores(host: $0.host) }
             switch status {
             case .all: break
             case .success, .clientError, .serverError: result = []
@@ -257,7 +204,11 @@
 
         private var installed = false
 
-        private init() {}
+        /// - Parameter ignoreStorage: Where the ignore list is kept between launches; nothing is
+        ///   read until `loadIgnoreList(adding:)`.
+        init(ignoreStorage: any NetworkIgnoreListStorage) {
+            self.ignoreStorage = ignoreStorage
+        }
 
         public func install() {
             guard !installed else { return }
@@ -311,63 +262,70 @@
             webSockets.removeAll()
             NetworkWebSocketRecorder.shared.clear()
         }
-    }
 
-    // MARK: - Plugin
+        // MARK: Ignore list
 
-    public struct NetworkPlugin: DebugDrawerPlugin {
-        public var title = "Network"
-        public var category = "Logs & Network"
-        public var icon = "network"
+        private static let logger = Logger(subsystem: "DebugDrawerNetworkPlugin", category: "NetworkStore")
 
-        public init() {}
-
-        public var body: some View {
-            NetworkPluginView()
+        /// How many of the requests and connections the log shows that pass the status filter and
+        /// the filter text are to an ignored host: the ones the ignore list hides, or, while
+        /// `showsIgnored`, the ones it would.
+        var ignoredCount: Int {
+            guard !ignoredDomains.isEmpty else { return 0 }
+            let requests = Self.entries(shownEntries, matching: filterStatus, text: filterText)
+                .count { ignoredDomains.ignores(host: $0.host) }
+            let connections = Self.connections(shownWebSockets, matching: filterStatus, text: filterText)
+                .count { ignoredDomains.ignores(host: $0.host) }
+            return requests + connections
         }
 
-        /// How many requests were captured, and how many of them failed; the conditions that are
-        /// on, when any are.
-        public var headerAccessory: some View {
-            NetworkHeaderAccessoryView()
-        }
-
-        /// The conditions that are on ("3G active"), so they show with the drawer closed.
-        @MainActor public var hud: NetworkConditionsHUD? {
-            NetworkConditionsHUD(conditions: .shared)
-        }
-    }
-
-    // MARK: - Convenience installer
-
-    public extension DebugDrawer {
-        /// Install the network inspector. Registers a URLProtocol to capture HTTP traffic, and
-        /// loads the saved mock rules, which answer the requests they match from then on, and the
-        /// saved conditioning profiles, which slow down or fail the requests to their hosts.
-        ///
-        /// - Parameters:
-        ///   - mocks: Rules to add to the saved ones, at the end; one whose id is saved already is
-        ///     skipped, so the drawer's edits to it last from launch to launch.
-        ///   - conditions: Profiles to add to the saved ones, at the end, by id as `mocks` are.
-        ///   - sessions: How many earlier launches' requests are kept on disk, in how many bytes,
-        ///     and where; each request is written, redacted, as it completes, and the log shows
-        ///     the earlier sessions under Previous. ``NetworkSessionPersistence/off`` writes none.
-        func installNetwork(
-            mocks: [NetworkMockRule] = [],
-            conditions: [NetworkConditionProfile] = [],
-            sessions: NetworkSessionPersistence = .standard
-        ) {
-            NetworkMocksModel.shared.load(adding: mocks)
-            NetworkConditionsModel.shared.load(adding: conditions)
-            // Started before the URL protocol is registered, so the first request is written too,
-            // and once a launch, so a second install doesn't start a second session.
-            if NetworkStore.shared.recorder == nil {
-                let recorder = NetworkSessionRecorder(sessions)
-                NetworkStore.shared.persist(to: recorder)
-                Task { await NetworkSessionsModel.shared.start(recorder) }
+        /// Reads the saved ignore list, then adds each of `domains` it doesn't hold, at the end.
+        /// The added ones aren't saved until the list is next changed, so a launch writes nothing.
+        func loadIgnoreList(adding domains: [NetworkIgnoredDomain] = []) {
+            var loaded: [NetworkIgnoredDomain] = []
+            do {
+                if let data = try ignoreStorage.readIgnoreList() {
+                    loaded = try NetworkIgnoreListFile.decode(data)
+                }
+                ignoreIssue = nil
+            } catch let error as NetworkMockRuleFile.ReadError {
+                Self.logger.error("Saved ignore list not loaded: \(String(describing: error), privacy: .public)")
+                ignoreIssue = switch error {
+                case .unreadable: .unreadable
+                case let .unsupportedVersion(version): .unsupportedVersion(version)
+                }
+            } catch {
+                Self.logger.error("Saved ignore list not read: \(error.localizedDescription, privacy: .public)")
+                ignoreIssue = .unreadable
             }
-            NetworkStore.shared.install()
-            registerGlobal(NetworkPlugin())
+            for domain in domains where !loaded.contains(domain) {
+                loaded.append(domain)
+            }
+            ignoredDomains = loaded
+        }
+
+        /// Hides the requests to `domain` and its subdomains from the log, and saves the list.
+        func ignore(_ domain: NetworkIgnoredDomain) {
+            guard !ignoredDomains.contains(domain) else { return }
+            ignoredDomains.append(domain)
+            saveIgnoreList()
+        }
+
+        /// Lists the requests to `domain` again, and saves the list.
+        func stopIgnoring(_ domain: NetworkIgnoredDomain) {
+            guard let index = ignoredDomains.firstIndex(of: domain) else { return }
+            ignoredDomains.remove(at: index)
+            saveIgnoreList()
+        }
+
+        private func saveIgnoreList() {
+            do {
+                try ignoreStorage.writeIgnoreList(NetworkIgnoreListFile.encode(ignoredDomains))
+                if ignoreIssue == .notSaved { ignoreIssue = nil }
+            } catch {
+                Self.logger.error("Ignore list not saved: \(error.localizedDescription, privacy: .public)")
+                ignoreIssue = .notSaved
+            }
         }
     }
 #endif
