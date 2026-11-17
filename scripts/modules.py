@@ -90,6 +90,7 @@ MODULES = [
     ("DebugDrawerLocalizationPlugin", "Plugins", "Pseudo-localization and show-keys modes over the strings the app looks up through Bundle's public API, live, and the translations missing for a language, grouped by table, searched and copied as text or CSV.", ["DebugDrawer"]),
     ("DebugDrawerScreenRecordingPlugin", "Plugins", "Records the app's windows as a QuickTime movie without the drawer, its HUD or its toasts, started and stopped from the drawer or the HUD, with optional touch indicators on iOS: the saved recordings to share or delete, and the newest in the bug report.", ["DebugDrawer"]),
     ("DebugDrawerDesignOverlayPlugin", "Plugins", "A design mockup laid over the app's content, picked from Photos or Files on iOS or a file or the pasteboard on macOS: opacity, an offset set by steppers or by dragging in Move mode, the mockup's scale, and a difference blend that shows pixel drift; touches pass through to the app.", ["DebugDrawer"]),
+    ("DebugDrawerColorVisionPlugin", "Plugins", "Protanopia, deuteranopia, tritanopia and grayscale simulated live over the views marked debugColorVision(), with a color-matrix shader in linear RGB, picked in the drawer or cycled from the HUD, so meaning carried only by color shows.", ["DebugDrawer"]),
 ]
 
 # Modules only iOS builds: SwiftUI views and what they draw with. Bazel builds them for the
@@ -109,9 +110,9 @@ IOS_MINIMUM = "17.0"
 # only on modules listed for it.
 EXTRA_PLATFORMS = {
     # visionOS 1 shipped with iOS 17's SwiftUI.
-    "visionOS": ("1.0", ["DebugDrawer", "DebugDrawerAnalyticsPlugin", "DebugDrawerDatabaseBrowserPlugin", "DebugDrawerLocalizationPlugin"]),
+    "visionOS": ("1.0", ["DebugDrawer", "DebugDrawerAnalyticsPlugin", "DebugDrawerDatabaseBrowserPlugin", "DebugDrawerLocalizationPlugin", "DebugDrawerColorVisionPlugin"]),
     # tvOS 17 shipped with iOS 17's SwiftUI.
-    "tvOS": ("17.0", ["DebugDrawer", "DebugDrawerAnalyticsPlugin", "DebugDrawerDatabaseBrowserPlugin", "DebugDrawerLocalizationPlugin"]),
+    "tvOS": ("17.0", ["DebugDrawer", "DebugDrawerAnalyticsPlugin", "DebugDrawerDatabaseBrowserPlugin", "DebugDrawerLocalizationPlugin", "DebugDrawerColorVisionPlugin"]),
     # watchOS 10 shipped with iOS 17's SwiftUI.
     "watchOS": ("10.0", ["DebugDrawer", "DebugDrawerAnalyticsPlugin", "DebugDrawerDatabaseBrowserPlugin", "DebugDrawerLocalizationPlugin"]),
 }
@@ -123,7 +124,7 @@ EXTRA_PLATFORMS = {
 # beside each library compiles it for the IOS_MINIMUM Catalyst target triple instead. A module
 # listed here depends only on modules listed here, and on no C or Objective-C package, which that
 # rule would still build for macOS.
-CATALYST_MODULES = ["DebugDrawer", "DebugDrawerAnalyticsPlugin", "DebugDrawerDatabaseBrowserPlugin", "DebugDrawerLocalizationPlugin", "DebugDrawerScreenRecordingPlugin", "DebugDrawerDesignOverlayPlugin"]
+CATALYST_MODULES = ["DebugDrawer", "DebugDrawerAnalyticsPlugin", "DebugDrawerDatabaseBrowserPlugin", "DebugDrawerLocalizationPlugin", "DebugDrawerScreenRecordingPlugin", "DebugDrawerDesignOverlayPlugin", "DebugDrawerColorVisionPlugin"]
 
 # Executables: (name, description, dependencies). Each is an `.executableTarget` and product in
 # Package.swift and a swift_binary in Bazel (`bazel run //Sources/<name>`). Keep them thin: the
@@ -166,6 +167,7 @@ TEST_TARGETS = [
     ("DebugDrawerLocalizationPluginTests", ["DebugDrawerLocalizationPlugin", "DebugDrawer", "viewinspector/ViewInspector", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
     ("DebugDrawerScreenRecordingPluginTests", ["DebugDrawerScreenRecordingPlugin", "DebugDrawer", "viewinspector/ViewInspector", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
     ("DebugDrawerDesignOverlayPluginTests", ["DebugDrawerDesignOverlayPlugin", "DebugDrawer", "viewinspector/ViewInspector", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
+    ("DebugDrawerColorVisionPluginTests", ["DebugDrawerColorVisionPlugin", "DebugDrawer", "viewinspector/ViewInspector", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
 ]
 
 # The modules the test-support target depends on (fixtures are usually written against the
@@ -198,6 +200,7 @@ PERFORMANCE_TESTS = [
     "DebugDrawerLocalizationPluginTests",
     "DebugDrawerScreenRecordingPluginTests",
     "DebugDrawerDesignOverlayPluginTests",
+    "DebugDrawerColorVisionPluginTests",
 ]
 
 # Performance tests run up to their one-minute limits each, so their targets get "medium" (300 s).
@@ -347,8 +350,9 @@ def bazel_label(d):
 
 
 def excluded(path):
-    """Non-source files SwiftPM would otherwise warn about, for the target at `path`."""
-    return [f for f in ("BUILD.bazel", "README.md", "Performance", "__Snapshots__") if os.path.exists(os.path.join(ROOT, path, f))]
+    """Non-source files SwiftPM would otherwise warn about, for the target at `path`. Shaders/ holds
+    Metal sources that ship precompiled (tools/metallibs.py), which SwiftPM would otherwise compile."""
+    return [f for f in ("BUILD.bazel", "README.md", "Performance", "__Snapshots__", "Shaders") if os.path.exists(os.path.join(ROOT, path, f))]
 
 
 def exclude_arg(path):
@@ -519,6 +523,15 @@ def build_bazel(name, description, deps):
             ")\n"
         )
     catalyst_load = 'load("//tools:catalyst.bzl", "catalyst_build_test")\n' if name in CATALYST_MODULES else ""
+    shaders = (
+        "\n# The module's Metal sources and the Swift files tools/metallibs.py compiles them into, which\n"
+        "# //tools:metallibs_test checks agree.\n"
+        "filegroup(\n"
+        '    name = "shaders",\n'
+        '    srcs = glob(["Shaders/*.metal", "*Shader+*Library.swift"]),\n'
+        '    visibility = ["//tools:__pkg__"],\n'
+        ")\n"
+    ) if os.path.isdir(os.path.join(ROOT, "Sources", name, "Shaders")) else ""
     doc_deps = "".join(f'        "{bazel_label(d)}:{d}Documentation",\n' for d in deps if "/" not in d)
     doc_deps_attr = f"    deps = [\n{doc_deps}    ],\n" if doc_deps else ""
     return (
@@ -545,6 +558,7 @@ def build_bazel(name, description, deps):
         '    tags = ["manual"],\n'
         '    visibility = ["//visibility:public"],\n'
         ")\n"
+        f"{shaders}"
         f"{platform_build_tests}"
     )
 

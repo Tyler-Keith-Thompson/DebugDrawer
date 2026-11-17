@@ -114,6 +114,10 @@ alias test-spm := spm-test
 modules:
     python3 {{PROJECT_ROOT}}/scripts/modules.py
 
+[doc('Precompile every Sources/*/Shaders/*.metal into Swift sources (needs the Metal toolchain Xcode downloads)')]
+metallibs:
+    python3 {{PROJECT_ROOT}}/tools/metallibs.py
+
 [doc('Build the combined DocC site for every library module into .build/docs')]
 docs:
     {{BAZEL}} build //:docs

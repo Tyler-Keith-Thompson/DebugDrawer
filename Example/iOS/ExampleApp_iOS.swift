@@ -29,6 +29,7 @@ import DebugDrawerAnalyticsPlugin
 import DebugDrawerLocalizationPlugin
 import DebugDrawerScreenRecordingPlugin
 import DebugDrawerDesignOverlayPlugin
+import DebugDrawerColorVisionPlugin
 import SwiftUI
 
 /// Demonstrates Send Report without a server: "sends" each report by copying it into the app's
@@ -109,6 +110,10 @@ struct DebugDrawerExampleiOSApp: App {
         // with -DesignOverlaySample, the app shows a generated sample comp over itself and pins the
         // plugin to the HUD.
         ExampleDesignOverlay.install()
+        // Installs Color Vision, which compiles in release too and does nothing there; launched with
+        // -ColorVision and a simulation's name (protanopia, deuteranopia, tritanopia or grayscale),
+        // the app starts in that simulation.
+        ExampleColorVision.install()
         #if DEBUG
             DebugDrawer.shared.installConsole()
             DebugDrawer.shared.installNetwork()
@@ -176,6 +181,11 @@ struct ExampleContentView_iOS: View {
     var body: some View {
         NavigationStack {
             List {
+                // The screen's content is under the Color Vision simulation, a section's rows at a
+                // time: the List around them is UIKit's, which a shader can't draw. The Inputs
+                // section stays outside it, and the stepper's control too (ExampleLocalizedSection):
+                // UIKit draws them, so they would show SwiftUI's placeholder.
+
                 // First, so its strings show beside the drawer.
                 ExampleLocalizedSection()
 
@@ -221,6 +231,13 @@ struct ExampleContentView_iOS: View {
                     ExampleTweaksBanner()
                     ExampleFeatureFlagsSummary()
                 }
+                .debugColorVision()
+
+                // Colors the Color Vision plugin simulates.
+                Section("Colors") {
+                    ExampleColorSwatches()
+                }
+                .debugColorVision()
 
                 Section("Inputs") {
                     TextField("Sample text field", text: $text)
@@ -235,6 +252,7 @@ struct ExampleContentView_iOS: View {
                         Label("Item \(item)", systemImage: "circle.fill")
                     }
                 }
+                .debugColorVision()
             }
             .navigationTitle("DebugDrawer Example")
             .sheet(isPresented: $isShowingSheet) {

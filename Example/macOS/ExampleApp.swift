@@ -29,6 +29,7 @@ import DebugDrawerAnalyticsPlugin
 import DebugDrawerLocalizationPlugin
 import DebugDrawerScreenRecordingPlugin
 import DebugDrawerDesignOverlayPlugin
+import DebugDrawerColorVisionPlugin
 import SwiftUI
 
 /// Demonstrates Send Report without a server: "sends" each report by copying it into the app's
@@ -111,6 +112,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // with -DesignOverlaySample, the app shows a generated sample comp over itself and pins the
         // plugin to the HUD.
         ExampleDesignOverlay.install()
+        // Installs Color Vision, which compiles in release too and does nothing there; launched with
+        // -ColorVision and a simulation's name (protanopia, deuteranopia, tritanopia or grayscale),
+        // the app starts in that simulation.
+        ExampleColorVision.install()
         installShippedPlugins()
 
         setupMenuBar()
@@ -240,54 +245,68 @@ struct ExampleContentView: View {
             .listStyle(.sidebar)
         } detail: {
             VStack(spacing: 20) {
-                Text("DebugDrawer Example")
-                    .font(.largeTitle)
-                    .accessibilityAddTraits(.isHeader)
+                // The screen's content, under the Color Vision simulation. The inputs below stay
+                // outside it, and the stepper's control too (ExampleLocalizedStrings): AppKit draws
+                // them, and a shader can't, so they would show SwiftUI's placeholder.
+                Group {
+                    Text("DebugDrawer Example")
+                        .font(.largeTitle)
+                        .accessibilityAddTraits(.isHeader)
 
-                Text("Press Ctrl+D to open the debug drawer")
-                    .foregroundStyle(.secondary)
+                    Text("Press Ctrl+D to open the debug drawer")
+                        .foregroundStyle(.secondary)
 
-                Divider()
+                    Divider()
 
-                HStack(spacing: 16) {
-                    Button("Increment") {
-                        counter += ExampleTweaks.counterStep.value
-                        ExampleAnalytics.trackCounter("increment", value: counter)
+                    HStack(spacing: 16) {
+                        Button("Increment") {
+                            counter += ExampleTweaks.counterStep.value
+                            ExampleAnalytics.trackCounter("increment", value: counter)
+                        }
+                        Button("Print") { print("Counter: \(counter)") }
+                        Button("Reset") {
+                            counter = 0
+                            ExampleAnalytics.trackCounter("reset", value: counter)
+                        }
                     }
-                    Button("Print") { print("Counter: \(counter)") }
-                    Button("Reset") {
-                        counter = 0
-                        ExampleAnalytics.trackCounter("reset", value: counter)
-                    }
+                    .accessibilityElement(children: .contain)
+                    .accessibilityLabel("Counter actions")
+
+                    Text("Counter: \(counter)")
+                        .font(.title2.monospacedDigit())
+                        .accessibilityAddTraits(.isHeader)
+
+                    ExampleTweaksBanner()
+                    ExampleFeatureFlagsSummary()
+
                 }
-                .accessibilityElement(children: .contain)
-                .accessibilityLabel("Counter actions")
-
-                Text("Counter: \(counter)")
-                    .font(.title2.monospacedDigit())
-                    .accessibilityAddTraits(.isHeader)
-
-                ExampleTweaksBanner()
-                ExampleFeatureFlagsSummary()
+                .debugColorVision()
 
                 ExampleLocalizedStrings()
 
-                // Crash Reports shows the crash on the next launch.
-                Button("Crash the App", role: .destructive) { ExampleCrash.crash() }
-                // Hangs reports the stall with its stack and a toast.
-                Button("Block the Main Thread for 500 ms") { ExampleHang.blockMainThread() }
-                // Leaks flags the sheet once it is closed, with a toast.
-                Button("Open a Leaking Screen") { ExampleLeak.presentLeakingScreen() }
-                // MetricKit lists the samples, clearly named as such: MetricKit itself delivers nothing
-                // to a debug run in time to see. Adding does nothing in release, so neither does the button.
-                #if DEBUG
-                    Button("Add Sample MetricKit Payloads") { ExampleMetricKit.addSamples() }
-                #endif
-                // Analytics lists each event as it is recorded. Recording does nothing in release,
-                // so neither does the button.
-                #if DEBUG
-                    Button("Track Sample Event") { ExampleAnalytics.trackSample() }
-                #endif
+                Group {
+                    // Colors the Color Vision plugin simulates.
+                    ExampleColorSwatches()
+                        .frame(maxWidth: 480)
+
+                    // Crash Reports shows the crash on the next launch.
+                    Button("Crash the App", role: .destructive) { ExampleCrash.crash() }
+                    // Hangs reports the stall with its stack and a toast.
+                    Button("Block the Main Thread for 500 ms") { ExampleHang.blockMainThread() }
+                    // Leaks flags the sheet once it is closed, with a toast.
+                    Button("Open a Leaking Screen") { ExampleLeak.presentLeakingScreen() }
+                    // MetricKit lists the samples, clearly named as such: MetricKit itself delivers nothing
+                    // to a debug run in time to see. Adding does nothing in release, so neither does the button.
+                    #if DEBUG
+                        Button("Add Sample MetricKit Payloads") { ExampleMetricKit.addSamples() }
+                    #endif
+                    // Analytics lists each event as it is recorded. Recording does nothing in release,
+                    // so neither does the button.
+                    #if DEBUG
+                        Button("Track Sample Event") { ExampleAnalytics.trackSample() }
+                    #endif
+                }
+                .debugColorVision()
 
                 HStack {
                     TextField("Sample text field", text: .constant(""))

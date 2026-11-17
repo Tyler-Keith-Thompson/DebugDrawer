@@ -13,6 +13,16 @@ python_test(
     ],
 )
 
+# The precompiled shaders (tools/metallibs.py) against the Metal sources they were compiled from.
+python_test(
+    name = "metallibs_test",
+    size = "small",
+    src = "metallibs_test.py",
+    data = [
+        "//Sources/DebugDrawerColorVisionPlugin:shaders",
+    ],
+)
+
 # Debug builds (the default; `--config=release` builds opt). Modules that generate mocks define
 # MOCKING only under this setting (MOCKING in scripts/modules.py).
 config_setting(

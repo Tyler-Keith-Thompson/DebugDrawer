@@ -307,8 +307,8 @@ DebugDrawer.shared.installLaunchTime()
 Each call needs its plugin's module imported (`import DebugDrawerConsolePlugin`, and so on).
 Tweaks takes the settings it shows and Feature Flags the adapter it reads, and Crash Reports,
 Hangs, Leaks, MetricKit, Permissions, Notifications, Background Tasks, Analytics, Databases,
-Localization, Screen Recording and Design Overlay install outside `#if DEBUG`, so each has a section
-of its own, next.
+Localization, Screen Recording, Design Overlay and Color Vision install outside `#if DEBUG`, so each
+has a section of its own, next.
 
 ### Tweaks: the app's own debug settings
 
@@ -951,6 +951,92 @@ app under it keeps working. The plugin's header shows the opacity and blend, "Hi
 and its HUD readout (Show in HUD) hides and shows the mockup with the drawer closed, or ends Move.
 The mockup belongs to the app's content, so screenshots and screen recordings include it.
 
+### Color Vision: meaning carried by color alone
+
+The Color Vision plugin simulates protanopia, deuteranopia, tritanopia and grayscale over the app's
+views while it runs, so a designer can see what carries meaning by color alone: an error that reads
+like a success, chart series that merge.
+
+```swift
+import DebugDrawerColorVisionPlugin
+
+struct ShopApp: App {
+    init() {
+        // At startup:
+        ColorVision.install()
+    }
+
+    var body: some Scene {
+        WindowGroup {
+            OrdersView(orders: Order.samples)
+        }
+    }
+}
+
+// A screen's content, inside its ScrollView:
+struct OrdersView: View {
+    let orders: [Order]
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading) {
+                Text("Orders")
+                    .font(.title)
+                ForEach(orders) { order in
+                    DeliveryBadge(isLate: order.isLate)
+                }
+            }
+            .debugColorVision()
+        }
+    }
+}
+
+// In a List, each row's content:
+struct OrderHistory: View {
+    let orders: [Order]
+
+    var body: some View {
+        List(orders) { order in
+            DeliveryBadge(isLate: order.isLate)
+                .debugColorVision()
+        }
+    }
+}
+
+// A view whose colors carry meaning:
+struct DeliveryBadge: View {
+    let isLate: Bool
+
+    var body: some View {
+        Label(isLate ? "Late" : "On time", systemImage: "clock")
+            .foregroundStyle(isLate ? .red : .green)
+    }
+}
+```
+
+`ColorVision` and `.debugColorVision()` exist in every configuration and do nothing in release, so
+neither needs `#if DEBUG`. The simulation is picked in the drawer, from Off, Protanopia,
+Deuteranopia, Tritanopia and Grayscale, and applies live to every view under `.debugColorVision()`,
+while the drawer, its HUD and its toasts keep their colors. The plugin's header names the simulation
+on, and its HUD readout (Show in HUD) moves to the next one with each tap, so they can be compared
+with the drawer closed. Each launch starts with the app's own colors; `install(simulating:)` starts
+in a simulation instead, for a launch argument of the app's own.
+
+Each pixel is decoded to linear RGB, multiplied by the simulation's matrix and encoded again: Machado,
+Oliveira and Fernandes's matrices (2009) at full severity for the three dichromacies, and Rec. 709
+relative luminance for grayscale. The matrix runs as a Metal shader through SwiftUI's `colorEffect`,
+which draws what SwiftUI draws. A view that UIKit or AppKit backs (`List`, `Form` and
+`NavigationStack` on iOS, `ScrollView` on macOS, text fields, maps, web views) shows SwiftUI's
+placeholder under it while a simulation is on, so apply the modifier to a screen's content: inside
+its `ScrollView`, or to each `List` row's content, rather than to the app's root. Leave controls
+UIKit or AppKit draws outside it, such as text fields, steppers, sliders and toggles. For the
+whole screen, every view included, the system's own color filters do it: Settings › Accessibility ›
+Display & Text Size › Color Filters on iOS, and System Settings › Accessibility › Display › Color
+filters on macOS. The plugin's footer names them; it never turns them on. With no simulation
+on, the modifier adds nothing, and the view draws exactly as without it; turning a simulation on or
+off draws the view anew, so the `@State` inside it starts over. The plugin builds for macOS, iOS,
+Mac Catalyst, visionOS and tvOS; SwiftUI has no shaders on watchOS.
+
 ### Opening the drawer
 
 The drawer doesn't decide how it opens. Call `DebugDrawer.shared.toggle()` from whatever trigger
@@ -1077,6 +1163,7 @@ ContentView()
 | `DebugDrawerLocalizationPlugin` | Pseudo-localization and show-keys modes over the strings the app looks up through Bundle, live, Apple's localization launch arguments to copy, and the translations missing for a language, grouped by table, searched and copied as text or CSV |
 | `DebugDrawerScreenRecordingPlugin` | The app's windows recorded as a QuickTime movie without the drawer, its HUD or its toasts, started and stopped from the drawer or the HUD, with touch indicators on iOS: the saved recordings to share or delete, and the newest in the bug report |
 | `DebugDrawerDesignOverlayPlugin` | A design mockup over the app's content, picked from Photos or Files on iOS or a file or the pasteboard on macOS: opacity, an offset set by steppers or by dragging in Move mode, the scale, and a difference blend that shows pixel drift; touches pass through to the app |
+| `DebugDrawerColorVisionPlugin` | Protanopia, deuteranopia, tritanopia and grayscale simulated live over the views marked `.debugColorVision()`, in linear RGB with Machado et al.'s matrices, picked in the drawer or cycled from the HUD, while the drawer keeps its colors |
 
 ## Development
 
