@@ -121,7 +121,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // -SeedResettableState, the app first writes state of every kind for it to clear.
         ExampleAppStateReset.install()
         // Installs Network; launched with -SeedNetworkMock, it adds a mock that answers the
-        // Fetch Greeting button.
+        // Fetch Greeting button, and with -SeedNetworkCondition, a profile that slows example.com.
         ExampleNetwork.install()
         installShippedPlugins()
 

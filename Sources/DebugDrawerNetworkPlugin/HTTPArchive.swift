@@ -80,7 +80,8 @@
             var timings: Timings
             /// Why the request failed, in the format's convention for custom fields.
             var error: String?
-            /// Which mock rule answered the request, when one did.
+            /// Which mock rule answered the request, and which conditioning profile slowed or
+            /// failed it and how, when any did.
             var comment: String?
         }
 
@@ -151,7 +152,11 @@
             )
             timings = HTTPArchive.Timings(entry.metrics, total: time)
             error = entry.error
-            comment = entry.mockRuleName.map { "Answered by the network mock “\($0)”" }
+            let notes = [
+                entry.mockRuleName.map { "Answered by the network mock “\($0)”" },
+                entry.conditionEffect.map { "Conditioned by “\($0.profileName)”: \($0.summary)" }
+            ].compactMap(\.self)
+            comment = notes.isEmpty ? nil : notes.joined(separator: ". ")
         }
     }
 

@@ -13,12 +13,17 @@
         /// A chosen file couldn't be read.
         case fileUnreadable
 
-        /// The issue in a sentence.
+        /// The issue in a sentence, about the mocks.
         var message: String {
+            message(about: "mocks")
+        }
+
+        /// The issue in a sentence, about the saved `things` ("mocks", "conditions").
+        func message(about things: String) -> String {
             switch self {
-            case .unreadable: "The saved mocks couldn't be read, so none are loaded."
+            case .unreadable: "The saved \(things) couldn't be read, so none are loaded."
             case let .unsupportedVersion(version):
-                "The saved mocks are in format \(version), newer than this build reads, so none are loaded."
+                "The saved \(things) are in format \(version), newer than this build reads, so none are loaded."
             case .notSaved: "The last change couldn't be saved; it lasts until the app quits."
             case .fileUnreadable: "The file couldn't be read."
             }

@@ -25,6 +25,8 @@
         public var metrics: NetworkTimingMetrics?
         /// The name of the mock rule that answered the request, or `nil` when the network did.
         public var mockRuleName: String?
+        /// What a conditioning profile did to the request, or `nil` when none applied.
+        public var conditionEffect: NetworkConditionEffect?
 
         /// Whether the request failed: the server answered with a status of 400 or more, or the
         /// request never got an answer (a transport error).
@@ -168,9 +170,15 @@
             NetworkPluginView()
         }
 
-        /// How many requests were captured, and how many of them failed.
+        /// How many requests were captured, and how many of them failed; the conditions that are
+        /// on, when any are.
         public var headerAccessory: some View {
             NetworkHeaderAccessoryView()
+        }
+
+        /// The conditions that are on ("3G active"), so they show with the drawer closed.
+        @MainActor public var hud: NetworkConditionsHUD? {
+            NetworkConditionsHUD(conditions: .shared)
         }
     }
 
@@ -178,12 +186,16 @@
 
     public extension DebugDrawer {
         /// Install the network inspector. Registers a URLProtocol to capture HTTP traffic, and
-        /// loads the saved mock rules, which answer the requests they match from then on.
+        /// loads the saved mock rules, which answer the requests they match from then on, and the
+        /// saved conditioning profiles, which slow down or fail the requests to their hosts.
         ///
-        /// - Parameter mocks: Rules to add to the saved ones, at the end; one whose id is saved
-        ///   already is skipped, so the drawer's edits to it last from launch to launch.
-        func installNetwork(mocks: [NetworkMockRule] = []) {
+        /// - Parameters:
+        ///   - mocks: Rules to add to the saved ones, at the end; one whose id is saved already is
+        ///     skipped, so the drawer's edits to it last from launch to launch.
+        ///   - conditions: Profiles to add to the saved ones, at the end, by id as `mocks` are.
+        func installNetwork(mocks: [NetworkMockRule] = [], conditions: [NetworkConditionProfile] = []) {
             NetworkMocksModel.shared.load(adding: mocks)
+            NetworkConditionsModel.shared.load(adding: conditions)
             NetworkStore.shared.install()
             registerGlobal(NetworkPlugin())
         }

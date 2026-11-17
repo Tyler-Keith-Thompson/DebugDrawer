@@ -2,33 +2,54 @@
     import DebugDrawer
     import SwiftUI
 
-    /// The plugin's body: the request log and the Mocks section, or the editor of one mock while
-    /// it is open.
+    /// The plugin's body: the request log, the Mocks section and the Conditions section, or the
+    /// editor of one mock or condition while it is open.
     struct NetworkPluginView: View {
+        /// What the plugin shows: the log and its sections, or one editor in their place until it
+        /// is saved or cancelled.
+        enum Screen {
+            case requests
+            case mock(NetworkMockDraft)
+            case condition(NetworkConditionDraft)
+        }
+
         @ObservedObject private var store = NetworkStore.shared
         @ObservedObject private var mocks = NetworkMocksModel.shared
+        @ObservedObject private var conditions = NetworkConditionsModel.shared
         @ObservedObject private var drawer = DebugDrawer.shared
         @State private var selectedId: UUID?
         @State private var selectedRule: NetworkMockRule.ID?
-        /// The mock being edited, which takes the plugin's place until it is saved or cancelled.
-        @State private var editing: NetworkMockDraft?
+        @State private var selectedProfile: NetworkConditionProfile.ID?
+        @State private var screen = Screen.requests
 
         var body: some View {
-            if let draft = editing {
+            switch screen {
+            case .requests:
+                requests
+            case let .mock(draft):
                 NetworkMockEditor(
                     draft: draft,
                     importBody: { mocks.importBody(from: $0) },
-                    cancel: { editing = nil },
+                    cancel: { screen = .requests },
                     save: { rule in
                         mocks.save(rule)
                         selectedRule = rule.id
-                        editing = nil
+                        screen = .requests
                     }
                 )
                 // A new draft starts from its own fields, not the last one's.
                 .id(draft.id)
-            } else {
-                requests
+            case let .condition(draft):
+                NetworkConditionEditor(
+                    draft: draft,
+                    cancel: { screen = .requests },
+                    save: { profile in
+                        conditions.save(profile)
+                        selectedProfile = profile.id
+                        screen = .requests
+                    }
+                )
+                .id(draft.id)
             }
         }
 
@@ -53,7 +74,7 @@
                         NetworkRequestRow(
                             entry: entry, redaction: drawer.redaction, isSelected: selectedId == entry.id,
                             onSelect: { selectedId = selectedId == entry.id ? nil : entry.id },
-                            onMock: { editing = NetworkMockDraft(mocks.rule(mocking: $0), isNew: true) }
+                            onMock: { screen = .mock(NetworkMockDraft(mocks.rule(mocking: $0), isNew: true)) }
                         )
                     }
                 }
@@ -64,51 +85,22 @@
                     issue: mocks.issue,
                     selected: $selectedRule,
                     setEnabled: { mocks.setEnabled($1, id: $0) },
-                    add: { editing = .new() },
-                    edit: { editing = NetworkMockDraft($0, isNew: false) },
+                    add: { screen = .mock(.new()) },
+                    edit: { screen = .mock(NetworkMockDraft($0, isNew: false)) },
                     move: { mocks.move($0, by: $1) },
                     delete: { mocks.delete($0) }
                 )
-            }
-        }
-    }
 
-    /// The Network plugin's header accessory, read from the shared store and mocks as the
-    /// plugin's body reads them.
-    struct NetworkHeaderAccessoryView: View {
-        @ObservedObject private var store = NetworkStore.shared
-        @ObservedObject private var mocks = NetworkMocksModel.shared
-
-        var body: some View {
-            NetworkHeaderSummary(entries: store.entries, activeMocks: mocks.enabledCount)
-        }
-    }
-
-    /// How many requests the plugin holds ("38 requests"), after an error glyph with the count of
-    /// those that failed, when any did, and the number of mocks on, when any are ("2 mocks").
-    struct NetworkHeaderSummary: View {
-        let total: Int
-        let failures: Int
-        let activeMocks: Int
-
-        /// - Parameters:
-        ///   - entries: The requests captured.
-        ///   - activeMocks: How many mock rules are on.
-        init(entries: [NetworkEntry], activeMocks: Int = 0) {
-            total = entries.count
-            failures = entries.count(where: \.isFailure)
-            self.activeMocks = activeMocks
-        }
-
-        var body: some View {
-            HStack {
-                if failures > 0 {
-                    DebugDrawerIssueCount(.error, count: failures)
-                }
-                if activeMocks > 0 {
-                    Text(activeMocks == 1 ? "1 mock" : "\(activeMocks.formatted()) mocks")
-                }
-                Text(total == 1 ? "1 request" : "\(total.formatted()) requests")
+                NetworkConditionsSection(
+                    profiles: conditions.profiles,
+                    issue: conditions.issue,
+                    selected: $selectedProfile,
+                    setEnabled: { conditions.setEnabled($1, id: $0) },
+                    add: { screen = .condition(.new()) },
+                    edit: { screen = .condition(NetworkConditionDraft($0, isNew: false)) },
+                    move: { conditions.move($0, by: $1) },
+                    delete: { conditions.delete($0) }
+                )
             }
         }
     }
@@ -156,23 +148,23 @@
                         ? AnyLayout(VStackLayout(alignment: .leading, spacing: 1))
                         : AnyLayout(HStackLayout(alignment: .firstTextBaseline))
                     layout {
-                        HStack(alignment: .firstTextBaseline) {
-                            glyph
-                            Text(entry.method)
-                                .debugDrawerFont(.code)
-                                .debugDrawerForegroundStyle(.secondary)
-                            status
-                            if entry.mockRuleName != nil, !dynamicTypeSize.isAccessibilitySize {
-                                NetworkMockedBadge()
+                        VStack(alignment: .leading, spacing: 1) {
+                            HStack(alignment: .firstTextBaseline) {
+                                glyph
+                                Text(entry.method)
+                                    .debugDrawerFont(.code)
+                                    .debugDrawerForegroundStyle(.secondary)
+                                status
+                                if !badgesOnOwnLine {
+                                    badges
+                                }
+                            }
+                            if badgesOnOwnLine, entry.mockRuleName != nil || entry.conditionEffect != nil {
+                                HStack { badges }
                             }
                         }
                         // A few short words that never wrap: the path gives way to them instead.
                         .fixedSize(horizontal: true, vertical: false)
-                        // At accessibility text sizes the badge would squeeze the status; it takes
-                        // a line of its own.
-                        if entry.mockRuleName != nil, dynamicTypeSize.isAccessibilitySize {
-                            NetworkMockedBadge()
-                        }
                         Text(entry.path)
                             .debugDrawerFont(.code)
                             .debugDrawerForegroundStyle(.primary)
@@ -207,6 +199,23 @@
                     }
                 }
                 .alignmentGuide(.firstTextBaseline) { $0[.bottom] - $0.height * 0.15 }
+        }
+
+        /// Whether the badges take a line of their own: at accessibility text sizes, where they
+        /// would squeeze the status, and when both show, since two beside the method and status
+        /// leave the path a letter's width in a phone-wide drawer.
+        private var badgesOnOwnLine: Bool {
+            dynamicTypeSize.isAccessibilitySize || (entry.mockRuleName != nil && entry.conditionEffect != nil)
+        }
+
+        /// Mocked and Conditioned, for a request a mock answered or a profile conditioned.
+        @ViewBuilder private var badges: some View {
+            if entry.mockRuleName != nil {
+                NetworkMockedBadge()
+            }
+            if entry.conditionEffect != nil {
+                NetworkConditionedBadge()
+            }
         }
 
         @ViewBuilder private var status: some View {
@@ -253,6 +262,12 @@
                 }
                 if let rule = entry.mockRuleName {
                     DebugDrawerKeyValueRow("Mocked by", value: rule)
+                        .debugDrawerValueStyle(.text)
+                }
+                if let effect = entry.conditionEffect {
+                    DebugDrawerKeyValueRow("Conditioned by", value: effect.profileName)
+                        .debugDrawerValueStyle(.text)
+                    DebugDrawerKeyValueRow("Condition", value: effect.summary)
                         .debugDrawerValueStyle(.text)
                 }
 

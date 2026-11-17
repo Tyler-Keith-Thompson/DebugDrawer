@@ -31,7 +31,7 @@
     extension NetworkMockRule.Pattern {
         /// The pattern as the summary shows it: a regex after "regex", `any` for one that matches
         /// anything.
-        fileprivate func summary(any: String) -> String {
+        func summary(any: String) -> String {
             switch self {
             case .any: any
             case let .exact(text), let .wildcard(text): text

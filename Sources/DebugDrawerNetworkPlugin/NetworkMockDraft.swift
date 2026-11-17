@@ -154,7 +154,7 @@
 
         // MARK: Converting
 
-        private static func fields(_ pattern: NetworkMockRule.Pattern) -> (PatternKind, String) {
+        static func fields(_ pattern: NetworkMockRule.Pattern) -> (PatternKind, String) {
             switch pattern {
             case .any: (.any, "")
             case let .exact(text): (.exact, text)
@@ -163,7 +163,7 @@
             }
         }
 
-        private static func pattern(_ kind: PatternKind, _ text: String) -> NetworkMockRule.Pattern {
+        static func pattern(_ kind: PatternKind, _ text: String) -> NetworkMockRule.Pattern {
             switch kind {
             case .any: .any
             case .exact: .exact(text)
@@ -180,7 +180,7 @@
             }
         }
 
-        private static func problem(kind: PatternKind, text: String, noun: String, separator: Character, caseInsensitive: Bool) -> String? {
+        static func problem(kind: PatternKind, text: String, noun: String, separator: Character, caseInsensitive: Bool) -> String? {
             let trimmed = text.trimmingCharacters(in: .whitespaces)
             guard kind != .any else { return nil }
             guard !trimmed.isEmpty else { return "Enter a \(noun), or match any." }

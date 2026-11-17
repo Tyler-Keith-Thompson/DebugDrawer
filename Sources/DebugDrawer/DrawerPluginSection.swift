@@ -27,23 +27,20 @@
             VStack(spacing: 0) {
                 // The accessory sits beside the header's button rather than in it, so an action
                 // in it is a control of its own and VoiceOver reads it apart from the heading.
-                // At accessibility text sizes it goes under the header, where the title has the
-                // row's width to itself.
-                let layout = dynamicTypeSize.isAccessibilitySize
-                    ? AnyLayout(VStackLayout(alignment: .leading, spacing: 0))
-                    : AnyLayout(HStackLayout(spacing: 0))
-                layout {
-                    header
-                    if let accessory = plugin.headerAccessory {
-                        accessory
-                            .debugDrawerFont(.code)
-                            .foregroundStyle(DrawerPalette.tertiaryText)
-                            .debugDrawerButtonStyle(.borderless)
-                            // Its ideal size, so it never wraps; the title beside it wraps instead.
-                            .fixedSize()
-                            .padding(.leading, dynamicTypeSize.isAccessibilitySize ? inset + indent : 0)
-                            .padding(.trailing, inset)
+                // It goes under the header, where the title has the row's width to itself, at
+                // accessibility text sizes and whenever the title and the accessory are too wide
+                // to share the row.
+                if let accessory = plugin.headerAccessory {
+                    if dynamicTypeSize.isAccessibilitySize {
+                        headerRow(accessory, below: true)
+                    } else {
+                        ViewThatFits(in: .horizontal) {
+                            headerRow(accessory, below: false)
+                            headerRow(accessory, below: true)
+                        }
                     }
+                } else {
+                    header
                 }
                 if isExpanded {
                     // A stack of its own, so a body of several views is laid out as one rather
@@ -60,6 +57,26 @@
                     .transition(.opacity.combined(with: .move(edge: .top)))
                 }
                 DrawerRule()
+            }
+        }
+
+        /// The header with `accessory` beside it, or under it, set in to where the body starts.
+        private func headerRow(_ accessory: AnyView, below: Bool) -> some View {
+            let layout = below
+                ? AnyLayout(VStackLayout(alignment: .leading, spacing: 0))
+                : AnyLayout(HStackLayout(spacing: 0))
+            return layout {
+                header
+                accessory
+                    .debugDrawerFont(.code)
+                    .foregroundStyle(DrawerPalette.tertiaryText)
+                    .debugDrawerButtonStyle(.borderless)
+                    // Beside the title, its ideal size, so it never wraps; the title wraps instead.
+                    // Under it, the row's width, so one wider than the drawer gives way (a
+                    // ViewThatFits in it picks a shorter form) rather than push the title off.
+                    .fixedSize(horizontal: !below, vertical: true)
+                    .padding(.leading, below ? inset + indent : 0)
+                    .padding(.trailing, inset)
             }
         }
     }
