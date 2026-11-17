@@ -213,7 +213,7 @@ The drawer's header has a Create Report button that collects every plugin's data
 attach to a bug: a `summary.txt` (app, version, OS, device model, date and the list of files) and a
 folder per plugin, named after its title. Every file is plain text, JSON, HAR, PNG or a QuickTime
 movie, so it opens without DebugDrawer, and the redaction rules mask what they call sensitive.
-Console adds its log lines, Network an HTTP Archive (`network.har`) of the captured requests, App
+Console adds its log lines (and an earlier launch's, `console-previous.txt`), Network an HTTP Archive (`network.har`) of the captured requests, App
 Info its facts, UserDefaults the app's keys, Cookies the stored cookies, Screenshot the key window
 and Screen Recording the newest recording; Keychain adds nothing. When the zip is ready, the drawer shows its name and a share button.
 
@@ -309,6 +309,38 @@ Tweaks takes the settings it shows and Feature Flags the adapter it reads, and C
 Hangs, Leaks, MetricKit, Permissions, Notifications, Background Tasks, Analytics, Databases,
 Localization, Screen Recording, Design Overlay, Color Vision and Reset App State install outside
 `#if DEBUG`, so each has a section of its own, after Network's mocks and conditions.
+
+### Console sessions: logs from earlier launches
+
+The lines logged during a launch, or just before a crash, are kept on disk, so the next launch can
+show them; the unified log of the current process holds no earlier launch's lines on iOS. Each
+line is written as it is captured, as logged: log text has no keys for the redaction rules to
+match, so the Console shows, copies and keeps it unmasked. A launch's session is a file of JSON
+Lines in Application Support, in the app's folder under `DebugDrawer/ConsoleSessions`: a header
+with the start and the app's version, then one line per log line, with its time, level, source and
+text, appended as it comes, so a crash mid-write costs at most the line being written, which is
+skipped on reading. Writing happens on a queue of its own, in batches, never on the main actor. By
+default 5 earlier sessions are kept in at most 20 MB; both are set at install:
+
+```swift
+import DebugDrawerConsolePlugin
+
+#if DEBUG
+DebugDrawer.shared.installConsole(sessions: ConsoleSessionPersistence(maxSessions: 3, maxBytes: 5_000_000))
+#endif
+```
+
+At launch the oldest sessions beyond `maxSessions` are deleted, then the oldest until the rest fit
+in `maxBytes`, which is checked again as the current session grows. The current session is never
+deleted; a line that would take it alone past `maxBytes` isn't written. `ConsoleSessionPersistence.off`
+writes nothing and deletes what earlier launches kept. To keep sessions somewhere else, pass a
+`storage` of your own, a `ConsoleSessionStorage` (append, list, read and delete).
+
+While an earlier session is kept, the console offers Captured and Previous. Previous shows the
+newest earlier session, read-only, with a menu of the others by start and size, the app version
+that wrote it and how many lines it holds; the level filter, search and Copy All work on it as on
+the captured lines. Delete deletes it and Delete All Sessions deletes every earlier one. The bug
+report adds the newest earlier session as `console-previous.txt`.
 
 ### Network mocks: canned responses without changing the server
 
@@ -1391,7 +1423,7 @@ ContentView()
 | Module | Holds |
 |---|---|
 | `DebugDrawer` | The drawer: its window, the plugin protocol and registry, the views plugins are built from, and release-build stand-ins |
-| `DebugDrawerConsolePlugin` | `os_log` entries (stdout and stderr on macOS): level filter, search, auto-follow, copy |
+| `DebugDrawerConsolePlugin` | `os_log` entries (stdout and stderr on macOS): level filter, search, auto-follow, copy, lines kept across launches |
 | `DebugDrawerViewInspectorPlugin` | View borders by depth, alignment grid, click indicators, animation speed, SwiftUI render tracking, hierarchy snapshot |
 | `DebugDrawerAccessibilityPlugin` | Runtime overrides of color scheme, Dynamic Type, layout direction, locale and the system accessibility settings SwiftUI exposes, each beside the system's value |
 | `DebugDrawerPerformancePlugin` | Live FPS and memory with sparkline graphs |

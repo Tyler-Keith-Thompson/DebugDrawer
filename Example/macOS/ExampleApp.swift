@@ -137,7 +137,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// launch short enough to read.
     private func installShippedPlugins() {
         #if DEBUG
-            DebugDrawer.shared.installConsole()
+            ExampleConsole.install()
             DebugDrawer.shared.installDiskIO()
             DebugDrawer.shared.installViewInspector()
             DebugDrawer.shared.installAccessibility()

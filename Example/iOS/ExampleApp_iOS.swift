@@ -132,7 +132,7 @@ struct DebugDrawerExampleiOSApp: App {
     /// launch short enough to read.
     private func installShippedPlugins() {
         #if DEBUG
-            DebugDrawer.shared.installConsole()
+            ExampleConsole.install()
             DebugDrawer.shared.installDiskIO()
             DebugDrawer.shared.installViewInspector()
             DebugDrawer.shared.installAccessibility()
@@ -211,7 +211,7 @@ struct ExampleContentView_iOS: View {
                             counter += ExampleTweaks.counterStep.value
                             ExampleAnalytics.trackCounter("increment", value: counter)
                         }
-                        Button("Print") { print("Counter: \(counter)") }
+                        Button("Print") { ExampleConsole.log("Counter: \(counter)") }
                         Button("Reset") {
                             counter = 0
                             ExampleAnalytics.trackCounter("reset", value: counter)

@@ -3,9 +3,14 @@
     import Foundation
 
     extension ConsolePlugin: DebugDrawerReportContributor {
-        /// Adds the lines the level filter shows, as Copy All copies them, as `console.txt`.
+        /// Adds the lines the level filter shows, as Copy All copies them, as `console.txt`, and
+        /// every line of the newest session an earlier launch kept as `console-previous.txt`:
+        /// after a crash, the lines that led up to it.
         public func contribute(to report: inout DebugDrawerReport, redaction: DebugDrawerRedaction) {
             Self.contribute(ConsoleLogStore.shared.filteredLines, to: &report)
+            // Read here, on the main actor, as the report is built now: a session is at most the
+            // size limit, 20 MB unless the app set another.
+            Self.contribute(previous: ConsoleLogStore.shared.recorder?.newestPreviousSession(), to: &report)
         }
 
         /// Adds `lines` as `console.txt`, one per line in Copy All's format; no lines add nothing.
@@ -13,6 +18,14 @@
         static func contribute(_ lines: [LogLine], to report: inout DebugDrawerReport) {
             guard !lines.isEmpty else { return }
             report.add(text: lines.copiedText, named: "console.txt")
+        }
+
+        /// Adds the lines of `previous`, an earlier launch's session, as `console-previous.txt`,
+        /// in Copy All's format, every level included. No session, or one with no lines, adds
+        /// nothing.
+        static func contribute(previous: ConsoleSessionLog?, to report: inout DebugDrawerReport) {
+            guard let previous, !previous.lines.isEmpty else { return }
+            report.add(text: previous.lines.copiedText, named: "console-previous.txt")
         }
     }
 

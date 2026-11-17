@@ -7,7 +7,7 @@
 
     // MARK: - Log line model
 
-    public struct LogLine: Identifiable {
+    public struct LogLine: Identifiable, Sendable {
         public let id = UUID()
         public let timestamp: Date
         public let text: String
@@ -114,6 +114,24 @@
             lines.filter { $0.level >= filterLevel }
         }
 
+        /// The lines the console shows at the level filter: the captured ones, or the earlier
+        /// session's while `source` is `.previous`.
+        var shownLines: [LogLine] {
+            switch source {
+            case .captured: filteredLines
+            case .previous: (previousLog?.lines ?? []).filter { $0.level >= filterLevel }
+            }
+        }
+
+        /// Whether the console shows the captured lines or an earlier session's; it is `.captured`
+        /// whenever no earlier session is shown.
+        @Published var source = ConsoleLogSource.captured
+        /// The session an earlier launch kept that shows under Previous, once one is read.
+        @Published private(set) var previousLog: ConsoleSessionLog?
+        /// Writes each line to the current session on disk as it is captured; `nil` until
+        /// `installConsole()` starts one.
+        private(set) var recorder: ConsoleSessionRecorder?
+
         private var installed = false
         private let driver = ConsoleLogDriver()
         /// Original stdout fd, used to write diagnostics without triggering capture loop.
@@ -122,7 +140,8 @@
         private let lineSubject = PassthroughSubject<LogLine, Never>()
         private var cancellable: AnyCancellable?
 
-        private init() {
+        /// An empty store; the plugin shows ``shared``.
+        init() {
             cancellable = lineSubject
                 .collect(.byTime(DispatchQueue.main, .milliseconds(100)))
                 .receive(on: DispatchQueue.main)
@@ -171,9 +190,33 @@
             }
         }
 
-        /// Push a line into the throttled pipeline.
+        /// Writes the line to the current session at once, and pushes it into the throttled
+        /// pipeline that shows it.
         func ingest(_ line: LogLine) {
+            // Recorded before the pipeline's batching, so a crash costs only what the recorder's
+            // queue hadn't written yet.
+            recorder?.record(line)
             lineSubject.send(line)
+        }
+
+        /// Writes each line from now on to the current session of `recorder`, as it is captured.
+        func persist(to recorder: ConsoleSessionRecorder) {
+            self.recorder = recorder
+        }
+
+        /// Shows the lines of `log`, a session an earlier launch kept, read-only, in place of the
+        /// captured ones.
+        func showPrevious(_ log: ConsoleSessionLog) {
+            previousLog = log
+            source = .previous
+        }
+
+        /// Stops showing the earlier session; the console shows the captured lines again.
+        func hidePrevious() {
+            previousLog = nil
+            if source == .previous {
+                source = .captured
+            }
         }
 
         private func redirectStream(source: LogLine.Source, fd: Int32) {
@@ -254,101 +297,23 @@
         }
     }
 
-    // MARK: - Console view (proper SwiftUI View so @ObservedObject works)
-
-    struct ConsolePluginView: View {
-        @ObservedObject private var store = ConsoleLogStore.shared
-        @State private var isFollowing = true
-        @State private var searchText = ""
-
-        private var visibleLines: [LogLine] {
-            let filtered = store.filteredLines
-            guard !searchText.isEmpty else { return filtered }
-            let query = searchText.lowercased()
-            return filtered.filter { $0.text.lowercased().contains(query) }
-        }
-
-        var body: some View {
-            VStack(alignment: .leading, spacing: 0) {
-                TextField("Search logs...", text: $searchText)
-                    .debugDrawerTextFieldStyle()
-                    .accessibilityLabel("Search logs")
-
-                // Toolbar — filter picker is in its own view to avoid
-                // re-creating the NSSegmentedControl on every log batch.
-                ConsoleToolbarView(
-                    isFollowing: $isFollowing,
-                    filterLevel: $store.filterLevel,
-                    copyAll: { debugDrawerCopyToClipboard(visibleLines.copiedText) },
-                    clear: { store.clear() }
-                )
-
-                DebugDrawerCodeBlock {
-                    ConsoleTextView(
-                        lines: visibleLines,
-                        isFollowing: $isFollowing
-                    )
-                    .frame(minHeight: 120, maxHeight: 300)
-                }
-            }
-        }
-    }
-
-    /// Extracted toolbar so the segmented picker doesn't get rebuilt on every log update.
-    /// Only `isFollowing` changes frequently — the picker binding (`filterLevel`) is stable and
-    /// won't cause the NSSegmentedControl to be recreated. The line count is the header's
-    /// accessory, so the toolbar doesn't repeat it.
-    struct ConsoleToolbarView: View {
-        @Binding var isFollowing: Bool
-        @Binding var filterLevel: LogLine.Level
-        let copyAll: () -> Void
-        let clear: () -> Void
-
-        var body: some View {
-            // The action row wraps what doesn't fit one line, and stacks at accessibility sizes.
-            DebugDrawerActionRow {
-                ConsoleFilterPicker(filterLevel: $filterLevel)
-
-                if !isFollowing {
-                    Button("Resume") { isFollowing = true }
-                        .debugDrawerButtonStyle(.borderless)
-                        .accessibilityHint("Scrolls to the newest line and follows new ones")
-                }
-
-                Button("Copy All", action: copyAll)
-            } trailing: {
-                Button("Clear", role: .destructive, action: clear)
-                    .debugDrawerButtonStyle(.destructive)
-                    .accessibilityLabel("Clear the console")
-            }
-        }
-    }
-
-    /// The segmented picker in its own view to prevent SwiftUI from
-    /// recreating the NSSegmentedControl when the parent re-renders.
-    struct ConsoleFilterPicker: View {
-        @Binding var filterLevel: LogLine.Level
-
-        var body: some View {
-            Picker("Level", selection: $filterLevel) {
-                Text("All").tag(LogLine.Level.debug)
-                Text("Info+").tag(LogLine.Level.info)
-                Text("Errors").tag(LogLine.Level.error)
-            }
-            .pickerStyle(.segmented)
-            .labelsHidden()
-            .accessibilityLabel("Lowest level shown")
-            .accessibilityElement(children: .contain)
-            .fixedSize()
-        }
-    }
-
     // MARK: - Convenience installer
 
     public extension DebugDrawer {
         /// Install the console capture plugin. Call once at app startup.
         /// Captures stdout, stderr, and os_log entries.
-        func installConsole() {
+        ///
+        /// - Parameter sessions: How many earlier launches' lines are kept on disk, in how many
+        ///   bytes, and where; each line is written as it is captured, and the console shows the
+        ///   earlier sessions under Previous. ``ConsoleSessionPersistence/off`` writes none.
+        func installConsole(sessions: ConsoleSessionPersistence = .standard) {
+            // Started before capture begins, so the first line is written too, and once a launch,
+            // so a second install doesn't start a second session.
+            if ConsoleLogStore.shared.recorder == nil {
+                let recorder = ConsoleSessionRecorder(sessions)
+                ConsoleLogStore.shared.persist(to: recorder)
+                Task { await ConsoleSessionsModel.shared.start(recorder) }
+            }
             ConsoleLogStore.shared.install()
             registerGlobal(ConsolePlugin())
         }
