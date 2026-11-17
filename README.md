@@ -307,8 +307,8 @@ DebugDrawer.shared.installLaunchTime()
 Each call needs its plugin's module imported (`import DebugDrawerConsolePlugin`, and so on).
 Tweaks takes the settings it shows and Feature Flags the adapter it reads, and Crash Reports,
 Hangs, Leaks, MetricKit, Permissions, Notifications, Background Tasks, Analytics, Databases,
-Localization, Screen Recording, Design Overlay and Color Vision install outside `#if DEBUG`, so each
-has a section of its own, next.
+Localization, Screen Recording, Design Overlay, Color Vision and Reset App State install outside
+`#if DEBUG`, so each has a section of its own, next.
 
 ### Tweaks: the app's own debug settings
 
@@ -1037,6 +1037,66 @@ on, the modifier adds nothing, and the view draws exactly as without it; turning
 off draws the view anew, so the `@State` inside it starts over. The plugin builds for macOS, iOS,
 Mac Catalyst, visionOS and tvOS; SwiftUI has no shaders on watchOS.
 
+### Reset App State: a fresh install without reinstalling
+
+The Reset App State plugin clears what deleting the app and installing it again would, without
+doing either: a checkbox for each kind of state, what it will delete beside it, a confirmation that
+lists it, and an optional restart.
+
+```swift
+import DebugDrawerAppStateResetPlugin
+
+// At startup:
+AppStateReset.install()
+
+// Or with the app's other stores, and a cleanup of its own:
+AppStateReset.install(
+    appGroups: ["group.com.example.orders"],
+    directories: [URL.libraryDirectory.appending(path: "Exports")],
+    cleanup: AppStateReset.Cleanup("Close the orders database") {
+        OrdersDatabase.shared.close()
+    }
+)
+```
+
+`AppStateReset` exists in every configuration and does nothing in release, so the call needs no
+`#if DEBUG`, and a release build links no WebKit through it. The categories, each cleared on its own:
+
+| Category | What it deletes |
+|---|---|
+| UserDefaults | The keys of the app's domain and of each app group's suite, listed by name |
+| Keychain | Every generic and internet password, certificate, key and identity the app can read, each by its persistent reference, listed by service and account or by label |
+| Files | The contents of Documents, Application Support and tmp, each app group's container less its Library/Preferences and Library/Caches, and the `directories` given; never the directories themselves |
+| Caches | The contents of Library/Caches, the app's and each app group's |
+| Cookies | `HTTPCookieStorage.shared`'s cookies, and `WKWebsiteDataStore.default()`'s where WebKit exists, listed by domain |
+| URL cache | `URLCache.shared`'s responses, its disk and memory use shown |
+| App cleanup | The `cleanup` the app gave, run first, so it can close a database before its file goes |
+
+Every category is read when the plugin is first shown, and again on Refresh, before anything is
+deleted. Reset… opens the confirmation, which lists exactly what will go: each key, keychain item,
+top-level file or folder with its size, and cookie domain. Reset deletes that and nothing else;
+Reset and Relaunch then starts a new instance of the app on macOS and quits this one. An iOS,
+tvOS, visionOS or Mac Catalyst app can't launch itself, so there the button is Reset and Quit, and
+the app is opened again from the Home Screen. UserDefaults are written to disk and WebKit's cookie
+store waited on before the app ends. When something can't be deleted (a file in a folder that can't
+be written, an item the keychain refuses), the app keeps running and the results name it and why.
+
+Links are deleted as links, never followed out of the container. App groups the entitlements name
+are found on their own. DebugDrawer's own state stays unless Include DebugDrawer's Own Settings is
+on: the UserDefaults keys starting `com.debugdrawer.` (the drawer's layout, HUD pins and plugin
+settings) and the files named `DebugDrawer…` in each directory and in its folder named after the
+app (recordings and mockups in `Caches/DebugDrawer`, crash reports and MetricKit payloads).
+
+On iOS, tvOS and visionOS each app has a keychain of its own, and a query sees only the access
+groups its entitlements name. On the Mac and in Mac Catalyst the plugin asks the data protection
+keychain, which is scoped the same way, never the login keychain, whose items belong to every app
+the user runs; an app without a keychain entitlement there gets `errSecMissingEntitlement`, which
+the plugin shows, and nothing is deleted. So does a simulator build whose entitlements lack
+`application-identifier`, which Xcode adds and Bazel's rules_apple doesn't. A Mac app that isn't
+sandboxed shares Documents, Application Support, Caches and the temporary directory with every other
+app, so there Files clears only Application Support's folder named after the app, and Caches only
+Caches' one. The plugin builds for macOS, iOS, Mac Catalyst, visionOS and tvOS.
+
 ### Opening the drawer
 
 The drawer doesn't decide how it opens. Call `DebugDrawer.shared.toggle()` from whatever trigger
@@ -1164,6 +1224,7 @@ ContentView()
 | `DebugDrawerScreenRecordingPlugin` | The app's windows recorded as a QuickTime movie without the drawer, its HUD or its toasts, started and stopped from the drawer or the HUD, with touch indicators on iOS: the saved recordings to share or delete, and the newest in the bug report |
 | `DebugDrawerDesignOverlayPlugin` | A design mockup over the app's content, picked from Photos or Files on iOS or a file or the pasteboard on macOS: opacity, an offset set by steppers or by dragging in Move mode, the scale, and a difference blend that shows pixel drift; touches pass through to the app |
 | `DebugDrawerColorVisionPlugin` | Protanopia, deuteranopia, tritanopia and grayscale simulated live over the views marked `.debugColorVision()`, in linear RGB with Machado et al.'s matrices, picked in the drawer or cycled from the HUD, while the drawer keeps its colors |
+| `DebugDrawerAppStateResetPlugin` | The app's state cleared as a fresh install leaves it, by category: UserDefaults, keychain items, the container's files, caches, cookies, the URL cache and the app's own cleanup, each listed before a confirmation, then relaunched on macOS or quit elsewhere |
 
 ## Development
 

@@ -30,6 +30,7 @@ import DebugDrawerLocalizationPlugin
 import DebugDrawerScreenRecordingPlugin
 import DebugDrawerDesignOverlayPlugin
 import DebugDrawerColorVisionPlugin
+import DebugDrawerAppStateResetPlugin
 import SwiftUI
 
 /// Demonstrates Send Report without a server: "sends" each report by copying it into the app's
@@ -116,6 +117,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // -ColorVision and a simulation's name (protanopia, deuteranopia, tritanopia or grayscale),
         // the app starts in that simulation.
         ExampleColorVision.install()
+        // Installs Reset App State, which compiles in release too and does nothing there; launched with
+        // -SeedResettableState, the app first writes state of every kind for it to clear.
+        ExampleAppStateReset.install()
         installShippedPlugins()
 
         setupMenuBar()
@@ -278,6 +282,7 @@ struct ExampleContentView: View {
 
                     ExampleTweaksBanner()
                     ExampleFeatureFlagsSummary()
+                    ExampleResettableState()
 
                 }
                 .debugColorVision()

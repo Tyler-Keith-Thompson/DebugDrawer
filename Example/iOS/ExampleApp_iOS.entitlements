@@ -6,5 +6,15 @@
          that declares it; the Notifications plugin shows it. -->
     <key>aps-environment</key>
     <string>development</string>
+    <!-- The identity Xcode gives a simulator build and rules_apple doesn't: without it the data
+         protection keychain refuses the app (errSecMissingEntitlement), so Reset App State and the
+         keychain tests this app hosts (//Example:AppStateResetKeychainTests) would have no keychain.
+         The simulator checks neither the team prefix nor a profile. -->
+    <key>application-identifier</key>
+    <string>FAKETEAMID.com.debugdrawer.example.ios</string>
+    <key>keychain-access-groups</key>
+    <array>
+        <string>FAKETEAMID.com.debugdrawer.example.ios</string>
+    </array>
 </dict>
 </plist>
