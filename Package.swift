@@ -45,6 +45,7 @@ let products: [Product] = [
     .library(name: "DebugDrawerAnalyticsPlugin", targets: ["DebugDrawerAnalyticsPlugin"]),
     .library(name: "DebugDrawerDatabaseBrowserPlugin", targets: ["DebugDrawerDatabaseBrowserPlugin"]),
     .library(name: "DebugDrawerLocalizationPlugin", targets: ["DebugDrawerLocalizationPlugin"]),
+    .library(name: "DebugDrawerScreenRecordingPlugin", targets: ["DebugDrawerScreenRecordingPlugin"]),
 ]
 
 let dependencies: [Package.Dependency] = [
@@ -88,6 +89,7 @@ let targets: [Target] = [
     .target(name: "DebugDrawerAnalyticsPlugin", dependencies: ["DebugDrawer"], exclude: bazelFiles),
     .target(name: "DebugDrawerDatabaseBrowserPlugin", dependencies: ["DebugDrawer"], exclude: bazelFiles),
     .target(name: "DebugDrawerLocalizationPlugin", dependencies: ["DebugDrawer"], exclude: bazelFiles),
+    .target(name: "DebugDrawerScreenRecordingPlugin", dependencies: ["DebugDrawer"], exclude: bazelFiles),
 
     // Shared fixtures (data only) for every test target.
     .target(name: "DebugDrawerTestSupport", path: "Tests/DebugDrawerTestSupport", exclude: bazelFiles),
@@ -122,6 +124,7 @@ let targets: [Target] = [
     .testTarget(name: "DebugDrawerAnalyticsPluginTests", dependencies: ["DebugDrawerAnalyticsPlugin", "DebugDrawer", .product(name: "ViewInspector", package: "viewinspector", condition: .when(platforms: applePlatforms)), .product(name: "SnapshotTesting", package: "swift-snapshot-testing", condition: .when(platforms: applePlatforms)), .product(name: "IssueReportingTestSupport", package: "xctest-dynamic-overlay", condition: .when(platforms: applePlatforms))], exclude: ["BUILD.bazel", "Performance", "__Snapshots__"]),
     .testTarget(name: "DebugDrawerDatabaseBrowserPluginTests", dependencies: ["DebugDrawerDatabaseBrowserPlugin", "DebugDrawer", .product(name: "ViewInspector", package: "viewinspector", condition: .when(platforms: applePlatforms)), .product(name: "SnapshotTesting", package: "swift-snapshot-testing", condition: .when(platforms: applePlatforms)), .product(name: "IssueReportingTestSupport", package: "xctest-dynamic-overlay", condition: .when(platforms: applePlatforms))], exclude: ["BUILD.bazel", "Performance", "__Snapshots__"]),
     .testTarget(name: "DebugDrawerLocalizationPluginTests", dependencies: ["DebugDrawerLocalizationPlugin", "DebugDrawer", .product(name: "ViewInspector", package: "viewinspector", condition: .when(platforms: applePlatforms)), .product(name: "SnapshotTesting", package: "swift-snapshot-testing", condition: .when(platforms: applePlatforms)), .product(name: "IssueReportingTestSupport", package: "xctest-dynamic-overlay", condition: .when(platforms: applePlatforms))], exclude: ["BUILD.bazel", "Performance", "__Snapshots__"]),
+    .testTarget(name: "DebugDrawerScreenRecordingPluginTests", dependencies: ["DebugDrawerScreenRecordingPlugin", "DebugDrawer", .product(name: "ViewInspector", package: "viewinspector", condition: .when(platforms: applePlatforms)), .product(name: "SnapshotTesting", package: "swift-snapshot-testing", condition: .when(platforms: applePlatforms)), .product(name: "IssueReportingTestSupport", package: "xctest-dynamic-overlay", condition: .when(platforms: applePlatforms))], exclude: ["BUILD.bazel", "Performance", "__Snapshots__"]),
 
     // Speed-reliant tests, split from the target of the same module (PERFORMANCE_TESTS in scripts/modules.py).
     .testTarget(name: "DebugDrawerHangDetectorPluginPerformanceTests", dependencies: ["DebugDrawerHangDetectorPlugin", "DebugDrawer", .product(name: "ViewInspector", package: "viewinspector", condition: .when(platforms: applePlatforms)), .product(name: "SnapshotTesting", package: "swift-snapshot-testing", condition: .when(platforms: applePlatforms)), .product(name: "IssueReportingTestSupport", package: "xctest-dynamic-overlay", condition: .when(platforms: applePlatforms))], path: "Tests/DebugDrawerHangDetectorPluginTests/Performance"),
@@ -133,6 +136,7 @@ let targets: [Target] = [
     .testTarget(name: "DebugDrawerAnalyticsPluginPerformanceTests", dependencies: ["DebugDrawerAnalyticsPlugin", "DebugDrawer", .product(name: "ViewInspector", package: "viewinspector", condition: .when(platforms: applePlatforms)), .product(name: "SnapshotTesting", package: "swift-snapshot-testing", condition: .when(platforms: applePlatforms)), .product(name: "IssueReportingTestSupport", package: "xctest-dynamic-overlay", condition: .when(platforms: applePlatforms))], path: "Tests/DebugDrawerAnalyticsPluginTests/Performance"),
     .testTarget(name: "DebugDrawerDatabaseBrowserPluginPerformanceTests", dependencies: ["DebugDrawerDatabaseBrowserPlugin", "DebugDrawer", .product(name: "ViewInspector", package: "viewinspector", condition: .when(platforms: applePlatforms)), .product(name: "SnapshotTesting", package: "swift-snapshot-testing", condition: .when(platforms: applePlatforms)), .product(name: "IssueReportingTestSupport", package: "xctest-dynamic-overlay", condition: .when(platforms: applePlatforms))], path: "Tests/DebugDrawerDatabaseBrowserPluginTests/Performance"),
     .testTarget(name: "DebugDrawerLocalizationPluginPerformanceTests", dependencies: ["DebugDrawerLocalizationPlugin", "DebugDrawer", .product(name: "ViewInspector", package: "viewinspector", condition: .when(platforms: applePlatforms)), .product(name: "SnapshotTesting", package: "swift-snapshot-testing", condition: .when(platforms: applePlatforms)), .product(name: "IssueReportingTestSupport", package: "xctest-dynamic-overlay", condition: .when(platforms: applePlatforms))], path: "Tests/DebugDrawerLocalizationPluginTests/Performance"),
+    .testTarget(name: "DebugDrawerScreenRecordingPluginPerformanceTests", dependencies: ["DebugDrawerScreenRecordingPlugin", "DebugDrawer", .product(name: "ViewInspector", package: "viewinspector", condition: .when(platforms: applePlatforms)), .product(name: "SnapshotTesting", package: "swift-snapshot-testing", condition: .when(platforms: applePlatforms)), .product(name: "IssueReportingTestSupport", package: "xctest-dynamic-overlay", condition: .when(platforms: applePlatforms))], path: "Tests/DebugDrawerScreenRecordingPluginTests/Performance"),
 ]
 
 let package = Package(

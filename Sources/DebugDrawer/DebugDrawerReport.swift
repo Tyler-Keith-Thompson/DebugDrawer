@@ -1,7 +1,7 @@
 import Foundation
 
-/// The files of a bug report, in the order they were added: plain text, JSON, HAR and PNG, each
-/// of which opens without DebugDrawer.
+/// The files of a bug report, in the order they were added: plain text, JSON, HAR, PNG and
+/// QuickTime movies, each of which opens without DebugDrawer.
 ///
 /// A ``DebugDrawerReportContributor`` adds its files to the report it is handed; the drawer puts
 /// them in a folder named after the plugin's title. A name is made safe for a file system (`/`,
@@ -18,6 +18,8 @@ public struct DebugDrawerReport: Equatable, Sendable {
         case har
         /// A PNG image, `.png`.
         case png
+        /// A QuickTime movie, `.mov`.
+        case movie
 
         /// The extension a file of this kind ends in, without the dot.
         public var fileExtension: String {
@@ -26,6 +28,7 @@ public struct DebugDrawerReport: Equatable, Sendable {
             case .json: "json"
             case .har: "har"
             case .png: "png"
+            case .movie: "mov"
             }
         }
     }
@@ -85,6 +88,14 @@ public struct DebugDrawerReport: Equatable, Sendable {
     /// Adds a PNG image, as it is, in a `.png` file.
     public mutating func add(png: Data, named name: String) {
         append(png, named: name, kind: .png)
+    }
+
+    /// Adds a QuickTime movie, as it is, in a `.mov` file.
+    ///
+    /// A movie can be large: read it with `Data(contentsOf:options: .alwaysMapped)`, so the
+    /// report maps the file rather than holding a copy in memory while the zip is written.
+    public mutating func add(movie: Data, named name: String) {
+        append(movie, named: name, kind: .movie)
     }
 
     /// Adds every file of `report` to a folder named `folder` (made safe and unique like a file

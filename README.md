@@ -164,7 +164,8 @@ A plugin can offer a compact readout for the floating HUD, which stays on screen
 is closed. Choose Show in HUD from a plugin's context menu in the drawer to pin its readout; drag
 the HUD anywhere in the window. Only the HUD itself takes touches; the rest of the window reaches
 the app. The pinned readouts and the HUD's position are remembered across launches, and the
-Screenshot plugin leaves the HUD out of its captures. Performance offers its frame rate and memory.
+Screenshot plugin leaves the HUD out of its captures. Performance offers its frame rate and memory,
+and Screen Recording a Record button that becomes the elapsed time and Stop.
 A plugin declares a readout like this; it declares none unless it says so:
 
 ```swift
@@ -210,11 +211,11 @@ and arrays are transparent. Assign `DebugDrawer.shared.redaction = .none` to mas
 
 The drawer's header has a Create Report button that collects every plugin's data into one zip to
 attach to a bug: a `summary.txt` (app, version, OS, device model, date and the list of files) and a
-folder per plugin, named after its title. Every file is plain text, JSON, HAR or PNG, so it opens
-without DebugDrawer, and the redaction rules mask what they call sensitive. Console adds its log
-lines, Network an HTTP Archive (`network.har`) of the captured requests, App Info its facts,
-UserDefaults the app's keys, Cookies the stored cookies and Screenshot the key window; Keychain
-adds nothing. When the zip is ready, the drawer shows its name and a share button.
+folder per plugin, named after its title. Every file is plain text, JSON, HAR, PNG or a QuickTime
+movie, so it opens without DebugDrawer, and the redaction rules mask what they call sensitive.
+Console adds its log lines, Network an HTTP Archive (`network.har`) of the captured requests, App
+Info its facts, UserDefaults the app's keys, Cookies the stored cookies, Screenshot the key window
+and Screen Recording the newest recording; Keychain adds nothing. When the zip is ready, the drawer shows its name and a share button.
 
 A plugin adds its own files by adopting `DebugDrawerReportContributor`; a plugin that doesn't is
 left out. Pass what you add through the redaction it is handed:
@@ -305,8 +306,9 @@ DebugDrawer.shared.installLaunchTime()
 
 Each call needs its plugin's module imported (`import DebugDrawerConsolePlugin`, and so on).
 Tweaks takes the settings it shows and Feature Flags the adapter it reads, and Crash Reports,
-Hangs, Leaks, MetricKit, Permissions, Notifications, Background Tasks, Analytics, Databases and Localization install outside `#if DEBUG`, so each has a
-section of its own, next.
+Hangs, Leaks, MetricKit, Permissions, Notifications, Background Tasks, Analytics, Databases,
+Localization and Screen Recording install outside `#if DEBUG`, so each has a section of its own,
+next.
 
 ### Tweaks: the app's own debug settings
 
@@ -876,6 +878,37 @@ picker and a filter, copies as text or CSV, and the plugin's header shows how ma
 the current language. The bug report carries `localization.txt`: the mode, the languages and what
 each is missing. tvOS and watchOS have no pasteboard, so there it offers no copy.
 
+### Screen Recording: a video of the bug, without the drawer in it
+
+The Screen Recording plugin records the app's windows as a QuickTime movie, started and stopped
+from the drawer or from the HUD, and leaves the drawer, its HUD and its toasts out of the movie:
+
+```swift
+import DebugDrawerScreenRecordingPlugin
+
+// At startup:
+ScreenRecording.install()
+
+// Or keep the newest ten recordings rather than five:
+ScreenRecording.install(capacity: 10)
+```
+
+`ScreenRecording` exists in every configuration and does nothing in release, so the call needs no
+`#if DEBUG`, and a release build links no AVFoundation through it. The plugin draws the app's own
+windows into each frame, up to 30 a second, rather than recording the screen, so it asks for no
+permission, and the drawer is open while it records without appearing in the movie: the layers
+`.debugDrawer()` draws above the app are hidden for the moment a frame is drawn and shown again
+before the screen updates. Pin it to the HUD (Show in HUD) to start and stop it with the drawer
+closed. On iOS, Show Touches draws a circle where each finger is, in the movie only; it is off until
+turned on, and remembered.
+
+Movies are H.264, at the window's size up to 1920 pixels on the longer side, and are saved in
+`Caches/DebugDrawer/Recordings`, the newest five (or `capacity`) kept. Each is listed with when it
+started, its length and size, and can be shared or deleted. The newest is marked In Bug Report and
+goes into the bug report's Screen Recording folder; any other can be added. The movie shows what the
+app's layers hold when each frame is drawn, so an animation Core Animation runs on its own shows at
+its end, and Metal, video and web content may draw blank.
+
 ### Opening the drawer
 
 The drawer doesn't decide how it opens. Call `DebugDrawer.shared.toggle()` from whatever trigger
@@ -998,6 +1031,7 @@ ContentView()
 | `DebugDrawerAnalyticsPlugin` | The analytics events the app records, live, newest first, with their time and properties: search by name, key or value, each open as inspector rows and JSON to copy, all exported as a JSON file |
 | `DebugDrawerDatabaseBrowserPlugin` | The app's SQLite, Core Data and SwiftData stores, opened read-only: tables or entities with row counts, rows paged and searched in a grid, and read-only SELECT queries, copied as CSV |
 | `DebugDrawerLocalizationPlugin` | Pseudo-localization and show-keys modes over the strings the app looks up through Bundle, live, Apple's localization launch arguments to copy, and the translations missing for a language, grouped by table, searched and copied as text or CSV |
+| `DebugDrawerScreenRecordingPlugin` | The app's windows recorded as a QuickTime movie without the drawer, its HUD or its toasts, started and stopped from the drawer or the HUD, with touch indicators on iOS: the saved recordings to share or delete, and the newest in the bug report |
 
 ## Development
 

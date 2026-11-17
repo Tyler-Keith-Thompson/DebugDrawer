@@ -27,6 +27,7 @@ import DebugDrawerNotificationsPlugin
 import DebugDrawerBackgroundTasksPlugin
 import DebugDrawerAnalyticsPlugin
 import DebugDrawerLocalizationPlugin
+import DebugDrawerScreenRecordingPlugin
 import SwiftUI
 
 /// Demonstrates Send Report without a server: "sends" each report by copying it into the app's
@@ -100,6 +101,9 @@ struct DebugDrawerExampleiOSApp: App {
         // Installs the Databases plugin, which compiles in release too and does nothing there;
         // launched with -SeedSampleDatabase, the app first writes its sample stores.
         ExampleDatabase.install()
+        // Installs Screen Recording, which compiles in release too and does nothing there; launched
+        // with -PinScreenRecordingToHUD, the app pins its Record button to the HUD.
+        ExampleScreenRecording.install()
         #if DEBUG
             DebugDrawer.shared.installConsole()
             DebugDrawer.shared.installNetwork()

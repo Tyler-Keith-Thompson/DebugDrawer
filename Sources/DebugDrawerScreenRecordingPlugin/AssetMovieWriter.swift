@@ -1,0 +1,204 @@
+#if DEBUG
+    import AVFoundation
+    import CoreGraphics
+    import CoreVideo
+    import os
+
+    /// Writes frames as H.264 in a QuickTime movie with AVAssetWriter.
+    ///
+    /// Main-actor isolated like the frames it is handed: each is drawn into a pixel buffer from the
+    /// adaptor's pool and appended at once, and the encoder works on its own queue. Rejected:
+    /// ReplayKit's and ScreenCaptureKit's writers, which record the screen, drawer included.
+    @MainActor
+    final class AssetMovieWriter: MovieWriter {
+        private let url: URL
+        private var session: Session?
+        /// A frame couldn't be appended; finish throws.
+        private var hasFailed = false
+
+        /// The writer, its input and what has been written, from the first frame on.
+        private struct Session {
+            let writer: AVAssetWriter
+            let input: AVAssetWriterInput
+            let adaptor: AVAssetWriterInputPixelBufferAdaptor
+            let width: Int
+            let height: Int
+            let firstTime: TimeInterval
+            /// The last frame appended's time, `nil` until the first is.
+            var lastTime: TimeInterval?
+            /// The latest frame the encoder wasn't ready for, appended at finish if no later one is.
+            var heldFrame: RecordedFrame?
+        }
+
+        /// A writer of a new movie at `url`, replacing any file there once the first frame arrives.
+        init(url: URL) {
+            self.url = url
+        }
+
+        func append(_ frame: RecordedFrame) {
+            guard !hasFailed else { return }
+            if session == nil {
+                session = startSession(with: frame)
+                guard session != nil else {
+                    hasFailed = true
+                    return
+                }
+            }
+            guard let session, frame.time > (session.lastTime ?? -.infinity), frame.time > (session.heldFrame?.time ?? -.infinity),
+                  frame.time >= session.firstTime
+            else { return }
+            guard session.input.isReadyForMoreMediaData else {
+                // Dropped while the encoder catches up, but kept as the latest, so the movie still
+                // ends on the last frame drawn before Stop.
+                self.session?.heldFrame = frame
+                return
+            }
+            self.session?.heldFrame = nil
+            write(frame)
+        }
+
+        func finish() async throws(RecordingFailure) -> Duration {
+            guard let held = session?.heldFrame ?? nil, let input = session?.input else {
+                return try await close()
+            }
+            await Self.readiness(of: input)
+            write(held)
+            return try await close()
+        }
+
+        /// Ends the movie at its last frame and closes the file.
+        private func close() async throws(RecordingFailure) -> Duration {
+            guard let session else { throw hasFailed ? .writeFailed : .noFrames }
+            self.session = nil
+            guard let lastTime = session.lastTime else {
+                session.writer.cancelWriting()
+                try? FileManager.default.removeItem(at: url)
+                throw hasFailed ? .writeFailed : .noFrames
+            }
+            // The last frame stays on screen for one frame's length rather than none.
+            let length = lastTime - session.firstTime + Self.frameLength
+            session.input.markAsFinished()
+            session.writer.endSession(atSourceTime: CMTime(seconds: length, preferredTimescale: Self.timescale))
+            let writer = UncheckedWriter(writer: session.writer)
+            await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+                writer.writer.finishWriting { continuation.resume() }
+            }
+            guard !hasFailed, session.writer.status == .completed else { throw .writeFailed }
+            return .seconds(length)
+        }
+
+        /// Draws `frame` into a pixel buffer and appends it at its time from the first frame.
+        private func write(_ frame: RecordedFrame) {
+            guard var session, let pool = session.adaptor.pixelBufferPool else { return }
+            var buffer: CVPixelBuffer?
+            guard CVPixelBufferPoolCreatePixelBuffer(nil, pool, &buffer) == kCVReturnSuccess, let buffer else { return }
+            Self.draw(frame.image, into: buffer, width: session.width, height: session.height)
+            let time = CMTime(seconds: frame.time - session.firstTime, preferredTimescale: Self.timescale)
+            guard session.adaptor.append(buffer, withPresentationTime: time) else {
+                hasFailed = true
+                return
+            }
+            session.lastTime = frame.time
+            session.heldFrame = nil
+            self.session = session
+        }
+
+        /// Returns once `input` is ready for more data: the event AVFoundation sends through
+        /// `requestMediaDataWhenReady`, which calls its block until the input is marked finished,
+        /// so only the first call resumes. `OSAllocatedUnfairLock` rather than `Mutex`, which needs
+        /// iOS 18; switch to `Mutex` once iOS 18 is the minimum.
+        private static func readiness(of input: AVAssetWriterInput) async {
+            guard !input.isReadyForMoreMediaData else { return }
+            let unchecked = UncheckedInput(input: input)
+            await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+                let resumed = OSAllocatedUnfairLock(initialState: false)
+                unchecked.input.requestMediaDataWhenReady(on: DispatchQueue(label: "com.debugdrawer.screenRecording.readiness")) {
+                    let isFirst = resumed.withLock { wasResumed in
+                        defer { wasResumed = true }
+                        return !wasResumed
+                    }
+                    if isFirst { continuation.resume() }
+                }
+            }
+        }
+
+        /// The size movies are written at for `image`: its own, each side rounded down to an even
+        /// number of pixels, as H.264 needs.
+        static func movieSize(of image: CGImage) -> (width: Int, height: Int) {
+            (image.width & ~1, image.height & ~1)
+        }
+
+        /// How long a frame shows at the recorder's 30 frames a second.
+        static let frameLength: TimeInterval = 1.0 / 30
+
+        private static let timescale: CMTimeScale = 600
+
+        private func startSession(with frame: RecordedFrame) -> Session? {
+            let (width, height) = Self.movieSize(of: frame.image)
+            guard width >= 2, height >= 2 else { return nil }
+            try? FileManager.default.removeItem(at: url)
+            guard let writer = try? AVAssetWriter(outputURL: url, fileType: .mov) else { return nil }
+            let input = AVAssetWriterInput(mediaType: .video, outputSettings: [
+                AVVideoCodecKey: AVVideoCodecType.h264,
+                AVVideoWidthKey: width,
+                AVVideoHeightKey: height,
+                // About two bits a pixel at 30 frames a second: text stays sharp, and a minute of
+                // an iPad's screen is around 50 MB.
+                AVVideoCompressionPropertiesKey: [AVVideoAverageBitRateKey: width * height * 2]
+            ])
+            input.expectsMediaDataInRealTime = true
+            let adaptor = AVAssetWriterInputPixelBufferAdaptor(assetWriterInput: input, sourcePixelBufferAttributes: [
+                kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA,
+                kCVPixelBufferWidthKey as String: width,
+                kCVPixelBufferHeightKey as String: height
+            ])
+            guard writer.canAdd(input) else { return nil }
+            writer.add(input)
+            guard writer.startWriting() else { return nil }
+            writer.startSession(atSourceTime: .zero)
+            return Session(writer: writer, input: input, adaptor: adaptor, width: width, height: height, firstTime: frame.time, lastTime: nil)
+        }
+
+        /// Draws `image` into `buffer`, scaled to fit and centred on black.
+        private static func draw(_ image: CGImage, into buffer: CVPixelBuffer, width: Int, height: Int) {
+            CVPixelBufferLockBaseAddress(buffer, [])
+            defer { CVPixelBufferUnlockBaseAddress(buffer, []) }
+            guard let context = CGContext(
+                data: CVPixelBufferGetBaseAddress(buffer),
+                width: width,
+                height: height,
+                bitsPerComponent: 8,
+                bytesPerRow: CVPixelBufferGetBytesPerRow(buffer),
+                space: CGColorSpaceCreateDeviceRGB(),
+                bitmapInfo: CGImageAlphaInfo.premultipliedFirst.rawValue | CGBitmapInfo.byteOrder32Little.rawValue
+            ) else { return }
+            let bounds = CGRect(x: 0, y: 0, width: width, height: height)
+            context.setFillColor(CGColor(gray: 0, alpha: 1))
+            context.fill(bounds)
+            context.interpolationQuality = .high
+            context.draw(image, in: bounds.fitting(width: CGFloat(image.width), height: CGFloat(image.height)))
+        }
+    }
+
+    /// The writer's input, handed to its readiness callback, which runs once before the input is
+    /// touched again.
+    private struct UncheckedInput: @unchecked Sendable {
+        let input: AVAssetWriterInput
+    }
+
+    /// The asset writer, handed to its own completion handler. AVAssetWriter isn't Sendable; the
+    /// writer is finished once, and touched again only after the handler resumes.
+    private struct UncheckedWriter: @unchecked Sendable {
+        let writer: AVAssetWriter
+    }
+
+    extension CGRect {
+        /// The largest rectangle of the given proportions that fits inside this one, centred.
+        fileprivate func fitting(width: CGFloat, height: CGFloat) -> CGRect {
+            guard width > 0, height > 0 else { return self }
+            let scale = min(self.width / width, self.height / height)
+            let size = CGSize(width: width * scale, height: height * scale)
+            return CGRect(x: midX - size.width / 2, y: midY - size.height / 2, width: size.width, height: size.height)
+        }
+    }
+#endif

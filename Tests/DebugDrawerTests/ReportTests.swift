@@ -71,19 +71,20 @@
         @Test("A name loses separators and a leading dot, gains its kind's extension, and an empty name becomes file")
         func namesAreSanitised() {
             var sut = DebugDrawerReport()
-            let expected = ["a-b-c.txt", "hidden.json", "file.har", "shot.png"]
+            let expected = ["a-b-c.txt", "hidden.json", "file.har", "shot.png", "clip.mov"]
 
             sut.add(text: "", named: "a/b:c")
             sut.add(jsonData: Data("{}".utf8), named: ".hidden")
             sut.add(har: Data("{}".utf8), named: "")
             sut.add(png: Data(), named: "shot.PNG")
+            sut.add(movie: Data(), named: "clip.MOV")
 
             #expect(sut.files.map(\.name) == expected)
         }
 
-        @Test("Each file's kind decides its extension: txt, json, har or png")
+        @Test("Each file's kind decides its extension: txt, json, har, png or mov")
         func kindsHaveTheirExtensions() {
-            let expected = ["txt", "json", "har", "png"]
+            let expected = ["txt", "json", "har", "png", "mov"]
 
             let actual = DebugDrawerReport.Kind.allCases.map(\.fileExtension)
 

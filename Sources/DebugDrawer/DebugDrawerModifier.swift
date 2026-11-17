@@ -9,6 +9,9 @@
 
         func body(content: Content) -> some View {
             content
+                // The chrome boundary's first layer: the HUD, the panel and the toast come after it
+                // (DrawerChromeBoundary).
+                .overlay { DrawerChromeBoundaryMarker(layerName: debugDrawerChromeStartLayerName) }
                 // Under the drawer, which takes no touches while closed, so the HUD keeps working.
                 .overlay {
                     let readouts = drawer.hudPlugins
@@ -35,6 +38,7 @@
                         .transition(.move(edge: .top).combined(with: .opacity))
                     }
                 }
+                .overlay { DrawerChromeBoundaryMarker(layerName: debugDrawerChromeEndLayerName) }
                 .animation(reduceMotion ? nil : .easeInOut(duration: 0.25), value: drawer.isOpen)
                 .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: drawer.toast)
         }

@@ -37,6 +37,7 @@ _SHARED_DEPS = [
     "//Sources/DebugDrawerAnalyticsPlugin",
     "//Sources/DebugDrawerDatabaseBrowserPlugin",
     "//Sources/DebugDrawerLocalizationPlugin",
+    "//Sources/DebugDrawerScreenRecordingPlugin",
 ]
 
 # ── macOS ────────────────────────────────────────────────────────────
