@@ -2,36 +2,19 @@
     import DebugDrawer
     import SwiftUI
 
-    /// A key and its value's type; selected, it shows the value, controls to change it (Bool,
-    /// String and Number values), a button to copy the value and one to delete the key, which
-    /// asks first. A sensitive value is masked in the copy, and on screen until revealed.
+    /// A key and its value's type; selected, it shows the value and the editor for it, whatever its
+    /// type and however deep, a button to copy the value and one to delete the key, which asks
+    /// first. A sensitive value is masked in the copy, and on screen until revealed.
     struct DefaultsEntryRow: View {
         let entry: DefaultsEntry
         let redaction: DebugDrawerRedaction
         let isSelected: Bool
         let onSelect: () -> Void
-        let onSet: (Any) -> Void
+        /// Saves the key's whole value.
+        let onSet: (PropertyListValue) -> Void
         let onDelete: () -> Void
-        @State private var editValue: String
         @State private var isConfirmingDelete = false
         @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-
-        init(
-            entry: DefaultsEntry,
-            redaction: DebugDrawerRedaction,
-            isSelected: Bool,
-            onSelect: @escaping () -> Void,
-            onSet: @escaping (Any) -> Void,
-            onDelete: @escaping () -> Void
-        ) {
-            self.entry = entry
-            self.redaction = redaction
-            self.isSelected = isSelected
-            self.onSelect = onSelect
-            self.onSet = onSet
-            self.onDelete = onDelete
-            _editValue = State(initialValue: entry.value)
-        }
 
         var body: some View {
             VStack(alignment: .leading, spacing: 2) {
@@ -43,11 +26,14 @@
 
                 if isSelected {
                     VStack(alignment: .leading, spacing: 4) {
-                        DebugDrawerCodeBlock {
-                            RedactedText(entry.value, redacted: entry.copiedValue(redaction: redaction))
+                        // An array or a dictionary lists what it holds instead.
+                        if entry.value.type != .array, entry.value.type != .dictionary {
+                            DebugDrawerCodeBlock {
+                                RedactedText(entry.value.copiedText, redacted: entry.copiedValue(redaction: redaction))
+                            }
                         }
 
-                        editControls
+                        PropertyListEditor(key: entry.key, value: entry.value, save: onSet)
 
                         DebugDrawerActionRow {
                             DebugDrawerCopyButton("Copy Value") { entry.copiedValue(redaction: redaction) }
@@ -55,8 +41,10 @@
                             if isConfirmingDelete {
                                 deleteConfirmation
                             } else {
-                                Button("Delete", role: .destructive) { isConfirmingDelete = true }
+                                // "Key", so it reads apart from a nested value's Delete Item.
+                                Button("Delete Key", role: .destructive) { isConfirmingDelete = true }
                                     .debugDrawerButtonStyle(.destructive)
+                                    .accessibilityLabel("Delete Key \(entry.key)")
                             }
                         }
                     }
@@ -64,7 +52,7 @@
                 }
             }
             .onChange(of: isSelected) {
-                if isSelected { editValue = entry.value }
+                if !isSelected { isConfirmingDelete = false }
             }
         }
 
@@ -89,7 +77,7 @@
                     Spacer()
                 }
 
-                Text(entry.type)
+                Text(entry.value.type.title)
                     .debugDrawerFont(.secondary)
                     .debugDrawerForegroundStyle(.tertiary)
             }
@@ -105,73 +93,15 @@
                     .debugDrawerForegroundStyle(.error)
                 Button("Cancel") { isConfirmingDelete = false }
                     .debugDrawerButtonStyle(.secondary)
-                Button("Delete", role: .destructive) {
+                Button("Delete Key", role: .destructive) {
                     isConfirmingDelete = false
                     onDelete()
                 }
                 .debugDrawerButtonStyle(.destructive)
-                .accessibilityLabel("Delete \(entry.key)")
+                .accessibilityLabel("Delete Key \(entry.key)")
             }
             .accessibilityElement(children: .contain)
-            .accessibilityLabel("Delete \(entry.key)?")
-        }
-
-        @ViewBuilder
-        private var editControls: some View {
-            switch entry.type {
-            case "Bool":
-                HStack {
-                    Text("Value")
-                        .debugDrawerFont(.label)
-                        .debugDrawerForegroundStyle(.secondary)
-                    Picker("Value", selection: Binding(
-                        get: { (entry.rawValue as? NSNumber)?.boolValue ?? false },
-                        set: { onSet($0) }
-                    )) {
-                        Text("true").tag(true)
-                        Text("false").tag(false)
-                    }
-                    .pickerStyle(.segmented)
-                    .labelsHidden()
-                    .controlSize(.small)
-                    .frame(width: 120)
-                    .accessibilityLabel("Value of \(entry.key)")
-                    .accessibilityElement(children: .contain)
-                }
-
-            case "String":
-                HStack {
-                    valueField
-                    Button("Set") { onSet(editValue) }
-                        .debugDrawerButtonStyle(.secondary)
-                        .accessibilityLabel("Set \(entry.key)")
-                }
-
-            case "Number":
-                HStack {
-                    valueField
-                    Button("Set") {
-                        if let number = Double(editValue) {
-                            onSet(number)
-                        } else if let integer = Int(editValue) {
-                            onSet(integer)
-                        }
-                    }
-                    .debugDrawerButtonStyle(.secondary)
-                    .accessibilityLabel("Set \(entry.key)")
-                }
-
-            default:
-                Text("Editing not supported for \(entry.type)")
-                    .debugDrawerFont(.secondary)
-                    .debugDrawerForegroundStyle(.tertiary)
-            }
-        }
-
-        private var valueField: some View {
-            TextField("New value", text: $editValue)
-                .debugDrawerTextFieldStyle()
-                .accessibilityLabel("New value for \(entry.key)")
+            .accessibilityLabel("Delete Key \(entry.key)?")
         }
     }
 #endif

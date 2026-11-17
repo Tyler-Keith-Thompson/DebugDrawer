@@ -293,7 +293,6 @@ DebugDrawer.shared.installNetwork()
 DebugDrawer.shared.installDiskIO()
 DebugDrawer.shared.installScreenshot()
 DebugDrawer.shared.installAppInfo()
-DebugDrawer.shared.installUserDefaults()
 DebugDrawer.shared.installKeychain()
 DebugDrawer.shared.installFileBrowser()
 DebugDrawer.shared.installLocation()
@@ -307,8 +306,9 @@ DebugDrawer.shared.installLaunchTime()
 Each call needs its plugin's module imported (`import DebugDrawerConsolePlugin`, and so on).
 Tweaks takes the settings it shows and Feature Flags the adapter it reads, and Crash Reports,
 Hangs, Leaks, MetricKit, Permissions, Notifications, Background Tasks, Analytics, Databases,
-Localization, Screen Recording, Design Overlay, Color Vision and Reset App State install outside
-`#if DEBUG`, so each has a section of its own, after Network's mocks and conditions.
+UserDefaults, Localization, Screen Recording, Design Overlay, Color Vision and Reset App State
+install outside `#if DEBUG`, so each has a section of its own, after Network's mocks and
+conditions.
 
 ### Console sessions: logs from earlier launches
 
@@ -1057,6 +1057,31 @@ holds locked shows "Store busy, try again". Reading a WAL store needs to write i
 browser says when it can't. The bug report carries `databases.txt`: each store with its tables and
 row counts, never their rows. tvOS and watchOS have no pasteboard, so there it offers no copy.
 
+### UserDefaults: app group suites, and values of every type
+
+The UserDefaults plugin lists the keys of the standard defaults and of any suite the app names,
+such as an app group's it shares with its extensions:
+
+```swift
+import DebugDrawerUserDefaultsPlugin
+
+// At startup:
+UserDefaultsBrowser.install(suites: ["group.com.example.shared"])
+```
+
+`UserDefaultsBrowser` exists in every configuration and does nothing in release, so the call needs
+no `#if DEBUG`. With suites named, a picker above the list switches between Standard and each
+suite. Selecting a key edits its value whatever its type: a string, number or data in a field
+(data in hex or Base64, as toggled), a Boolean as true or false, a date with a date picker, and an
+array or a dictionary as a list of what it holds, where tapping an item drills in, however deep.
+Text that isn't a value of the type says why under the field, and Save waits until it is. Each
+edit writes the key's whole value back. Add Key adds a key of a chosen type, starting empty (a
+date starts now), and an array or a dictionary takes items the same way. The list follows the
+app's writes to any suite in the process as they happen (`UserDefaults.didChangeNotification`);
+a write from another process, such as an extension's, shows after Reload in the menu beside Add
+Key, which also shows the system's keys. The bug report carries the standard defaults' keys as
+`user-defaults.json`.
+
 ### Localization: text that doesn't fit, and strings nobody translated
 
 The Localization plugin pseudo-localizes the app's strings or shows their keys, while the app runs,
@@ -1431,7 +1456,7 @@ ContentView()
 | `DebugDrawerNetworkPlugin` | URLProtocol HTTP interception: method, URL, status, timing, headers, body, cURL export, mock responses by rule, slow and failing networks per host, replay and edit-and-resend, HAR export and import, WebSocket frames, requests kept across launches, ignored hosts, GraphQL operation names |
 | `DebugDrawerDiskIOPlugin` | FileManager reads, writes, deletes and listings, flagging main-thread I/O |
 | `DebugDrawerAppInfoPlugin` | Bundle, version, OS, memory, uptime, process, debugger, screen and reachability facts |
-| `DebugDrawerUserDefaultsPlugin` | Browse, search, edit, copy and delete UserDefaults keys |
+| `DebugDrawerUserDefaultsPlugin` | Browse, search, add, edit, copy and delete UserDefaults keys of the standard defaults and app group suites, values of every property-list type edited at any depth, the list following the app's writes |
 | `DebugDrawerKeychainPlugin` | Generic and internet passwords, certificates and keys, each with every attribute the keychain returns (a key's or certificate's data is never read), filtered by access group and text; generic passwords added and edited, any item deleted; on the Mac, the data protection keychain |
 | `DebugDrawerScreenshotPlugin` | The app window captured to a file or the clipboard, optionally without the drawer |
 | `DebugDrawerFileBrowserPlugin` | The app's Application Support and Caches directories: delete and share files |

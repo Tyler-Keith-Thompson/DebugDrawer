@@ -120,6 +120,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Installs Reset App State, which compiles in release too and does nothing there; launched with
         // -SeedResettableState, the app first writes state of every kind for it to clear.
         ExampleAppStateReset.install()
+        // Installs UserDefaults over the standard defaults and an app group's suite, seeded with a
+        // value of each type; it compiles in release too and does nothing there.
+        ExampleUserDefaults.install()
         // Installs Network; launched with -SeedNetworkMock, it adds mocks that answer the
         // Fetch Greeting and Place Order buttons, and with -SeedNetworkCondition, a profile that
         // slows example.com.
@@ -145,7 +148,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             DebugDrawer.shared.installEnergy()
             DebugDrawer.shared.installScreenshot()
             DebugDrawer.shared.installAppInfo()
-            DebugDrawer.shared.installUserDefaults()
             DebugDrawer.shared.installKeychain()
             DebugDrawer.shared.installFileBrowser()
             DebugDrawer.shared.installLocation()
@@ -289,6 +291,8 @@ struct ExampleContentView: View {
                     ExampleTweaksBanner()
                     ExampleFeatureFlagsSummary()
                     ExampleResettableState()
+                    // UserDefaults lists the key as it is written, without a reload.
+                    ExampleUserDefaultsWriter()
                     // Network logs each request; a mock answers the greeting, which no server does.
                     ExampleNetworkRequests()
                     ExampleWebSocketDemo()

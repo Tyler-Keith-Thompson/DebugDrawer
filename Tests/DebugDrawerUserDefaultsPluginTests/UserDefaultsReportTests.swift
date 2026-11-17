@@ -9,8 +9,8 @@
         @Test("The report gets user-defaults.json with each key's type and value, a password key masked")
         func defaultsAsJSON() throws {
             let entries = [
-                DefaultsEntry(id: "launchCount", key: "launchCount", value: "3", type: "Number", rawValue: 3),
-                DefaultsEntry(id: "password", key: "password", value: "hunter2", type: "String", rawValue: "hunter2")
+                DefaultsEntry(key: "launchCount", value: .number(3)),
+                DefaultsEntry(key: "password", value: .string("hunter2"))
             ]
             let expected = """
             {
@@ -41,13 +41,6 @@
             UserDefaultsPlugin.contribute([], to: &actual, redaction: .standard)
 
             #expect(actual.files.isEmpty)
-        }
-
-        @Test("The system's keys are not the app's")
-        @MainActor func systemKeys() {
-            #expect(UserDefaultsStore.isSystemKey("NSLanguages"))
-            #expect(UserDefaultsStore.isSystemKey("com.apple.something"))
-            #expect(!UserDefaultsStore.isSystemKey("launchCount"))
         }
     }
 #endif

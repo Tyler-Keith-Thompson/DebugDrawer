@@ -2,184 +2,67 @@
     import DebugDrawer
     import SwiftUI
 
-    // MARK: - UserDefaults model
-
-    struct DefaultsEntry: Identifiable {
-        let id: String
-        let key: String
-        let value: String
-        let type: String
-        let rawValue: Any
-
-        /// What Copy Value puts on the clipboard: the value's description, or the mask when the
-        /// key contains a key pattern.
-        func copiedValue(redaction: DebugDrawerRedaction) -> String {
-            redaction.redacting(value, forKey: key)
-        }
-    }
-
-    @MainActor
-    final class UserDefaultsStore: ObservableObject {
-        static let shared = UserDefaultsStore()
-
-        @Published var entries: [DefaultsEntry] = []
-        @Published var searchText = ""
-        @Published var showSystemKeys = false
-
-        var filteredEntries: [DefaultsEntry] {
-            var result = showSystemKeys ? entries : entries.filter { !Self.isSystemKey($0.key) }
-            if !searchText.isEmpty {
-                let query = searchText.lowercased()
-                result = result.filter {
-                    $0.key.lowercased().contains(query) || $0.value.lowercased().contains(query)
-                }
-            }
-            return result
-        }
-
-        private static let systemPrefixes = [
-            "NS", "Apple", "AK", "com.apple.", "WebKit",
-            "Country", "AddressBook", "PKLog", "INNext",
-            "METAL_", "MTL", "CTDirtyCount"
-        ]
-
-        /// Whether the system or a framework, not the app, wrote the key, judged by its prefix.
-        static func isSystemKey(_ key: String) -> Bool {
-            Self.systemPrefixes.contains(where: { key.hasPrefix($0) })
-        }
-
-        private init() {
-            reload()
-        }
-
-        func reload() {
-            let dict = UserDefaults.standard.dictionaryRepresentation()
-            entries = dict.keys.sorted().map { key in
-                let val = dict[key]!
-                return DefaultsEntry(
-                    id: key,
-                    key: key,
-                    value: describeValue(val),
-                    type: typeLabel(val),
-                    rawValue: val
-                )
-            }
-        }
-
-        func deleteKey(_ key: String) {
-            UserDefaults.standard.removeObject(forKey: key)
-            reload()
-        }
-
-        func setValue(_ key: String, _ value: Any) {
-            UserDefaults.standard.set(value, forKey: key)
-            reload()
-        }
-
-        private func describeValue(_ value: Any) -> String {
-            switch value {
-            case let string as String: return string
-            case let number as NSNumber:
-                if CFBooleanGetTypeID() == CFGetTypeID(number) {
-                    return number.boolValue ? "true" : "false"
-                }
-                return number.stringValue
-            case let date as Date: return date.formatted()
-            case let data as Data: return "<Data: \(data.count) bytes>"
-            case let arr as [Any]: return "[\(arr.count) items]"
-            case let dict as [String: Any]: return "{\(dict.count) keys}"
-            default: return String(describing: value)
-            }
-        }
-
-        private func typeLabel(_ value: Any) -> String {
-            switch value {
-            case is String: return "String"
-            case let number as NSNumber:
-                if CFBooleanGetTypeID() == CFGetTypeID(number) { return "Bool" }
-                if number === kCFBooleanTrue || number === kCFBooleanFalse { return "Bool" }
-                return "Number"
-            case is Date: return "Date"
-            case is Data: return "Data"
-            case is [Any]: return "Array"
-            case is [String: Any]: return "Dict"
-            default: return String(describing: type(of: value))
-            }
-        }
-    }
-
-    // MARK: - Plugin
-
+    /// The app's UserDefaults: a picker of the suites, the shown suite's keys with a filter, each
+    /// value edited in place whatever its type, and keys added and deleted. Installed by
+    /// ``UserDefaultsBrowser/install(suites:)``.
     public struct UserDefaultsPlugin: DebugDrawerPlugin {
         public var title = "UserDefaults"
         public var category = "Storage"
         public var icon = "cylinder.split.1x2"
 
-        public init() {}
+        let model: UserDefaultsModel
+
+        init(model: UserDefaultsModel) {
+            self.model = model
+        }
 
         public var body: some View {
-            UserDefaultsPluginView()
+            UserDefaultsPluginView(model: model)
+        }
+
+        /// How many keys the filters let through ("12 keys").
+        public var headerAccessory: some View {
+            UserDefaultsHeaderAccessory(model: model)
         }
     }
 
+    /// Reads the model and hands its values to `UserDefaultsBrowserView`; while shown, the list
+    /// follows the app's writes.
     struct UserDefaultsPluginView: View {
-        @ObservedObject private var store = UserDefaultsStore.shared
+        @ObservedObject var model: UserDefaultsModel
         @ObservedObject private var drawer = DebugDrawer.shared
-        @State private var selectedKey: String?
-        @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
         var body: some View {
-            VStack(alignment: .leading, spacing: 6) {
-                HStack {
-                    Text("\(store.filteredEntries.count) keys")
-                        .debugDrawerFont(.secondary)
-                        .debugDrawerForegroundStyle(.secondary)
-                    Spacer()
-                    Toggle("System", isOn: $store.showSystemKeys)
-                        .toggleStyle(.switch)
-                        .controlSize(.mini)
-                        .debugDrawerFont(.label)
-                    Button("Reload") { store.reload() }
-                        .debugDrawerButtonStyle(.borderless)
-                }
-
-                ScrollViewReader { proxy in
-                    DebugDrawerSearchableList("Filter...", text: $store.searchText, accessibilityLabel: "Filter keys and values") {
-                        ForEach(store.filteredEntries) { entry in
-                            DefaultsEntryRow(
-                                entry: entry,
-                                redaction: drawer.redaction,
-                                isSelected: selectedKey == entry.key,
-                                onSelect: { selectedKey = selectedKey == entry.key ? nil : entry.key },
-                                onSet: { value in
-                                    store.setValue(entry.key, value)
-                                    selectedKey = nil
-                                },
-                                onDelete: {
-                                    store.deleteKey(entry.key)
-                                    selectedKey = nil
-                                }
-                            )
-                            .id(entry.key)
-                        }
-                    }
-                    .onChange(of: selectedKey) { _, newKey in
-                        if let key = newKey {
-                            withAnimation(reduceMotion ? nil : .default) {
-                                proxy.scrollTo(key, anchor: .bottom)
-                            }
-                        }
-                    }
-                }
-            }
+            UserDefaultsBrowserView(
+                suites: model.suites,
+                selectedSuite: $model.selectedSuite,
+                entries: model.filteredEntries,
+                keys: Set(model.entries.map(\.key)),
+                searchText: $model.searchText,
+                showSystemKeys: $model.showSystemKeys,
+                redaction: drawer.redaction,
+                actions: UserDefaultsBrowserActions(
+                    set: { model.set($0, forKey: $1) },
+                    add: { model.add($0, type: $1) },
+                    remove: { model.remove($0) },
+                    reload: { model.reload() }
+                )
+            )
+            .onAppear { model.startObservingChanges() }
+            .onDisappear { model.stopObservingChanges() }
         }
     }
 
-    // MARK: - Convenience installer
+    /// The header's readout: reads the model, and follows the app's writes while shown, which it
+    /// is while the plugin is closed too.
+    struct UserDefaultsHeaderAccessory: View {
+        @ObservedObject var model: UserDefaultsModel
 
-    public extension DebugDrawer {
-        func installUserDefaults() {
-            registerGlobal(UserDefaultsPlugin())
+        var body: some View {
+            let count = model.filteredEntries.count
+            Text(count == 1 ? "1 key" : "\(count.formatted()) keys")
+                .onAppear { model.startObservingChanges() }
+                .onDisappear { model.stopObservingChanges() }
         }
     }
 #endif
