@@ -99,40 +99,61 @@
 
     // MARK: - Plugin
 
+    /// The App Info plugin: the build (version, commit, branch, CI build), the process, the device,
+    /// the provisioning profile and the entitlements.
     public struct AppInfoPlugin: DebugDrawerPlugin {
         public var title = "App Info"
         public var category = "App"
         public var icon = "info.circle"
 
-        public init() {}
+        let buildMetadata: AppInfoBuildMetadata
+        let signing: AppSigningStore
+
+        /// - Parameter buildMetadata: The commit, branch and CI build to show; each one `nil` is
+        ///   read from the main bundle's Info.plist (``AppInfoBuildMetadata``).
+        @MainActor public init(buildMetadata: AppInfoBuildMetadata = AppInfoBuildMetadata()) {
+            self.init(buildMetadata: buildMetadata, signing: .shared)
+        }
+
+        init(buildMetadata: AppInfoBuildMetadata, signing: AppSigningStore) {
+            self.buildMetadata = buildMetadata
+            self.signing = signing
+        }
 
         public var body: some View {
-            AppInfoPluginView()
+            AppInfoPluginView(buildMetadata: buildMetadata, signing: signing)
         }
     }
 
     struct AppInfoPluginView: View {
         @ObservedObject var metrics = AppMetrics.shared
+        let buildMetadata: AppInfoBuildMetadata
+        let signing: AppSigningStore
 
         var body: some View {
-            AppInfoFactsView(facts: AppInfoFacts(metrics: metrics)) { metrics.refresh() }
+            AppInfoFactsView(facts: AppInfoFacts(metrics: metrics, buildMetadata: buildMetadata, signing: signing.signing)) {
+                metrics.refresh()
+            }
         }
     }
 
-    /// The facts, in sections, with buttons to copy them and to read them again.
+    /// The facts, in sections, then the provisioning profile and the entitlements, with buttons
+    /// to copy them all and to read them again.
     struct AppInfoFactsView: View {
         let facts: AppInfoFacts
         let refresh: () -> Void
 
         var body: some View {
             VStack(alignment: .leading, spacing: 0) {
-                ForEach(Array(facts.sections.enumerated()), id: \.offset) { _, section in
-                    DebugDrawerSection {
-                        ForEach(section, id: \.label) { fact in
+                ForEach(facts.sections, id: \.title) { section in
+                    DebugDrawerSection(section.title) {
+                        ForEach(section.facts, id: \.label) { fact in
                             DebugDrawerKeyValueRow(fact.label, value: fact.value)
                         }
                     }
                 }
+                AppInfoProvisioningSection(profile: facts.signing.profile, isExpired: facts.isProfileExpired)
+                AppInfoEntitlementsSection(entitlements: facts.signing.entitlements)
 
                 DebugDrawerActionRow {
                     DebugDrawerCopyButton("Copy Info") { facts.report }
@@ -155,8 +176,16 @@
     // MARK: - Convenience installer
 
     public extension DebugDrawer {
-        func installAppInfo() {
-            registerGlobal(AppInfoPlugin())
+        /// Adds the App Info plugin, replacing one added before.
+        ///
+        /// Nothing is read until the plugin is shown or a report is made.
+        ///
+        /// - Parameter buildMetadata: The commit, branch and CI build to show; each one `nil` is
+        ///   read from the main bundle's Info.plist (``AppInfoBuildMetadata``).
+        func installAppInfo(buildMetadata: AppInfoBuildMetadata = AppInfoBuildMetadata()) {
+            let plugin = AppInfoPlugin(buildMetadata: buildMetadata)
+            unregisterGlobal(id: plugin.id)
+            registerGlobal(plugin)
         }
     }
 #endif

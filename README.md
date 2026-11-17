@@ -349,6 +349,29 @@ the first window scene delegate with `scene(_:continue:)`, else the app delegate
 `application(_:continue:restorationHandler:)`; on the Mac, the app delegate's. When the app has
 none of these, the plugin says so rather than dropping the activity.
 
+### App Info: which build is this?
+
+App Info answers QA's first question with more than the version. Its Build section shows the
+version and build number and, when the app supplies them, the commit, branch and CI build number it
+was built from. Pass them at install, or write them into the app's Info.plist (from a CI script, say)
+under `DebugDrawerGitCommit`, `DebugDrawerGitBranch` and `DebugDrawerCIBuildNumber`; a value passed
+at install wins over the plist's:
+
+```swift
+#if DEBUG
+DebugDrawer.shared.installAppInfo(buildMetadata: AppInfoBuildMetadata(gitCommit: "4f9c2e1", gitBranch: "release/2.4"))
+#endif
+```
+
+Below it, Provisioning shows the embedded profile (`embedded.mobileprovision` on iOS,
+`embedded.provisionprofile` on the Mac): its name, team, creation and expiry dates, with a warning
+once it has expired, and how many devices it names. A simulator, App Store or unprovisioned Mac
+build has none, and says None. Entitlements lists what the app runs with, the common ones by name
+(associated domains first, then app groups, keychain access groups, the sandbox, get-task-allow)
+and the rest by key: on the Mac from the code signature, on a simulator from the entitlements linked
+into the executable, and on a device from the profile, which gives what it allows. Copy Info and the
+bug report's `App Info/app-info.json` carry all of it, entitlements by key.
+
 ### Console sessions: logs from earlier launches
 
 The lines logged during a launch, or just before a crash, are kept on disk, so the next launch can
@@ -1537,7 +1560,7 @@ ContentView()
 | `DebugDrawerEnergyPlugin` | Battery level and charging, CPU load and thermal state |
 | `DebugDrawerNetworkPlugin` | URLProtocol HTTP interception: method, URL, status, timing, headers, body, cURL export, mock responses by rule, slow and failing networks per host, replay and edit-and-resend, HAR export and import, WebSocket frames, requests kept across launches, ignored hosts, GraphQL operation names |
 | `DebugDrawerDiskIOPlugin` | FileManager reads, writes, deletes and listings, flagging main-thread I/O |
-| `DebugDrawerAppInfoPlugin` | Bundle, version, OS, memory, uptime, process, debugger, screen and reachability facts |
+| `DebugDrawerAppInfoPlugin` | Build (version, commit, branch, CI build), provisioning profile, entitlements, OS, memory, uptime, process, debugger, screen and reachability facts |
 | `DebugDrawerUserDefaultsPlugin` | Browse, search, add, edit, copy and delete UserDefaults keys of the standard defaults and app group suites, values of every property-list type edited at any depth, the list following the app's writes |
 | `DebugDrawerKeychainPlugin` | Generic and internet passwords, certificates and keys, each with every attribute the keychain returns (a key's or certificate's data is never read), filtered by access group and text; generic passwords added and edited, any item deleted; on the Mac, the data protection keychain |
 | `DebugDrawerScreenshotPlugin` | The app window captured to a file or the clipboard, optionally without the drawer |

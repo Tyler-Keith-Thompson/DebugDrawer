@@ -3,7 +3,7 @@
 load("//tools:docc.bzl", "docc_archive")
 load("//tools:swift_rules.bzl", "swift_library")
 
-# Bundle, version, OS, memory, uptime, process, debugger, screen and reachability facts.
+# Build (version, commit, branch, CI build), provisioning profile, entitlements, OS, memory, uptime, process, debugger, screen and reachability facts.
 swift_library(
     name = "DebugDrawerAppInfoPlugin",
     srcs = glob(["**/*.swift"]),

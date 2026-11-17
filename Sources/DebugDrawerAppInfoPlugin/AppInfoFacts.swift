@@ -6,8 +6,8 @@
     #endif
     import Foundation
 
-    /// What the App Info plugin shows: labeled facts about the bundle, the process and the device,
-    /// in sections.
+    /// What the App Info plugin shows: labeled facts about the build, the process and the device,
+    /// in titled sections, and how the app was signed.
     struct AppInfoFacts: Equatable {
         /// One labeled value.
         struct Fact: Equatable {
@@ -15,12 +15,37 @@
             var value: String
         }
 
-        /// Bundle, runtime and environment, in that order.
-        var sections: [[Fact]]
+        /// A titled group of facts.
+        struct Section: Equatable {
+            var title: String
+            var facts: [Fact]
+        }
 
-        /// The facts as plain text, one `label: value` line each, for the clipboard.
+        /// Build, runtime and environment, in that order.
+        var sections: [Section]
+        /// The provisioning profile and the entitlements, shown after the sections.
+        var signing: AppSigning
+        /// Whether the profile had expired when the facts were read.
+        var isProfileExpired: Bool
+
+        init(sections: [Section], signing: AppSigning = AppSigning(profile: .none, entitlements: nil), isProfileExpired: Bool = false) {
+            self.sections = sections
+            self.signing = signing
+            self.isProfileExpired = isProfileExpired
+        }
+
+        /// Every section, Provisioning and Entitlements last, as Copy Info and the bug report give
+        /// them: entitlements by key rather than by word label, so a key can be searched for.
+        var reportSections: [Section] {
+            sections + [provisioningSection, entitlementsSection]
+        }
+
+        /// The facts as plain text, for the clipboard: each section's title, then a `label: value`
+        /// line per fact, with a blank line between sections.
         var report: String {
-            sections.joined().map { "\($0.label): \($0.value)" }.joined(separator: "\n")
+            reportSections
+                .map { section in ([section.title] + section.facts.map { "\($0.label): \($0.value)" }).joined(separator: "\n") }
+                .joined(separator: "\n\n")
         }
 
         static let launchFormatter: DateFormatter = {
@@ -32,14 +57,28 @@
     }
 
     extension AppInfoFacts {
-        /// The facts now: the main bundle, this process and the device, with `metrics` for
-        /// memory, uptime, network and the process's start.
-        @MainActor init(metrics: AppMetrics, bundle: Bundle = .main, process: ProcessInfo = .processInfo) {
+        /// The facts now: the main bundle, this process and the device.
+        ///
+        /// - Parameters:
+        ///   - metrics: Memory, uptime, network and the process's start.
+        ///   - buildMetadata: The commit, branch and CI build the host passed; each one missing
+        ///     is read from `bundle`'s Info.plist.
+        ///   - signing: The profile and the entitlements.
+        ///   - bundle: The app's bundle.
+        ///   - process: This process.
+        ///   - now: The time the profile's expiry is checked against.
+        @MainActor init(
+            metrics: AppMetrics,
+            buildMetadata: AppInfoBuildMetadata,
+            signing: AppSigning,
+            bundle: Bundle = .main,
+            process: ProcessInfo = .processInfo,
+            now: Date = Date()
+        ) {
             let info = bundle.infoDictionary
-            let version = info?["CFBundleShortVersionString"] as? String ?? "—"
-            let build = info?["CFBundleVersion"] as? String ?? "—"
+            let build = buildMetadata.filled(from: info)
             let gigabyte = 1024.0 * 1024 * 1024
-            var environment: [Fact] = []
+            var environment = [Fact(label: Self.operatingSystemName, value: process.operatingSystemVersionString)]
             #if os(macOS)
                 // iOS, tvOS, watchOS and visionOS apps are always sandboxed, and don't get this variable.
                 let isSandboxed = process.environment["APP_SANDBOX_CONTAINER_ID"] != nil
@@ -53,21 +92,28 @@
                 Fact(label: "Network", value: metrics.networkStatus),
                 Fact(label: "Launched", value: metrics.processStart.map { Self.launchFormatter.string(from: $0.date) } ?? "—")
             ]
-            sections = [
-                [
-                    Fact(label: "Bundle ID", value: bundle.bundleIdentifier ?? "—"),
-                    Fact(label: "Version", value: "\(version) (\(build))"),
-                    Fact(label: Self.operatingSystemName, value: process.operatingSystemVersionString)
+            self.init(
+                sections: [
+                    Section(title: "Build", facts: [
+                        Fact(label: "Bundle ID", value: bundle.bundleIdentifier ?? "—"),
+                        Fact(label: "Version", value: info?["CFBundleShortVersionString"] as? String ?? "—"),
+                        Fact(label: "Build", value: info?["CFBundleVersion"] as? String ?? "—"),
+                        Fact(label: "Commit", value: build.gitCommit ?? "—"),
+                        Fact(label: "Branch", value: build.gitBranch ?? "—"),
+                        Fact(label: "CI Build", value: build.ciBuildNumber ?? "—")
+                    ]),
+                    Section(title: "Runtime", facts: [
+                        Fact(label: "Footprint", value: String(format: "%.1f MB", metrics.footprintMB)),
+                        Fact(label: "Uptime", value: metrics.uptime.map(Self.formatDuration) ?? "—"),
+                        Fact(label: "PID", value: "\(process.processIdentifier)"),
+                        Fact(label: "Arch", value: process.machineHardwareName),
+                        Fact(label: "Arguments", value: "\(process.arguments.count)")
+                    ]),
+                    Section(title: "Environment", facts: environment)
                 ],
-                [
-                    Fact(label: "Footprint", value: String(format: "%.1f MB", metrics.footprintMB)),
-                    Fact(label: "Uptime", value: metrics.uptime.map(Self.formatDuration) ?? "—"),
-                    Fact(label: "PID", value: "\(process.processIdentifier)"),
-                    Fact(label: "Arch", value: process.machineHardwareName),
-                    Fact(label: "Arguments", value: "\(process.arguments.count)")
-                ],
-                environment
-            ]
+                signing: signing,
+                isProfileExpired: signing.profile.provisioningProfile?.isExpired(at: now) ?? false
+            )
         }
 
         /// The OS row's label. The same names as core's bug-report summary, written out again
@@ -115,6 +161,45 @@
             #else
                 return "—"
             #endif
+        }
+    }
+
+    extension AppInfoFacts {
+        fileprivate var provisioningSection: Section {
+            let facts: [Fact] = switch signing.profile {
+            case .none: [Fact(label: "Profile", value: "None")]
+            case .unreadable: [Fact(label: "Profile", value: "Unreadable")]
+            case let .embedded(profile): [
+                    Fact(label: "Name", value: profile.name),
+                    Fact(label: "Team", value: profile.teamName),
+                    Fact(label: "Team ID", value: profile.teamIdentifier),
+                    Fact(label: "Created", value: ProvisioningProfile.format(profile.creationDate)),
+                    Fact(label: "Expires", value: ProvisioningProfile.format(profile.expirationDate) + (isProfileExpired ? " (expired)" : "")),
+                    Fact(label: "Devices", value: profile.devices.text)
+                ]
+            }
+            return Section(title: "Provisioning", facts: facts)
+        }
+
+        fileprivate var entitlementsSection: Section {
+            guard let entitlements = signing.entitlements, !entitlements.entries.isEmpty else {
+                return Section(title: "Entitlements", facts: [Fact(label: "Entitlements", value: "None")])
+            }
+            return Section(
+                title: "Entitlements",
+                facts: [Fact(label: "Source", value: entitlements.source.text)] + entitlements.entries.map { Fact(label: $0.key, value: $0.text) }
+            )
+        }
+    }
+
+    extension Entitlements.Source {
+        /// Where the entitlements were read, in a few words.
+        var text: String {
+            switch self {
+            case .codeSignature: "Code signature"
+            case .executable: "Linked into the executable"
+            case .provisioningProfile: "Provisioning profile"
+            }
         }
     }
 #endif

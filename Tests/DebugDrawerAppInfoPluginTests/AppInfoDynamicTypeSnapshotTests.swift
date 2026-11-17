@@ -6,37 +6,64 @@
     @testable import DebugDrawerAppInfoPlugin
 
     // ImageRenderer draws the view without a window, at a fixed scale and width, so the
-    // reference doesn't depend on which simulator runs it.
+    // reference doesn't depend on which simulator runs it. At 316 points, the width of the drawer
+    // on an iPad and the narrowest it gets, at the default text size and an accessibility one.
     @MainActor
     @Suite(.timeLimit(.minutes(1)))
     struct AppInfoDynamicTypeSnapshotTests {
-        @Test("The facts view stays readable at a large accessibility text size")
-        func factsView() throws {
-            let facts = AppInfoFacts(sections: [
-                [
-                    .init(label: "Bundle ID", value: "com.example.App"),
-                    .init(label: "Version", value: "1.2.3 (45)")
-                ],
-                [
-                    .init(label: "Footprint", value: "182.4 MB"),
-                    .init(label: "Uptime", value: "2m 14s")
-                ],
-                [
-                    .init(label: "OS", value: "macOS 15.4"),
-                    .init(label: "Device", value: "arm64")
-                ]
-            ])
+        @Test(
+            "In an iPad's drawer, the facts, the profile and the entitlements stay readable",
+            arguments: [DynamicTypeSize.large, .accessibility3]
+        )
+        func factsView(size: DynamicTypeSize) throws {
+            let facts = AppInfoFacts(
+                sections: AppInfoFixtures.sections,
+                signing: AppSigning(profile: .embedded(AppInfoFixtures.profile), entitlements: AppInfoFixtures.profile.entitlements)
+            )
             let sut = AppInfoFactsView(facts: facts) {}
             let renderer = ImageRenderer(content: sut
-                .frame(width: 320, alignment: .leading)
+                .frame(width: 316, alignment: .leading)
                 .padding()
                 .background(.background)
-                .environment(\.dynamicTypeSize, .accessibility3))
+                .environment(\.dynamicTypeSize, size))
             renderer.scale = 2
 
             let actual = try #require(renderer.uiImage)
 
-            assertSnapshot(of: actual, as: .image(perceptualPrecision: 0.98), named: "accessibility3")
+            assertSnapshot(of: actual, as: .image(perceptualPrecision: 0.98), named: size == .large ? "large" : "accessibility3")
+        }
+
+        @Test("In an iPad's drawer, an expired profile's warning and fields stay readable", arguments: [DynamicTypeSize.large, .accessibility3])
+        func expiredProfile(size: DynamicTypeSize) throws {
+            let sut = AppInfoProvisioningSection(profile: .embedded(AppInfoFixtures.profile), isExpired: true)
+            let renderer = ImageRenderer(content: sut
+                .frame(width: 316, alignment: .leading)
+                .padding()
+                .background(.background)
+                .environment(\.dynamicTypeSize, size))
+            renderer.scale = 2
+
+            let actual = try #require(renderer.uiImage)
+
+            assertSnapshot(of: actual, as: .image(perceptualPrecision: 0.98), named: size == .large ? "large" : "accessibility3")
+        }
+
+        @Test("In an iPad's drawer, the None rows of an unsigned simulator build stay readable", arguments: [DynamicTypeSize.large, .accessibility3])
+        func unsigned(size: DynamicTypeSize) throws {
+            let sut = VStack(alignment: .leading, spacing: 0) {
+                AppInfoProvisioningSection(profile: .none, isExpired: false)
+                AppInfoEntitlementsSection(entitlements: nil)
+            }
+            let renderer = ImageRenderer(content: sut
+                .frame(width: 316, alignment: .leading)
+                .padding()
+                .background(.background)
+                .environment(\.dynamicTypeSize, size))
+            renderer.scale = 2
+
+            let actual = try #require(renderer.uiImage)
+
+            assertSnapshot(of: actual, as: .image(perceptualPrecision: 0.98), named: size == .large ? "large" : "accessibility3")
         }
     }
 #endif

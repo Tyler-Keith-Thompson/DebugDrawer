@@ -150,7 +150,9 @@ struct DebugDrawerExampleiOSApp: App {
             DebugDrawer.shared.installPerformance()
             DebugDrawer.shared.installEnergy()
             DebugDrawer.shared.installScreenshot()
-            DebugDrawer.shared.installAppInfo()
+            // Sample values: a real app's CI passes its own, here or through the Info.plist keys
+            // (this Info.plist sets DebugDrawerCIBuildNumber).
+            DebugDrawer.shared.installAppInfo(buildMetadata: AppInfoBuildMetadata(gitCommit: "4f9c2e1", gitBranch: "main"))
             DebugDrawer.shared.installKeychain()
             DebugDrawer.shared.installLocation()
             DebugDrawer.shared.installLoadedLibraries()

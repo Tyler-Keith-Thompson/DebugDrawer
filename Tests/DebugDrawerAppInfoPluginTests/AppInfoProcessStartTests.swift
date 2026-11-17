@@ -13,7 +13,9 @@
         }
 
         private func texts(_ metrics: AppMetrics) throws -> [String] {
-            try AppInfoPluginView(metrics: metrics).inspect().findAll(ViewType.Text.self).map { try $0.string() }
+            let signing = AppSigningStore(source: FakeSigningInformation())
+            let view = AppInfoPluginView(metrics: metrics, buildMetadata: AppInfoBuildMetadata(), signing: signing)
+            return try view.inspect().findAll(ViewType.Text.self).map { try $0.string() }
         }
 
         func testUptimeCountsFromProcessStartNotFromWhenMetricsAreCreated() throws {

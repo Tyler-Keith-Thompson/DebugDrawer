@@ -32,5 +32,8 @@
     <string>The example asks for your location to show the Permissions plugin's Request button.</string>
     <key>NSContactsUsageDescription</key>
     <string>The example asks for contacts to show the Permissions plugin's Request button.</string>
+    <!-- Read by App Info's Build section; a CI script would write its own build number here. -->
+    <key>DebugDrawerCIBuildNumber</key>
+    <string>local</string>
 </dict>
 </plist>

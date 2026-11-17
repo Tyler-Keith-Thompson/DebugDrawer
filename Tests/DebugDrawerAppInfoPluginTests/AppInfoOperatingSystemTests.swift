@@ -18,8 +18,9 @@
             let expectedValue = ProcessInfo.processInfo.operatingSystemVersionString
             let metrics = AppMetrics(processStart: nil, now: Date.init)
 
-            let actual = try #require(AppInfoFacts(metrics: metrics).sections.first?.last)
+            let facts = AppInfoFacts(metrics: metrics, buildMetadata: AppInfoBuildMetadata(), signing: AppSigning(profile: .none, entitlements: nil))
 
+            let actual = try #require(facts.sections.first { $0.title == "Environment" }?.facts.first)
             #expect(actual.label == expectedLabel)
             #expect(actual.value == expectedValue)
         }
