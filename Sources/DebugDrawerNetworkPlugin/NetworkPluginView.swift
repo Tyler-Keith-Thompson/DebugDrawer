@@ -3,7 +3,7 @@
     import SwiftUI
     import UniformTypeIdentifiers
 
-    /// The plugin's body: the request log, the Mocks section and the Conditions section, or the
+    /// The plugin's body: the request log, the WebSocket connections, the Mocks section and the Conditions section, or the
     /// editor of one mock or condition while it is open. The log shows the captured requests, or
     /// those of an imported HAR file, read-only, until it is cleared.
     struct NetworkPluginView: View {
@@ -22,6 +22,7 @@
         @ObservedObject private var replays = NetworkReplayModel.shared
         @ObservedObject private var drawer = DebugDrawer.shared
         @State private var selectedId: UUID?
+        @State private var selectedWebSocket: NetworkWebSocketConnection.ID?
         @State private var selectedRule: NetworkMockRule.ID?
         @State private var selectedProfile: NetworkConditionProfile.ID?
         @State private var screen = Screen.requests
@@ -84,11 +85,12 @@
                 }
 
                 let filtered = store.filteredEntries
+                let webSockets = store.filteredWebSockets
                 NetworkToolbar(
                     filterStatus: $store.filterStatus,
                     clear: { store.clearShown() },
-                    export: NetworkArchiveFile(entries: filtered, redaction: drawer.redaction),
-                    isFiltered: filtered.count < shown.count,
+                    export: NetworkArchiveFile(entries: filtered, redaction: drawer.redaction, webSockets: webSockets),
+                    isFiltered: filtered.count < shown.count || webSockets.count < store.shownWebSockets.count,
                     importArchive: { isImporting = true },
                     source: store.source
                 )
@@ -129,6 +131,10 @@
                         store.importArchive(from: url)
                     }
                 }
+
+                // WebSocket traffic bypasses the URL protocol, so its connections are listed
+                // apart from the requests, under the same filters.
+                NetworkWebSocketsSection(connections: webSockets, redaction: drawer.redaction, selected: $selectedWebSocket)
 
                 // Below the log, which is what the plugin is opened for most often.
                 NetworkMocksSection(

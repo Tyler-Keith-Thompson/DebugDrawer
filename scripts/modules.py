@@ -65,7 +65,7 @@ MODULES = [
     ("DebugDrawerAppInfoPlugin", "Plugins", "Bundle, version, OS, memory, uptime, process, debugger, screen and reachability facts.", ["DebugDrawer"]),
     ("DebugDrawerUserDefaultsPlugin", "Plugins", "Browse, search, edit, copy and delete UserDefaults keys.", ["DebugDrawer"]),
     ("DebugDrawerPerformancePlugin", "Plugins", "Live FPS and memory with sparkline graphs.", ["DebugDrawer"]),
-    ("DebugDrawerNetworkPlugin", "Plugins", "URLProtocol HTTP interception: requests, responses, timing, cURL export, mock responses, slow and failing networks per host, replay and edit-and-resend, HAR export and import.", ["DebugDrawer"]),
+    ("DebugDrawerNetworkPlugin", "Plugins", "URLProtocol HTTP interception: requests, responses, timing, cURL export, mock responses, slow and failing networks per host, replay and edit-and-resend, HAR export and import, WebSocket frames.", ["DebugDrawer"]),
     ("DebugDrawerKeychainPlugin", "Plugins", "Browse generic and internet passwords; copy and delete entries.", ["DebugDrawer"]),
     ("DebugDrawerScreenshotPlugin", "Plugins", "Capture the app window to a file or the clipboard.", ["DebugDrawer"]),
     ("DebugDrawerFileBrowserPlugin", "Plugins", "Browse the app's Application Support and Caches directories; delete and share files.", ["DebugDrawer"]),

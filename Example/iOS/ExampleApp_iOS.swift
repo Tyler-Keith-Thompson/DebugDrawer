@@ -122,6 +122,9 @@ struct DebugDrawerExampleiOSApp: App {
         // Fetch Greeting and Place Order buttons, and with -SeedNetworkCondition, a profile that
         // slows example.com.
         ExampleNetwork.install()
+        // Launched with -WebSocketEchoServer, starts a WebSocket echo server on 127.0.0.1 for the
+        // WebSocket buttons.
+        ExampleWebSocketServer.startIfAsked()
         installShippedPlugins()
     }
 
@@ -250,6 +253,7 @@ struct ExampleContentView_iOS: View {
                 // Network logs each request; a mock answers the greeting, which no server does.
                 Section("Network") {
                     ExampleNetworkRequests()
+                    ExampleWebSocketDemo()
                 }
 
                 // Colors the Color Vision plugin simulates.

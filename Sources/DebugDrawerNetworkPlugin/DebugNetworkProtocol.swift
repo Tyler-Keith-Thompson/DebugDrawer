@@ -21,6 +21,14 @@
             return request.url?.scheme == "http" || request.url?.scheme == "https"
         }
 
+        override static func canInit(with task: URLSessionTask) -> Bool {
+            // A WebSocket's handshake is an HTTP request, but answered through a data task here it
+            // would never upgrade, and the socket would fail. Its traffic is recorded on the task
+            // instead (NetworkWebSocketInterception).
+            guard !(task is URLSessionWebSocketTask) else { return false }
+            return super.canInit(with: task)
+        }
+
         override static func canonicalRequest(for request: URLRequest) -> URLRequest {
             request
         }

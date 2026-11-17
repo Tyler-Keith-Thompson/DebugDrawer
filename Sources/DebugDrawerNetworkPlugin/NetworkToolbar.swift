@@ -51,11 +51,11 @@
         @ViewBuilder private var exportButton: some View {
             if let export {
                 let title = isFiltered ? "Export Shown" : "Export All"
-                let count = export.entries.count
+                let count = export.entries.count + export.webSockets.count
                 ShareLink(item: export, preview: SharePreview(export.fileName)) {
                     Text(title)
                 }
-                .disabled(export.entries.isEmpty)
+                .disabled(export.isEmpty)
                 .accessibilityLabel(title)
                 .accessibilityHint("Shares the \(count == 1 ? "request" : "\(count) requests") the list shows as a HAR file, sensitive values masked")
             }

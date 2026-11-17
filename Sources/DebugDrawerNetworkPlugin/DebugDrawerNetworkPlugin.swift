@@ -106,6 +106,21 @@
             Self.entries(shownEntries, matching: filterStatus, text: filterText)
         }
 
+        /// The WebSocket connections the log shows that pass the status filter and the filter
+        /// text: the captured ones, none while an imported file shows.
+        var filteredWebSockets: [NetworkWebSocketConnection] {
+            Self.connections(shownWebSockets, matching: filterStatus, text: filterText)
+        }
+
+        /// The WebSocket connections the log shows: the captured ones, none while an imported
+        /// file shows.
+        var shownWebSockets: [NetworkWebSocketConnection] {
+            source == .imported ? [] : webSockets
+        }
+
+        /// The WebSocket connections the app opened, the latest first, with their frames.
+        @Published private(set) var webSockets: [NetworkWebSocketConnection] = []
+
         /// Which requests the log shows: the captured ones, or the imported file's while
         /// `source` is `.imported`.
         var shownEntries: [NetworkEntry] {
@@ -141,6 +156,35 @@
                 }
             }
             return result
+        }
+
+        /// The connections in `connections` that pass the status filter `status` and contain
+        /// `text` (ignoring case) in the URL, the method ("WS") or a text frame. A connection has
+        /// no HTTP status, so All shows every one, Errors those that failed, and the others none.
+        nonisolated static func connections(
+            _ connections: [NetworkWebSocketConnection],
+            matching status: StatusFilter,
+            text: String
+        ) -> [NetworkWebSocketConnection] {
+            var result = connections
+            switch status {
+            case .all: break
+            case .success, .clientError, .serverError: result = []
+            case .errors: result = result.filter(\.isFailure)
+            }
+            if !text.isEmpty {
+                let query = text.lowercased()
+                result = result.filter { connection in
+                    connection.url.lowercased().contains(query) || "ws".contains(query)
+                        || connection.frames.contains { $0.text?.lowercased().contains(query) ?? false }
+                }
+            }
+            return result
+        }
+
+        /// Shows `connections` as the WebSocket connections the app opened.
+        func showWebSockets(_ connections: [NetworkWebSocketConnection]) {
+            webSockets = connections
         }
 
         /// Reads the HAR file at `url` and shows its requests in the log in place of the captured
@@ -180,6 +224,8 @@
             URLProtocol.registerClass(DebugNetworkProtocol.self)
             // Swizzle URLSessionConfiguration so custom sessions also get intercepted
             URLSessionConfiguration.swizzleProtocolClasses()
+            // WebSocket tasks bypass URL protocols, so their traffic is recorded on the tasks.
+            NetworkWebSocketInterception.install()
         }
 
         func recordStart(_ entry: NetworkEntry) {
@@ -204,8 +250,11 @@
             entries[idx].metrics = metrics
         }
 
+        /// Clears the captured requests and WebSocket connections.
         public func clear() {
             entries.removeAll()
+            webSockets.removeAll()
+            NetworkWebSocketRecorder.shared.clear()
         }
     }
 

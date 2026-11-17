@@ -99,6 +99,24 @@
             /// Which captured request this one resends, which mock rule answered it, and which
             /// conditioning profile slowed or failed it and how, when any did.
             var comment: String?
+            /// `websocket` for a WebSocket connection, in Chrome DevTools' custom field
+            /// `_resourceType`; `nil` for a request.
+            var resourceType: String?
+            /// A WebSocket connection's messages, in Chrome DevTools' custom field
+            /// `_webSocketMessages`; `nil` for a request.
+            var webSocketMessages: [WebSocketMessage]?
+        }
+
+        /// A WebSocket message, as Chrome DevTools writes it in `_webSocketMessages`.
+        struct WebSocketMessage: Codable, Equatable {
+            /// `send` or `receive`.
+            var type: String
+            /// When it went, in seconds since 1970.
+            var time: Double
+            /// 1 for text, 2 for binary.
+            var opcode: Int
+            /// The text, or a binary message's base64.
+            var data: String
         }
 
         struct Cache: Codable, Equatable {}
@@ -111,6 +129,8 @@
         enum CodingKeys: String, CodingKey {
             case startedDateTime, time, request, response, cache, timings, comment
             case error = "_error"
+            case resourceType = "_resourceType"
+            case webSocketMessages = "_webSocketMessages"
         }
     }
 
@@ -122,13 +142,22 @@
     }
 
     extension HTTPArchive {
-        /// The archive of `entries`, oldest first, with every value `redaction` calls sensitive
-        /// masked: header values, URL query items, and values in JSON bodies.
-        init(_ entries: [NetworkEntry], redaction: DebugDrawerRedaction) {
+        /// The archive of `entries` and of the WebSocket connections `webSockets`, oldest first,
+        /// with every value `redaction` calls sensitive masked: header values, URL query items,
+        /// and values in JSON bodies and JSON text messages.
+        init(_ entries: [NetworkEntry], webSockets: [NetworkWebSocketConnection] = [], redaction: DebugDrawerRedaction) {
             let byID = Dictionary(entries.map { ($0.id, $0) }) { first, _ in first }
-            log = Log(entries: entries.sorted { $0.timestamp < $1.timestamp }.map { entry in
-                Entry(entry, original: entry.replayOf.flatMap { byID[$0] }, redaction: redaction)
-            })
+            let requests = entries.map { entry in
+                Dated(start: entry.timestamp, entry: Entry(entry, original: entry.replayOf.flatMap { byID[$0] }, redaction: redaction))
+            }
+            let connections = webSockets.map { Dated(start: $0.opened, entry: Entry($0, redaction: redaction)) }
+            log = Log(entries: (requests + connections).sorted { $0.start < $1.start }.map(\.entry))
+        }
+
+        /// An entry and when it started, to sort by.
+        private struct Dated {
+            var start: Date
+            var entry: Entry
         }
     }
 

@@ -4,15 +4,23 @@
     import Foundation
     import UniformTypeIdentifiers
 
-    /// Requests as a HAR file to share or save: HAR 1.2, the oldest first, with what the redaction
-    /// rules call sensitive masked.
+    /// Requests and WebSocket connections as a HAR file to share or save: HAR 1.2, the oldest
+    /// first, with what the redaction rules call sensitive masked.
     struct NetworkArchiveFile: Transferable, Sendable {
         let entries: [NetworkEntry]
         let redaction: DebugDrawerRedaction
+        var webSockets: [NetworkWebSocketConnection] = []
 
-        /// `Network <the newest request's time>.har`, the colons a file name can't hold as dashes.
+        /// Whether it holds neither requests nor connections.
+        var isEmpty: Bool {
+            entries.isEmpty && webSockets.isEmpty
+        }
+
+        /// `Network <the newest request's or connection's time>.har`, the colons a file name can't
+        /// hold as dashes.
         var fileName: String {
-            let time = entries.map(\.timestamp).max().map { " " + $0.formatted(.iso8601).replacing(":", with: "-") } ?? ""
+            let newest = (entries.map(\.timestamp) + webSockets.map(\.opened)).max()
+            let time = newest.map { " " + $0.formatted(.iso8601).replacing(":", with: "-") } ?? ""
             return "Network\(time).har"
         }
 
@@ -21,7 +29,7 @@
             let encoder = JSONEncoder()
             encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
             // The archive is strings, numbers, Booleans and arrays of them, so encoding it can't fail.
-            return (try? encoder.encode(HTTPArchive(entries, redaction: redaction))) ?? Data()
+            return (try? encoder.encode(HTTPArchive(entries, webSockets: webSockets, redaction: redaction))) ?? Data()
         }
 
         static var transferRepresentation: some TransferRepresentation {

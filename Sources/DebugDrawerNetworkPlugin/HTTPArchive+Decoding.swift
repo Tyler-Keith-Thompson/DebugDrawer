@@ -182,6 +182,10 @@
             // Chrome writes an empty `_error` for a request that didn't fail.
             error = try (container.decodeIfPresent(String.self, forKey: .error) ?? responseError).flatMap { $0.isEmpty ? nil : $0 }
             comment = try container.decodeIfPresent(String.self, forKey: .comment)
+            resourceType = try? container.decodeIfPresent(String.self, forKey: .resourceType)
+            // Read for a round trip; messages another tool wrote in a shape of its own are no
+            // reason to refuse the file.
+            webSocketMessages = try? container.decodeIfPresent([HTTPArchive.WebSocketMessage].self, forKey: .webSocketMessages)
         }
     }
 #endif

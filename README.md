@@ -428,7 +428,26 @@ and fields of their own are ignored. Imported requests are read-only: their deta
 and Mock This, which makes a mock that answers like the archive's response, but not Resend. Clear
 removes the imported file and shows the captured requests again. A file that isn't a HAR 1.x
 archive is refused with the reason under the buttons ("The file isn't JSON.") and leaves the log as
-it was. The bug report's `network.har` holds the captured requests only.
+it was. The bug report's `network.har` holds the captured requests and WebSocket connections only.
+
+### Network WebSockets: frames sent and received
+
+`URLSessionWebSocketTask` traffic never passes through a URL protocol, so `installNetwork()` also
+records it on the tasks themselves: each task a session makes from then on is a connection in the
+WebSockets section, under the request log, with WS, whether it is open, closed or failed, its path
+and how many frames it carried. Its detail shows when it opened, the subprotocols offered, who
+closed it with which close code and reason (from `cancel(with:reason:)`, or the server's close
+frame), or the error it failed with, then its frames, the latest first: ↑ for sent, ↓ for
+received, the time to the millisecond, the kind and size, and a preview, the start of a text frame
+or the first 16 bytes of a binary one in hex (`00 01 02 … 0f …`). Pings and their pongs are listed
+too. The async and completion-handler forms of `send` and `receive` are both recorded, and the app
+gets exactly the messages and errors it would without the plugin.
+
+A connection keeps its latest 500 frames, and the log its latest 50 connections; each frame keeps
+its first 16 KB. Copy Frames and the HAR export (Chrome DevTools' `_webSocketMessages`) mask the
+URL's query items and JSON text frames as the redaction rules say; a text frame larger than 16 KB
+is copied and exported without its text, which can't be masked. There is nothing to install
+beyond `installNetwork()`; socket libraries that don't use `URLSessionWebSocketTask` aren't seen.
 
 ### Tweaks: the app's own debug settings
 
@@ -1317,7 +1336,7 @@ ContentView()
 | `DebugDrawerAccessibilityPlugin` | Runtime overrides of color scheme, Dynamic Type, layout direction, locale and the system accessibility settings SwiftUI exposes, each beside the system's value |
 | `DebugDrawerPerformancePlugin` | Live FPS and memory with sparkline graphs |
 | `DebugDrawerEnergyPlugin` | Battery level and charging, CPU load and thermal state |
-| `DebugDrawerNetworkPlugin` | URLProtocol HTTP interception: method, URL, status, timing, headers, body, cURL export, mock responses by rule, slow and failing networks per host, replay and edit-and-resend, HAR export and import |
+| `DebugDrawerNetworkPlugin` | URLProtocol HTTP interception: method, URL, status, timing, headers, body, cURL export, mock responses by rule, slow and failing networks per host, replay and edit-and-resend, HAR export and import, WebSocket frames |
 | `DebugDrawerDiskIOPlugin` | FileManager reads, writes, deletes and listings, flagging main-thread I/O |
 | `DebugDrawerAppInfoPlugin` | Bundle, version, OS, memory, uptime, process, debugger, screen and reachability facts |
 | `DebugDrawerUserDefaultsPlugin` | Browse, search, edit, copy and delete UserDefaults keys |

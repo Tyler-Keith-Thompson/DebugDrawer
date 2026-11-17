@@ -124,6 +124,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Fetch Greeting and Place Order buttons, and with -SeedNetworkCondition, a profile that
         // slows example.com.
         ExampleNetwork.install()
+        // Launched with -WebSocketEchoServer, starts a WebSocket echo server on 127.0.0.1 for the
+        // WebSocket buttons.
+        ExampleWebSocketServer.startIfAsked()
         installShippedPlugins()
 
         setupMenuBar()
@@ -288,6 +291,7 @@ struct ExampleContentView: View {
                     ExampleResettableState()
                     // Network logs each request; a mock answers the greeting, which no server does.
                     ExampleNetworkRequests()
+                    ExampleWebSocketDemo()
                         .frame(maxWidth: 480)
 
                 }
