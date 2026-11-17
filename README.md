@@ -294,7 +294,6 @@ DebugDrawer.shared.installDiskIO()
 DebugDrawer.shared.installScreenshot()
 DebugDrawer.shared.installAppInfo()
 DebugDrawer.shared.installKeychain()
-DebugDrawer.shared.installFileBrowser()
 DebugDrawer.shared.installLocation()
 DebugDrawer.shared.installLoadedLibraries()
 DebugDrawer.shared.installDeepLink()
@@ -305,9 +304,9 @@ DebugDrawer.shared.installLaunchTime()
 
 Each call needs its plugin's module imported (`import DebugDrawerConsolePlugin`, and so on).
 Tweaks takes the settings it shows and Feature Flags the adapter it reads, and Crash Reports,
-Hangs, Leaks, MetricKit, Permissions, Notifications, Background Tasks, Analytics, Databases,
-UserDefaults, Localization, Screen Recording, Design Overlay, Color Vision and Reset App State
-install outside `#if DEBUG`, so each has a section of its own, after Network's mocks and
+Hangs, Leaks, MetricKit, Permissions, Notifications, Background Tasks, Analytics, Databases, File
+Browser, UserDefaults, Localization, Screen Recording, Design Overlay, Color Vision and Reset App
+State install outside `#if DEBUG`, so each has a section of its own, after Network's mocks and
 conditions.
 
 ### Console sessions: logs from earlier launches
@@ -1082,6 +1081,37 @@ a write from another process, such as an extension's, shows after Reload in the 
 Key, which also shows the system's keys. The bug report carries the standard defaults' keys as
 `user-defaults.json`.
 
+### File Browser: what the app wrote to disk
+
+The File Browser plugin lists the app's own folders, so a developer can see what it wrote, how big
+it is, and what is inside, without copying the container off the device:
+
+```swift
+import DebugDrawerFileBrowserPlugin
+
+// At startup:
+FileBrowser.install()
+
+// Or with the containers of the app's groups as well:
+FileBrowser.install(appGroups: ["group.com.example.orders"])
+```
+
+`FileBrowser` exists in every configuration and does nothing in release, so the call needs no
+`#if DEBUG`. Its roots are Documents, Library, tmp, the app bundle and the shared container of each
+group in `appGroups` (from `FileManager.containerURL(forSecurityApplicationGroupIdentifier:)`); a
+group the system gives no container is listed as missing. A Mac app outside the sandbox shares
+those folders with the user's other apps, so there it lists its own folders of Application Support
+and Caches instead of Documents and Library. Every folder shows the total size of what it holds,
+at any depth, counted off the main thread and stopped when you leave it; folders and files show
+their size and their modified and created dates.
+
+A file opens to a preview, told from its bytes rather than its name: text, JSON pretty-printed with
+its keys sorted, property lists (binary or XML) as XML, and images as a thumbnail with their pixel
+size. The first megabyte is read, and longer text says it is cut short. A SQLite file is listed
+like any other, with no preview. A file can be shared, its path or text copied, and on the Mac
+revealed in Finder. Import… copies a picked file into the folder shown, and Rename… and Delete
+(which asks first) change a file or folder, anywhere but in the bundle, which is read-only.
+
 ### Localization: text that doesn't fit, and strings nobody translated
 
 The Localization plugin pseudo-localizes the app's strings or shows their keys, while the app runs,
@@ -1459,7 +1489,7 @@ ContentView()
 | `DebugDrawerUserDefaultsPlugin` | Browse, search, add, edit, copy and delete UserDefaults keys of the standard defaults and app group suites, values of every property-list type edited at any depth, the list following the app's writes |
 | `DebugDrawerKeychainPlugin` | Generic and internet passwords, certificates and keys, each with every attribute the keychain returns (a key's or certificate's data is never read), filtered by access group and text; generic passwords added and edited, any item deleted; on the Mac, the data protection keychain |
 | `DebugDrawerScreenshotPlugin` | The app window captured to a file or the clipboard, optionally without the drawer |
-| `DebugDrawerFileBrowserPlugin` | The app's Application Support and Caches directories: delete and share files |
+| `DebugDrawerFileBrowserPlugin` | The app's Documents, Library, tmp, bundle and app group containers, with folder totals and dates, previews of text, JSON, property lists and images, and files imported, renamed, deleted and shared, the bundle read-only |
 | `DebugDrawerLocationPlugin` | Spoofed CLLocationManager coordinates: presets and a custom latitude and longitude |
 | `DebugDrawerLoadedLibrariesPlugin` | Every loaded image, grouped as app, third-party and system, with UUIDs and load addresses |
 | `DebugDrawerDeepLinkPlugin` | Opens deep links and keeps a history of them |

@@ -19,5 +19,11 @@
              (ExampleKeychain adds a password to it). -->
         <string>FAKETEAMID.com.debugdrawer.example.shared</string>
     </array>
+    <!-- The app group File Browser lists the container of, which the simulator gives the app
+         without a profile. -->
+    <key>com.apple.security.application-groups</key>
+    <array>
+        <string>group.com.debugdrawer.example</string>
+    </array>
 </dict>
 </plist>

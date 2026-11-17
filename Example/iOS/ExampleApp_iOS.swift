@@ -4,7 +4,6 @@ import DebugDrawerAppInfoPlugin
 import DebugDrawerConsolePlugin
 import DebugDrawerDiskIOPlugin
 import DebugDrawerEnergyPlugin
-import DebugDrawerFileBrowserPlugin
 import DebugDrawerKeychainPlugin
 import DebugDrawerNetworkPlugin
 import DebugDrawerPerformancePlugin
@@ -124,6 +123,9 @@ struct DebugDrawerExampleiOSApp: App {
         // Installs UserDefaults over the standard defaults and an app group's suite, seeded with a
         // value of each type; it compiles in release too and does nothing there.
         ExampleUserDefaults.install()
+        // Installs File Browser, which compiles in release too and does nothing there; launched
+        // with -SeedSampleFiles, the app first writes sample files to preview.
+        ExampleFileBrowser.install()
         // Installs Network; launched with -SeedNetworkMock, it adds mocks that answer the
         // Fetch Greeting and Place Order buttons, and with -SeedNetworkCondition, a profile that
         // slows example.com.
@@ -147,7 +149,6 @@ struct DebugDrawerExampleiOSApp: App {
             DebugDrawer.shared.installScreenshot()
             DebugDrawer.shared.installAppInfo()
             DebugDrawer.shared.installKeychain()
-            DebugDrawer.shared.installFileBrowser()
             DebugDrawer.shared.installLocation()
             DebugDrawer.shared.installLoadedLibraries()
             DebugDrawer.shared.installDeepLink()

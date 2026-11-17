@@ -3,7 +3,7 @@
 load("//tools:docc.bzl", "docc_archive")
 load("//tools:swift_rules.bzl", "swift_library")
 
-# Browse the app's Application Support and Caches directories; delete and share files.
+# The app's Documents, Library, tmp, bundle and app group containers, with folder totals and dates, previews of text, JSON, property lists and images, and files imported, renamed, deleted and shared, the bundle read-only.
 swift_library(
     name = "DebugDrawerFileBrowserPlugin",
     srcs = glob(["**/*.swift"]),
