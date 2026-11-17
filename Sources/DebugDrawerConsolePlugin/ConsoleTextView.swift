@@ -7,9 +7,11 @@
     // The log is a platform text view rather than SwiftUI rows: it holds up to 2,000 lines,
     // appends each batch without laying the others out again, and selects across lines. Each line
     // is the time in the tertiary color, the issue glyph for an error or fault (drawn from the
-    // drawer's own `DebugDrawerIssueGlyph`, so it matches every other plugin's), and the text in
-    // the drawer's monospaced code type, debug lines dimmed. The view is clear and sits in a
-    // `DebugDrawerCodeBlock`, which gives it the panel's well.
+    // drawer's own `DebugDrawerIssueGlyph`, so it matches every other plugin's), the subsystem and
+    // category, short and in the tertiary color, and the text in the drawer's monospaced code
+    // type, debug lines dimmed. The view is clear and sits in a `DebugDrawerCodeBlock`, which
+    // gives it the panel's well. A line's context menu (the edit menu on iOS) mutes its subsystem
+    // or category, or shows the lines from it on.
 
     #if os(macOS)
         import AppKit
@@ -17,6 +19,8 @@
         struct ConsoleTextView: NSViewRepresentable {
             let lines: [LogLine]
             @Binding var isFollowing: Bool
+            /// Runs what a line's context menu offers.
+            var perform: (ConsoleLineAction) -> Void = { _ in }
 
             func makeCoordinator() -> Coordinator {
                 Coordinator(isFollowing: $isFollowing)
@@ -39,6 +43,7 @@
                 textView.textContainer?.lineFragmentPadding = 0
                 textView.textContainer?.widthTracksTextView = true
                 textView.textContainer?.lineBreakMode = .byCharWrapping
+                textView.delegate = context.coordinator
 
                 context.coordinator.scrollView = scrollView
                 NotificationCenter.default.addObserver(
@@ -56,28 +61,36 @@
                       let storage = textView.textStorage else { return }
 
                 let coordinator = context.coordinator
-                let newCount = lines.count
-                let prevCount = coordinator.renderedLineCount
+                coordinator.perform = perform
                 let colorScheme = context.environment.colorScheme
 
                 // The glyphs are drawn for one appearance, so a new one redraws every line.
+                let update: ConsoleRenderedLines.Update
                 if colorScheme != coordinator.renderedColorScheme {
                     coordinator.glyphs = ConsoleGlyphs(environment: context.environment)
                     coordinator.renderedColorScheme = colorScheme
-                    storage.setAttributedString(buildAttributedString(from: lines, glyphs: coordinator.glyphs, prefixNewline: false))
-                    coordinator.renderedLineCount = newCount
-                } else if newCount == 0, prevCount > 0 {
-                    storage.setAttributedString(NSAttributedString())
-                    coordinator.renderedLineCount = 0
-                } else if newCount > prevCount {
-                    let newLines = Array(lines[prevCount...])
-                    let fragment = buildAttributedString(from: newLines, glyphs: coordinator.glyphs, prefixNewline: prevCount > 0)
-                    storage.append(fragment)
-                    coordinator.renderedLineCount = newCount
-                } else if newCount < prevCount {
-                    // Ring buffer trimmed — full rebuild
-                    storage.setAttributedString(buildAttributedString(from: lines, glyphs: coordinator.glyphs, prefixNewline: false))
-                    coordinator.renderedLineCount = newCount
+                    update = .redraw
+                } else {
+                    update = coordinator.rendered.update(to: lines)
+                }
+
+                switch update {
+                case .none:
+                    break
+                case .redraw:
+                    let text = buildAttributedString(from: lines, glyphs: coordinator.glyphs, prefixNewline: false, offset: 0)
+                    storage.setAttributedString(text.string)
+                    coordinator.rendered.redrew(lines, starts: text.starts)
+                case let .extend(dropping, appending):
+                    storage.beginEditing()
+                    if dropping > 0 {
+                        storage.deleteCharacters(in: NSRange(location: 0, length: coordinator.rendered.length(ofFirst: dropping)))
+                    }
+                    let appended = Array(lines[appending...])
+                    let text = buildAttributedString(from: appended, glyphs: coordinator.glyphs, prefixNewline: true, offset: storage.length)
+                    storage.append(text.string)
+                    storage.endEditing()
+                    coordinator.rendered.extended(dropping: dropping, appended: appended, appendedStarts: text.starts)
                 }
 
                 if isFollowing {
@@ -100,13 +113,23 @@
                 return formatter
             }()
 
-            private func buildAttributedString(from lines: [LogLine], glyphs: ConsoleGlyphs?, prefixNewline: Bool) -> NSAttributedString {
+            /// `lines` as text, a newline between each and, with `prefixNewline`, one before the
+            /// first, with where each line starts once the text is placed at `offset`.
+            private func buildAttributedString(
+                from lines: [LogLine],
+                glyphs: ConsoleGlyphs?,
+                prefixNewline: Bool,
+                offset: Int
+            ) -> ConsoleDrawnText {
                 let font = Self.codeFont
                 let result = NSMutableAttributedString()
+                var starts: [Int] = []
+                starts.reserveCapacity(lines.count)
                 for (index, line) in lines.enumerated() {
                     if index > 0 || prefixNewline {
                         result.append(NSAttributedString(string: "\n"))
                     }
+                    starts.append(offset + result.length)
 
                     let ts = Self.dateFormatter.string(from: line.timestamp)
                     result.append(NSAttributedString(string: ts + " ", attributes: [
@@ -119,21 +142,34 @@
                         result.append(NSAttributedString(string: " ", attributes: [.font: font]))
                     }
 
+                    if let origin = line.shownOrigin {
+                        result.append(NSAttributedString(string: origin + " ", attributes: [
+                            .font: font,
+                            .foregroundColor: NSColor.tertiaryLabelColor
+                        ]))
+                    }
+
                     result.append(NSAttributedString(string: line.text, attributes: [
                         .font: font,
                         .foregroundColor: line.level == .debug ? NSColor.secondaryLabelColor : NSColor.labelColor
                     ]))
                 }
-                return result
+                return ConsoleDrawnText(string: result, starts: starts)
             }
 
-            final class Coordinator: NSObject {
-                var renderedLineCount = 0
+            @MainActor
+            final class Coordinator: NSObject, NSTextViewDelegate {
+                /// The lines the text shows, and where each starts.
+                var rendered = ConsoleRenderedLines()
                 /// The appearance the glyphs were drawn for; nil before the first render.
                 var renderedColorScheme: ColorScheme?
                 var glyphs: ConsoleGlyphs?
                 var isProgrammaticScroll = false
                 var isFollowing: Binding<Bool>
+                /// Runs what a line's context menu offers.
+                var perform: (ConsoleLineAction) -> Void = { _ in }
+                /// The actions of the context menu last shown, by the items' tags.
+                private var menuActions: [ConsoleLineAction] = []
                 weak var scrollView: NSScrollView?
 
                 init(isFollowing: Binding<Bool>) {
@@ -141,7 +177,7 @@
                 }
 
                 // Posted by the clip view, on the main thread.
-                @MainActor @objc func scrollViewDidScroll(_: Notification) {
+                @objc func scrollViewDidScroll(_: Notification) {
                     guard !isProgrammaticScroll, let scrollView else { return }
                     let clipView = scrollView.contentView
                     let contentHeight = scrollView.documentView?.frame.height ?? 0
@@ -150,38 +186,25 @@
 
                     isFollowing.wrappedValue = atBottom
                 }
-            }
-        }
 
-        /// The issue glyphs a log line can carry, drawn once for an appearance from the drawer's
-        /// `DebugDrawerIssueGlyph`, to set into the text as attachments.
-        @MainActor
-        struct ConsoleGlyphs {
-            private let images: [DebugDrawerIssueGlyph.Severity: NSImage]
-
-            init(environment: EnvironmentValues) {
-                var images: [DebugDrawerIssueGlyph.Severity: NSImage] = [:]
-                for severity in [DebugDrawerIssueGlyph.Severity.error, .warning] {
-                    let renderer = ImageRenderer(content: DebugDrawerIssueGlyph(severity)
-                        .environment(\.colorScheme, environment.colorScheme))
-                    renderer.scale = environment.displayScale
-                    images[severity] = renderer.nsImage
+                /// The text view's context menu, with the actions of the line under the pointer first.
+                func textView(_: NSTextView, menu: NSMenu, for _: NSEvent, at charIndex: Int) -> NSMenu? {
+                    guard let line = rendered.line(at: charIndex) else { return menu }
+                    menuActions = ConsoleLineAction.actions(for: line)
+                    for (index, action) in menuActions.enumerated() {
+                        let item = NSMenuItem(title: action.title, action: #selector(performMenuAction(_:)), keyEquivalent: "")
+                        item.target = self
+                        item.tag = index
+                        menu.insertItem(item, at: index)
+                    }
+                    menu.insertItem(.separator(), at: menuActions.count)
+                    return menu
                 }
-                self.images = images
-            }
 
-            /// The glyph as text, centered on the font's capitals.
-            func attachment(for severity: DebugDrawerIssueGlyph.Severity, font: NSFont) -> NSAttributedString? {
-                guard let image = images[severity] else { return nil }
-                let attachment = NSTextAttachment()
-                attachment.image = image
-                attachment.bounds = CGRect(
-                    x: 0,
-                    y: (font.capHeight - image.size.height) / 2,
-                    width: image.size.width,
-                    height: image.size.height
-                )
-                return NSAttributedString(attachment: attachment)
+                @objc private func performMenuAction(_ item: NSMenuItem) {
+                    guard menuActions.indices.contains(item.tag) else { return }
+                    perform(menuActions[item.tag])
+                }
             }
         }
 
@@ -191,6 +214,8 @@
         struct ConsoleTextView: UIViewRepresentable {
             let lines: [LogLine]
             @Binding var isFollowing: Bool
+            /// Runs what a line's edit menu offers.
+            var perform: (ConsoleLineAction) -> Void = { _ in }
 
             func makeCoordinator() -> Coordinator {
                 Coordinator(isFollowing: $isFollowing)
@@ -212,32 +237,42 @@
             func updateUIView(_ textView: UITextView, context: Context) {
                 let storage = textView.textStorage
                 let coordinator = context.coordinator
+                coordinator.perform = perform
                 let dynamicTypeSize = context.environment.dynamicTypeSize
                 let colorScheme = context.environment.colorScheme
                 let fonts = ConsoleFonts(dynamicTypeSize: dynamicTypeSize)
 
-                let newCount = lines.count
-                let prevCount = coordinator.renderedLineCount
-
                 // The fonts and glyphs are baked into the rendered text, so a new text size or
                 // appearance redraws every line.
+                let update: ConsoleRenderedLines.Update
                 if dynamicTypeSize != coordinator.renderedDynamicTypeSize || colorScheme != coordinator.renderedColorScheme {
                     coordinator.glyphs = ConsoleGlyphs(environment: context.environment)
-                    storage.setAttributedString(buildAttributedString(from: lines, fonts: fonts, glyphs: coordinator.glyphs, prefixNewline: false))
-                    coordinator.renderedLineCount = newCount
                     coordinator.renderedDynamicTypeSize = dynamicTypeSize
                     coordinator.renderedColorScheme = colorScheme
-                } else if newCount == 0, prevCount > 0 {
-                    storage.setAttributedString(NSAttributedString())
-                    coordinator.renderedLineCount = 0
-                } else if newCount > prevCount {
-                    let newLines = Array(lines[prevCount...])
-                    let fragment = buildAttributedString(from: newLines, fonts: fonts, glyphs: coordinator.glyphs, prefixNewline: prevCount > 0)
-                    storage.append(fragment)
-                    coordinator.renderedLineCount = newCount
-                } else if newCount < prevCount {
-                    storage.setAttributedString(buildAttributedString(from: lines, fonts: fonts, glyphs: coordinator.glyphs, prefixNewline: false))
-                    coordinator.renderedLineCount = newCount
+                    update = .redraw
+                } else {
+                    update = coordinator.rendered.update(to: lines)
+                }
+
+                switch update {
+                case .none:
+                    break
+                case .redraw:
+                    let text = buildAttributedString(from: lines, fonts: fonts, glyphs: coordinator.glyphs, prefixNewline: false, offset: 0)
+                    storage.setAttributedString(text.string)
+                    coordinator.rendered.redrew(lines, starts: text.starts)
+                case let .extend(dropping, appending):
+                    storage.beginEditing()
+                    if dropping > 0 {
+                        storage.deleteCharacters(in: NSRange(location: 0, length: coordinator.rendered.length(ofFirst: dropping)))
+                    }
+                    let appended = Array(lines[appending...])
+                    let text = buildAttributedString(
+                        from: appended, fonts: fonts, glyphs: coordinator.glyphs, prefixNewline: true, offset: storage.length
+                    )
+                    storage.append(text.string)
+                    storage.endEditing()
+                    coordinator.rendered.extended(dropping: dropping, appended: appended, appendedStarts: text.starts)
                 }
 
                 if isFollowing, storage.length > 0 {
@@ -254,17 +289,23 @@
                 return formatter
             }()
 
+            /// `lines` as text, a newline between each and, with `prefixNewline`, one before the
+            /// first, with where each line starts once the text is placed at `offset`.
             private func buildAttributedString(
                 from lines: [LogLine],
                 fonts: ConsoleFonts,
                 glyphs: ConsoleGlyphs?,
-                prefixNewline: Bool
-            ) -> NSAttributedString {
+                prefixNewline: Bool,
+                offset: Int
+            ) -> ConsoleDrawnText {
                 let result = NSMutableAttributedString()
+                var starts: [Int] = []
+                starts.reserveCapacity(lines.count)
                 for (index, line) in lines.enumerated() {
                     if index > 0 || prefixNewline {
                         result.append(NSAttributedString(string: "\n"))
                     }
+                    starts.append(offset + result.length)
 
                     let ts = Self.dateFormatter.string(from: line.timestamp)
                     result.append(NSAttributedString(string: ts + " ", attributes: [
@@ -277,16 +318,24 @@
                         result.append(NSAttributedString(string: " ", attributes: [.font: fonts.code]))
                     }
 
+                    if let origin = line.shownOrigin {
+                        result.append(NSAttributedString(string: origin + " ", attributes: [
+                            .font: fonts.code,
+                            .foregroundColor: UIColor.tertiaryLabel
+                        ]))
+                    }
+
                     result.append(NSAttributedString(string: line.text, attributes: [
                         .font: fonts.code,
                         .foregroundColor: line.level == .debug ? UIColor.secondaryLabel : UIColor.label
                     ]))
                 }
-                return result
+                return ConsoleDrawnText(string: result, starts: starts)
             }
 
             final class Coordinator: NSObject, UITextViewDelegate {
-                var renderedLineCount = 0
+                /// The lines the text shows, and where each starts.
+                var rendered = ConsoleRenderedLines()
                 /// The text size the rendered lines' fonts were made for; nil before the first render.
                 var renderedDynamicTypeSize: DynamicTypeSize?
                 /// The appearance the glyphs were drawn for; nil before the first render.
@@ -294,6 +343,8 @@
                 var glyphs: ConsoleGlyphs?
                 var isProgrammaticScroll = false
                 var isFollowing: Binding<Bool>
+                /// Runs what a line's edit menu offers.
+                var perform: (ConsoleLineAction) -> Void = { _ in }
                 weak var textView: UITextView?
 
                 init(isFollowing: Binding<Bool>) {
@@ -307,40 +358,23 @@
                     let atBottom = contentHeight - scrollOffset < 20
                     isFollowing.wrappedValue = atBottom
                 }
-            }
-        }
 
-        /// The issue glyphs a log line can carry, drawn once for an appearance and text size from
-        /// the drawer's `DebugDrawerIssueGlyph`, to set into the text as attachments.
-        @MainActor
-        struct ConsoleGlyphs {
-            private let images: [DebugDrawerIssueGlyph.Severity: UIImage]
-
-            init(environment: EnvironmentValues) {
-                var images: [DebugDrawerIssueGlyph.Severity: UIImage] = [:]
-                for severity in [DebugDrawerIssueGlyph.Severity.error, .warning] {
-                    let renderer = ImageRenderer(content: DebugDrawerIssueGlyph(severity)
-                        .environment(\.colorScheme, environment.colorScheme)
-                        .environment(\.dynamicTypeSize, environment.dynamicTypeSize))
-                    renderer.scale = environment.displayScale
-                    images[severity] = renderer.uiImage
+                /// The edit menu, with the actions of the line the selection starts in first.
+                func textView(_: UITextView, editMenuForTextIn range: NSRange, suggestedActions: [UIMenuElement]) -> UIMenu? {
+                    guard let line = rendered.line(at: range.location) else { return nil }
+                    let actions = ConsoleLineAction.actions(for: line).map { action in
+                        UIAction(title: action.title) { [weak self] _ in self?.perform(action) }
+                    }
+                    return UIMenu(children: [UIMenu(options: .displayInline, children: actions)] + suggestedActions)
                 }
-                self.images = images
-            }
-
-            /// The glyph as text, centered on the font's capitals.
-            func attachment(for severity: DebugDrawerIssueGlyph.Severity, font: UIFont) -> NSAttributedString? {
-                guard let image = images[severity] else { return nil }
-                let attachment = NSTextAttachment()
-                attachment.image = image
-                attachment.bounds = CGRect(
-                    x: 0,
-                    y: (font.capHeight - image.size.height) / 2,
-                    width: image.size.width,
-                    height: image.size.height
-                )
-                return NSAttributedString(attachment: attachment)
             }
         }
+
     #endif
+
+    /// Lines drawn as text, with where each starts in it.
+    struct ConsoleDrawnText {
+        let string: NSAttributedString
+        let starts: [Int]
+    }
 #endif

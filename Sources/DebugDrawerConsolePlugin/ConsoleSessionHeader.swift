@@ -8,6 +8,10 @@
     /// log line as it was captured.
     struct ConsoleSessionHeader: Codable, Equatable {
         /// The format of the lines this header heads; a reader skips a file of a later one.
+        ///
+        /// A key a line may leave out, such as `subsystem` and `category`, keeps the format: a
+        /// reader of format 1 ignores keys it doesn't know and reads one left out as empty. Only a
+        /// change an earlier reader would misread raises it.
         static let currentFormat = 1
 
         /// ISO 8601 with milliseconds, in UTC: `2027-01-15T08:00:00.000Z`.

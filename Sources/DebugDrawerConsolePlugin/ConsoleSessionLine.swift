@@ -14,6 +14,11 @@
         var source: String
         /// What was logged.
         var text: String
+        /// The os_log subsystem; left out for a line without one, as stdout and stderr lines are,
+        /// and read as empty when absent, as in a file an earlier build wrote.
+        var subsystem: String?
+        /// The os_log category; left out and read like `subsystem`.
+        var category: String?
     }
 
     extension ConsoleSessionLine {
@@ -23,7 +28,9 @@
                 time: ConsoleSessionHeader.dateStyle.format(line.timestamp),
                 level: line.level.name,
                 source: line.source.rawValue,
-                text: line.text
+                text: line.text,
+                subsystem: line.subsystem.isEmpty ? nil : line.subsystem,
+                category: line.category.isEmpty ? nil : line.category
             )
         }
 
@@ -32,7 +39,9 @@
             guard let timestamp = try? ConsoleSessionHeader.dateStyle.parse(time),
                   let level = LogLine.Level(name: level),
                   let source = LogLine.Source(rawValue: source) else { return nil }
-            return LogLine(timestamp: timestamp, text: text, source: source, level: level)
+            return LogLine(
+                timestamp: timestamp, text: text, source: source, level: level, subsystem: subsystem ?? "", category: category ?? ""
+            )
         }
     }
 

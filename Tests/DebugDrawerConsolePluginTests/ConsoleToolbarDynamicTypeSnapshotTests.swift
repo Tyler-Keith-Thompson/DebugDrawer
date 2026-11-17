@@ -11,7 +11,10 @@
     struct ConsoleToolbarDynamicTypeSnapshotTests {
         @Test("The console's toolbar keeps whole words at a large accessibility text size")
         func toolbar() {
-            let sut = ConsoleToolbarView(isFollowing: .constant(false), filterLevel: .constant(.debug), copyAll: {}, clear: {})
+            let sut = ConsoleToolbarView(
+                isFollowing: .constant(false), filterLevel: .constant(.debug),
+                clear: {}
+            )
                 .frame(width: 320, alignment: .leading)
                 .padding()
                 .background(Color(uiColor: .systemBackground))

@@ -98,7 +98,7 @@
             let summary = try #require(ConsoleSessionSummary(ConsoleSessionFile(
                 name: ConsoleSessionSummary.name(started: started, id: UUID()), byteCount: data.count
             )))
-            let sut = ConsoleLogStore()
+            let sut = ConsoleLogStore(muteStorage: FakeConsoleMuteStorage())
 
             let before = sut.source
             sut.showPrevious(ConsoleSessionLog(summary: summary, data: data))

@@ -3,7 +3,8 @@
     import Foundation
 
     extension ConsolePlugin: DebugDrawerReportContributor {
-        /// Adds the lines the level filter shows, as Copy All copies them, as `console.txt`, and
+        /// Adds the captured lines the console's filter passes (level, search, mutes and time
+        /// range), as Copy All copies them, as `console.txt`, and
         /// every line of the newest session an earlier launch kept as `console-previous.txt`:
         /// after a crash, the lines that led up to it.
         public func contribute(to report: inout DebugDrawerReport, redaction: DebugDrawerRedaction) {
@@ -30,14 +31,26 @@
     }
 
     extension [LogLine] {
-        /// The lines as Copy All copies them: time (`HH:mm:ss.SSS`, local), level badge and text,
-        /// one per line.
+        /// The lines as Copy All copies them: time (`HH:mm:ss.SSS`, local), level badge, the
+        /// subsystem and category in full (`[com.example.shop/networking]`) and text, one per line.
         var copiedText: String {
             map { line in
                 let time = LogLine.copyDateFormatter.string(from: line.timestamp)
                 let badge = line.level.label.map { $0 + " " } ?? ""
-                return "\(time) \(badge)\(line.text)"
+                return "\(time) \(badge)\(line.copiedOrigin)\(line.text)"
             }.joined(separator: "\n")
+        }
+    }
+
+    extension LogLine {
+        /// The subsystem and category in brackets, then a space; empty for a line without them.
+        fileprivate var copiedOrigin: String {
+            switch (subsystem.isEmpty, category.isEmpty) {
+            case (true, true): ""
+            case (false, true): "[\(subsystem)] "
+            case (true, false): "[\(category)] "
+            case (false, false): "[\(subsystem)/\(category)] "
+            }
         }
     }
 

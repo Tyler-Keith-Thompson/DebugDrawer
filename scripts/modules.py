@@ -59,7 +59,7 @@ MODULES = [
     # Core
     ("DebugDrawer", "Core", "The drawer: its window, the plugin protocol and registry, the views plugins are built from, and release-build stand-ins.", []),
     # Plugins
-    ("DebugDrawerConsolePlugin", "Plugins", "Captures os_log entries (stdout and stderr on macOS): level filter, search, auto-follow, copy, lines kept across launches.", ["DebugDrawer", "oslogclient/OSLogClient"]),
+    ("DebugDrawerConsolePlugin", "Plugins", "Captures os_log entries (stdout and stderr on macOS): level filter, text or regular-expression search, subsystem and category mutes, time range, auto-follow, copy, lines kept across launches.", ["DebugDrawer", "oslogclient/OSLogClient"]),
     ("DebugDrawerViewInspectorPlugin", "Plugins", "View borders by depth, alignment grid, click indicators, animation speed, render tracking, hierarchy snapshot.", ["DebugDrawer"]),
     ("DebugDrawerAccessibilityPlugin", "Plugins", "Overrides color scheme, Dynamic Type, layout direction, locale and the system accessibility settings at runtime.", ["DebugDrawer"]),
     ("DebugDrawerAppInfoPlugin", "Plugins", "Bundle, version, OS, memory, uptime, process, debugger, screen and reachability facts.", ["DebugDrawer"]),

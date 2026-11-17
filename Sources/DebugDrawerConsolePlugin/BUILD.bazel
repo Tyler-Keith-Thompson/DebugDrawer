@@ -3,7 +3,7 @@
 load("//tools:docc.bzl", "docc_archive")
 load("//tools:swift_rules.bzl", "swift_library")
 
-# Captures os_log entries (stdout and stderr on macOS): level filter, search, auto-follow, copy, lines kept across launches.
+# Captures os_log entries (stdout and stderr on macOS): level filter, text or regular-expression search, subsystem and category mutes, time range, auto-follow, copy, lines kept across launches.
 swift_library(
     name = "DebugDrawerConsolePlugin",
     srcs = glob(["**/*.swift"]),

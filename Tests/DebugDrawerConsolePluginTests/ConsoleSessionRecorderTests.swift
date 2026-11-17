@@ -16,7 +16,7 @@
             let persistence = ConsoleSessionPersistence(storage: _ConsoleSessionStorage(directory: directory))
             let started = Date(timeIntervalSince1970: 1_800_000_000)
             let first = ConsoleSessionRecorder(persistence, started: started)
-            let firstStore = ConsoleLogStore()
+            let firstStore = ConsoleLogStore(muteStorage: FakeConsoleMuteStorage())
             firstStore.persist(to: first)
             firstStore.ingest(LogLine(timestamp: started.addingTimeInterval(1), text: "App launched", source: .oslog, level: .info))
             firstStore.ingest(LogLine(timestamp: started.addingTimeInterval(2), text: "Fetching feed", source: .stdout, level: .debug))
@@ -24,7 +24,7 @@
             let firstSees = await first.previousSessions()
 
             let second = ConsoleSessionRecorder(persistence, started: Date(timeIntervalSince1970: 1_800_000_100))
-            let sut = ConsoleLogStore()
+            let sut = ConsoleLogStore(muteStorage: FakeConsoleMuteStorage())
             sut.persist(to: second)
             let sessions = ConsoleSessionsModel(recorder: second)
             await sessions.reload()

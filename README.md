@@ -316,8 +316,8 @@ show them; the unified log of the current process holds no earlier launch's line
 line is written as it is captured, as logged: log text has no keys for the redaction rules to
 match, so the Console shows, copies and keeps it unmasked. A launch's session is a file of JSON
 Lines in Application Support, in the app's folder under `DebugDrawer/ConsoleSessions`: a header
-with the start and the app's version, then one line per log line, with its time, level, source and
-text, appended as it comes, so a crash mid-write costs at most the line being written, which is
+with the start and the app's version, then one line per log line, with its time, level, source,
+os_log subsystem and category (left out when empty) and text, appended as it comes, so a crash mid-write costs at most the line being written, which is
 skipped on reading. Writing happens on a queue of its own, in batches, never on the main actor. By
 default 5 earlier sessions are kept in at most 20 MB; both are set at install:
 
@@ -337,9 +337,21 @@ writes nothing and deletes what earlier launches kept. To keep sessions somewher
 
 While an earlier session is kept, the console offers Captured and Previous. Previous shows the
 newest earlier session, read-only, with a menu of the others by start and size, the app version
-that wrote it and how many lines it holds; the level filter, search and Copy All work on it as on
-the captured lines. Delete deletes it and Delete All Sessions deletes every earlier one. The bug
+that wrote it and how many lines it holds; the level filter, search, mutes, time range and Copy All
+work on it as on the captured lines. Delete deletes it and Delete All Sessions deletes every earlier one. The bug
 report adds the newest earlier session as `console-previous.txt`.
+
+### Console filters: subsystems, categories, patterns and time
+
+Each os_log line shows its subsystem and category, short and quiet, before its text (`feed/networking`
+for `com.example.feed`'s `networking`). A line's context menu, or its edit menu on iOS, mutes its
+subsystem or its category, or shows the lines from it on; More offers the same mutes for every
+subsystem and category shown, Copy All, and a time range (the last 1, 5 or 15 minutes before the
+newest line). Mutes are kept across launches in the app's folder in Application Support, under
+`DebugDrawer/Console/muted.json`. While they hide lines, a note under the log says how many, with Show
+and Unmute; a time range says so the same way. The `.*` toggle beside the search field reads the
+search as a regular expression (`NSRegularExpression`, ignoring case); while the text isn't one, the
+field says so and the list keeps the last valid search.
 
 ### Network mocks: canned responses without changing the server
 
@@ -1478,7 +1490,7 @@ ContentView()
 | Module | Holds |
 |---|---|
 | `DebugDrawer` | The drawer: its window, the plugin protocol and registry, the views plugins are built from, and release-build stand-ins |
-| `DebugDrawerConsolePlugin` | `os_log` entries (stdout and stderr on macOS): level filter, search, auto-follow, copy, lines kept across launches |
+| `DebugDrawerConsolePlugin` | `os_log` entries (stdout and stderr on macOS): level filter, text or regular-expression search, subsystem and category mutes, time range, auto-follow, copy, lines kept across launches |
 | `DebugDrawerViewInspectorPlugin` | View borders by depth, alignment grid, click indicators, animation speed, SwiftUI render tracking, hierarchy snapshot |
 | `DebugDrawerAccessibilityPlugin` | Runtime overrides of color scheme, Dynamic Type, layout direction, locale and the system accessibility settings SwiftUI exposes, each beside the system's value |
 | `DebugDrawerPerformancePlugin` | Live FPS and memory with sparkline graphs |

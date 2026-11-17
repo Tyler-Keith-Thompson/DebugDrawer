@@ -277,6 +277,8 @@ struct ExampleContentView: View {
                             ExampleAnalytics.trackCounter("increment", value: counter)
                         }
                         Button("Print") { print("Counter: \(counter)") }
+                        Button("Log") { ExampleConsole.logSubsystems(counter) }
+                            .accessibilityLabel("Log from Two Subsystems")
                         Button("Reset") {
                             counter = 0
                             ExampleAnalytics.trackCounter("reset", value: counter)

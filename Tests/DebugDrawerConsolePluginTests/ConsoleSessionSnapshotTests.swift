@@ -37,7 +37,10 @@
                 ConsolePreviousSessionPicker(
                     sessions: [newest, older], shown: ConsoleSessionLog(summary: newest, data: data), select: { _ in }, deleteAll: {}
                 )
-                ConsoleToolbarView(isFollowing: .constant(true), filterLevel: .constant(.debug), copyAll: {}, clear: {}, source: .previous)
+                ConsoleToolbarView(
+                    isFollowing: .constant(true), filterLevel: .constant(.debug),
+                    clear: {}, source: .previous
+                )
             }
             let host = NSHostingView(rootView: sut
                 .environment(\.locale, Locale(identifier: "en_US"))

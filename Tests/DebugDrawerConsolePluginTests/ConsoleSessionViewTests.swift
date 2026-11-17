@@ -87,7 +87,8 @@
         func toolbarDeletes() throws {
             var deletes = 0
             let sut = ConsoleToolbarView(
-                isFollowing: .constant(true), filterLevel: .constant(.debug), copyAll: {}, clear: { deletes += 1 }, source: .previous
+                isFollowing: .constant(true), filterLevel: .constant(.debug),
+                clear: { deletes += 1 }, source: .previous
             )
             let expected = "Delete this session"
 
@@ -102,7 +103,10 @@
         @Test("Under Captured, the toolbar's trailing button clears the console")
         func toolbarClears() throws {
             var clears = 0
-            let sut = ConsoleToolbarView(isFollowing: .constant(true), filterLevel: .constant(.debug), copyAll: {}, clear: { clears += 1 })
+            let sut = ConsoleToolbarView(
+                isFollowing: .constant(true), filterLevel: .constant(.debug),
+                clear: { clears += 1 }
+            )
             let expected = "Clear the console"
 
             let button = try sut.inspect().find(button: "Clear")

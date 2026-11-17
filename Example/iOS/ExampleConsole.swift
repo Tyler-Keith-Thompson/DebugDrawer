@@ -32,4 +32,14 @@ enum ExampleConsole {
     static func log(_ message: String) {
         logger.notice("\(message, privacy: .public)")
     }
+
+    private static let feedLogger = Logger(subsystem: "com.example.feed", category: "networking")
+    private static let cartLogger = Logger(subsystem: "com.example.cart", category: "ui")
+
+    /// Logs a line to each of two subsystems, so the Console's subsystem and category filters
+    /// and mutes have something to work on.
+    static func logSubsystems(_ counter: Int) {
+        feedLogger.info("GET /feed?page=\(counter, privacy: .public) 200")
+        cartLogger.error("Cart badge shows \(counter, privacy: .public) items, expected 0")
+    }
 }

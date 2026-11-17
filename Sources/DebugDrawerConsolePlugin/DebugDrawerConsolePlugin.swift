@@ -2,6 +2,7 @@
     import Combine
     import DebugDrawer
     import Foundation
+    import os
     import OSLogClient
     import SwiftUI
 
@@ -13,6 +14,28 @@
         public let text: String
         public let source: Source
         public let level: Level
+        /// The os_log subsystem it was logged to (`com.example.shop`); empty for stdout and stderr.
+        public let subsystem: String
+        /// The os_log category it was logged to (`networking`); empty for stdout and stderr.
+        public let category: String
+
+        /// A line as it was captured.
+        ///
+        /// - Parameters:
+        ///   - timestamp: When it was logged.
+        ///   - text: What was logged, without its subsystem or category.
+        ///   - source: Where it was captured from.
+        ///   - level: Its level.
+        ///   - subsystem: The os_log subsystem; empty for stdout and stderr.
+        ///   - category: The os_log category; empty for stdout and stderr.
+        init(timestamp: Date, text: String, source: Source, level: Level, subsystem: String = "", category: String = "") {
+            self.timestamp = timestamp
+            self.text = text
+            self.source = source
+            self.level = level
+            self.subsystem = subsystem
+            self.category = category
+        }
 
         public enum Source: String, Sendable {
             case stdout, stderr, oslog
@@ -42,90 +65,98 @@
         }
     }
 
-    // MARK: - OSLogClient driver
-
-    /// Receives os_log entries and pushes them into the shared ConsoleLogStore.
-    final class ConsoleLogDriver: LogDriver, @unchecked Sendable {
-        convenience init() {
-            self.init(id: "com.debugdrawer.console")
-        }
-
-        #if os(macOS)
-            override func processLog(
-                level: LogLevel,
-                subsystem: String,
-                category: String,
-                date: Date,
-                message: String,
-                components _: [OSLogMessageComponent]
-            ) {
-                handleLog(level: level, subsystem: subsystem, category: category, date: date, message: message)
-            }
-        #else
-            override func processLog(
-                level: LogLevel,
-                subsystem: String,
-                category: String,
-                date: Date,
-                message: String
-            ) {
-                handleLog(level: level, subsystem: subsystem, category: category, date: date, message: message)
-            }
-        #endif
-
-        private func handleLog(level: LogLevel, subsystem: String, category: String, date: Date, message: String) {
-            let mapped: LogLine.Level = switch level {
-            case .debug: .debug
-            case .info: .info
-            case .notice: .notice
-            case .error: .error
-            case .fault: .fault
-            case .undefined: .info
-            }
-
-            let prefix = subsystem.isEmpty ? "" : "[\(subsystem)/\(category)] "
-            let line = LogLine(
-                timestamp: date,
-                text: "\(prefix)\(message)",
-                source: .oslog,
-                level: mapped
-            )
-
-            Task { @MainActor in
-                ConsoleLogStore.shared.ingest(line)
-            }
-        }
-    }
-
     // MARK: - Log store
 
     /// Captures stdout, stderr, and os_log output into a ring buffer.
     @MainActor
     public final class ConsoleLogStore: ObservableObject {
-        public static let shared = ConsoleLogStore()
+        /// The store `installConsole()` fills and the plugin shows, its mutes in the app's
+        /// Application Support folder.
+        public static let shared = ConsoleLogStore(muteStorage: _ConsoleMuteStorage(directory: _ConsoleMuteStorage.defaultDirectory))
 
         @Published public private(set) var lines: [LogLine] = []
-        @Published public var filterLevel: LogLine.Level = .debug
+        /// Which lines the console lists. The level, time range and whether muted lines show are
+        /// set through their own properties, the search through `searchText`, and the mutes
+        /// through `mute(_:)`, which saves them.
+        @Published private(set) var filter = ConsoleFilter()
+
+        /// The lowest level the console shows.
+        public var filterLevel: LogLine.Level {
+            get { filter.level }
+            set { filter.level = newValue }
+        }
+
+        /// When a line must be logged to show.
+        var timeRange: ConsoleTimeRange {
+            get { filter.timeRange }
+            set { filter.timeRange = newValue }
+        }
+
+        /// Whether the muted lines show anyway, for now; off at each launch.
+        var showsMuted: Bool {
+            get { filter.showsMuted }
+            set { filter.showsMuted = newValue }
+        }
+
+        /// The search field's text, matched as text or, with `searchIsRegularExpression`, as a
+        /// pattern; each change compiles it once.
+        @Published var searchText = "" {
+            didSet { updateSearch() }
+        }
+
+        /// Whether `searchText` is a regular expression.
+        @Published var searchIsRegularExpression = false {
+            didSet { updateSearch() }
+        }
+
+        /// Why `searchText` isn't a pattern, while it isn't one; the filter keeps the last search
+        /// that was.
+        @Published private(set) var searchIssue: ConsoleSearch.InvalidPattern?
+        /// What went wrong reading or saving the mutes, if anything.
+        @Published var muteIssue: ConsoleMuteIssue?
+        /// Where the mutes are kept between launches.
+        let muteStorage: any ConsoleMuteStorage
 
         /// Maximum number of lines retained in the ring buffer.
         public var capacity = 2000
 
+        /// The captured lines the console lists: those the level, search, mutes and time range
+        /// pass.
         public var filteredLines: [LogLine] {
-            lines.filter { $0.level >= filterLevel }
+            filter.apply(to: lines)
         }
 
-        /// The lines the console shows at the level filter: the captured ones, or the earlier
-        /// session's while `source` is `.previous`.
+        /// The lines the console lists: the captured ones, or the earlier session's while `source`
+        /// is `.previous`, that the filter passes.
         var shownLines: [LogLine] {
+            filter.apply(to: sourceLines)
+        }
+
+        /// How many of the source's lines the mutes hide, of those the other filters pass; while
+        /// `showsMuted`, how many they would hide.
+        var mutedCount: Int {
+            filter.mutedCount(in: sourceLines)
+        }
+
+        /// Every line of the source, before the filter: the captured ones, or the earlier
+        /// session's while `source` is `.previous`.
+        var sourceLines: [LogLine] {
             switch source {
-            case .captured: filteredLines
-            case .previous: (previousLog?.lines ?? []).filter { $0.level >= filterLevel }
+            case .captured: lines
+            case .previous: previousLog?.lines ?? []
             }
         }
 
         /// Whether the console shows the captured lines or an earlier session's; it is `.captured`
         /// whenever no earlier session is shown.
-        @Published var source = ConsoleLogSource.captured
+        @Published var source = ConsoleLogSource.captured {
+            // A line's time belongs to its session, so "Since This Line" doesn't carry over to
+            // the other source, where it would hide every line or none.
+            didSet {
+                if source != oldValue, case .since = timeRange { timeRange = .all }
+            }
+        }
+
         /// The session an earlier launch kept that shows under Previous, once one is read.
         @Published private(set) var previousLog: ConsoleSessionLog?
         /// Writes each line to the current session on disk as it is captured; `nil` until
@@ -140,8 +171,11 @@
         private let lineSubject = PassthroughSubject<LogLine, Never>()
         private var cancellable: AnyCancellable?
 
-        /// An empty store; the plugin shows ``shared``.
-        init() {
+        /// An empty store with the mutes `muteStorage` saved; the plugin shows ``shared``.
+        ///
+        /// - Parameter muteStorage: Where the mutes are kept between launches; they are read now.
+        init(muteStorage: any ConsoleMuteStorage) {
+            self.muteStorage = muteStorage
             cancellable = lineSubject
                 .collect(.byTime(DispatchQueue.main, .milliseconds(100)))
                 .receive(on: DispatchQueue.main)
@@ -152,6 +186,78 @@
                         self.lines.removeFirst(self.lines.count - self.capacity)
                     }
                 }
+            loadMutes()
+        }
+
+        /// Compiles the search field's text into the filter, or, when it isn't a pattern, names
+        /// why and keeps the last search that was.
+        private func updateSearch() {
+            do {
+                filter.search = try ConsoleSearch(searchText, isRegularExpression: searchIsRegularExpression)
+                searchIssue = nil
+            } catch {
+                searchIssue = error
+            }
+        }
+
+        // MARK: - Mutes
+
+        private static let logger = Logger(subsystem: "DebugDrawerConsolePlugin", category: "ConsoleLogStore")
+
+        /// Hides the lines `mute` matches, from now on and in later launches.
+        func mute(_ mute: ConsoleMute) {
+            guard !filter.mutes.contains(mute) else { return }
+            filter.mutes.append(mute)
+            saveMutes()
+        }
+
+        /// Shows the lines `mute` hid again.
+        func unmute(_ mute: ConsoleMute) {
+            guard let index = filter.mutes.firstIndex(of: mute) else { return }
+            filter.mutes.remove(at: index)
+            saveMutes()
+        }
+
+        /// Shows every muted line again, and forgets the mutes.
+        func unmuteAll() {
+            guard !filter.mutes.isEmpty else { return }
+            filter.mutes.removeAll()
+            filter.showsMuted = false
+            saveMutes()
+        }
+
+        /// Reads the saved mutes into the filter; a file this build can't read mutes nothing and
+        /// says why in `muteIssue`.
+        private func loadMutes() {
+            do {
+                if let data = try muteStorage.readMutes() {
+                    filter.mutes = try ConsoleMuteListFile.decode(data)
+                }
+                muteIssue = nil
+            } catch let error as ConsoleMuteListFile.ReadError {
+                Self.logger.error("Saved console mutes not loaded: \(String(describing: error), privacy: .public)")
+                muteIssue = switch error {
+                case .unreadable: .unreadable
+                case let .unsupportedVersion(version): .unsupportedVersion(version)
+                }
+            } catch {
+                Self.logger.error("Saved console mutes not read: \(error.localizedDescription, privacy: .public)")
+                muteIssue = .unreadable
+            }
+        }
+
+        /// Writes the mutes to their storage; a failure says so in `muteIssue`, and the mutes
+        /// apply until the app quits.
+        private func saveMutes() {
+            do {
+                try muteStorage.writeMutes(ConsoleMuteListFile.encode(filter.mutes))
+                if muteIssue == .notSaved { muteIssue = nil }
+            } catch {
+                // Logged once per change a person makes, so it can't loop through the console's
+                // own capture.
+                Self.logger.error("Console mutes not saved: \(error.localizedDescription, privacy: .public)")
+                muteIssue = .notSaved
+            }
         }
 
         // MARK: - Installation
@@ -251,71 +357,6 @@
 
         public func clear() {
             lines.removeAll()
-        }
-    }
-
-    // MARK: - Plugin
-
-    public struct ConsolePlugin: DebugDrawerPlugin {
-        public var title = "Console"
-        public var category = "Logs & Network"
-        public var icon = "terminal"
-
-        public init() {}
-
-        public var body: some View {
-            ConsolePluginView()
-        }
-
-        /// How many lines the console holds.
-        public var headerAccessory: some View {
-            ConsoleHeaderAccessoryView()
-        }
-    }
-
-    /// The Console plugin's header accessory, read from the shared store as the plugin's body
-    /// reads it.
-    struct ConsoleHeaderAccessoryView: View {
-        @ObservedObject private var store = ConsoleLogStore.shared
-
-        var body: some View {
-            ConsoleHeaderSummary(lineCount: store.lines.count)
-        }
-    }
-
-    /// How many lines the console holds ("1,204 lines").
-    struct ConsoleHeaderSummary: View {
-        let lineCount: Int
-
-        /// The count as the header shows it.
-        var text: String {
-            lineCount == 1 ? "1 line" : "\(lineCount.formatted()) lines"
-        }
-
-        var body: some View {
-            Text(text)
-        }
-    }
-
-    // MARK: - Convenience installer
-
-    public extension DebugDrawer {
-        /// Install the console capture plugin. Call once at app startup.
-        /// Captures stdout, stderr, and os_log entries.
-        ///
-        /// - Parameter sessions: How many earlier launches' lines are kept on disk, in how many
-        ///   bytes, and where; each line is written as it is captured, and the console shows the
-        ///   earlier sessions under Previous. ``ConsoleSessionPersistence/off`` writes none.
-        func installConsole(sessions: ConsoleSessionPersistence = .standard) {
-            // Started before capture begins, so the first line is written too, and once a launch,
-            // so a second install doesn't start a second session.
-            if ConsoleLogStore.shared.recorder == nil {
-                let recorder = ConsoleSessionRecorder(sessions)
-                ConsoleLogStore.shared.persist(to: recorder)
-                Task { await ConsoleSessionsModel.shared.start(recorder) }
-            }
-            ConsoleLogStore.shared.install()
-            registerGlobal(ConsolePlugin())
         }
     }
 #endif

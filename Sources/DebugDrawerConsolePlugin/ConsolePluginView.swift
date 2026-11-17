@@ -2,28 +2,33 @@
     import DebugDrawer
     import SwiftUI
 
-    /// The plugin's body: search, the toolbar and the lines. The lines are the captured ones, or,
-    /// read-only, those of a session an earlier launch kept, under Previous.
+    /// The plugin's body: search, the toolbar, the lines and, under them, what the time range and
+    /// the mutes hide. The lines are the captured ones, or, read-only, those of a session an
+    /// earlier launch kept, under Previous.
     struct ConsolePluginView: View {
         @ObservedObject private var store = ConsoleLogStore.shared
         @ObservedObject private var sessions = ConsoleSessionsModel.shared
         @Environment(\.locale) private var locale
         @Environment(\.timeZone) private var timeZone
         @State private var isFollowing = true
-        @State private var searchText = ""
-
-        private var visibleLines: [LogLine] {
-            let filtered = store.shownLines
-            guard !searchText.isEmpty else { return filtered }
-            let query = searchText.lowercased()
-            return filtered.filter { $0.text.lowercased().contains(query) }
-        }
 
         var body: some View {
+            let visibleLines = store.shownLines
             VStack(alignment: .leading, spacing: 0) {
-                TextField("Search logs...", text: $searchText)
-                    .debugDrawerTextFieldStyle()
-                    .accessibilityLabel("Search logs")
+                ConsoleSearchField(
+                    text: $store.searchText,
+                    isRegularExpression: $store.searchIsRegularExpression,
+                    issue: store.searchIssue
+                ) {
+                    ConsoleMoreMenu(
+                        timeRange: $store.timeRange,
+                        mutes: store.filter.mutes,
+                        muteChoices: ConsoleMute.choices(in: store.sourceLines, excluding: store.filter.mutes),
+                        mute: { store.mute($0) },
+                        unmute: { store.unmute($0) },
+                        copyAll: { debugDrawerCopyToClipboard(visibleLines.copiedText) }
+                    )
+                }
 
                 if !sessions.sessions.isEmpty {
                     ConsoleLogSourcePicker(source: $store.source)
@@ -47,7 +52,6 @@
                 ConsoleToolbarView(
                     isFollowing: $isFollowing,
                     filterLevel: $store.filterLevel,
-                    copyAll: { debugDrawerCopyToClipboard(visibleLines.copiedText) },
                     clear: {
                         if store.source == .previous, let shown = store.previousLog {
                             Task { await deletePrevious([shown.summary.id]) }
@@ -57,17 +61,32 @@
                     },
                     source: store.source
                 )
+                if let issue = store.muteIssue {
+                    DebugDrawerIssueRow("Mutes", status: issue == .notSaved ? "Not saved" : "Not read", severity: .warning) {
+                        Text(issue.message)
+                    }
+                }
 
                 DebugDrawerCodeBlock {
                     ConsoleTextView(
                         lines: visibleLines,
-                        isFollowing: $isFollowing
+                        isFollowing: $isFollowing,
+                        perform: perform
                     )
-                    // A new text view for each source and session: the view appends only the
-                    // lines past those it drew, which would leave the other source's lines above.
+                    // A new text view for each source and session, so each opens at its end.
                     .id(shownSession)
                     .frame(minHeight: 120, maxHeight: 300)
                 }
+
+                ConsoleTimeRangeHint(timeRange: store.timeRange) { store.timeRange = .all }
+                ConsoleMutedHint(
+                    count: store.mutedCount,
+                    mutes: store.filter.mutes,
+                    isShowing: store.showsMuted,
+                    toggle: { store.showsMuted.toggle() },
+                    unmute: { store.unmute($0) },
+                    unmuteAll: { store.unmuteAll() }
+                )
             }
             // Listed again each time the plugin shows: writing the current session may have
             // deleted the oldest for room.
@@ -86,6 +105,14 @@
         /// The session the lines are from: `nil` for the captured ones.
         private var shownSession: ConsoleSessionSummary.ID? {
             store.source == .previous ? store.previousLog?.summary.id : nil
+        }
+
+        /// Runs what a line's context menu offers.
+        private func perform(_ action: ConsoleLineAction) {
+            switch action {
+            case let .mute(mute): store.mute(mute)
+            case let .showSince(date): store.timeRange = .since(date)
+            }
         }
 
         /// Reads the earlier session with `id` and shows its lines.
@@ -107,14 +134,13 @@
         }
     }
 
-    /// Extracted toolbar so the segmented picker doesn't get rebuilt on every log update.
-    /// Only `isFollowing` changes frequently — the picker binding (`filterLevel`) is stable and
-    /// won't cause the NSSegmentedControl to be recreated. The line count is the header's
-    /// accessory, so the toolbar doesn't repeat it.
+    /// Extracted toolbar so the segmented picker doesn't get rebuilt on every log update: the
+    /// level, Resume while the log doesn't follow new lines, and Clear at the trailing edge. Copy
+    /// All, the time range and the mutes are in More, beside the search field. The line count is
+    /// the header's accessory, so the toolbar doesn't repeat it.
     struct ConsoleToolbarView: View {
         @Binding var isFollowing: Bool
         @Binding var filterLevel: LogLine.Level
-        let copyAll: () -> Void
         /// Clears the captured lines, or, under Previous, deletes the session shown.
         let clear: () -> Void
         /// What the trailing button clears, or for an earlier session, deletes.
@@ -130,8 +156,6 @@
                         .debugDrawerButtonStyle(.borderless)
                         .accessibilityHint("Scrolls to the newest line and follows new ones")
                 }
-
-                Button("Copy All", action: copyAll)
             } trailing: {
                 Button(source == .previous ? "Delete" : "Clear", role: .destructive, action: clear)
                     .debugDrawerButtonStyle(.destructive)

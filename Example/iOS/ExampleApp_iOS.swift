@@ -225,6 +225,8 @@ struct ExampleContentView_iOS: View {
                     }
                     .buttonStyle(.bordered)
 
+                    // Console shows each line's subsystem and category, and can mute either.
+                    Button("Log from Two Subsystems") { ExampleConsole.logSubsystems(counter) }
                     Button("Show Sheet") {
                         isShowingSheet = true
                         ExampleAnalytics.track("sheet_shown")
