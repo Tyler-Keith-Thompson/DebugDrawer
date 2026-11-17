@@ -1,7 +1,7 @@
-#if DEBUG
-    import DebugDrawer
-    import SwiftUI
+import DebugDrawer
+import SwiftUI
 
+#if DEBUG
     /// "3G active" (or, in the header, "1 active") after a tortoise in the accent color, while
     /// conditioning profiles are on, so a slow or failing app is never mistaken for a slow or
     /// failing server. Nothing while none is.
@@ -33,17 +33,27 @@
             }
         }
     }
+#endif
 
-    /// The Network plugin's HUD readout: the conditions that are on, so they show with the drawer
-    /// closed, or "Network unconditioned" while none is.
-    public struct NetworkConditionsHUD: View {
+/// The Network plugin's HUD readout: the conditions that are on, so they show with the drawer
+/// closed, or "Network unconditioned" while none is.
+///
+/// The type exists in every build; in release it draws nothing.
+public struct NetworkConditionsHUD: View {
+    #if DEBUG
         @ObservedObject var conditions: NetworkConditionsModel
+    #endif
 
-        public var body: some View {
+    public var body: some View {
+        #if DEBUG
             NetworkConditionsHUDReadout(summary: conditions.profiles.activeSummary)
-        }
+        #else
+            EmptyView()
+        #endif
     }
+}
 
+#if DEBUG
     /// The HUD's readout for `summary`: the indicator, or "Network unconditioned" in the secondary
     /// color while no profile is on.
     struct NetworkConditionsHUDReadout: View {

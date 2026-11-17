@@ -10,9 +10,7 @@
     // InstallingInSwiftUI.md
     struct OrdersApp: App {
         init() {
-            #if DEBUG
-                DebugDrawer.shared.registerGlobal(CachePlugin())
-            #endif
+            DebugDrawer.shared.registerGlobal(CachePlugin())
         }
 
         var body: some Scene {
@@ -28,9 +26,7 @@
         var body: some View {
             Text("Orders")
                 .onTapGesture(count: 3) {
-                    #if DEBUG
-                        DebugDrawer.shared.toggle()
-                    #endif
+                    DebugDrawer.shared.toggle()
                 }
         }
     }
@@ -154,15 +150,13 @@
             #expect(actual.hasHUD)
         }
 
-        @Test("Release builds: the debug-only calls an app makes compile under DEBUG")
+        @Test("Release builds: the calls that set the drawer up need no #if DEBUG")
         func releaseBuilds() throws {
             let reportsEndpoint = try #require(URL(string: "https://bugs.example.com/reports"))
             let previous = DebugDrawer.shared.reportUploader
 
-            #if DEBUG
-                DebugDrawer.shared.registerGlobal(CachePlugin())
-                DebugDrawer.shared.reportUploader = TeamReportUploader(endpoint: reportsEndpoint)
-            #endif
+            DebugDrawer.shared.registerGlobal(CachePlugin())
+            DebugDrawer.shared.reportUploader = TeamReportUploader(endpoint: reportsEndpoint)
 
             let actual = DebugDrawer.shared.reportUploader as? TeamReportUploader
             // Leave the shared drawer as the other suites expect it, within this one main-actor turn.

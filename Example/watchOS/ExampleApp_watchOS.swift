@@ -6,11 +6,9 @@ import SwiftUI
 @main
 struct DebugDrawerExampleWatchOSApp: App {
     init() {
-        #if DEBUG
-            DebugDrawer.shared.registerGlobal(ExampleBuildPlugin())
-            DebugDrawer.shared.registerGlobal(ExampleCachePlugin())
-            DebugDrawer.shared.registerGlobal(ExampleWorkoutPlugin())
-        #endif
+        DebugDrawer.shared.registerGlobal(ExampleBuildPlugin())
+        DebugDrawer.shared.registerGlobal(ExampleCachePlugin())
+        DebugDrawer.shared.registerGlobal(ExampleWorkoutPlugin())
     }
 
     var body: some Scene {
@@ -23,25 +21,21 @@ struct DebugDrawerExampleWatchOSApp: App {
                 // -OpenDebugDrawerPlugin <id> opens it at one plugin, through a toast, as a plugin
                 // that raises one would.
                 .onAppear {
-                    #if DEBUG
-                        openFromLaunchArguments(ProcessInfo.processInfo.arguments)
-                    #endif
+                    openFromLaunchArguments(ProcessInfo.processInfo.arguments)
                 }
         }
     }
 
-    #if DEBUG
-        @MainActor
-        private func openFromLaunchArguments(_ arguments: [String]) {
-            let drawer = DebugDrawer.shared
-            if let flag = arguments.firstIndex(of: "-OpenDebugDrawerPlugin"), arguments.indices.contains(flag + 1) {
-                drawer.postToast("Opened at launch", fromPlugin: arguments[flag + 1])
-                drawer.openToast()
-            } else if arguments.contains("-OpenDebugDrawer"), !drawer.isOpen {
-                drawer.toggle()
-            }
+    @MainActor
+    private func openFromLaunchArguments(_ arguments: [String]) {
+        let drawer = DebugDrawer.shared
+        if let flag = arguments.firstIndex(of: "-OpenDebugDrawerPlugin"), arguments.indices.contains(flag + 1) {
+            drawer.postToast("Opened at launch", fromPlugin: arguments[flag + 1])
+            drawer.openToast()
+        } else if arguments.contains("-OpenDebugDrawer"), !drawer.isOpen {
+            drawer.toggle()
         }
-    #endif
+    }
 }
 
 struct ExampleContentView_watchOS: View {
@@ -59,16 +53,14 @@ struct ExampleContentView_watchOS: View {
                 }
 
                 // The library binds no gesture or button (it adds no global trigger), so the app
-                // opens the drawer: here from a button. The drawer exists in debug builds only.
-                #if DEBUG
-                    Section("Debug") {
-                        Button {
-                            DebugDrawer.shared.toggle()
-                        } label: {
-                            Label("Debug Drawer", systemImage: "ladybug")
-                        }
+                // opens the drawer: here from a button. Release builds have no drawer, so there it does nothing.
+                Section("Debug") {
+                    Button {
+                        DebugDrawer.shared.toggle()
+                    } label: {
+                        Label("Debug Drawer", systemImage: "ladybug")
                     }
-                #endif
+                }
             }
             .navigationTitle("Example")
         }

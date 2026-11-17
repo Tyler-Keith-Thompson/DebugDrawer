@@ -26,4 +26,12 @@
         var type: String
         var value: String
     }
+#else
+    import DebugDrawer
+
+    // The release stand-in: release builds make no reports.
+    extension UserDefaultsPlugin: DebugDrawerReportContributor {
+        /// Adds nothing: release builds make no reports.
+        public func contribute(to report: inout DebugDrawerReport, redaction: DebugDrawerRedaction) {}
+    }
 #endif

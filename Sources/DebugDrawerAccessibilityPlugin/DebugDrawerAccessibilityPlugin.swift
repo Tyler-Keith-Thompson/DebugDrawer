@@ -1,21 +1,38 @@
-#if DEBUG
-    import DebugDrawer
-    import SwiftUI
+import DebugDrawer
+import SwiftUI
 
-    // MARK: - Plugin
+// MARK: - Plugin
 
-    public struct AccessibilityPlugin: DebugDrawerPlugin {
-        public var title = "Accessibility"
-        public var category = "Interface"
-        public var icon = "accessibility"
+// The public API compiles in every configuration; the implementation under `#if DEBUG` below does
+// not, so release builds get an empty view and an installer that registers nothing.
 
-        public init() {}
+public struct AccessibilityPlugin: DebugDrawerPlugin {
+    public var title = "Accessibility"
+    public var category = "Interface"
+    public var icon = "accessibility"
 
-        public var body: some View {
+    public init() {}
+
+    public var body: some View {
+        #if DEBUG
             AccessibilityPluginView()
-        }
+        #else
+            EmptyView()
+        #endif
     }
+}
 
+// MARK: - Convenience installer
+
+public extension DebugDrawer {
+    func installAccessibility() {
+        #if DEBUG
+            registerGlobal(AccessibilityPlugin())
+        #endif
+    }
+}
+
+#if DEBUG
     struct AccessibilityPluginView: View {
         @ObservedObject private var overrides = AccessibilityOverrides.shared
 
@@ -261,11 +278,4 @@
         let value: String
     }
 
-    // MARK: - Convenience installer
-
-    public extension DebugDrawer {
-        func installAccessibility() {
-            registerGlobal(AccessibilityPlugin())
-        }
-    }
 #endif

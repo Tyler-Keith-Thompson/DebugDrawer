@@ -14,9 +14,7 @@
         func networkSessions() async {
             await #expect(processExitsWith: .success) {
                 await MainActor.run {
-                    #if DEBUG
                     DebugDrawer.shared.installNetwork(sessions: NetworkSessionPersistence(maxSessions: 3, maxBytes: 5_000_000))
-                    #endif
                 }
                 // `.invalid` never resolves, so the request fails at once, with or without a
                 // network, and is written as a failure.

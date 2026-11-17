@@ -58,4 +58,12 @@
                 + (userInfo.isEmpty ? [] : ["    userInfo:"] + userInfo.split(separator: "\n").map { "      \($0)" })
         }
     }
+#else
+    import DebugDrawer
+
+    // The release stand-in: release builds make no reports.
+    extension NotificationsPlugin: DebugDrawerReportContributor {
+        /// Adds nothing: release builds make no reports.
+        public func contribute(to report: inout DebugDrawerReport, redaction: DebugDrawerRedaction) {}
+    }
 #endif

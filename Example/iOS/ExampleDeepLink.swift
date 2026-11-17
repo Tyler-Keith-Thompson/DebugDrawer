@@ -30,9 +30,7 @@ final class ExampleContinuedActivity: ObservableObject {
 enum ExampleDeepLink {
     @MainActor
     static func install() {
-        #if DEBUG
-            DebugDrawer.shared.installDeepLink { ExampleContinuedActivity.shared.record($0, via: "Handler") }
-        #endif
+        DebugDrawer.shared.installDeepLink { ExampleContinuedActivity.shared.record($0, via: "Handler") }
     }
 }
 

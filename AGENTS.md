@@ -65,6 +65,7 @@ Every shell command gets a timeout. macOS has no `timeout`; use
 | `bazel test //Tests/XTests` | One test target (`just test-one //Tests/XTests`) |
 | `just filter <pattern>` | Tests whose name matches |
 | `just test-release` | `--config=release`: builds and runs only the `XPerformanceTests` targets |
+| `just release-check` | Example apps built optimized, and every public symbol present in release (`scripts/release_api.py`); a `just deploy` gate |
 | `just spm-test`, `just verify` | SwiftPM tests; both build systems |
 | `just modules` | Regenerate build files from `scripts/modules.py` |
 | `just resolve` | Re-resolve Bazel's SwiftPM dependencies after editing `PACKAGES` |

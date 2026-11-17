@@ -21,9 +21,7 @@
                 setenv("CFFIXED_USER_HOME", home, 1)
                 guard _ConsoleSessionStorage.defaultDirectory.path(percentEncoded: false).hasPrefix(home) else { exit(EXIT_FAILURE) }
                 await MainActor.run {
-                    #if DEBUG
                     DebugDrawer.shared.installConsole(sessions: ConsoleSessionPersistence(maxSessions: 3, maxBytes: 5_000_000))
-                    #endif
                 }
                 let recorder = await MainActor.run { () -> ConsoleSessionRecorder? in
                     ConsoleLogStore.shared.ingest(LogLine(timestamp: Date(), text: "README example line", source: .oslog, level: .info))

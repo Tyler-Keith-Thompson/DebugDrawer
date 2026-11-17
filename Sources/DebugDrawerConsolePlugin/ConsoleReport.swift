@@ -1,19 +1,23 @@
-#if DEBUG
-    import DebugDrawer
-    import Foundation
+import DebugDrawer
+import Foundation
 
-    extension ConsolePlugin: DebugDrawerReportContributor {
-        /// Adds the captured lines the console's filter passes (level, search, mutes and time
-        /// range), as Copy All copies them, as `console.txt`, and
-        /// every line of the newest session an earlier launch kept as `console-previous.txt`:
-        /// after a crash, the lines that led up to it.
-        public func contribute(to report: inout DebugDrawerReport, redaction: DebugDrawerRedaction) {
+extension ConsolePlugin: DebugDrawerReportContributor {
+    /// Adds the captured lines the console's filter passes (level, search, mutes and time
+    /// range), as Copy All copies them, as `console.txt`, and
+    /// every line of the newest session an earlier launch kept as `console-previous.txt`:
+    /// after a crash, the lines that led up to it. In release builds it adds nothing.
+    public func contribute(to report: inout DebugDrawerReport, redaction: DebugDrawerRedaction) {
+        #if DEBUG
             Self.contribute(ConsoleLogStore.shared.filteredLines, to: &report)
             // Read here, on the main actor, as the report is built now: a session is at most the
             // size limit, 20 MB unless the app set another.
             Self.contribute(previous: ConsoleLogStore.shared.recorder?.newestPreviousSession(), to: &report)
-        }
+        #endif
+    }
+}
 
+#if DEBUG
+    extension ConsolePlugin {
         /// Adds `lines` as `console.txt`, one per line in Copy All's format; no lines add nothing.
         /// Log text has no keys for the redaction rules to match, so it goes in as logged.
         static func contribute(_ lines: [LogLine], to report: inout DebugDrawerReport) {

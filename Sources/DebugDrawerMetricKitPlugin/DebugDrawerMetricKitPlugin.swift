@@ -1,41 +1,54 @@
-#if DEBUG
-    import DebugDrawer
-    import SwiftUI
+import DebugDrawer
+import SwiftUI
 
-    /// The payloads `MetricKitPayloads.install(directory:)` keeps, the latest first, each open as
-    /// formatted JSON to copy or export; a badge counts the ones not yet opened.
-    public struct MetricKitPlugin: DebugDrawerPlugin {
-        /// The plugin's identity in the drawer, which its badge is set under.
-        static let pluginID = "MetricKitPlugin"
+// The public API compiles in every configuration; the implementation under `#if DEBUG` below does
+// not, so release builds get an empty view and an installer that installs nothing.
 
-        public var id: String {
-            Self.pluginID
-        }
+/// The payloads `MetricKitPayloads.install(directory:)` keeps, the latest first, each open as
+/// formatted JSON to copy or export; a badge counts the ones not yet opened.
+public struct MetricKitPlugin: DebugDrawerPlugin {
+    /// The plugin's identity in the drawer, which its badge is set under.
+    static let pluginID = "MetricKitPlugin"
 
-        public var title = "MetricKit"
-        public var category = "Performance"
-        public var icon = "chart.bar.doc.horizontal"
+    public var id: String {
+        Self.pluginID
+    }
 
+    public var title = "MetricKit"
+    public var category = "Performance"
+    public var icon = "chart.bar.doc.horizontal"
+
+    #if DEBUG
         let store: MetricKitPayloadStore
 
         init(store: MetricKitPayloadStore) {
             self.store = store
         }
+    #endif
 
-        public var body: some View {
+    public var body: some View {
+        #if DEBUG
             MetricKitPluginView(store: store)
-        }
+        #else
+            EmptyView()
+        #endif
+    }
 
-        /// Delete All, found by "metrics" and "diagnostics" too.
-        public var actions: [DebugDrawerAction] {
+    /// Delete All, found by "metrics" and "diagnostics" too.
+    public var actions: [DebugDrawerAction] {
+        #if DEBUG
             [
                 DebugDrawerAction("Delete MetricKit payloads", keywords: ["metrickit", "metrics", "diagnostics", "payloads", "clear"]) { [store] in
                     store.deleteAll()
                 }
             ]
-        }
+        #else
+            []
+        #endif
     }
+}
 
+#if DEBUG
     /// Reads the store and hands its payloads to `MetricKitPayloadsView`, keeping which one is
     /// open.
     struct MetricKitPluginView: View {

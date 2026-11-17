@@ -18,4 +18,12 @@
             report.add(text: ([header] + events.map { $0.text() }).joined(separator: "\n"), named: "hangs")
         }
     }
+#else
+    import DebugDrawer
+
+    // The release stand-in: release builds make no reports.
+    extension HangDetectorPlugin: DebugDrawerReportContributor {
+        /// Adds nothing: release builds make no reports.
+        public func contribute(to report: inout DebugDrawerReport, redaction: DebugDrawerRedaction) {}
+    }
 #endif

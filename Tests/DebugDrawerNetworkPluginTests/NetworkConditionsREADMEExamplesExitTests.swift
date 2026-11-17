@@ -18,7 +18,6 @@
                 // ignored), so the child removes what it saved before it exits.
                 let saved = _NetworkMockStorage.defaultDirectory
                 await MainActor.run {
-                    #if DEBUG
                     let slowImages = NetworkConditionProfile(
                         id: UUID(uuidString: "8C4F2A61-7B3D-4E59-A1C8-2D6E9F0B3A47")!,
                         name: "Slow images",
@@ -34,7 +33,6 @@
                         failure: .notConnectedToInternet
                     )
                     DebugDrawer.shared.installNetwork(conditions: [slowImages, paymentsOffline])
-                    #endif
                 }
                 guard let url = URL(string: "https://payments.example.com/v1/charge") else { exit(EXIT_FAILURE) }
                 var code: URLError.Code?

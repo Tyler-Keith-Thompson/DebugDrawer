@@ -29,9 +29,7 @@
         func readme() async {
             await #expect(processExitsWith: .success) {
                 await MainActor.run {
-                    #if DEBUG
                     DebugDrawer.shared.installAppInfo(buildMetadata: AppInfoBuildMetadata(gitCommit: "4f9c2e1", gitBranch: "release/2.4"))
-                    #endif
 
                     let plugins = DebugDrawer.shared.globalPlugins.filter { $0.title == "App Info" }
                     exit(plugins.count == 1 ? EXIT_SUCCESS : EXIT_FAILURE)

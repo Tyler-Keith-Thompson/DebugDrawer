@@ -1,37 +1,50 @@
-#if DEBUG
-    import DebugDrawer
-    import SwiftUI
+import DebugDrawer
+import SwiftUI
 
-    /// Pseudo-localization and show-keys for the strings the app looks up through `Bundle`, the
-    /// translations a language is missing, and Apple's launch arguments for the rest. The header
-    /// counts the translations missing for the language the app runs in, after a pending relaunch.
-    public struct LocalizationPlugin: DebugDrawerPlugin {
-        public var id: String {
-            "LocalizationPlugin"
-        }
+// The public API compiles in every configuration; the implementation under `#if DEBUG` below does
+// not, so release builds get an empty view and an installer that installs nothing.
 
-        public var title = "Localization"
-        public var category = "Interface"
-        public var icon = "character.bubble"
+/// Pseudo-localization and show-keys for the strings the app looks up through `Bundle`, the
+/// translations a language is missing, and Apple's launch arguments for the rest. The header
+/// counts the translations missing for the language the app runs in, after a pending relaunch.
+public struct LocalizationPlugin: DebugDrawerPlugin {
+    public var id: String {
+        "LocalizationPlugin"
+    }
 
+    public var title = "Localization"
+    public var category = "Interface"
+    public var icon = "character.bubble"
+
+    #if DEBUG
         let model: LocalizationModel
 
         init(model: LocalizationModel) {
             self.model = model
         }
+    #endif
 
-        public var body: some View {
+    public var body: some View {
+        #if DEBUG
             LocalizationPluginView(model: model)
-        }
+        #else
+            EmptyView()
+        #endif
+    }
 
-        /// How many translations the current language is missing, so the gap shows while the
-        /// plugin is closed.
-        public var headerAccessory: some View {
+    /// How many translations the current language is missing, so the gap shows while the
+    /// plugin is closed.
+    public var headerAccessory: some View {
+        #if DEBUG
             LocalizationHeaderAccessory(model: model)
-        }
+        #else
+            EmptyView()
+        #endif
+    }
 
-        /// Each mode, found by "pseudo", "keys" and "translations" too.
-        public var actions: [DebugDrawerAction] {
+    /// Each mode, found by "pseudo", "keys" and "translations" too.
+    public var actions: [DebugDrawerAction] {
+        #if DEBUG
             [
                 DebugDrawerAction("Pseudo-localize strings", keywords: ["localization", "pseudo", "accents", "longer"]) { [model] in
                     model.mode = model.mode == .pseudoLocalized ? .standard : .pseudoLocalized
@@ -43,9 +56,13 @@
                     model.mode = .standard
                 }
             ]
-        }
+        #else
+            []
+        #endif
     }
+}
 
+#if DEBUG
     /// Reads the model and hands its values to `LocalizationView`; it reads the tables again
     /// each time it appears, so a table the app downloaded since shows.
     struct LocalizationPluginView: View {

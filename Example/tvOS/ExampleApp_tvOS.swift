@@ -6,11 +6,9 @@ import SwiftUI
 @main
 struct DebugDrawerExampleTVOSApp: App {
     init() {
-        #if DEBUG
-            DebugDrawer.shared.registerGlobal(ExampleBuildPlugin())
-            DebugDrawer.shared.registerGlobal(ExampleCachePlugin())
-            DebugDrawer.shared.registerGlobal(ExamplePlaybackPlugin())
-        #endif
+        DebugDrawer.shared.registerGlobal(ExampleBuildPlugin())
+        DebugDrawer.shared.registerGlobal(ExampleCachePlugin())
+        DebugDrawer.shared.registerGlobal(ExamplePlaybackPlugin())
     }
 
     var body: some Scene {
@@ -20,18 +18,14 @@ struct DebugDrawerExampleTVOSApp: App {
                 // The library binds no remote button (it adds no global trigger), so the app opens
                 // the drawer: from a button in the list, and from Play/Pause here. Attached outside
                 // .debugDrawer(), it also closes the drawer while focus is in it.
-                #if DEBUG
-                    .onPlayPauseCommand { DebugDrawer.shared.toggle() }
-                #endif
+                .onPlayPauseCommand { DebugDrawer.shared.toggle() }
                 // Launched with -OpenDebugDrawer, the app starts with the drawer open, so it can be
                 // checked without a remote:
                 // `xcrun simctl launch booted com.debugdrawer.example.tvos -OpenDebugDrawer`.
                 .onAppear {
-                    #if DEBUG
-                        if ProcessInfo.processInfo.arguments.contains("-OpenDebugDrawer"), !DebugDrawer.shared.isOpen {
-                            DebugDrawer.shared.toggle()
-                        }
-                    #endif
+                    if ProcessInfo.processInfo.arguments.contains("-OpenDebugDrawer"), !DebugDrawer.shared.isOpen {
+                        DebugDrawer.shared.toggle()
+                    }
                 }
         }
     }
@@ -51,16 +45,14 @@ struct ExampleContentView_tvOS: View {
                         .accessibilityAddTraits(.isHeader)
                 }
 
-                // The drawer exists in debug builds only.
-                #if DEBUG
-                    Section("Debug") {
-                        Button {
-                            DebugDrawer.shared.toggle()
-                        } label: {
-                            Label("Debug Drawer", systemImage: "ladybug")
-                        }
+                // Release builds have no drawer, so there it does nothing.
+                Section("Debug") {
+                    Button {
+                        DebugDrawer.shared.toggle()
+                    } label: {
+                        Label("Debug Drawer", systemImage: "ladybug")
                     }
-                #endif
+                }
 
                 Section("Items") {
                     ForEach(1 ... 20, id: \.self) { item in

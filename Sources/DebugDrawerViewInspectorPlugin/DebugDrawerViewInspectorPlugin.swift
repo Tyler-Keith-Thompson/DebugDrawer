@@ -1,27 +1,44 @@
-#if DEBUG
-    import Combine
-    import DebugDrawer
-    import SwiftUI
+import Combine
+import DebugDrawer
+import SwiftUI
 
+// MARK: - Plugin
+
+// The public API compiles in every configuration; the implementation under `#if DEBUG` below does
+// not, so release builds get an empty view and an installer that registers nothing.
+
+public struct ViewInspectorPlugin: DebugDrawerPlugin {
+    public var title = "View Inspector"
+    public var category = "Interface"
+    public var icon = "rectangle.dashed"
+
+    public init() {}
+
+    public var body: some View {
+        #if DEBUG
+            ViewInspectorPluginView()
+        #else
+            EmptyView()
+        #endif
+    }
+}
+
+// MARK: - Convenience installer
+
+public extension DebugDrawer {
+    func installViewInspector() {
+        #if DEBUG
+            registerGlobal(ViewInspectorPlugin())
+        #endif
+    }
+}
+
+#if DEBUG
     #if os(macOS)
     import AppKit
     #elseif os(iOS)
     import UIKit
     #endif
-
-    // MARK: - Plugin
-
-    public struct ViewInspectorPlugin: DebugDrawerPlugin {
-        public var title = "View Inspector"
-        public var category = "Interface"
-        public var icon = "rectangle.dashed"
-
-        public init() {}
-
-        public var body: some View {
-            ViewInspectorPluginView()
-        }
-    }
 
     struct ViewInspectorPluginView: View {
         @ObservedObject private var controller = ViewBorderController.shared
@@ -159,14 +176,6 @@
             hierarchy = ViewNode.build(from: rootView)
             isHierarchyExpanded = true
             #endif
-        }
-    }
-
-    // MARK: - Convenience installer
-
-    public extension DebugDrawer {
-        func installViewInspector() {
-            registerGlobal(ViewInspectorPlugin())
         }
     }
 

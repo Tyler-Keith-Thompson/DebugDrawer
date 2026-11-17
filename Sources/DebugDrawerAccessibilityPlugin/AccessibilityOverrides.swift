@@ -114,6 +114,61 @@
 #else
     import SwiftUI
 
+    // The release stand-ins: the same members, so the host's code compiles unchanged, and no
+    // overrides behind them. Every value stays nil and the modifier changes nothing.
+
+    /// Release builds override nothing: this stand-in keeps the debug build's members.
+    @MainActor
+    public final class AccessibilityOverrides: ObservableObject {
+        /// The stand-in overrides.
+        public static let shared = AccessibilityOverrides()
+
+        /// Always nil unless set; nothing reads it.
+        @Published public var colorScheme: ColorScheme?
+        /// Always nil unless set; nothing reads it.
+        @Published public var dynamicTypeSize: DynamicTypeSize?
+        /// Always nil unless set; nothing reads it.
+        @Published public var layoutDirection: LayoutDirection?
+        /// Always nil unless set; nothing reads it.
+        @Published public var locale: Locale?
+        /// Always nil unless set; nothing reads it.
+        @Published public var reduceMotion: Bool?
+        /// Always nil unless set; nothing reads it.
+        @Published public var increaseContrast: Bool?
+        /// Always nil unless set; nothing reads it.
+        @Published public var boldText: Bool?
+        /// Always nil unless set; nothing reads it.
+        @Published public var reduceTransparency: Bool?
+        /// Always nil unless set; nothing reads it.
+        @Published public var differentiateWithoutColor: Bool?
+        /// Always nil unless set; nothing reads it.
+        @Published public var invertColors: Bool?
+
+        /// Always empty.
+        public let availableLocales: [Locale] = []
+
+        private init() {}
+
+        /// Does nothing.
+        public func reset() {}
+
+        /// Always false.
+        public var hasOverrides: Bool {
+            false
+        }
+    }
+
+    /// Returns the content unchanged: release builds override nothing.
+    public struct AccessibilityOverridesModifier: ViewModifier {
+        /// The stand-in modifier.
+        public init() {}
+
+        /// Returns `content` unchanged.
+        public func body(content: Content) -> some View {
+            content
+        }
+    }
+
     public extension View {
         func debugAccessibilityOverrides() -> some View { self }
     }

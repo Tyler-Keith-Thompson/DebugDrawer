@@ -124,95 +124,92 @@ public extension DebugDrawerPlugin where HeaderAccessory == EmptyView {
 /// The category of a plugin that names none.
 let defaultPluginCategory = "General"
 
-#if DEBUG
+// MARK: - Type-erased wrapper
 
-    // MARK: - Type-erased wrapper
+/// A plugin of any type, as the drawer holds it: its properties read once, and its views
+/// built on demand.
+public struct AnyDebugDrawerPlugin: Identifiable {
+    /// The plugin's ``DebugDrawerPlugin/id``.
+    public let id: String
+    /// The plugin's ``DebugDrawerPlugin/title``.
+    public let title: String
+    /// The plugin's ``DebugDrawerPlugin/icon``.
+    public let icon: String
+    /// The plugin's ``DebugDrawerPlugin/category``.
+    public let category: String
+    /// The plugin's ``DebugDrawerPlugin/actions``.
+    public let actions: [DebugDrawerAction]
+    private let _body: @MainActor () -> AnyView
+    private let _hud: (@MainActor () -> AnyView)?
+    private let _headerAccessory: (@MainActor () -> AnyView)?
+    private let _contribute: (@MainActor (inout DebugDrawerReport, DebugDrawerRedaction) -> Void)?
 
-    /// A plugin of any type, as the drawer holds it: its properties read once, and its views
-    /// built on demand.
-    public struct AnyDebugDrawerPlugin: Identifiable {
-        /// The plugin's ``DebugDrawerPlugin/id``.
-        public let id: String
-        /// The plugin's ``DebugDrawerPlugin/title``.
-        public let title: String
-        /// The plugin's ``DebugDrawerPlugin/icon``.
-        public let icon: String
-        /// The plugin's ``DebugDrawerPlugin/category``.
-        public let category: String
-        /// The plugin's ``DebugDrawerPlugin/actions``.
-        public let actions: [DebugDrawerAction]
-        private let _body: @MainActor () -> AnyView
-        private let _hud: (@MainActor () -> AnyView)?
-        private let _headerAccessory: (@MainActor () -> AnyView)?
-        private let _contribute: (@MainActor (inout DebugDrawerReport, DebugDrawerRedaction) -> Void)?
-
-        /// Wraps `plugin`, reading its properties now and keeping it to build its views later.
-        ///
-        /// - Parameter plugin: The plugin to wrap.
-        @MainActor public init<P: DebugDrawerPlugin>(_ plugin: P) {
-            id = plugin.id
-            title = plugin.title
-            icon = plugin.icon
-            category = plugin.category
-            actions = plugin.actions
-            _body = { AnyView(plugin.body) }
-            if plugin.hud == nil {
-                _hud = nil
-            } else {
-                _hud = { AnyView(plugin.hud) }
-            }
-            if P.HeaderAccessory.self == EmptyView.self {
-                _headerAccessory = nil
-            } else {
-                _headerAccessory = { AnyView(plugin.headerAccessory) }
-            }
-            if let contributor = plugin as? any DebugDrawerReportContributor {
-                _contribute = { contributor.contribute(to: &$0, redaction: $1) }
-            } else {
-                _contribute = nil
-            }
+    /// Wraps `plugin`, reading its properties now and keeping it to build its views later.
+    ///
+    /// - Parameter plugin: The plugin to wrap.
+    @MainActor public init<P: DebugDrawerPlugin>(_ plugin: P) {
+        id = plugin.id
+        title = plugin.title
+        icon = plugin.icon
+        category = plugin.category
+        actions = plugin.actions
+        _body = { AnyView(plugin.body) }
+        if plugin.hud == nil {
+            _hud = nil
+        } else {
+            _hud = { AnyView(plugin.hud) }
         }
-
-        /// Whether the plugin adopts ``DebugDrawerReportContributor``, and so adds files to the
-        /// bug report.
-        public var contributesToReport: Bool {
-            _contribute != nil
+        if P.HeaderAccessory.self == EmptyView.self {
+            _headerAccessory = nil
+        } else {
+            _headerAccessory = { AnyView(plugin.headerAccessory) }
         }
-
-        /// Adds the plugin's files to `report`; a plugin that doesn't adopt
-        /// ``DebugDrawerReportContributor`` adds nothing.
-        @MainActor public func contribute(to report: inout DebugDrawerReport, redaction: DebugDrawerRedaction) {
-            _contribute?(&report, redaction)
-        }
-
-        /// The plugin's ``DebugDrawerPlugin/body``, built now.
-        @MainActor public var body: AnyView {
-            _body()
-        }
-
-        /// Whether the plugin offers a HUD readout.
-        public var hasHUD: Bool {
-            _hud != nil
-        }
-
-        /// The plugin's HUD readout, if it offers one.
-        @MainActor public var hud: AnyView? {
-            _hud?()
-        }
-
-        /// The plugin's header accessory, if it declares one.
-        @MainActor public var headerAccessory: AnyView? {
-            _headerAccessory?()
-        }
-
-        /// Whether the plugin declares a header accessory, without building it.
-        var hasHeaderAccessory: Bool {
-            _headerAccessory != nil
-        }
-
-        /// The `UserDefaults` key that records whether the user collapsed this plugin's section.
-        var collapsedStateKey: String {
-            "com.debugdrawer.collapsed." + id
+        if let contributor = plugin as? any DebugDrawerReportContributor {
+            _contribute = { contributor.contribute(to: &$0, redaction: $1) }
+        } else {
+            _contribute = nil
         }
     }
-#endif
+
+    /// Whether the plugin adopts ``DebugDrawerReportContributor``, and so adds files to the
+    /// bug report.
+    public var contributesToReport: Bool {
+        _contribute != nil
+    }
+
+    /// Adds the plugin's files to `report`; a plugin that doesn't adopt
+    /// ``DebugDrawerReportContributor`` adds nothing.
+    @MainActor public func contribute(to report: inout DebugDrawerReport, redaction: DebugDrawerRedaction) {
+        _contribute?(&report, redaction)
+    }
+
+    /// The plugin's ``DebugDrawerPlugin/body``, built now.
+    @MainActor public var body: AnyView {
+        _body()
+    }
+
+    /// Whether the plugin offers a HUD readout.
+    public var hasHUD: Bool {
+        _hud != nil
+    }
+
+    /// The plugin's HUD readout, if it offers one.
+    @MainActor public var hud: AnyView? {
+        _hud?()
+    }
+
+    /// The plugin's header accessory, if it declares one.
+    @MainActor public var headerAccessory: AnyView? {
+        _headerAccessory?()
+    }
+
+    /// Whether the plugin declares a header accessory, without building it.
+    var hasHeaderAccessory: Bool {
+        _headerAccessory != nil
+    }
+
+    /// The `UserDefaults` key that records whether the user collapsed this plugin's section.
+    var collapsedStateKey: String {
+        "com.debugdrawer.collapsed." + id
+    }
+}

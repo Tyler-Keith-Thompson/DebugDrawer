@@ -16,4 +16,12 @@
             report.add(jsonData: Data(AnalyticsEvent.formattedJSON(of: events, redaction: redaction).utf8), named: "analytics")
         }
     }
+#else
+    import DebugDrawer
+
+    // The release stand-in: release builds make no reports.
+    extension AnalyticsPlugin: DebugDrawerReportContributor {
+        /// Adds nothing: release builds make no reports.
+        public func contribute(to report: inout DebugDrawerReport, redaction: DebugDrawerRedaction) {}
+    }
 #endif

@@ -1,14 +1,12 @@
 import AppKit
-#if DEBUG
-    import UserNotifications
-#endif
+import UserNotifications
 
 // The iOS example has its own copy of this file: each app is its own module, and the examples
 // share no code.
 
 /// Registers for remote notifications, which the app delegate's methods forward to the
 /// Notifications plugin. On the Mac the push entitlement needs a provisioning profile, which the
-/// example isn't signed with, so registering fails and the plugin shows why. In debug builds it is
+/// example isn't signed with, so registering fails and the plugin shows why. It is
 /// also the notification center's delegate, so a payload the drawer sends shows as a banner while
 /// the app is in front, and it logs each notification the user opens.
 @MainActor
@@ -18,28 +16,24 @@ final class ExamplePushNotifications: NSObject {
 
     /// Becomes the notification center's delegate and registers.
     static func register() {
-        #if DEBUG
-            UNUserNotificationCenter.current().delegate = shared
-        #endif
+        UNUserNotificationCenter.current().delegate = shared
         NSApplication.shared.registerForRemoteNotifications()
     }
 }
 
-#if DEBUG
-    extension ExamplePushNotifications: UNUserNotificationCenterDelegate {
-        // The app decides how a notification shows while it is in front; this one shows each as a
-        // banner, so a payload sent from the drawer is seen at once.
-        nonisolated func userNotificationCenter(
-            _: UNUserNotificationCenter, willPresent _: UNNotification
-        ) async -> UNNotificationPresentationOptions {
-            [.banner, .list, .sound, .badge]
-        }
-
-        // The handler a pasted payload exercises: the Console plugin shows the line.
-        nonisolated func userNotificationCenter(_: UNUserNotificationCenter, didReceive response: UNNotificationResponse) async {
-            let request = response.notification.request
-            let keys = request.content.userInfo.keys.map(String.init(describing:)).sorted()
-            print("Opened notification \(request.identifier) with userInfo keys \(keys)")
-        }
+extension ExamplePushNotifications: UNUserNotificationCenterDelegate {
+    // The app decides how a notification shows while it is in front; this one shows each as a
+    // banner, so a payload sent from the drawer is seen at once.
+    nonisolated func userNotificationCenter(
+        _: UNUserNotificationCenter, willPresent _: UNNotification
+    ) async -> UNNotificationPresentationOptions {
+        [.banner, .list, .sound, .badge]
     }
-#endif
+
+    // The handler a pasted payload exercises: the Console plugin shows the line.
+    nonisolated func userNotificationCenter(_: UNUserNotificationCenter, didReceive response: UNNotificationResponse) async {
+        let request = response.notification.request
+        let keys = request.content.userInfo.keys.map(String.init(describing:)).sorted()
+        print("Opened notification \(request.identifier) with userInfo keys \(keys)")
+    }
+}

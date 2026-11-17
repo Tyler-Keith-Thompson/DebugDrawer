@@ -139,29 +139,27 @@ struct DebugDrawerExampleiOSApp: App {
         installShippedPlugins()
     }
 
-    /// The plugins installed with one call each, inside `#if DEBUG`; a function of its own to keep
-    /// launch short enough to read.
+    /// The plugins installed with one call each, which compile in release too and do nothing there;
+    /// a function of its own to keep launch short enough to read.
     private func installShippedPlugins() {
-        #if DEBUG
-            ExampleConsole.install()
-            DebugDrawer.shared.installDiskIO()
-            DebugDrawer.shared.installViewInspector()
-            DebugDrawer.shared.installAccessibility()
-            DebugDrawer.shared.installPerformance()
-            DebugDrawer.shared.installEnergy()
-            DebugDrawer.shared.installScreenshot()
-            // Sample values: a real app's CI passes its own, here or through the Info.plist keys
-            // (this Info.plist sets DebugDrawerCIBuildNumber).
-            DebugDrawer.shared.installAppInfo(buildMetadata: AppInfoBuildMetadata(gitCommit: "4f9c2e1", gitBranch: "main"))
-            DebugDrawer.shared.installKeychain()
-            DebugDrawer.shared.installLocation()
-            DebugDrawer.shared.installLoadedLibraries()
-            DebugDrawer.shared.installCookies()
-            DebugDrawer.shared.installLaunchTime()
-            ExampleTweaks.install()
-            ExampleFeatureFlags.install()
-            DebugDrawer.shared.reportUploader = FolderReportUploader()
-        #endif
+        ExampleConsole.install()
+        DebugDrawer.shared.installDiskIO()
+        DebugDrawer.shared.installViewInspector()
+        DebugDrawer.shared.installAccessibility()
+        DebugDrawer.shared.installPerformance()
+        DebugDrawer.shared.installEnergy()
+        DebugDrawer.shared.installScreenshot()
+        // Sample values: a real app's CI passes its own, here or through the Info.plist keys
+        // (this Info.plist sets DebugDrawerCIBuildNumber).
+        DebugDrawer.shared.installAppInfo(buildMetadata: AppInfoBuildMetadata(gitCommit: "4f9c2e1", gitBranch: "main"))
+        DebugDrawer.shared.installKeychain()
+        DebugDrawer.shared.installLocation()
+        DebugDrawer.shared.installLoadedLibraries()
+        DebugDrawer.shared.installCookies()
+        DebugDrawer.shared.installLaunchTime()
+        ExampleTweaks.install()
+        ExampleFeatureFlags.install()
+        DebugDrawer.shared.reportUploader = FolderReportUploader()
     }
 
     var body: some Scene {
@@ -178,18 +176,14 @@ struct DebugDrawerExampleiOSApp: App {
                 // Launched with -OpenDebugDrawer, the window opens with the drawer open, so it can
                 // be checked without a hand, in the simulator or as a Mac Catalyst app.
                 .onAppear {
-                    #if DEBUG
-                        if ProcessInfo.processInfo.arguments.contains("-OpenDebugDrawer"), !DebugDrawer.shared.isOpen {
-                            DebugDrawer.shared.toggle()
-                        }
-                    #endif
+                    if ProcessInfo.processInfo.arguments.contains("-OpenDebugDrawer"), !DebugDrawer.shared.isOpen {
+                        DebugDrawer.shared.toggle()
+                    }
                 }
                 .background {
                     Button("") {
-                        // The drawer exists in debug builds only.
-                        #if DEBUG
-                            DebugDrawer.shared.toggle()
-                        #endif
+                        // Release builds have no drawer, so there it does nothing.
+                        DebugDrawer.shared.toggle()
                     }
                         .keyboardShortcut("d", modifiers: .control)
                         .hidden()
@@ -239,9 +233,7 @@ struct ExampleContentView_iOS: View {
                     }
                     // Analytics lists each event as it is recorded. Recording does nothing in
                     // release, so neither does the button.
-                    #if DEBUG
-                        Button("Track Sample Event") { ExampleAnalytics.trackSample() }
-                    #endif
+                    Button("Track Sample Event") { ExampleAnalytics.trackSample() }
                     // Keychain lists both passwords, each in its access group, and the key.
                     Button("Add Sample Keychain Items") { ExampleKeychain.seed() }
                     // Crash Reports shows the crash on the next launch.
@@ -252,9 +244,7 @@ struct ExampleContentView_iOS: View {
                     Button("Open a Leaking Screen") { ExampleLeak.presentLeakingScreen() }
                     // MetricKit lists the samples, clearly named as such: MetricKit itself delivers nothing
                     // to a debug run in time to see. Adding does nothing in release, so neither does the button.
-                    #if DEBUG
-                        Button("Add Sample MetricKit Payloads") { ExampleMetricKit.addSamples() }
-                    #endif
+                    Button("Add Sample MetricKit Payloads") { ExampleMetricKit.addSamples() }
 
                     Text("Counter: \(counter)")
                         .font(.title2.monospacedDigit())
@@ -320,27 +310,25 @@ struct ExampleContentView_iOS: View {
                 ExampleSheet_iOS()
             }
             .toolbar {
-                // The drawer exists in debug builds only. A device without a keyboard has no
-                // Ctrl+D, so the example opens it from here.
-                #if DEBUG
-                    ToolbarItem(placement: .primaryAction) {
-                        Button {
-                            DebugDrawer.shared.toggle()
-                        } label: {
-                            Label("Debug Drawer", systemImage: "ladybug")
-                        }
+                // A device without a keyboard has no Ctrl+D, so the example opens the drawer from here;
+                // release builds have no drawer, so there it does nothing.
+                ToolbarItem(placement: .primaryAction) {
+                    Button {
+                        DebugDrawer.shared.toggle()
+                    } label: {
+                        Label("Debug Drawer", systemImage: "ladybug")
                     }
-                    // Shows what a plugin's notice looks like: a badge on Network and a toast that opens it.
-                    ToolbarItem(placement: .secondaryAction) {
-                        Button {
-                            let network = NetworkPlugin()
-                            network.setBadge(1)
-                            network.postToast("GET /api/orders failed with 500")
-                        } label: {
-                            Label("Post Sample Notice", systemImage: "bell.badge")
-                        }
+                }
+                // Shows what a plugin's notice looks like: a badge on Network and a toast that opens it.
+                ToolbarItem(placement: .secondaryAction) {
+                    Button {
+                        let network = NetworkPlugin()
+                        network.setBadge(1)
+                        network.postToast("GET /api/orders failed with 500")
+                    } label: {
+                        Label("Post Sample Notice", systemImage: "bell.badge")
                     }
-                #endif
+                }
             }
         }
     }
@@ -360,15 +348,13 @@ struct ExampleSheet_iOS: View {
                     ToolbarItem(placement: .cancellationAction) {
                         Button("Done") { dismiss() }
                     }
-                    #if DEBUG
-                        ToolbarItem(placement: .primaryAction) {
-                            Button {
-                                DebugDrawer.shared.toggle()
-                            } label: {
-                                Label("Debug Drawer", systemImage: "ladybug")
-                            }
+                    ToolbarItem(placement: .primaryAction) {
+                        Button {
+                            DebugDrawer.shared.toggle()
+                        } label: {
+                            Label("Debug Drawer", systemImage: "ladybug")
                         }
-                    #endif
+                    }
                 }
         }
         .debugDrawer()

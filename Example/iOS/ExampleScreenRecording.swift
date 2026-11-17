@@ -16,12 +16,10 @@ enum ExampleScreenRecording {
     @MainActor
     static func install() {
         ScreenRecording.install()
-        #if DEBUG
-            // The plugin's ID is its type's name, as for every plugin that declares none.
-            let pluginID = "ScreenRecordingPlugin"
-            if ProcessInfo.processInfo.arguments.contains(launchArgument), !DebugDrawer.shared.hudLayout.pinned.contains(pluginID) {
-                DebugDrawer.shared.toggleHUD(forPlugin: pluginID)
-            }
-        #endif
+        // The plugin's ID is its type's name, as for every plugin that declares none.
+        let pluginID = "ScreenRecordingPlugin"
+        if ProcessInfo.processInfo.arguments.contains(launchArgument), !DebugDrawer.shared.hudLayout.pinned.contains(pluginID) {
+            DebugDrawer.shared.toggleHUD(forPlugin: pluginID)
+        }
     }
 }

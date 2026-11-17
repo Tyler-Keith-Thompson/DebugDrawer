@@ -1,38 +1,51 @@
-#if DEBUG
-    import DebugDrawer
-    import SwiftUI
+import DebugDrawer
+import SwiftUI
 
-    /// Clears the app's state as a fresh install leaves it: a checkbox per category with what it
-    /// will delete, a confirmation that lists it, and Reset, or Reset and Relaunch (Quit outside
-    /// macOS).
-    public struct AppStateResetPlugin: DebugDrawerPlugin {
-        /// The plugin's identity in the drawer.
-        static let pluginID = "AppStateResetPlugin"
+// The public API compiles in every configuration; the implementation under `#if DEBUG` below does
+// not, so release builds get an empty view and an installer that installs nothing.
 
-        public var id: String {
-            Self.pluginID
-        }
+/// Clears the app's state as a fresh install leaves it: a checkbox per category with what it
+/// will delete, a confirmation that lists it, and Reset, or Reset and Relaunch (Quit outside
+/// macOS).
+public struct AppStateResetPlugin: DebugDrawerPlugin {
+    /// The plugin's identity in the drawer.
+    static let pluginID = "AppStateResetPlugin"
 
-        public var title = "Reset App State"
-        public var category = "Storage"
-        public var icon = "arrow.counterclockwise.circle"
+    public var id: String {
+        Self.pluginID
+    }
 
+    public var title = "Reset App State"
+    public var category = "Storage"
+    public var icon = "arrow.counterclockwise.circle"
+
+    #if DEBUG
         let model: AppStateResetModel
 
         init(model: AppStateResetModel) {
             self.model = model
         }
+    #endif
 
-        public var body: some View {
+    public var body: some View {
+        #if DEBUG
             AppStateResetPluginView(model: model)
-        }
-
-        /// How many categories are selected ("3 selected").
-        public var headerAccessory: some View {
-            AppStateResetHeaderAccessory(model: model)
-        }
+        #else
+            EmptyView()
+        #endif
     }
 
+    /// How many categories are selected ("3 selected").
+    public var headerAccessory: some View {
+        #if DEBUG
+            AppStateResetHeaderAccessory(model: model)
+        #else
+            EmptyView()
+        #endif
+    }
+}
+
+#if DEBUG
     /// Reads the model and hands its values to `AppStateResetView`.
     struct AppStateResetPluginView: View {
         @ObservedObject var model: AppStateResetModel

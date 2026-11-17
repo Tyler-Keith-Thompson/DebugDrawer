@@ -1,46 +1,63 @@
-#if DEBUG
-    import DebugDrawer
-    import SwiftUI
+import DebugDrawer
+import SwiftUI
 
-    /// A design mockup over the app: picking it, its opacity, offset, scale and blend, Show and
-    /// Move. The header and the HUD say whether it shows and at what opacity, or that Move is on.
-    public struct DesignOverlayPlugin: DebugDrawerPlugin {
-        /// The plugin's identity in the drawer and the HUD.
-        static let pluginID = "DesignOverlayPlugin"
+// The public API compiles in every configuration; the implementation under `#if DEBUG` below does
+// not, so release builds get an empty view and an installer that installs nothing.
 
-        public var id: String {
-            Self.pluginID
-        }
+/// A design mockup over the app: picking it, its opacity, offset, scale and blend, Show and
+/// Move. The header and the HUD say whether it shows and at what opacity, or that Move is on.
+public struct DesignOverlayPlugin: DebugDrawerPlugin {
+    /// The plugin's identity in the drawer and the HUD.
+    static let pluginID = "DesignOverlayPlugin"
 
-        public var title = "Design Overlay"
-        public var category = "Interface"
-        public var icon = "square.on.square.dashed"
+    public var id: String {
+        Self.pluginID
+    }
 
+    public var title = "Design Overlay"
+    public var category = "Interface"
+    public var icon = "square.on.square.dashed"
+
+    #if DEBUG
         let model: DesignOverlayModel
 
         init(model: DesignOverlayModel) {
             self.model = model
         }
+    #endif
 
-        public var body: some View {
+    public var body: some View {
+        #if DEBUG
             DesignOverlayPluginView(model: model)
-        }
+        #else
+            EmptyView()
+        #endif
+    }
 
-        /// Show or Hide with the opacity, and Done while Move is on, so the mockup can be checked
-        /// against the app with the drawer closed.
-        public var hud: DesignOverlayHUD? {
+    /// Show or Hide with the opacity, and Done while Move is on, so the mockup can be checked
+    /// against the app with the drawer closed.
+    public var hud: DesignOverlayHUD? {
+        #if DEBUG
             DesignOverlayHUD(model: model)
-        }
+        #else
+            nil
+        #endif
+    }
 
-        /// The opacity and blend while the mockup shows, "Hidden" or "Moving"; nothing before a
-        /// mockup is picked.
-        public var headerAccessory: some View {
+    /// The opacity and blend while the mockup shows, "Hidden" or "Moving"; nothing before a
+    /// mockup is picked.
+    public var headerAccessory: some View {
+        #if DEBUG
             DesignOverlayHeaderAccessory(model: model)
-        }
+        #else
+            EmptyView()
+        #endif
+    }
 
-        /// Show or hide the mockup, and switch the difference blend, found by "mockup", "design"
-        /// and "comp" too.
-        public var actions: [DebugDrawerAction] {
+    /// Show or hide the mockup, and switch the difference blend, found by "mockup", "design"
+    /// and "comp" too.
+    public var actions: [DebugDrawerAction] {
+        #if DEBUG
             [
                 DebugDrawerAction("Show or hide the design overlay", keywords: ["design", "overlay", "mockup", "comp"]) { [model] in
                     model.toggleVisibility()
@@ -49,9 +66,32 @@
                     model.settings.blend = model.settings.blend == .difference ? .normal : .difference
                 }
             ]
-        }
+        #else
+            []
+        #endif
     }
+}
 
+/// The HUD readout: reads the model and hands its state to `DesignOverlayHUDButtons`.
+public struct DesignOverlayHUD: View {
+    #if DEBUG
+        @ObservedObject var model: DesignOverlayModel
+    #endif
+
+    public var body: some View {
+        #if DEBUG
+            DesignOverlayHUDButtons(
+                state: DesignOverlayStatus(hasMockup: model.mockup != nil, settings: model.settings, isMoving: model.isMoving),
+                toggleVisibility: { model.toggleVisibility() },
+                endMoving: { model.isMoving = false }
+            )
+        #else
+            EmptyView()
+        #endif
+    }
+}
+
+#if DEBUG
     /// Reads the model and hands its values to `DesignOverlayView`.
     struct DesignOverlayPluginView: View {
         @ObservedObject var model: DesignOverlayModel
@@ -78,19 +118,6 @@
                 openFile: { model.open(fileAt: $0) },
                 paste: { model.paste() },
                 fail: { model.fail($0) }
-            )
-        }
-    }
-
-    /// The HUD readout: reads the model and hands its state to `DesignOverlayHUDButtons`.
-    public struct DesignOverlayHUD: View {
-        @ObservedObject var model: DesignOverlayModel
-
-        public var body: some View {
-            DesignOverlayHUDButtons(
-                state: DesignOverlayStatus(hasMockup: model.mockup != nil, settings: model.settings, isMoving: model.isMoving),
-                toggleVisibility: { model.toggleVisibility() },
-                endMoving: { model.isMoving = false }
             )
         }
     }

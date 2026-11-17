@@ -1,10 +1,12 @@
+import Foundation
+
+extension DebugDrawerReport {
+    /// Thrown when the report can't be written or zipped; nothing is left in the destination.
+    public struct WriteFailed: Error, Equatable {}
+}
+
 #if DEBUG
-    import Foundation
-
     extension DebugDrawerReport {
-        /// Thrown when the report can't be written or zipped; nothing is left in the destination.
-        public struct WriteFailed: Error, Equatable {}
-
         /// The report of every plugin in `plugins` that adopts ``DebugDrawerReportContributor``,
         /// each in a folder named after its title; the others are left out.
         @MainActor init(contributionsOf plugins: [AnyDebugDrawerPlugin], redaction: DebugDrawerRedaction) {

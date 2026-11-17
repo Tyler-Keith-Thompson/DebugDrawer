@@ -1,43 +1,60 @@
-#if DEBUG
-    import DebugDrawer
-    import SwiftUI
+import DebugDrawer
+import SwiftUI
 
-    /// The app's stores, each open to its tables or entities, a table's rows paged and searched in
-    /// a grid, and a read-only query editor.
-    public struct DatabaseBrowserPlugin: DebugDrawerPlugin {
-        public var id: String {
-            "DatabaseBrowserPlugin"
-        }
+// The public API compiles in every configuration; the implementation under `#if DEBUG` below does
+// not, so release builds get an empty view and an installer that installs nothing.
 
-        public var title = "Databases"
-        public var category = "Storage"
-        public var icon = "cylinder.split.1x2"
+/// The app's stores, each open to its tables or entities, a table's rows paged and searched in
+/// a grid, and a read-only query editor.
+public struct DatabaseBrowserPlugin: DebugDrawerPlugin {
+    public var id: String {
+        "DatabaseBrowserPlugin"
+    }
 
+    public var title = "Databases"
+    public var category = "Storage"
+    public var icon = "cylinder.split.1x2"
+
+    #if DEBUG
         let model: DatabaseBrowserModel
 
         init(model: DatabaseBrowserModel) {
             self.model = model
         }
+    #endif
 
-        public var body: some View {
+    public var body: some View {
+        #if DEBUG
             DatabaseBrowserPluginView(model: model)
-        }
+        #else
+            EmptyView()
+        #endif
+    }
 
-        /// How many stores were found, so the count shows while the plugin is closed.
-        public var headerAccessory: some View {
+    /// How many stores were found, so the count shows while the plugin is closed.
+    public var headerAccessory: some View {
+        #if DEBUG
             DatabaseBrowserHeaderAccessory(model: model)
-        }
+        #else
+            EmptyView()
+        #endif
+    }
 
-        /// Refresh, found by "SQLite", "Core Data" and "SwiftData" too.
-        public var actions: [DebugDrawerAction] {
+    /// Refresh, found by "SQLite", "Core Data" and "SwiftData" too.
+    public var actions: [DebugDrawerAction] {
+        #if DEBUG
             [
                 DebugDrawerAction("Refresh databases", keywords: ["database", "SQLite", "Core Data", "SwiftData", "store"]) { [model] in
                     Task { await model.refresh() }
                 }
             ]
-        }
+        #else
+            []
+        #endif
     }
+}
 
+#if DEBUG
     /// "3 stores" once any is found; nothing otherwise.
     struct DatabaseBrowserHeaderAccessory: View {
         @ObservedObject var model: DatabaseBrowserModel

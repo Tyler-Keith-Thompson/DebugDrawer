@@ -1,3 +1,7 @@
+/// Tags the nearest platform view with a known tag so the a11y auditor
+/// can skip the debug drawer subtree without relying on class names.
+public let debugDrawerViewTag = 0xDDB6 // "DDB" = DebugDrawerBoundary
+
 #if DEBUG
     import SwiftUI
 
@@ -124,10 +128,6 @@
     #endif
 
     // MARK: - Platform view tagger
-
-    /// Tags the nearest platform view with a known tag so the a11y auditor
-    /// can skip the debug drawer subtree without relying on class names.
-    public let debugDrawerViewTag = 0xDDB6 // "DDB" = DebugDrawerBoundary
 
     // The tag view fills the drawer's full-window overlay, so it refuses every touch and click at
     // both levels: SwiftUI's (allowsHitTesting(false) where it is attached, without which SwiftUI

@@ -10,9 +10,7 @@ import UIKit
 @main
 final class ExampleUIKitAppDelegate: UIResponder, UIApplicationDelegate {
     func application(_: UIApplication, didFinishLaunchingWithOptions _: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
-        #if DEBUG
-            DebugDrawer.shared.installDeepLink()
-        #endif
+        DebugDrawer.shared.installDeepLink()
         return true
     }
 
@@ -36,12 +34,10 @@ final class ExampleUIKitSceneDelegate: UIResponder, UIWindowSceneDelegate {
         window.rootViewController = UIHostingController(rootView: ExampleUIKitContentView(continued: continued).debugDrawer())
         window.makeKeyAndVisible()
         self.window = window
-        #if DEBUG
-            // Launched with -OpenDebugDrawer, the window opens with the drawer open.
-            if ProcessInfo.processInfo.arguments.contains("-OpenDebugDrawer"), !DebugDrawer.shared.isOpen {
-                DebugDrawer.shared.toggle()
-            }
-        #endif
+        // Launched with -OpenDebugDrawer, the window opens with the drawer open.
+        if ProcessInfo.processInfo.arguments.contains("-OpenDebugDrawer"), !DebugDrawer.shared.isOpen {
+            DebugDrawer.shared.toggle()
+        }
     }
 
     func scene(_: UIScene, continue userActivity: NSUserActivity) {
@@ -85,15 +81,13 @@ struct ExampleUIKitContentView: View {
             }
             .navigationTitle("UIKit Example")
             .toolbar {
-                #if DEBUG
-                    ToolbarItem(placement: .primaryAction) {
-                        Button {
-                            DebugDrawer.shared.toggle()
-                        } label: {
-                            Label("Debug Drawer", systemImage: "ladybug")
-                        }
+                ToolbarItem(placement: .primaryAction) {
+                    Button {
+                        DebugDrawer.shared.toggle()
+                    } label: {
+                        Label("Debug Drawer", systemImage: "ladybug")
                     }
-                #endif
+                }
             }
         }
     }

@@ -15,4 +15,12 @@
             report.add(text: suspects.map { $0.text() }.joined(separator: "\n"), named: "leaks")
         }
     }
+#else
+    import DebugDrawer
+
+    // The release stand-in: release builds make no reports.
+    extension LeakDetectorPlugin: DebugDrawerReportContributor {
+        /// Adds nothing: release builds make no reports.
+        public func contribute(to report: inout DebugDrawerReport, redaction: DebugDrawerRedaction) {}
+    }
 #endif

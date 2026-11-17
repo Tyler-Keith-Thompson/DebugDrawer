@@ -19,9 +19,7 @@ A global plugin stays in the drawer for the app's lifetime. Register it once, at
 ``DebugDrawer/DebugDrawer/registerGlobal(_:)``:
 
 ```swift
-#if DEBUG
-    DebugDrawer.shared.registerGlobal(CachePlugin())
-#endif
+DebugDrawer.shared.registerGlobal(CachePlugin())
 ```
 
 Global plugins are listed by ``DebugDrawerPlugin/category``, a string a plugin may declare; one
@@ -143,8 +141,8 @@ struct JobsPlugin: DebugDrawerPlugin {
 
 A body that reads a large file or scans a directory shouldn't block the main actor.
 ``AsyncPluginView`` runs its task when it appears and shows a progress indicator until the result
-arrives; ``OnDemandPluginView`` waits for a button press first. Both exist in debug builds only,
-so a plugin that uses them sits under `#if DEBUG`.
+arrives; ``OnDemandPluginView`` waits for a button press first. Both exist in
+every build and draw nothing in release.
 
 ### A plugin's state
 

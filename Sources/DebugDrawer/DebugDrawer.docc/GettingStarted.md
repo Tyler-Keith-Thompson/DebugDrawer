@@ -61,9 +61,8 @@ let settings = Text("Settings").debugLocalPlugin(CachePlugin())
 DebugDrawer.shared.toggle()
 ```
 
-``DebugDrawer/DebugDrawer/shared`` exists in debug builds only, so the calls that name it sit
-under `#if DEBUG` in an app. The plugin, `debugDrawer()` and `debugLocalPlugin(_:)` compile in
-every build; <doc:ReleaseBuilds> lists what each does there.
+None of this needs `#if DEBUG`: every call compiles in every build, and in release each does
+nothing; <doc:ReleaseBuilds> lists what each does there.
 
 ### Next steps
 

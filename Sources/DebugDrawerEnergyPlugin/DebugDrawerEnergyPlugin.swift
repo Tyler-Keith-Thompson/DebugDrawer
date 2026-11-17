@@ -1,13 +1,57 @@
+import Combine
+import DebugDrawer
+import Foundation
+import SwiftUI
+
+// MARK: - Plugin
+
+// The public API compiles in every configuration; the implementation under `#if DEBUG` below does
+// not, so release builds get an empty view and an installer that samples and registers nothing.
+
+public struct EnergyPlugin: DebugDrawerPlugin {
+    public var title = "Energy"
+    public var category = "Performance"
+    public var icon = "bolt.fill"
+
+    public init() {}
+
+    public var body: some View {
+        #if DEBUG
+            EnergyPluginView()
+        #else
+            EmptyView()
+        #endif
+    }
+}
+
+// MARK: - Convenience installer
+
+public extension DebugDrawer {
+    func installEnergy() {
+        #if DEBUG
+            EnergyMonitor.shared.start()
+            registerGlobal(EnergyPlugin())
+        #endif
+    }
+}
+
+// MARK: - Battery snapshot
+
+public extension EnergyMonitor {
+    struct BatterySnapshot: Identifiable {
+        public let id = UUID()
+        public let timestamp: Date
+        public let level: Int
+        public let isCharging: Bool
+    }
+}
+
 #if DEBUG
-    import Combine
-    import DebugDrawer
-    import Foundation
     #if os(macOS)
         import IOKit.ps
     #elseif os(iOS)
         import UIKit
     #endif
-    import SwiftUI
 
     // MARK: - Battery monitoring switch
 
@@ -49,13 +93,6 @@
         /// Turned on while monitoring (iOS reports no battery level otherwise), then put back.
         private let batteryMonitoring: BatteryMonitoringSwitch?
         private var hostBatteryMonitoring: Bool?
-
-        public struct BatterySnapshot: Identifiable {
-            public let id = UUID()
-            public let timestamp: Date
-            public let level: Int
-            public let isCharging: Bool
-        }
 
         private convenience init() {
             #if os(iOS)
@@ -184,21 +221,53 @@
             return "Very High"
         }
     }
+#else
+    // The release stand-in: the same members, nothing sampled behind them, and every value at its start.
 
-    // MARK: - Plugin
+    /// Release builds monitor nothing: this stand-in keeps the debug build's members.
+    @MainActor
+    public final class EnergyMonitor: ObservableObject {
+        /// The stand-in monitor.
+        public static let shared = EnergyMonitor()
 
-    public struct EnergyPlugin: DebugDrawerPlugin {
-        public var title = "Energy"
-        public var category = "Performance"
-        public var icon = "bolt.fill"
+        /// Always -1, no battery.
+        @Published public private(set) var batteryLevel: Int = -1
+        /// Always false.
+        @Published public private(set) var isCharging = false
+        /// Always "Unknown".
+        @Published public private(set) var powerSource = "Unknown"
+        /// Always nominal.
+        @Published public private(set) var thermalState: ProcessInfo.ThermalState = .nominal
+        /// Always zero.
+        @Published public private(set) var cpuUsage: Double = 0
+        /// Always false.
+        @Published public private(set) var isMonitoring = false
+        /// Always empty.
+        @Published public private(set) var batteryHistory: [BatterySnapshot] = []
+        /// Always empty.
+        @Published public private(set) var cpuHistory: [Double] = []
 
-        public init() {}
+        private init() {}
 
-        public var body: some View {
-            EnergyPluginView()
+        /// Does nothing: release builds sample nothing.
+        public func start() {}
+
+        /// Does nothing.
+        public func stop() {}
+
+        /// Always "Nominal".
+        public var thermalLabel: String {
+            "Nominal"
+        }
+
+        /// Always "Low".
+        public var cpuLoad: String {
+            "Low"
         }
     }
+#endif
 
+#if DEBUG
     struct EnergyPluginView: View {
         @ObservedObject var monitor = EnergyMonitor.shared
         /// The cores CPU use is measured against: the process's threads together can use each.
@@ -277,15 +346,6 @@
             case .critical: .error
             @unknown default: .neutral
             }
-        }
-    }
-
-    // MARK: - Convenience installer
-
-    public extension DebugDrawer {
-        func installEnergy() {
-            EnergyMonitor.shared.start()
-            registerGlobal(EnergyPlugin())
         }
     }
 #endif

@@ -1,43 +1,75 @@
-#if DEBUG
-    import Combine
-    import DebugDrawer
-    import Foundation
-    import ObjectiveC
-    import SwiftUI
+import Combine
+import DebugDrawer
+import Foundation
+import ObjectiveC
+import SwiftUI
 
-    // MARK: - I/O event model
+// MARK: - I/O event model
 
-    public struct IOEvent: Identifiable {
-        public let id = UUID()
-        public let timestamp: Date
-        public let operation: Operation
-        public let path: String
-        public let size: Int64
-        public let duration: TimeInterval
-        public let isMainThread: Bool
+public struct IOEvent: Identifiable {
+    public let id = UUID()
+    public let timestamp: Date
+    public let operation: Operation
+    public let path: String
+    public let size: Int64
+    public let duration: TimeInterval
+    public let isMainThread: Bool
 
-        public enum Operation: String {
-            case read = "R"
-            case write = "W"
-            case delete = "D"
-            case create = "C"
-            case list = "L"
-            case stat = "S"
+    public enum Operation: String {
+        case read = "R"
+        case write = "W"
+        case delete = "D"
+        case create = "C"
+        case list = "L"
+        case stat = "S"
 
-            /// The operation in a word ("Read"), for the filter and VoiceOver.
-            var name: String {
-                switch self {
-                case .read: "Read"
-                case .write: "Write"
-                case .delete: "Delete"
-                case .create: "Create"
-                case .list: "List"
-                case .stat: "Stat"
-                }
+        /// The operation in a word ("Read"), for the filter and VoiceOver.
+        var name: String {
+            switch self {
+            case .read: "Read"
+            case .write: "Write"
+            case .delete: "Delete"
+            case .create: "Create"
+            case .list: "List"
+            case .stat: "Stat"
             }
         }
     }
+}
 
+// MARK: - Plugin
+
+// The public API compiles in every configuration; the implementation under `#if DEBUG` below does
+// not, so release builds get an empty view and an installer that swizzles and registers nothing.
+
+public struct DiskIOPlugin: DebugDrawerPlugin {
+    public var title = "Disk I/O"
+    public var category = "Storage"
+    public var icon = "externaldrive"
+
+    public init() {}
+
+    public var body: some View {
+        #if DEBUG
+            DiskIOPluginView()
+        #else
+            EmptyView()
+        #endif
+    }
+}
+
+// MARK: - Convenience installer
+
+public extension DebugDrawer {
+    func installDiskIO() {
+        #if DEBUG
+            DiskIOStore.shared.install()
+            registerGlobal(DiskIOPlugin())
+        #endif
+    }
+}
+
+#if DEBUG
     // MARK: - I/O monitor store
 
     @MainActor
@@ -108,7 +140,66 @@
             events.removeAll()
         }
     }
+#else
+    // The release stand-in: the same members, no swizzling behind them, and no events ever.
 
+    /// Release builds record no disk I/O: this stand-in keeps the debug build's members.
+    @MainActor
+    public final class DiskIOStore: ObservableObject {
+        /// The stand-in store.
+        public static let shared = DiskIOStore()
+
+        /// Always empty.
+        @Published public private(set) var events: [IOEvent] = []
+        /// Kept, never applied.
+        @Published public var filterOp: IOEvent.Operation?
+        /// Kept, never applied.
+        @Published public var mainThreadOnly = false
+
+        /// Kept, never used.
+        public var capacity = 500
+
+        /// Always zero.
+        public var totalReads: Int {
+            0
+        }
+
+        /// Always zero.
+        public var totalWrites: Int {
+            0
+        }
+
+        /// Always zero.
+        public var totalBytesRead: Int64 {
+            0
+        }
+
+        /// Always zero.
+        public var totalBytesWritten: Int64 {
+            0
+        }
+
+        /// Always zero.
+        public var mainThreadOps: Int {
+            0
+        }
+
+        /// Always empty.
+        public var filteredEvents: [IOEvent] {
+            []
+        }
+
+        private init() {}
+
+        /// Does nothing: release builds swizzle nothing.
+        public func install() {}
+
+        /// Does nothing.
+        public func clear() {}
+    }
+#endif
+
+#if DEBUG
     // MARK: - FileManager swizzling
 
     enum DiskIOSwizzler {
@@ -223,29 +314,6 @@
             )
             Task { @MainActor in DiskIOStore.shared.record(event) }
             return result
-        }
-    }
-
-    // MARK: - Plugin
-
-    public struct DiskIOPlugin: DebugDrawerPlugin {
-        public var title = "Disk I/O"
-        public var category = "Storage"
-        public var icon = "externaldrive"
-
-        public init() {}
-
-        public var body: some View {
-            DiskIOPluginView()
-        }
-    }
-
-    // MARK: - Convenience installer
-
-    public extension DebugDrawer {
-        func installDiskIO() {
-            DiskIOStore.shared.install()
-            registerGlobal(DiskIOPlugin())
         }
     }
 #endif

@@ -1,3 +1,68 @@
+import DebugDrawer
+import SwiftUI
+
+// MARK: - Plugin
+
+// The public API compiles in every configuration; the implementation under `#if DEBUG` below does
+// not, so release builds get an empty view and an installer that registers nothing.
+
+/// The App Info plugin: the build (version, commit, branch, CI build), the process, the device,
+/// the provisioning profile and the entitlements.
+public struct AppInfoPlugin: DebugDrawerPlugin {
+    public var title = "App Info"
+    public var category = "App"
+    public var icon = "info.circle"
+
+    let buildMetadata: AppInfoBuildMetadata
+
+    #if DEBUG
+        let signing: AppSigningStore
+
+        /// - Parameter buildMetadata: The commit, branch and CI build to show; each one `nil` is
+        ///   read from the main bundle's Info.plist (``AppInfoBuildMetadata``).
+        @MainActor public init(buildMetadata: AppInfoBuildMetadata = AppInfoBuildMetadata()) {
+            self.init(buildMetadata: buildMetadata, signing: .shared)
+        }
+
+        init(buildMetadata: AppInfoBuildMetadata, signing: AppSigningStore) {
+            self.buildMetadata = buildMetadata
+            self.signing = signing
+        }
+    #else
+        /// - Parameter buildMetadata: The commit, branch and CI build to show; each one `nil` is
+        ///   read from the main bundle's Info.plist (``AppInfoBuildMetadata``).
+        @MainActor public init(buildMetadata: AppInfoBuildMetadata = AppInfoBuildMetadata()) {
+            self.buildMetadata = buildMetadata
+        }
+    #endif
+
+    public var body: some View {
+        #if DEBUG
+            AppInfoPluginView(buildMetadata: buildMetadata, signing: signing)
+        #else
+            EmptyView()
+        #endif
+    }
+}
+
+// MARK: - Convenience installer
+
+public extension DebugDrawer {
+    /// Adds the App Info plugin, replacing one added before.
+    ///
+    /// Nothing is read until the plugin is shown or a report is made.
+    ///
+    /// - Parameter buildMetadata: The commit, branch and CI build to show; each one `nil` is
+    ///   read from the main bundle's Info.plist (``AppInfoBuildMetadata``).
+    func installAppInfo(buildMetadata: AppInfoBuildMetadata = AppInfoBuildMetadata()) {
+        #if DEBUG
+            let plugin = AppInfoPlugin(buildMetadata: buildMetadata)
+            unregisterGlobal(id: plugin.id)
+            registerGlobal(plugin)
+        #endif
+    }
+}
+
 #if DEBUG
     #if os(macOS)
         import AppKit
@@ -97,34 +162,6 @@
 
     }
 
-    // MARK: - Plugin
-
-    /// The App Info plugin: the build (version, commit, branch, CI build), the process, the device,
-    /// the provisioning profile and the entitlements.
-    public struct AppInfoPlugin: DebugDrawerPlugin {
-        public var title = "App Info"
-        public var category = "App"
-        public var icon = "info.circle"
-
-        let buildMetadata: AppInfoBuildMetadata
-        let signing: AppSigningStore
-
-        /// - Parameter buildMetadata: The commit, branch and CI build to show; each one `nil` is
-        ///   read from the main bundle's Info.plist (``AppInfoBuildMetadata``).
-        @MainActor public init(buildMetadata: AppInfoBuildMetadata = AppInfoBuildMetadata()) {
-            self.init(buildMetadata: buildMetadata, signing: .shared)
-        }
-
-        init(buildMetadata: AppInfoBuildMetadata, signing: AppSigningStore) {
-            self.buildMetadata = buildMetadata
-            self.signing = signing
-        }
-
-        public var body: some View {
-            AppInfoPluginView(buildMetadata: buildMetadata, signing: signing)
-        }
-    }
-
     struct AppInfoPluginView: View {
         @ObservedObject var metrics = AppMetrics.shared
         let buildMetadata: AppInfoBuildMetadata
@@ -173,19 +210,4 @@
         }
     }
 
-    // MARK: - Convenience installer
-
-    public extension DebugDrawer {
-        /// Adds the App Info plugin, replacing one added before.
-        ///
-        /// Nothing is read until the plugin is shown or a report is made.
-        ///
-        /// - Parameter buildMetadata: The commit, branch and CI build to show; each one `nil` is
-        ///   read from the main bundle's Info.plist (``AppInfoBuildMetadata``).
-        func installAppInfo(buildMetadata: AppInfoBuildMetadata = AppInfoBuildMetadata()) {
-            let plugin = AppInfoPlugin(buildMetadata: buildMetadata)
-            unregisterGlobal(id: plugin.id)
-            registerGlobal(plugin)
-        }
-    }
 #endif

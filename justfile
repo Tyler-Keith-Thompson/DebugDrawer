@@ -168,6 +168,17 @@ generate *args="":
 release:
     {{BAZEL_RELEASE}} build --config=release //...
 
+# Every public API keeps a release stand-in, so callers compile unchanged without DEBUG (the
+# charter's rules). Two checks, since neither covers the other: the example apps call the drawer
+# and every shipped plugin's install with no `#if DEBUG`, so their optimized build fails when a
+# call they make has no stand-in; and scripts/release_api.py compares every library module's
+# public symbols and conformances, built through SwiftPM in debug and in release, so a symbol no
+# example calls is checked too.
+[doc('Check that release builds keep the public API: build the example apps optimized, then compare each module’s public symbols in debug and release')]
+release-check:
+    {{BAZEL_RELEASE}} build --config=release //Example/...
+    python3 {{PROJECT_ROOT}}/scripts/release_api.py check --swift "{{SWIFT}}"
+
 # The simulators `just run visionOS`, `just run tvOS` and `just run watchOS` boot, by name.
 VISIONOS_DEVICE := env("VISIONOS_DEVICE", "Apple Vision Pro")
 TVOS_DEVICE := env("TVOS_DEVICE", "Apple TV 4K (4th generation)")
@@ -240,7 +251,8 @@ run target="macOS" *args="":
 # diagnose-api-breaking-changes) unless the bump is major or `allow-breaking` is given. The owner
 # releases patch bumps, so a patch that knowingly carries a break says so on the command line,
 # where it is visible and never left set in a shell; the breaks it allows are listed in the
-# release notes. `dry-run` runs only the gates, on the working tree, and prints the notes.
+# release notes. Then `release-check`: the example apps build optimized and every public symbol
+# exists in release. `dry-run` runs only the gates, on the working tree, and prints the notes.
 [doc('Release origin/main as a new version: check CHANGELOG.md and the public API, verify, tag it, push only the tag and create the GitHub release; runs from any worktree whose HEAD is origin/main, e.g. just deploy, just deploy patch allow-breaking, just deploy patch dry-run')]
 deploy bump="patch" *options="":
     #!/usr/bin/env bash
@@ -258,6 +270,7 @@ deploy bump="patch" *options="":
     NOTES="{{PROJECT_ROOT}}/.build/release-notes/${NEW_VERSION}.md"
     gate() {
         python3 {{PROJECT_ROOT}}/scripts/release.py gate {{bump}} --swift "{{SWIFT}}" --notes-file "$NOTES" $ALLOW_BREAKING
+        just release-check
     }
     if [ "$DRY_RUN" = yes ]; then
         gate
@@ -271,7 +284,8 @@ deploy bump="patch" *options="":
     fi
     just _require-origin-main
     gate
-    # Every drawer entry point is #if DEBUG, so the tests run in debug; release must still build.
+    # Every drawer entry point is #if DEBUG, so the tests run in debug; release must still build,
+    # which the gate's release-check has shown for the example apps and the public API.
     just verify
     just release
     just _push-version-tag "${NEW_VERSION}"

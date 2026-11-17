@@ -43,13 +43,11 @@ enum ExampleFeatureFlags {
         FeatureFlag(key: "promo-banner", liveValue: .bool(true), title: "Promo banner")
     ])
 
-    #if DEBUG
-        /// Adds the Feature Flags plugin over the sample adapter.
-        @MainActor
-        static func install() {
-            DebugDrawer.shared.installFeatureFlags(provider: provider)
-        }
-    #endif
+    /// Adds the Feature Flags plugin over the sample adapter.
+    @MainActor
+    static func install() {
+        DebugDrawer.shared.installFeatureFlags(provider: provider)
+    }
 }
 
 /// What the example's checkout would look like, read from the flags, following overrides as the

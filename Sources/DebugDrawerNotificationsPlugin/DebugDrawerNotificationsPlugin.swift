@@ -1,31 +1,40 @@
-#if DEBUG
-    import DebugDrawer
-    import SwiftUI
+import DebugDrawer
+import SwiftUI
 
-    /// The APNs device token, the app's notification authorization and settings, an editor that
-    /// sends a pasted APNs payload as a local notification, and the pending and delivered
-    /// notifications, each removable.
-    public struct NotificationsPlugin: DebugDrawerPlugin {
-        public var id: String {
-            "NotificationsPlugin"
-        }
+// The public API compiles in every configuration; the implementation under `#if DEBUG` below does
+// not, so release builds get an empty view and an installer that installs nothing.
 
-        public var title = "Notifications"
-        public var category = "App"
-        public var icon = "bell.badge"
+/// The APNs device token, the app's notification authorization and settings, an editor that
+/// sends a pasted APNs payload as a local notification, and the pending and delivered
+/// notifications, each removable.
+public struct NotificationsPlugin: DebugDrawerPlugin {
+    public var id: String {
+        "NotificationsPlugin"
+    }
 
+    public var title = "Notifications"
+    public var category = "App"
+    public var icon = "bell.badge"
+
+    #if DEBUG
         let model: NotificationsModel
 
         init(model: NotificationsModel) {
             self.model = model
         }
+    #endif
 
-        public var body: some View {
+    public var body: some View {
+        #if DEBUG
             NotificationsPluginView(model: model)
-        }
+        #else
+            EmptyView()
+        #endif
+    }
 
-        /// Refresh and the two Remove All buttons, found by "push" and "notifications" too.
-        public var actions: [DebugDrawerAction] {
+    /// Refresh and the two Remove All buttons, found by "push" and "notifications" too.
+    public var actions: [DebugDrawerAction] {
+        #if DEBUG
             [
                 DebugDrawerAction("Refresh notifications", keywords: ["notifications", "push", "pending", "delivered"]) { [model] in
                     Task { await model.refresh() }
@@ -37,9 +46,13 @@
                     model.removeAllDelivered()
                 }
             ]
-        }
+        #else
+            []
+        #endif
     }
+}
 
+#if DEBUG
     /// Reads the model and hands its state to `NotificationsView`; every action runs on the model.
     struct NotificationsPluginView: View {
         @ObservedObject var model: NotificationsModel

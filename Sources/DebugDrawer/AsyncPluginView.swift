@@ -1,40 +1,43 @@
-#if DEBUG
-    import SwiftUI
+import SwiftUI
 
-    /// A view that runs an async task when it appears, showing a progress indicator
-    /// until the result is available. Designed for debug drawer plugins that need
-    /// to do potentially slow work (file I/O, network, scanning) without blocking
-    /// the main thread.
+/// A view that runs an async task when it appears, showing a progress indicator
+/// until the result is available. Designed for debug drawer plugins that need
+/// to do potentially slow work (file I/O, network, scanning) without blocking
+/// the main thread.
+///
+/// Usage:
+/// ```swift
+/// AsyncPluginView {
+///     await scanFileSystem()
+/// } content: { result in
+///     FileTreeView(root: result)
+/// }
+/// ```
+///
+/// The type exists in every build so a plugin's body compiles unchanged in release, where it
+/// draws nothing and runs nothing.
+public struct AsyncPluginView<Result: Sendable, Content: View>: View {
+    private let task: @Sendable () async -> Result
+    private let content: (Result) -> Content
+
+    @State private var result: Result?
+    @State private var isLoading = false
+
+    /// A view that runs `task` when it appears and then shows `content` of its result.
     ///
-    /// Usage:
-    /// ```swift
-    /// AsyncPluginView {
-    ///     await scanFileSystem()
-    /// } content: { result in
-    ///     FileTreeView(root: result)
-    /// }
-    /// ```
-    public struct AsyncPluginView<Result: Sendable, Content: View>: View {
-        private let task: @Sendable () async -> Result
-        private let content: (Result) -> Content
+    /// - Parameters:
+    ///   - task: The work to do; it is cancelled if the view disappears first.
+    ///   - content: The view of the result.
+    public init(
+        task: @escaping @Sendable () async -> Result,
+        @ViewBuilder content: @escaping (Result) -> Content
+    ) {
+        self.task = task
+        self.content = content
+    }
 
-        @State private var result: Result?
-        @State private var isLoading = false
-
-        /// A view that runs `task` when it appears and then shows `content` of its result.
-        ///
-        /// - Parameters:
-        ///   - task: The work to do; it is cancelled if the view disappears first.
-        ///   - content: The view of the result.
-        public init(
-            task: @escaping @Sendable () async -> Result,
-            @ViewBuilder content: @escaping (Result) -> Content
-        ) {
-            self.task = task
-            self.content = content
-        }
-
-        public var body: some View {
+    public var body: some View {
+        #if DEBUG
             Group {
                 if let result {
                     content(result)
@@ -55,37 +58,44 @@
                 result = await task()
                 isLoading = false
             }
-        }
+        #else
+            EmptyView()
+        #endif
+    }
+}
+
+/// A variant that loads on demand (e.g. when a button is pressed) rather than
+/// on appear. Shows nothing until `load()` is called.
+///
+/// The type exists in every build so a plugin's body compiles unchanged in release, where it
+/// draws nothing and runs nothing.
+public struct OnDemandPluginView<Result: Sendable, Content: View>: View {
+    private let task: @Sendable () async -> Result
+    private let content: (Result) -> Content
+    private let loadLabel: String
+
+    @State private var result: Result?
+    @State private var isLoading = false
+
+    /// A view that shows a button titled `loadLabel`, runs `task` when it is pressed, and then
+    /// shows `content` of its result.
+    ///
+    /// - Parameters:
+    ///   - loadLabel: The button's title.
+    ///   - task: The work to do.
+    ///   - content: The view of the result.
+    public init(
+        loadLabel: String = "Load",
+        task: @escaping @Sendable () async -> Result,
+        @ViewBuilder content: @escaping (Result) -> Content
+    ) {
+        self.loadLabel = loadLabel
+        self.task = task
+        self.content = content
     }
 
-    /// A variant that loads on demand (e.g. when a button is pressed) rather than
-    /// on appear. Shows nothing until `load()` is called.
-    public struct OnDemandPluginView<Result: Sendable, Content: View>: View {
-        private let task: @Sendable () async -> Result
-        private let content: (Result) -> Content
-        private let loadLabel: String
-
-        @State private var result: Result?
-        @State private var isLoading = false
-
-        /// A view that shows a button titled `loadLabel`, runs `task` when it is pressed, and then
-        /// shows `content` of its result.
-        ///
-        /// - Parameters:
-        ///   - loadLabel: The button's title.
-        ///   - task: The work to do.
-        ///   - content: The view of the result.
-        public init(
-            loadLabel: String = "Load",
-            task: @escaping @Sendable () async -> Result,
-            @ViewBuilder content: @escaping (Result) -> Content
-        ) {
-            self.loadLabel = loadLabel
-            self.task = task
-            self.content = content
-        }
-
-        public var body: some View {
+    public var body: some View {
+        #if DEBUG
             Group {
                 if let result {
                     content(result)
@@ -106,15 +116,17 @@
                         .padding(.vertical, 4)
                 }
             }
-        }
+        #else
+            EmptyView()
+        #endif
+    }
 
-        private func load() {
-            isLoading = true
-            Task {
-                let value = await task()
-                result = value
-                isLoading = false
-            }
+    private func load() {
+        isLoading = true
+        Task {
+            let value = await task()
+            result = value
+            isLoading = false
         }
     }
-#endif
+}

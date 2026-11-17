@@ -1,47 +1,64 @@
-#if DEBUG
-    import DebugDrawer
-    import SwiftUI
+import DebugDrawer
+import SwiftUI
 
-    /// The events `AnalyticsEvents.record(_:properties:source:)` keeps, the newest first, each open
-    /// to its properties and JSON; a filter over names, keys and values, Export All and Clear. A
-    /// badge counts the events that arrived while the list was off screen.
-    public struct AnalyticsPlugin: DebugDrawerPlugin {
-        /// The plugin's identity in the drawer, which its badge is set under.
-        static let pluginID = "AnalyticsPlugin"
+// The public API compiles in every configuration; the implementation under `#if DEBUG` below does
+// not, so release builds get an empty view and an installer that installs nothing.
 
-        public var id: String {
-            Self.pluginID
-        }
+/// The events `AnalyticsEvents.record(_:properties:source:)` keeps, the newest first, each open
+/// to its properties and JSON; a filter over names, keys and values, Export All and Clear. A
+/// badge counts the events that arrived while the list was off screen.
+public struct AnalyticsPlugin: DebugDrawerPlugin {
+    /// The plugin's identity in the drawer, which its badge is set under.
+    static let pluginID = "AnalyticsPlugin"
 
-        public var title = "Analytics"
-        public var category = "Logs & Network"
-        public var icon = "chart.line.uptrend.xyaxis"
+    public var id: String {
+        Self.pluginID
+    }
 
+    public var title = "Analytics"
+    public var category = "Logs & Network"
+    public var icon = "chart.line.uptrend.xyaxis"
+
+    #if DEBUG
         let model: AnalyticsEventsModel
 
         init(model: AnalyticsEventsModel) {
             self.model = model
         }
+    #endif
 
-        public var body: some View {
+    public var body: some View {
+        #if DEBUG
             AnalyticsPluginView(model: model)
-        }
+        #else
+            EmptyView()
+        #endif
+    }
 
-        /// How many events are kept, so the count shows while the plugin is closed.
-        public var headerAccessory: some View {
+    /// How many events are kept, so the count shows while the plugin is closed.
+    public var headerAccessory: some View {
+        #if DEBUG
             AnalyticsHeaderAccessory(model: model)
-        }
+        #else
+            EmptyView()
+        #endif
+    }
 
-        /// Clear, found by "events" and "tracking" too.
-        public var actions: [DebugDrawerAction] {
+    /// Clear, found by "events" and "tracking" too.
+    public var actions: [DebugDrawerAction] {
+        #if DEBUG
             [
                 DebugDrawerAction("Clear analytics events", keywords: ["analytics", "events", "tracking", "clear"]) { [model] in
                     model.clear()
                 }
             ]
-        }
+        #else
+            []
+        #endif
     }
+}
 
+#if DEBUG
     /// Reads the model and hands its events to `AnalyticsEventsView`, keeping the filter and which
     /// event is open; while it is on screen, every event is seen.
     struct AnalyticsPluginView: View {

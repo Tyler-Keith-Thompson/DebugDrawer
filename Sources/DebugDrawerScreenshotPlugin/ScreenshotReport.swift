@@ -1,25 +1,28 @@
+#if os(macOS)
+    import AppKit
+#elseif os(iOS)
+    import UIKit
+#endif
+import DebugDrawer
+
+extension ScreenshotPlugin: DebugDrawerReportContributor {
+    /// Adds the key window, captured now, as `screenshot.png`; with no key window, nothing. In
+    /// release builds it adds nothing.
+    public func contribute(to report: inout DebugDrawerReport, redaction: DebugDrawerRedaction) {
+        #if DEBUG && os(macOS)
+            Self.contribute(capturing: NSApp?.keyWindow, to: &report)
+        #elseif DEBUG && os(iOS)
+            let window = UIApplication.shared.connectedScenes
+                .compactMap { $0 as? UIWindowScene }
+                .first { $0.activationState == .foregroundActive }?
+                .windows.first(where: \.isKeyWindow)
+            Self.contribute(capturing: window, to: &report)
+        #endif
+    }
+}
+
 #if DEBUG
-    #if os(macOS)
-        import AppKit
-    #elseif os(iOS)
-        import UIKit
-    #endif
-    import DebugDrawer
-
-    extension ScreenshotPlugin: DebugDrawerReportContributor {
-        /// Adds the key window, captured now, as `screenshot.png`; with no key window, nothing.
-        public func contribute(to report: inout DebugDrawerReport, redaction: DebugDrawerRedaction) {
-            #if os(macOS)
-                Self.contribute(capturing: NSApp?.keyWindow, to: &report)
-            #elseif os(iOS)
-                let window = UIApplication.shared.connectedScenes
-                    .compactMap { $0 as? UIWindowScene }
-                    .first { $0.activationState == .foregroundActive }?
-                    .windows.first(where: \.isKeyWindow)
-                Self.contribute(capturing: window, to: &report)
-            #endif
-        }
-
+    extension ScreenshotPlugin {
         #if os(macOS)
             /// Adds `window`'s content as `screenshot.png`, at the window's backing scale; a
             /// missing window, or one with nothing to draw, adds nothing.

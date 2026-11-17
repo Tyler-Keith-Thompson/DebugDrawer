@@ -95,4 +95,17 @@
             modifier(DebugGridModifier())
         }
     }
+#else
+    import SwiftUI
+
+    /// The release stand-in: returns the content unchanged, with no grid.
+    public struct DebugGridModifier: ViewModifier {
+        /// The stand-in modifier.
+        public init() {}
+
+        /// Returns `content` unchanged.
+        public func body(content: Content) -> some View {
+            content
+        }
+    }
 #endif

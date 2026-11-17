@@ -1,21 +1,38 @@
-#if DEBUG
-    import DebugDrawer
-    import SwiftUI
+import DebugDrawer
+import SwiftUI
 
-    // MARK: - Plugin
+// MARK: - Plugin
 
-    public struct CookiesPlugin: DebugDrawerPlugin {
-        public var title = "HTTP Cookies"
-        public var category = "Logs & Network"
-        public var icon = "doc.plaintext"
+// The public API compiles in every configuration; the implementation under `#if DEBUG` below does
+// not, so release builds get an empty view and an installer that registers nothing.
 
-        public init() {}
+public struct CookiesPlugin: DebugDrawerPlugin {
+    public var title = "HTTP Cookies"
+    public var category = "Logs & Network"
+    public var icon = "doc.plaintext"
 
-        public var body: some View {
+    public init() {}
+
+    public var body: some View {
+        #if DEBUG
             CookiesPluginView()
-        }
+        #else
+            EmptyView()
+        #endif
     }
+}
 
+// MARK: - Convenience installer
+
+public extension DebugDrawer {
+    func installCookies() {
+        #if DEBUG
+            registerGlobal(CookiesPlugin())
+        #endif
+    }
+}
+
+#if DEBUG
     // MARK: - View
 
     private struct CookiesPluginView: View {
@@ -176,11 +193,4 @@
         }
     }
 
-    // MARK: - Convenience installer
-
-    public extension DebugDrawer {
-        func installCookies() {
-            registerGlobal(CookiesPlugin())
-        }
-    }
 #endif

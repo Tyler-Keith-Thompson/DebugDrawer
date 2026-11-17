@@ -1,35 +1,48 @@
-#if DEBUG
-    import DebugDrawer
-    import SwiftUI
+import DebugDrawer
+import SwiftUI
 
-    /// The app's folders, its bundle and its app groups' containers: each folder's files with
-    /// their sizes and dates, folder totals, previews, and imports, renames and deletes outside
-    /// the bundle.
-    public struct FileBrowserPlugin: DebugDrawerPlugin {
-        public var id: String {
-            "FileBrowserPlugin"
-        }
+// The public API compiles in every configuration; the implementation under `#if DEBUG` does not,
+// so release builds get an empty view.
 
-        public var title = "File Browser"
-        public var category = "Storage"
-        public var icon = "folder"
+/// The app's folders, its bundle and its app groups' containers: each folder's files with
+/// their sizes and dates, folder totals, previews, and imports, renames and deletes outside
+/// the bundle.
+public struct FileBrowserPlugin: DebugDrawerPlugin {
+    public var id: String {
+        "FileBrowserPlugin"
+    }
 
+    public var title = "File Browser"
+    public var category = "Storage"
+    public var icon = "folder"
+
+    #if DEBUG
         let model: FileBrowserModel
 
         init(model: FileBrowserModel) {
             self.model = model
         }
+    #endif
 
-        public var body: some View {
+    public var body: some View {
+        #if DEBUG
             FileBrowserPluginView(model: model)
-        }
-
-        /// The root being browsed, so where the browser is shows while the plugin is closed.
-        public var headerAccessory: some View {
-            FileBrowserHeaderAccessory(model: model)
-        }
+        #else
+            EmptyView()
+        #endif
     }
 
+    /// The root being browsed, so where the browser is shows while the plugin is closed.
+    public var headerAccessory: some View {
+        #if DEBUG
+            FileBrowserHeaderAccessory(model: model)
+        #else
+            EmptyView()
+        #endif
+    }
+}
+
+#if DEBUG
     /// "Documents" while a folder or file under Documents is shown; nothing at the list of roots.
     struct FileBrowserHeaderAccessory: View {
         @ObservedObject var model: FileBrowserModel

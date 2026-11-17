@@ -67,9 +67,10 @@ let settings = Text("Settings").debugLocalPlugin(CachePlugin())
 DebugDrawer.shared.toggle()
 ```
 
-`DebugDrawer.shared` and the plugins' `install*()` calls exist in debug builds only, so wrap them
-in `#if DEBUG`. The `DebugDrawerPlugin` protocol exists in every configuration, so conformances
-compile in release, and `.debugDrawer()` and `.debugLocalPlugin()` do nothing there.
+Every public API exists in every configuration, so none of this needs `#if DEBUG`. Release builds
+get stand-ins that do nothing: `DebugDrawer.shared` drops the plugins registered with it and never
+opens, the plugins' `install*()` calls install nothing, and `.debugDrawer()` and
+`.debugLocalPlugin()` return the view unchanged.
 
 ### Building a plugin's view
 
@@ -193,13 +194,11 @@ button beside them reveals them. Revealing never changes a copy. The rules start
 `apikey`. Add your own with one call:
 
 ```swift
-#if DEBUG
 DebugDrawer.shared.redact(
     headers: ["X-Api-Signature"],
     keys: ["pin"],
     jsonPaths: ["user.ssn", "cards.number"]
 )
-#endif
 ```
 
 Header names and key patterns match case-insensitively; a key pattern matches header names, URL
@@ -236,14 +235,13 @@ struct CartPlugin: DebugDrawerPlugin, DebugDrawerReportContributor {
     }
 }
 
-#if DEBUG
 DebugDrawer.shared.registerGlobal(CartPlugin())
 let zip = try DebugDrawer.shared.createReport() // the same zip the button makes
-#endif
 ```
 
 The protocol, `DebugDrawerReport` and `DebugDrawerRedaction` exist in every configuration, so a
-conformance compiles in release, where there is no drawer and no report.
+conformance compiles in release, where there is no drawer and `createReport(in:)` throws
+`DebugDrawerReport.WriteFailed`.
 
 #### Sending reports
 
@@ -270,9 +268,7 @@ struct TeamReportUploader: DebugDrawerReportUploader {
     }
 }
 
-#if DEBUG
 DebugDrawer.shared.reportUploader = TeamReportUploader(endpoint: reportsEndpoint)
-#endif
 ```
 
 `DebugDrawerReportUploader` exists in every configuration too, so the uploader compiles in
@@ -283,7 +279,6 @@ release, where nothing calls it.
 Each plugin installs itself with one call at startup. All of them:
 
 ```swift
-#if DEBUG
 DebugDrawer.shared.installConsole()
 DebugDrawer.shared.installViewInspector()
 DebugDrawer.shared.installAccessibility()
@@ -299,15 +294,14 @@ DebugDrawer.shared.installLoadedLibraries()
 DebugDrawer.shared.installDeepLink()
 DebugDrawer.shared.installCookies()
 DebugDrawer.shared.installLaunchTime()
-#endif
 ```
 
 Each call needs its plugin's module imported (`import DebugDrawerConsolePlugin`, and so on).
 Tweaks takes the settings it shows and Feature Flags the adapter it reads, and Crash Reports,
 Hangs, Leaks, MetricKit, Permissions, Notifications, Background Tasks, Analytics, Databases, File
 Browser, UserDefaults, Localization, Screen Recording, Design Overlay, Color Vision and Reset App
-State install outside `#if DEBUG`, so each has a section of its own, after Network's mocks and
-conditions.
+State install through a type of their own, so each has a section of its own, after Network's mocks
+and conditions.
 
 ### Deep links: universal links and user activities
 
@@ -339,9 +333,7 @@ final class Router {
 
 let router = Router()
 
-#if DEBUG
 DebugDrawer.shared.installDeepLink(continueUserActivity: router.handle)
-#endif
 ```
 
 Without a handler, an activity goes where the system sends it in a UIKit or AppKit app: on iOS,
@@ -358,9 +350,7 @@ under `DebugDrawerGitCommit`, `DebugDrawerGitBranch` and `DebugDrawerCIBuildNumb
 at install wins over the plist's:
 
 ```swift
-#if DEBUG
 DebugDrawer.shared.installAppInfo(buildMetadata: AppInfoBuildMetadata(gitCommit: "4f9c2e1", gitBranch: "release/2.4"))
-#endif
 ```
 
 Below it, Provisioning shows the embedded profile (`embedded.mobileprovision` on iOS,
@@ -387,9 +377,7 @@ default 5 earlier sessions are kept in at most 20 MB; both are set at install:
 ```swift
 import DebugDrawerConsolePlugin
 
-#if DEBUG
 DebugDrawer.shared.installConsole(sessions: ConsoleSessionPersistence(maxSessions: 3, maxBytes: 5_000_000))
-#endif
 ```
 
 At launch the oldest sessions beyond `maxSessions` are deleted, then the oldest until the rest fit
@@ -497,7 +485,6 @@ response the server sent), or passed to `installNetwork(mocks:)`:
 ```swift
 import DebugDrawerNetworkPlugin
 
-#if DEBUG
 let outage = NetworkMockRule(
     id: UUID(uuidString: "3F2B8E1C-0D4A-4B7E-9C61-5A2D7E8F9B10")!,
     name: "Orders outage",
@@ -505,7 +492,6 @@ let outage = NetworkMockRule(
     response: .init(status: 503, body: .text(#"{"error":"maintenance"}"#), contentType: "application/json")
 )
 DebugDrawer.shared.installNetwork(mocks: [outage])
-#endif
 ```
 
 A host or path is matched exactly, by a wildcard or by a regular expression (`NSRegularExpression`),
@@ -540,7 +526,6 @@ network), or passed to `installNetwork(conditions:)`:
 ```swift
 import DebugDrawerNetworkPlugin
 
-#if DEBUG
 let slowImages = NetworkConditionProfile(
     id: UUID(uuidString: "8C4F2A61-7B3D-4E59-A1C8-2D6E9F0B3A47")!,
     name: "Slow images",
@@ -556,7 +541,6 @@ let paymentsOffline = NetworkConditionProfile(
     failure: .notConnectedToInternet
 )
 DebugDrawer.shared.installNetwork(conditions: [slowImages, paymentsOffline])
-#endif
 ```
 
 The bandwidth is in bytes a second and the failure rate in percent. The first profile that is on
@@ -641,9 +625,7 @@ set at install:
 ```swift
 import DebugDrawerNetworkPlugin
 
-#if DEBUG
 DebugDrawer.shared.installNetwork(sessions: NetworkSessionPersistence(maxSessions: 3, maxBytes: 5_000_000))
-#endif
 ```
 
 At launch the oldest sessions beyond `maxSessions` are deleted, then the oldest until the rest fit
@@ -705,7 +687,6 @@ enum AppTweaks {
     static let timeout = Tweak.stepper("Timeout (s)", key: "timeout", default: 30, in: 5 ... 120, step: 5)
 }
 
-#if DEBUG
 DebugDrawer.shared.installTweaks {
     TweakSection("Features") {
         AppTweaks.newCheckout
@@ -721,7 +702,6 @@ DebugDrawer.shared.installTweaks {
         }
     }
 }
-#endif
 
 // Anywhere in the app, in every build:
 let url = switch AppTweaks.backend.value {
@@ -791,9 +771,7 @@ final class AppFlags: FeatureFlagProvider {
 
 let appFlags = AppFlags()
 
-#if DEBUG
 DebugDrawer.shared.installFeatureFlags(provider: appFlags)
-#endif
 
 // Anywhere in the app, through the adapter, so overrides apply:
 let isNewCheckout = appFlags.currentValue(forKey: "new-checkout") == .bool(true)

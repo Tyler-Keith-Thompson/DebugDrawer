@@ -22,13 +22,11 @@ enum ExampleDesignOverlay {
             return
         }
         DesignOverlay.install(mockup: sampleComp())
-        #if DEBUG
-            // The plugin's ID is its type's name, as for every plugin that declares none.
-            let pluginID = "DesignOverlayPlugin"
-            if !DebugDrawer.shared.hudLayout.pinned.contains(pluginID) {
-                DebugDrawer.shared.toggleHUD(forPlugin: pluginID)
-            }
-        #endif
+        // The plugin's ID is its type's name, as for every plugin that declares none.
+        let pluginID = "DesignOverlayPlugin"
+        if !DebugDrawer.shared.hudLayout.pinned.contains(pluginID) {
+            DebugDrawer.shared.toggleHUD(forPlugin: pluginID)
+        }
     }
 
     /// A comp of the example's screen, as a designer might hand it over: the title, the Controls

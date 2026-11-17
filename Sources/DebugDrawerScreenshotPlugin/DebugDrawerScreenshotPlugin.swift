@@ -1,27 +1,44 @@
-#if DEBUG
-    import DebugDrawer
-    import SwiftUI
+import DebugDrawer
+import SwiftUI
 
+// MARK: - Plugin
+
+// The public API compiles in every configuration; the implementation under `#if DEBUG` below does
+// not, so release builds get an empty view and an installer that registers nothing.
+
+public struct ScreenshotPlugin: DebugDrawerPlugin {
+    public var title = "Screenshot"
+    public var category = "Interface"
+    public var icon = "camera"
+
+    public init() {}
+
+    public var body: some View {
+        #if DEBUG
+            ScreenshotPluginView()
+        #else
+            EmptyView()
+        #endif
+    }
+}
+
+// MARK: - Convenience installer
+
+public extension DebugDrawer {
+    func installScreenshot() {
+        #if DEBUG
+            registerGlobal(ScreenshotPlugin())
+        #endif
+    }
+}
+
+#if DEBUG
     #if os(macOS)
     import AppKit
     import UniformTypeIdentifiers
     #elseif os(iOS)
     import UIKit
     #endif
-
-    // MARK: - Plugin
-
-    public struct ScreenshotPlugin: DebugDrawerPlugin {
-        public var title = "Screenshot"
-        public var category = "Interface"
-        public var icon = "camera"
-
-        public init() {}
-
-        public var body: some View {
-            ScreenshotPluginView()
-        }
-    }
 
     /// What the plugin shows between captures. It outlives the plugin's view, which the drawer
     /// removes while it hides for a capture, so a result reported then is still there after.
@@ -228,14 +245,6 @@
             #else
             self.init(uiImage: platformImage)
             #endif
-        }
-    }
-
-    // MARK: - Convenience installer
-
-    public extension DebugDrawer {
-        func installScreenshot() {
-            registerGlobal(ScreenshotPlugin())
         }
     }
 

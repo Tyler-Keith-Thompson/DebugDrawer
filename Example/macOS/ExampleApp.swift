@@ -141,29 +141,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         createMainWindow()
     }
 
-    /// The plugins installed with one call each, inside `#if DEBUG`; a function of its own to keep
-    /// launch short enough to read.
+    /// The plugins installed with one call each, which compile in release too and do nothing there;
+    /// a function of its own to keep launch short enough to read.
     private func installShippedPlugins() {
-        #if DEBUG
-            ExampleConsole.install()
-            DebugDrawer.shared.installDiskIO()
-            DebugDrawer.shared.installViewInspector()
-            DebugDrawer.shared.installAccessibility()
-            DebugDrawer.shared.installPerformance()
-            DebugDrawer.shared.installEnergy()
-            DebugDrawer.shared.installScreenshot()
-            // Sample values: a real app's CI passes its own, here or through the Info.plist keys
-            // (this Info.plist sets DebugDrawerCIBuildNumber).
-            DebugDrawer.shared.installAppInfo(buildMetadata: AppInfoBuildMetadata(gitCommit: "4f9c2e1", gitBranch: "main"))
-            DebugDrawer.shared.installKeychain()
-            DebugDrawer.shared.installLocation()
-            DebugDrawer.shared.installLoadedLibraries()
-            DebugDrawer.shared.installCookies()
-            DebugDrawer.shared.installLaunchTime()
-            ExampleTweaks.install()
-            ExampleFeatureFlags.install()
-            DebugDrawer.shared.reportUploader = FolderReportUploader()
-        #endif
+        ExampleConsole.install()
+        DebugDrawer.shared.installDiskIO()
+        DebugDrawer.shared.installViewInspector()
+        DebugDrawer.shared.installAccessibility()
+        DebugDrawer.shared.installPerformance()
+        DebugDrawer.shared.installEnergy()
+        DebugDrawer.shared.installScreenshot()
+        // Sample values: a real app's CI passes its own, here or through the Info.plist keys
+        // (this Info.plist sets DebugDrawerCIBuildNumber).
+        DebugDrawer.shared.installAppInfo(buildMetadata: AppInfoBuildMetadata(gitCommit: "4f9c2e1", gitBranch: "main"))
+        DebugDrawer.shared.installKeychain()
+        DebugDrawer.shared.installLocation()
+        DebugDrawer.shared.installLoadedLibraries()
+        DebugDrawer.shared.installCookies()
+        DebugDrawer.shared.installLaunchTime()
+        ExampleTweaks.install()
+        ExampleFeatureFlags.install()
+        DebugDrawer.shared.reportUploader = FolderReportUploader()
     }
 
     func application(_: NSApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
@@ -197,43 +195,39 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         appMenuItem.submenu = appMenu
         mainMenu.addItem(appMenuItem)
 
-        // The drawer exists in debug builds only. A menu item, unlike a hidden button, is listed
+        // Release builds have no drawer, so there it does nothing. A menu item, unlike a hidden button, is listed
         // in the menu bar and reachable through accessibility.
-        #if DEBUG
-            let debugMenuItem = NSMenuItem()
-            let debugMenu = NSMenu(title: "Debug")
-            let toggle = debugMenu.addItem(
-                withTitle: "Toggle Debug Drawer",
-                action: #selector(toggleDebugDrawer),
-                keyEquivalent: "d"
-            )
-            toggle.keyEquivalentModifierMask = .control
-            toggle.target = self
-            let notice = debugMenu.addItem(
-                withTitle: "Post Sample Notice",
-                action: #selector(postSampleNotice),
-                keyEquivalent: ""
-            )
-            notice.target = self
-            debugMenuItem.submenu = debugMenu
-            mainMenu.addItem(debugMenuItem)
-        #endif
+        let debugMenuItem = NSMenuItem()
+        let debugMenu = NSMenu(title: "Debug")
+        let toggle = debugMenu.addItem(
+            withTitle: "Toggle Debug Drawer",
+            action: #selector(toggleDebugDrawer),
+            keyEquivalent: "d"
+        )
+        toggle.keyEquivalentModifierMask = .control
+        toggle.target = self
+        let notice = debugMenu.addItem(
+            withTitle: "Post Sample Notice",
+            action: #selector(postSampleNotice),
+            keyEquivalent: ""
+        )
+        notice.target = self
+        debugMenuItem.submenu = debugMenu
+        mainMenu.addItem(debugMenuItem)
 
         NSApp.mainMenu = mainMenu
     }
 
-    #if DEBUG
-        @objc private func toggleDebugDrawer() {
-            DebugDrawer.shared.toggle()
-        }
+    @objc private func toggleDebugDrawer() {
+        DebugDrawer.shared.toggle()
+    }
 
-        // Shows what a plugin's notice looks like: a badge on Network and a toast that opens it.
-        @objc private func postSampleNotice() {
-            let network = NetworkPlugin()
-            network.setBadge(1)
-            network.postToast("GET /api/orders failed with 500")
-        }
-    #endif
+    // Shows what a plugin's notice looks like: a badge on Network and a toast that opens it.
+    @objc private func postSampleNotice() {
+        let network = NetworkPlugin()
+        network.setBadge(1)
+        network.postToast("GET /api/orders failed with 500")
+    }
 
     func applicationShouldTerminateAfterLastWindowClosed(_: NSApplication) -> Bool { true }
 }
@@ -334,14 +328,10 @@ struct ExampleContentView: View {
                     Button("Open a Leaking Screen") { ExampleLeak.presentLeakingScreen() }
                     // MetricKit lists the samples, clearly named as such: MetricKit itself delivers nothing
                     // to a debug run in time to see. Adding does nothing in release, so neither does the button.
-                    #if DEBUG
-                        Button("Add Sample MetricKit Payloads") { ExampleMetricKit.addSamples() }
-                    #endif
+                    Button("Add Sample MetricKit Payloads") { ExampleMetricKit.addSamples() }
                     // Analytics lists each event as it is recorded. Recording does nothing in release,
                     // so neither does the button.
-                    #if DEBUG
-                        Button("Track Sample Event") { ExampleAnalytics.trackSample() }
-                    #endif
+                    Button("Track Sample Event") { ExampleAnalytics.trackSample() }
                 }
                 .debugColorVision()
 
@@ -374,11 +364,9 @@ struct ExampleContentView: View {
         // Launched with -OpenDebugDrawer, the window opens with the drawer open, so it can be
         // checked without a hand, like the iOS example.
         .onAppear {
-            #if DEBUG
-                if ProcessInfo.processInfo.arguments.contains("-OpenDebugDrawer"), !DebugDrawer.shared.isOpen {
-                    DebugDrawer.shared.toggle()
-                }
-            #endif
+            if ProcessInfo.processInfo.arguments.contains("-OpenDebugDrawer"), !DebugDrawer.shared.isOpen {
+                DebugDrawer.shared.toggle()
+            }
         }
     }
 }

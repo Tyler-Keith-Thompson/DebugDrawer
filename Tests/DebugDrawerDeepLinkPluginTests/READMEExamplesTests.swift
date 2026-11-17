@@ -26,9 +26,7 @@
         func deepLinks() {
             let router = Router()
 
-            #if DEBUG
             DebugDrawer.shared.installDeepLink(continueUserActivity: router.handle)
-            #endif
 
             // Leave the shared drawer as the other suites expect it, within this one main-actor turn.
             let installed = DebugDrawer.shared.globalPlugins.contains { $0.id == "DeepLinkPlugin" }

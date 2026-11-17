@@ -86,9 +86,7 @@ struct ExampleResettableState: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(hasSeenOnboarding ? "Onboarding: seen" : "Onboarding: not seen (fresh install)")
-            #if DEBUG
-                Button("Seed State to Reset") { ExampleAppStateReset.seed() }
-            #endif
+            Button("Seed State to Reset") { ExampleAppStateReset.seed() }
         }
         .accessibilityElement(children: .contain)
     }

@@ -46,6 +46,10 @@ the entry becomes the GitHub release's notes.
 - `installNetwork`, `installConsole` and `installDeepLink` take new parameters with defaults, and
   `DebugDrawerReport.Kind` gains `movie`.
 - DD-189: `AsyncPluginView.reload()` is removed; it never re-ran the task.
+- DD-61: every public API compiles in release, where it does nothing: `DebugDrawer.shared`, the
+  plugins' `install*()` calls and types, their stores, `.trackRenders()`, `AsyncPluginView`,
+  `OnDemandPluginView`, `RedactedText` and the clipboard helpers no longer need `#if DEBUG`, and
+  `just deploy` builds the example apps optimized and checks every public symbol exists in release.
 
 ### Fixed
 

@@ -1,7 +1,42 @@
-#if DEBUG
-    import DebugDrawer
-    import SwiftUI
+import DebugDrawer
+import SwiftUI
 
+// MARK: - Plugin
+
+// The public API compiles in every configuration; the implementation under `#if DEBUG` below does
+// not, so release builds get an empty view and an installer that measures and registers nothing.
+
+public struct LaunchTimePlugin: DebugDrawerPlugin {
+    public var title = "Launch Time"
+    public var category = "Performance"
+    public var icon = "timer"
+
+    public init() {}
+
+    public var body: some View {
+        #if DEBUG
+            LaunchTimePluginView()
+        #else
+            EmptyView()
+        #endif
+    }
+}
+
+// MARK: - Convenience installer
+
+public extension DebugDrawer {
+    /// Install the launch time plugin. Call it as early as you can (your `App.init` or
+    /// `application(_:didFinishLaunchingWithOptions:)`): app init is measured here, and
+    /// the first frame is the first time the main run loop goes idle afterwards.
+    func installLaunchTime() {
+        #if DEBUG
+            LaunchTimeTracker.shared.observeFirstFrame()
+            registerGlobal(LaunchTimePlugin())
+        #endif
+    }
+}
+
+#if DEBUG
     // MARK: - Launch time capture
 
     /// Launch timing, measured from app-level events so that opening the drawer late
@@ -97,20 +132,6 @@
         }
     }
 
-    // MARK: - Plugin
-
-    public struct LaunchTimePlugin: DebugDrawerPlugin {
-        public var title = "Launch Time"
-        public var category = "Performance"
-        public var icon = "timer"
-
-        public init() {}
-
-        public var body: some View {
-            LaunchTimePluginView()
-        }
-    }
-
     struct LaunchTimePluginView: View {
         @ObservedObject var tracker = LaunchTimeTracker.shared
 
@@ -185,15 +206,4 @@
         }
     }
 
-    // MARK: - Convenience installer
-
-    public extension DebugDrawer {
-        /// Install the launch time plugin. Call it as early as you can (your `App.init` or
-        /// `application(_:didFinishLaunchingWithOptions:)`): app init is measured here, and
-        /// the first frame is the first time the main run loop goes idle afterwards.
-        func installLaunchTime() {
-            LaunchTimeTracker.shared.observeFirstFrame()
-            registerGlobal(LaunchTimePlugin())
-        }
-    }
 #endif

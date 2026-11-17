@@ -1,8 +1,39 @@
-#if DEBUG
-    import DebugDrawer
-    import MachO
-    import SwiftUI
+import DebugDrawer
+import MachO
+import SwiftUI
 
+// MARK: - Plugin
+
+// The public API compiles in every configuration; the implementation under `#if DEBUG` below does
+// not, so release builds get an empty view and an installer that registers nothing.
+
+public struct LoadedLibrariesPlugin: DebugDrawerPlugin {
+    public var title = "Loaded Libraries"
+    public var category = "App"
+    public var icon = "books.vertical"
+
+    public init() {}
+
+    public var body: some View {
+        #if DEBUG
+            LoadedLibrariesPluginView()
+        #else
+            EmptyView()
+        #endif
+    }
+}
+
+// MARK: - Convenience installer
+
+public extension DebugDrawer {
+    func installLoadedLibraries() {
+        #if DEBUG
+            registerGlobal(LoadedLibrariesPlugin())
+        #endif
+    }
+}
+
+#if DEBUG
     // MARK: - Model
 
     struct LoadedLibrary: Identifiable, Equatable {
@@ -93,20 +124,6 @@
         case app = "App"
         case thirdParty = "Third-Party"
         case system = "System"
-    }
-
-    // MARK: - Plugin
-
-    public struct LoadedLibrariesPlugin: DebugDrawerPlugin {
-        public var title = "Loaded Libraries"
-        public var category = "App"
-        public var icon = "books.vertical"
-
-        public init() {}
-
-        public var body: some View {
-            LoadedLibrariesPluginView()
-        }
     }
 
     private struct LoadedLibrariesPluginView: View {
@@ -213,11 +230,4 @@
         }
     }
 
-    // MARK: - Convenience installer
-
-    public extension DebugDrawer {
-        func installLoadedLibraries() {
-            registerGlobal(LoadedLibrariesPlugin())
-        }
-    }
 #endif

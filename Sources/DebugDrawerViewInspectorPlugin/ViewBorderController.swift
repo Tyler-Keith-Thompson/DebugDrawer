@@ -194,4 +194,39 @@
     }
 
     #endif
+#else
+    import Combine
+    import CoreGraphics
+
+    // The release stand-in: the same members, so the host's code compiles unchanged, and no
+    // borders, grid, click indicators or animation changes behind them.
+
+    /// Release builds draw no borders or grid: this stand-in keeps the debug build's members.
+    @MainActor
+    public final class ViewBorderController: ObservableObject {
+        /// The stand-in controller.
+        public static let shared = ViewBorderController()
+
+        /// Kept, never read: release builds draw no borders.
+        @Published public var isBordersEnabled = false
+        /// Kept, never read: release builds draw no grid.
+        @Published public var isGridEnabled = false
+        /// Kept, never read.
+        @Published public var gridSpacing: CGFloat = 8
+        /// Kept, never read.
+        @Published public var gridColor: GridColor = .blue
+        /// Kept, never read.
+        @Published public var gridOpacity: Double = 0.15
+        /// Kept, never read: release builds show no click indicators.
+        @Published public var isClickIndicatorEnabled = false
+        /// Kept, never read: release builds leave animations at their speed.
+        @Published public var animationSpeed: Double = 1.0
+
+        /// The grid's color.
+        public enum GridColor: String, CaseIterable {
+            case blue, red, green, white, gray
+        }
+
+        private init() {}
+    }
 #endif

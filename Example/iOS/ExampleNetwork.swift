@@ -34,77 +34,73 @@ enum ExampleNetwork {
     /// app's own requests; a mock answers it.
     static let analytics = "https://collect.analytics.example.net/v1/events"
 
-    #if DEBUG
-        /// The mock the launch argument adds. Its id is fixed, so it is added once and the drawer's
-        /// edits to it last.
-        static let greetingMock = NetworkMockRule(
-            id: UUID(uuidString: "6E1D3C5A-2B4F-4F7E-9A51-3C1D2E4F5A6B") ?? UUID(),
-            name: "Greeting",
-            matcher: .init(methods: ["GET"], host: .exact("api.example.com"), path: .wildcard("/v1/greeting*")),
-            response: .init(status: 200, body: .text(#"{"message":"Hello from a mock"}"#), contentType: "application/json")
-        )
+    /// The mock the launch argument adds. Its id is fixed, so it is added once and the drawer's
+    /// edits to it last.
+    static let greetingMock = NetworkMockRule(
+        id: UUID(uuidString: "6E1D3C5A-2B4F-4F7E-9A51-3C1D2E4F5A6B") ?? UUID(),
+        name: "Greeting",
+        matcher: .init(methods: ["GET"], host: .exact("api.example.com"), path: .wildcard("/v1/greeting*")),
+        response: .init(status: 200, body: .text(#"{"message":"Hello from a mock"}"#), contentType: "application/json")
+    )
 
-        /// The mock the launch argument adds for the order, with a fixed id like the greeting's.
-        static let orderMock = NetworkMockRule(
-            id: UUID(uuidString: "9A3C5E71-4B2D-4F86-A1E9-6D7B8C0F2A35") ?? UUID(),
-            name: "Place order",
-            matcher: .init(methods: ["POST"], host: .exact("api.example.com"), path: .exact("/v1/orders")),
-            response: .init(status: 201, body: .text(#"{"id":7,"status":"placed"}"#), contentType: "application/json")
-        )
+    /// The mock the launch argument adds for the order, with a fixed id like the greeting's.
+    static let orderMock = NetworkMockRule(
+        id: UUID(uuidString: "9A3C5E71-4B2D-4F86-A1E9-6D7B8C0F2A35") ?? UUID(),
+        name: "Place order",
+        matcher: .init(methods: ["POST"], host: .exact("api.example.com"), path: .exact("/v1/orders")),
+        response: .init(status: 201, body: .text(#"{"id":7,"status":"placed"}"#), contentType: "application/json")
+    )
 
-        /// The mock the launch argument adds for GraphQL: every POST to /graphql gets a user.
-        static let graphQLMock = NetworkMockRule(
-            id: UUID(uuidString: "3D8F1B6A-5C2E-4A97-B0D4-7E9A1C3F5B28") ?? UUID(),
-            name: "GraphQL",
-            matcher: .init(methods: ["POST"], host: .exact("api.example.com"), path: .exact("/graphql")),
-            response: .init(status: 200, body: .text(#"{"data":{"user":{"id":"1","name":"Ada"}}}"#), contentType: "application/json")
-        )
+    /// The mock the launch argument adds for GraphQL: every POST to /graphql gets a user.
+    static let graphQLMock = NetworkMockRule(
+        id: UUID(uuidString: "3D8F1B6A-5C2E-4A97-B0D4-7E9A1C3F5B28") ?? UUID(),
+        name: "GraphQL",
+        matcher: .init(methods: ["POST"], host: .exact("api.example.com"), path: .exact("/graphql")),
+        response: .init(status: 200, body: .text(#"{"data":{"user":{"id":"1","name":"Ada"}}}"#), contentType: "application/json")
+    )
 
-        /// The mock the launch argument adds for the analytics events, which it accepts.
-        static let analyticsMock = NetworkMockRule(
-            id: UUID(uuidString: "C61E2A94-7B3F-4D85-9A0C-2F4E6B8D1A73") ?? UUID(),
-            name: "Analytics",
-            matcher: .init(methods: ["POST"], host: .wildcard("*.analytics.example.net")),
-            response: .init(status: 202, body: .text(#"{"accepted":true}"#), contentType: "application/json")
-        )
+    /// The mock the launch argument adds for the analytics events, which it accepts.
+    static let analyticsMock = NetworkMockRule(
+        id: UUID(uuidString: "C61E2A94-7B3F-4D85-9A0C-2F4E6B8D1A73") ?? UUID(),
+        name: "Analytics",
+        matcher: .init(methods: ["POST"], host: .wildcard("*.analytics.example.net")),
+        response: .init(status: 202, body: .text(#"{"accepted":true}"#), contentType: "application/json")
+    )
 
-        /// The profiles the condition argument adds, with fixed ids, so they are added once and the
-        /// drawer's edits to them last.
-        static let conditionSeeds = [
-            NetworkConditionProfile(
-                id: UUID(uuidString: "0B7E4C2A-9D31-4A6F-8E25-1C3B5D7F9A02") ?? UUID(),
-                name: "Slow example.com",
-                host: .exact("example.com"),
-                latency: .seconds(2)
-            ),
-            NetworkConditionProfile(
-                id: UUID(uuidString: "4F2A9C61-3E7B-4D58-B1A6-8C0E2D4F6B13") ?? UUID(),
-                name: "Greeting offline",
-                isEnabled: false,
-                host: .exact("api.example.com"),
-                failureRate: 100,
-                failure: .notConnectedToInternet
-            )
-        ]
-    #endif
+    /// The profiles the condition argument adds, with fixed ids, so they are added once and the
+    /// drawer's edits to them last.
+    static let conditionSeeds = [
+        NetworkConditionProfile(
+            id: UUID(uuidString: "0B7E4C2A-9D31-4A6F-8E25-1C3B5D7F9A02") ?? UUID(),
+            name: "Slow example.com",
+            host: .exact("example.com"),
+            latency: .seconds(2)
+        ),
+        NetworkConditionProfile(
+            id: UUID(uuidString: "4F2A9C61-3E7B-4D58-B1A6-8C0E2D4F6B13") ?? UUID(),
+            name: "Greeting offline",
+            isEnabled: false,
+            host: .exact("api.example.com"),
+            failureRate: 100,
+            failure: .notConnectedToInternet
+        )
+    ]
 
     /// Installs the Network plugin, with the greeting's mock, the profiles and the number of
     /// sessions kept when launched with their arguments.
     @MainActor
     static func install() {
-        #if DEBUG
-            let arguments = ProcessInfo.processInfo.arguments
-            let mocks = arguments.contains(launchArgument) ? [greetingMock, orderMock, graphQLMock, analyticsMock] : []
-            let conditions = arguments.contains(conditionArgument) ? conditionSeeds : []
-            let kept = arguments.firstIndex(of: sessionsArgument)
-                .flatMap { arguments.indices.contains($0 + 1) ? Int(arguments[$0 + 1]) : nil }
-                .map { max($0, 0) }
-            let sessions = kept.map { NetworkSessionPersistence(maxSessions: $0) } ?? .standard
-            DebugDrawer.shared.installNetwork(mocks: mocks, conditions: conditions, sessions: sessions)
-            if !conditions.isEmpty, !DebugDrawer.shared.hudLayout.pinned.contains(NetworkPlugin().id) {
-                DebugDrawer.shared.toggleHUD(forPlugin: NetworkPlugin().id)
-            }
-        #endif
+        let arguments = ProcessInfo.processInfo.arguments
+        let mocks = arguments.contains(launchArgument) ? [greetingMock, orderMock, graphQLMock, analyticsMock] : []
+        let conditions = arguments.contains(conditionArgument) ? conditionSeeds : []
+        let kept = arguments.firstIndex(of: sessionsArgument)
+            .flatMap { arguments.indices.contains($0 + 1) ? Int(arguments[$0 + 1]) : nil }
+            .map { max($0, 0) }
+        let sessions = kept.map { NetworkSessionPersistence(maxSessions: $0) } ?? .standard
+        DebugDrawer.shared.installNetwork(mocks: mocks, conditions: conditions, sessions: sessions)
+        if !conditions.isEmpty, !DebugDrawer.shared.hudLayout.pinned.contains(NetworkPlugin().id) {
+            DebugDrawer.shared.toggleHUD(forPlugin: NetworkPlugin().id)
+        }
     }
 
     /// The status, the start of the body and the time of a GET to `address`, or why it failed and

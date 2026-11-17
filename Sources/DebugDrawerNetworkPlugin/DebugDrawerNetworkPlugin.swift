@@ -1,10 +1,20 @@
-#if DEBUG
-    import Combine
-    import DebugDrawer
-    import Foundation
-    import os
-    import SwiftUI
+import Combine
+import DebugDrawer
+import Foundation
+import os
+import SwiftUI
 
+public extension NetworkStore {
+    enum StatusFilter: String, CaseIterable {
+        case all = "All"
+        case success = "2xx"
+        case clientError = "4xx"
+        case serverError = "5xx"
+        case errors = "Errors"
+    }
+}
+
+#if DEBUG
     @MainActor
     public final class NetworkStore: ObservableObject {
         /// The store `installNetwork()` fills and the plugin shows, its ignore list in the app's
@@ -16,14 +26,6 @@
         @Published public var filterStatus: StatusFilter = .all
 
         public var capacity = 200
-
-        public enum StatusFilter: String, CaseIterable {
-            case all = "All"
-            case success = "2xx"
-            case clientError = "4xx"
-            case serverError = "5xx"
-            case errors = "Errors"
-        }
 
         /// The requests the log shows that pass the status filter and the filter text, without
         /// those to an ignored host unless `showsIgnored`: the captured ones, or the earlier
@@ -327,5 +329,38 @@
                 ignoreIssue = .notSaved
             }
         }
+    }
+#else
+    // The release stand-in: the same members, no URL protocol or swizzling behind them, and no
+    // requests ever.
+
+    /// Release builds capture no requests: this stand-in keeps the debug build's members.
+    @MainActor
+    public final class NetworkStore: ObservableObject {
+        /// The stand-in store.
+        public static let shared = NetworkStore()
+
+        /// Always empty.
+        @Published public private(set) var entries: [NetworkEntry] = []
+        /// Kept, never applied.
+        @Published public var filterText = ""
+        /// Kept, never applied.
+        @Published public var filterStatus: StatusFilter = .all
+
+        /// Kept, never used.
+        public var capacity = 200
+
+        /// Always empty.
+        public var filteredEntries: [NetworkEntry] {
+            []
+        }
+
+        private init() {}
+
+        /// Does nothing: release builds intercept nothing.
+        public func install() {}
+
+        /// Does nothing.
+        public func clear() {}
     }
 #endif

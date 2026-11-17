@@ -25,4 +25,23 @@
             return try report.writeArchive(summary: .current(at: Date()), in: directory)
         }
     }
+#else
+    import Foundation
+
+    // The release stand-ins: release builds have no plugins to report on.
+    public extension DebugDrawer {
+        /// Always empty.
+        var reportContributors: [AnyDebugDrawerPlugin] {
+            []
+        }
+
+        /// Throws: release builds make no reports.
+        ///
+        /// - Parameter directory: Ignored.
+        /// - Returns: Never returns.
+        /// - Throws: ``DebugDrawerReport/WriteFailed``, always.
+        func createReport(in directory: URL = FileManager.default.temporaryDirectory) throws(DebugDrawerReport.WriteFailed) -> URL {
+            throw DebugDrawerReport.WriteFailed()
+        }
+    }
 #endif

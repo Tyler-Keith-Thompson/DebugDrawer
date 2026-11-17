@@ -23,28 +23,24 @@ plugins call, as stand-ins, so the same code compiles in both configurations wit
 | The rows, buttons and code views, such as ``DebugDrawerSection`` and ``DebugDrawerKeyValueRow`` | Draw nothing |
 | `debugDrawerButtonStyle(_:)`, `debugDrawerFont(_:)` and the other style modifiers | Return the view unchanged |
 | ``DebugDrawerReportContributor``, ``DebugDrawerReportUploader``, ``DebugDrawerReport``, ``DebugDrawerRedaction`` | Compile; there is no report and nothing calls them |
+| ``DebugDrawer/DebugDrawer`` and its ``DebugDrawer/DebugDrawer/shared`` instance | Registering drops the plugin, toggling opens nothing, and every property keeps its starting value |
+| ``DebugDrawer/DebugDrawer/createReport(in:)`` | Throws ``DebugDrawerReport/WriteFailed`` |
+| ``AnyDebugDrawerPlugin``, ``HUDLayout``, ``DebugDrawerToast`` | Compile; the drawer holds none |
+| ``AsyncPluginView``, ``OnDemandPluginView``, ``RedactedText`` | Draw nothing and run nothing |
+| `debugDrawerCopyToClipboard(_:)`, `debugDrawerCopyImageToClipboard(_:)` | Do nothing |
+| The shipped plugins' `install*()` calls, their plugin types and their stores | Install nothing; the stores stay empty and swizzle or intercept nothing |
 
-### What exists in debug builds only
-
-``DebugDrawer/DebugDrawer`` and its ``DebugDrawer/DebugDrawer/shared`` instance,
-``AnyDebugDrawerPlugin``, ``AsyncPluginView``, ``OnDemandPluginView``, ``RedactedText``, the HUD
-and toast types, and the clipboard helpers. Code that names them sits under `#if DEBUG`, as the
-shipped plugins' `install*()` calls do, since those install the swizzling and interception some
-plugins need:
+So the calls that set the drawer up need no `#if DEBUG`:
 
 ```swift
-#if DEBUG
-    DebugDrawer.shared.registerGlobal(CachePlugin())
-    DebugDrawer.shared.reportUploader = TeamReportUploader(endpoint: reportsEndpoint)
-#endif
+DebugDrawer.shared.registerGlobal(CachePlugin())
+DebugDrawer.shared.reportUploader = TeamReportUploader(endpoint: reportsEndpoint)
 ```
 
-Leaving them out of release builds, rather than giving them stand-ins, means a release build
-can't open the drawer by accident: there is nothing to open.
+A release build can't open the drawer by accident: the stand-in has nothing to open, and the
+code that draws the drawer, swizzles or intercepts isn't compiled into it.
 
 ### Writing a plugin that compiles in release
 
-A plugin whose body uses only the API in the first table compiles in both configurations, so it
-needs no `#if DEBUG` of its own; its body is simply never built in release. A plugin that uses
-debug-only API, such as ``AsyncPluginView``, goes under `#if DEBUG` whole, with the code that
-registers or attaches it.
+Every public API compiles in both configurations, so a plugin needs no `#if DEBUG` of its own; its
+body is simply never shown in release.

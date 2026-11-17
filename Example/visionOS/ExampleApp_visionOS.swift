@@ -6,10 +6,8 @@ import SwiftUI
 @main
 struct DebugDrawerExampleVisionOSApp: App {
     init() {
-        #if DEBUG
-            DebugDrawer.shared.registerGlobal(ExampleBuildPlugin())
-            DebugDrawer.shared.registerGlobal(ExampleCachePlugin())
-        #endif
+        DebugDrawer.shared.registerGlobal(ExampleBuildPlugin())
+        DebugDrawer.shared.registerGlobal(ExampleCachePlugin())
     }
 
     var body: some Scene {
@@ -20,11 +18,9 @@ struct DebugDrawerExampleVisionOSApp: App {
                 // be checked without a hand:
                 // `xcrun simctl launch booted com.debugdrawer.example.visionos -OpenDebugDrawer`.
                 .onAppear {
-                    #if DEBUG
-                        if ProcessInfo.processInfo.arguments.contains("-OpenDebugDrawer"), !DebugDrawer.shared.isOpen {
-                            DebugDrawer.shared.toggle()
-                        }
-                    #endif
+                    if ProcessInfo.processInfo.arguments.contains("-OpenDebugDrawer"), !DebugDrawer.shared.isOpen {
+                        DebugDrawer.shared.toggle()
+                    }
                 }
         }
     }
@@ -54,16 +50,14 @@ struct ExampleContentView_visionOS: View {
             }
             .navigationTitle("DebugDrawer Example")
             .toolbar {
-                // The drawer exists in debug builds only.
-                #if DEBUG
-                    ToolbarItem(placement: .primaryAction) {
-                        Button {
-                            DebugDrawer.shared.toggle()
-                        } label: {
-                            Label("Debug Drawer", systemImage: "ladybug")
-                        }
+                // Release builds have no drawer, so there it does nothing.
+                ToolbarItem(placement: .primaryAction) {
+                    Button {
+                        DebugDrawer.shared.toggle()
+                    } label: {
+                        Label("Debug Drawer", systemImage: "ladybug")
                     }
-                #endif
+                }
             }
         }
     }

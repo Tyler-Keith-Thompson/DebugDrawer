@@ -1,3 +1,16 @@
+/// The name of the empty layer just before the drawer's own interface (the HUD, the panel and
+/// the toast) in the window's layer tree; ``debugDrawerChromeEndLayerName`` names the one just
+/// after it.
+///
+/// In painter's order, every layer between the two belongs to the drawer, so a plugin that
+/// renders the window in process (a screen recorder) can leave the drawer out by hiding them for
+/// the length of the render.
+public let debugDrawerChromeStartLayerName = "com.debugdrawer.chrome.start"
+
+/// The name of the empty layer just after the drawer's own interface in the window's layer
+/// tree; see ``debugDrawerChromeStartLayerName``.
+public let debugDrawerChromeEndLayerName = "com.debugdrawer.chrome.end"
+
 #if DEBUG
     import SwiftUI
 
@@ -12,19 +25,6 @@
     // drawer in a window of its own (plugins' views would lose the environment the app gives the
     // views under .debugDrawer(), and every host's touches and focus would change), and naming the
     // drawer's layers by SwiftUI's internal classes (undocumented, and they change between releases).
-
-    /// The name of the empty layer just before the drawer's own interface (the HUD, the panel and
-    /// the toast) in the window's layer tree; ``debugDrawerChromeEndLayerName`` names the one just
-    /// after it.
-    ///
-    /// In painter's order, every layer between the two belongs to the drawer, so a plugin that
-    /// renders the window in process (a screen recorder) can leave the drawer out by hiding them for
-    /// the length of the render.
-    public let debugDrawerChromeStartLayerName = "com.debugdrawer.chrome.start"
-
-    /// The name of the empty layer just after the drawer's own interface in the window's layer
-    /// tree; see ``debugDrawerChromeStartLayerName``.
-    public let debugDrawerChromeEndLayerName = "com.debugdrawer.chrome.end"
 
     /// An empty platform view with a named layer, which takes no touches and no space and is hidden
     /// from accessibility. Platforms with no recorder draw nothing.

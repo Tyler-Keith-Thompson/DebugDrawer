@@ -1,18 +1,22 @@
-#if DEBUG
-    import DebugDrawer
-    import Foundation
+import DebugDrawer
+import Foundation
 
-    extension NetworkPlugin: DebugDrawerReportContributor {
-        /// Adds every captured request and WebSocket connection as `network.har`, and the newest
-        /// session an earlier launch kept as `network-previous.har`: after a crash, the requests
-        /// that led up to it.
-        public func contribute(to report: inout DebugDrawerReport, redaction: DebugDrawerRedaction) {
+extension NetworkPlugin: DebugDrawerReportContributor {
+    /// Adds every captured request and WebSocket connection as `network.har`, and the newest
+    /// session an earlier launch kept as `network-previous.har`: after a crash, the requests
+    /// that led up to it. Release builds capture nothing, so it adds nothing there.
+    public func contribute(to report: inout DebugDrawerReport, redaction: DebugDrawerRedaction) {
+        #if DEBUG
             Self.contribute(NetworkStore.shared.entries, webSockets: NetworkStore.shared.webSockets, to: &report, redaction: redaction)
             // Read here, on the main actor, as the report is built now: a session is at most the
             // size limit, 20 MB unless the app set another.
             Self.contribute(previous: NetworkStore.shared.recorder?.newestPreviousSession(), to: &report)
-        }
+        #endif
+    }
+}
 
+#if DEBUG
+    extension NetworkPlugin {
         /// Adds `entries` and `webSockets` as an HTTP Archive, `network.har`, oldest first, with
         /// what `redaction` calls sensitive masked. Neither adds nothing.
         static func contribute(

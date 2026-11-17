@@ -19,27 +19,25 @@ enum ExampleTweaks {
     static let bannerText = Tweak.text("Banner text", key: "bannerText", default: "Hello from Tweaks")
     static let server = Tweak.picker("Server", key: "server", default: ExampleServer.production).productionSafe()
 
-    #if DEBUG
-        /// Adds the Tweaks plugin.
-        @MainActor
-        static func install() {
-            DebugDrawer.shared.installTweaks {
-                TweakSection("Counter") {
-                    counterStep
-                    TweakAction("Reset counter") {
-                        UserDefaults.standard.removeObject(forKey: counterKey)
-                    }
-                }
-                TweakSection("Banner") {
-                    showBanner
-                    bannerText
-                }
-                TweakSection("Server") {
-                    server
+    /// Adds the Tweaks plugin.
+    @MainActor
+    static func install() {
+        DebugDrawer.shared.installTweaks {
+            TweakSection("Counter") {
+                counterStep
+                TweakAction("Reset counter") {
+                    UserDefaults.standard.removeObject(forKey: counterKey)
                 }
             }
+            TweakSection("Banner") {
+                showBanner
+                bannerText
+            }
+            TweakSection("Server") {
+                server
+            }
         }
-    #endif
+    }
 }
 
 /// A banner the Show banner tweak turns on, reading its text and the server from the tweaks, and

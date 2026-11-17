@@ -18,7 +18,6 @@
                 // the child removes what it saved before it exits.
                 let saved = _NetworkMockStorage.defaultDirectory
                 await MainActor.run {
-                    #if DEBUG
                     let outage = NetworkMockRule(
                         id: UUID(uuidString: "3F2B8E1C-0D4A-4B7E-9C61-5A2D7E8F9B10")!,
                         name: "Orders outage",
@@ -26,7 +25,6 @@
                         response: .init(status: 503, body: .text(#"{"error":"maintenance"}"#), contentType: "application/json")
                     )
                     DebugDrawer.shared.installNetwork(mocks: [outage])
-                    #endif
                 }
                 guard let url = URL(string: "https://api.example.com/v1/orders/42/items") else { exit(EXIT_FAILURE) }
                 let answer = try? await URLSession.shared.data(from: url)

@@ -1,41 +1,58 @@
-#if DEBUG
-    import DebugDrawer
-    import SwiftUI
+import DebugDrawer
+import SwiftUI
 
-    /// Protanopia, deuteranopia, tritanopia and grayscale simulated over the app. The header and
-    /// the HUD name the simulation on; the HUD cycles through them.
-    public struct ColorVisionPlugin: DebugDrawerPlugin {
-        public var id: String {
-            "ColorVisionPlugin"
-        }
+// The public API compiles in every configuration; the implementation under `#if DEBUG` below does
+// not, so release builds get an empty view and an installer that installs nothing.
 
-        public var title = "Color Vision"
-        public var category = "Interface"
-        public var icon = "eye"
+/// Protanopia, deuteranopia, tritanopia and grayscale simulated over the app. The header and
+/// the HUD name the simulation on; the HUD cycles through them.
+public struct ColorVisionPlugin: DebugDrawerPlugin {
+    public var id: String {
+        "ColorVisionPlugin"
+    }
 
+    public var title = "Color Vision"
+    public var category = "Interface"
+    public var icon = "eye"
+
+    #if DEBUG
         let model: ColorVisionModel
 
         init(model: ColorVisionModel) {
             self.model = model
         }
+    #endif
 
-        public var body: some View {
+    public var body: some View {
+        #if DEBUG
             ColorVisionPluginView(model: model)
-        }
+        #else
+            EmptyView()
+        #endif
+    }
 
-        /// The simulation on, which a tap moves to the next, so they can be compared with the
-        /// drawer closed.
-        public var hud: ColorVisionHUD? {
+    /// The simulation on, which a tap moves to the next, so they can be compared with the
+    /// drawer closed.
+    public var hud: ColorVisionHUD? {
+        #if DEBUG
             ColorVisionHUD(model: model)
-        }
+        #else
+            nil
+        #endif
+    }
 
-        /// The simulation on ("Protanopia"); nothing while the app shows its own colors.
-        public var headerAccessory: some View {
+    /// The simulation on ("Protanopia"); nothing while the app shows its own colors.
+    public var headerAccessory: some View {
+        #if DEBUG
             ColorVisionHeaderAccessory(model: model)
-        }
+        #else
+            EmptyView()
+        #endif
+    }
 
-        /// Each simulation on or off, found by "color blind" and its kind too, and all of them off.
-        public var actions: [DebugDrawerAction] {
+    /// Each simulation on or off, found by "color blind" and its kind too, and all of them off.
+    public var actions: [DebugDrawerAction] {
+        #if DEBUG
             ColorVision.Simulation.allCases.map { simulation in
                 DebugDrawerAction(
                     "Simulate \(simulation.rawValue)",
@@ -48,24 +65,34 @@
                     model.simulation = nil
                 }
             ]
-        }
+        #else
+            []
+        #endif
     }
+}
 
+/// The HUD readout: reads the model and hands its simulation to `ColorVisionHUDButton`.
+public struct ColorVisionHUD: View {
+    #if DEBUG
+        @ObservedObject var model: ColorVisionModel
+    #endif
+
+    public var body: some View {
+        #if DEBUG
+            ColorVisionHUDButton(simulation: model.simulation, cycle: { model.cycle() })
+        #else
+            EmptyView()
+        #endif
+    }
+}
+
+#if DEBUG
     /// Reads the model and hands its simulation to `ColorVisionView`.
     struct ColorVisionPluginView: View {
         @ObservedObject var model: ColorVisionModel
 
         var body: some View {
             ColorVisionView(simulation: $model.simulation)
-        }
-    }
-
-    /// The HUD readout: reads the model and hands its simulation to `ColorVisionHUDButton`.
-    public struct ColorVisionHUD: View {
-        @ObservedObject var model: ColorVisionModel
-
-        public var body: some View {
-            ColorVisionHUDButton(simulation: model.simulation, cycle: { model.cycle() })
         }
     }
 

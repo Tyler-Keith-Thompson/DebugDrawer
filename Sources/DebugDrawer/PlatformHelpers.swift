@@ -14,55 +14,55 @@ extension CGFloat {
     }
 }
 
+import SwiftUI
+
+#if os(macOS)
+    import AppKit
+#elseif canImport(UIKit)
+    // Mac Catalyst takes this branch too: a Catalyst app is a UIKit app and can't import AppKit.
+    import UIKit
+#endif
+#if os(watchOS)
+    import WatchKit
+#endif
+
+/// Puts `string` on the general pasteboard, replacing what was there.
+///
+/// Unavailable on tvOS and watchOS, which have no pasteboard: a call there fails to compile
+/// rather than silently copying nothing. In release builds it does nothing.
+///
+/// - Parameter string: The text to copy.
+@available(tvOS, unavailable)
+@available(watchOS, unavailable)
+public func debugDrawerCopyToClipboard(_ string: String) {
+    #if DEBUG && os(macOS)
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(string, forType: .string)
+    #elseif DEBUG && (os(iOS) || os(visionOS))
+        // Under Mac Catalyst, UIPasteboard.general is the Mac's general pasteboard.
+        UIPasteboard.general.string = string
+    #endif
+}
+
+/// Puts `image` on the general pasteboard, replacing what was there.
+///
+/// Unavailable on tvOS and watchOS, which have no pasteboard. In release builds it does nothing.
+///
+/// - Parameter image: The image to copy.
+@available(tvOS, unavailable)
+@available(watchOS, unavailable)
+public func debugDrawerCopyImageToClipboard(_ image: PlatformImage) {
+    #if DEBUG && os(macOS)
+        let pb = NSPasteboard.general
+        pb.clearContents()
+        pb.writeObjects([image])
+    #elseif DEBUG && (os(iOS) || os(visionOS))
+        // Under Mac Catalyst this puts the image on the Mac's general pasteboard.
+        UIPasteboard.general.image = image
+    #endif
+}
+
 #if DEBUG
-    import SwiftUI
-
-    #if os(macOS)
-        import AppKit
-    #elseif canImport(UIKit)
-        // Mac Catalyst takes this branch too: a Catalyst app is a UIKit app and can't import AppKit.
-        import UIKit
-    #endif
-    #if os(watchOS)
-        import WatchKit
-    #endif
-
-    /// Puts `string` on the general pasteboard, replacing what was there.
-    ///
-    /// Unavailable on tvOS and watchOS, which have no pasteboard: a call there fails to compile
-    /// rather than silently copying nothing.
-    ///
-    /// - Parameter string: The text to copy.
-    @available(tvOS, unavailable)
-    @available(watchOS, unavailable)
-    public func debugDrawerCopyToClipboard(_ string: String) {
-        #if os(macOS)
-            NSPasteboard.general.clearContents()
-            NSPasteboard.general.setString(string, forType: .string)
-        #elseif os(iOS) || os(visionOS)
-            // Under Mac Catalyst, UIPasteboard.general is the Mac's general pasteboard.
-            UIPasteboard.general.string = string
-        #endif
-    }
-
-    /// Puts `image` on the general pasteboard, replacing what was there.
-    ///
-    /// Unavailable on tvOS and watchOS, which have no pasteboard.
-    ///
-    /// - Parameter image: The image to copy.
-    @available(tvOS, unavailable)
-    @available(watchOS, unavailable)
-    public func debugDrawerCopyImageToClipboard(_ image: PlatformImage) {
-        #if os(macOS)
-            let pb = NSPasteboard.general
-            pb.clearContents()
-            pb.writeObjects([image])
-        #elseif os(iOS) || os(visionOS)
-            // Under Mac Catalyst this puts the image on the Mac's general pasteboard.
-            UIPasteboard.general.image = image
-        #endif
-    }
-
     /// Whether the user turned on Reduce Motion in the system's accessibility settings, for code
     /// outside a view, which can't read `\.accessibilityReduceMotion`.
     @MainActor var debugDrawerSystemReduceMotion: Bool {
@@ -90,21 +90,21 @@ extension CGFloat {
             #endif
         }
     }
+#endif
 
-    #if os(macOS)
-        /// The platform's image type: `NSImage` on the Mac, `UIImage` elsewhere.
-        public typealias PlatformImage = NSImage
-        /// The platform's color type: `NSColor` on the Mac, `UIColor` elsewhere.
-        public typealias PlatformColor = NSColor
-        /// The platform's font type: `NSFont` on the Mac, `UIFont` elsewhere.
-        public typealias PlatformFont = NSFont
-    #elseif os(iOS) || os(visionOS) || os(tvOS) || os(watchOS)
-        // UIKit's types on Mac Catalyst too, whose views and pasteboard are UIKit's.
-        /// The platform's image type: `UIImage` here, `NSImage` on the Mac.
-        public typealias PlatformImage = UIImage
-        /// The platform's color type: `UIColor` here, `NSColor` on the Mac.
-        public typealias PlatformColor = UIColor
-        /// The platform's font type: `UIFont` here, `NSFont` on the Mac.
-        public typealias PlatformFont = UIFont
-    #endif
+#if os(macOS)
+    /// The platform's image type: `NSImage` on the Mac, `UIImage` elsewhere.
+    public typealias PlatformImage = NSImage
+    /// The platform's color type: `NSColor` on the Mac, `UIColor` elsewhere.
+    public typealias PlatformColor = NSColor
+    /// The platform's font type: `NSFont` on the Mac, `UIFont` elsewhere.
+    public typealias PlatformFont = NSFont
+#elseif os(iOS) || os(visionOS) || os(tvOS) || os(watchOS)
+    // UIKit's types on Mac Catalyst too, whose views and pasteboard are UIKit's.
+    /// The platform's image type: `UIImage` here, `NSImage` on the Mac.
+    public typealias PlatformImage = UIImage
+    /// The platform's color type: `UIColor` here, `NSColor` on the Mac.
+    public typealias PlatformColor = UIColor
+    /// The platform's font type: `UIFont` here, `NSFont` on the Mac.
+    public typealias PlatformFont = UIFont
 #endif

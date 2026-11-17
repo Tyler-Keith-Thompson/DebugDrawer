@@ -36,9 +36,7 @@
         func featureFlags() {
             let appFlags = AppFlags()
 
-            #if DEBUG
             DebugDrawer.shared.installFeatureFlags(provider: appFlags)
-            #endif
 
             // Anywhere in the app, through the adapter, so overrides apply:
             let isNewCheckout = appFlags.currentValue(forKey: "new-checkout") == .bool(true)

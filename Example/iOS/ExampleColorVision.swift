@@ -20,12 +20,10 @@ enum ExampleColorVision {
     static func install() {
         let named = UserDefaults.standard.string(forKey: launchArgument).flatMap(ColorVision.Simulation.init(rawValue:))
         ColorVision.install(simulating: named)
-        #if DEBUG
-            let pluginID = "ColorVisionPlugin"
-            if named != nil, !DebugDrawer.shared.hudLayout.pinned.contains(pluginID) {
-                DebugDrawer.shared.toggleHUD(forPlugin: pluginID)
-            }
-        #endif
+        let pluginID = "ColorVisionPlugin"
+        if named != nil, !DebugDrawer.shared.hudLayout.pinned.contains(pluginID) {
+            DebugDrawer.shared.toggleHUD(forPlugin: pluginID)
+        }
     }
 }
 

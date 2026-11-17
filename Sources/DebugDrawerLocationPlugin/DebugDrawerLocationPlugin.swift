@@ -1,11 +1,45 @@
-#if DEBUG
-    import CoreLocation
-    import DebugDrawer
-    import ObjectiveC
-    import os
-    import SwiftUI
-    import UniformTypeIdentifiers
+import CoreLocation
+import DebugDrawer
+import ObjectiveC
+import os
+import SwiftUI
+import UniformTypeIdentifiers
 
+// MARK: - Plugin
+
+// The public API compiles in every configuration; the implementation under `#if DEBUG` below does
+// not, so release builds get an empty view and an installer that swizzles and registers nothing.
+
+public struct LocationPlugin: DebugDrawerPlugin {
+    public var title = "Location Simulator"
+    public var category = "App"
+    public var icon = "location.circle"
+
+    public init() {}
+
+    public var body: some View {
+        #if DEBUG
+            LocationPluginView()
+        #else
+            EmptyView()
+        #endif
+    }
+}
+
+// MARK: - Convenience installer
+
+public extension DebugDrawer {
+    func installLocation() {
+        #if DEBUG
+            // At install, so a manager the app creates before spoofing is turned on is tracked too,
+            // and a route's points reach it. Until then each swapped method calls the original.
+            LocationSimulator.shared.installSwizzlesIfNeeded()
+            registerGlobal(LocationPlugin())
+        #endif
+    }
+}
+
+#if DEBUG
     // MARK: - Location toolkit
 
     /// Manages simulated location state and CLLocationManager swizzling.
@@ -192,20 +226,6 @@
         }
     }
 
-    // MARK: - Plugin
-
-    public struct LocationPlugin: DebugDrawerPlugin {
-        public var title = "Location Simulator"
-        public var category = "App"
-        public var icon = "location.circle"
-
-        public init() {}
-
-        public var body: some View {
-            LocationPluginView()
-        }
-    }
-
     /// Reads and writes `LocationSimulator.shared` and `RoutePlayer.shared`; `LocationForm` and
     /// `RouteSection` draw them. It presents the file importer for Import GPX….
     private struct LocationPluginView: View {
@@ -371,14 +391,4 @@
         fileprivate static let gpx = UTType(filenameExtension: "gpx", conformingTo: .xml) ?? .xml
     }
 
-    // MARK: - Convenience installer
-
-    public extension DebugDrawer {
-        func installLocation() {
-            // At install, so a manager the app creates before spoofing is turned on is tracked too,
-            // and a route's points reach it. Until then each swapped method calls the original.
-            LocationSimulator.shared.installSwizzlesIfNeeded()
-            registerGlobal(LocationPlugin())
-        }
-    }
 #endif

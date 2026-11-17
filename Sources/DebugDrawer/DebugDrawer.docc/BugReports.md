@@ -33,10 +33,8 @@ struct CartPlugin: DebugDrawerPlugin, DebugDrawerReportContributor {
     }
 }
 
-#if DEBUG
 DebugDrawer.shared.registerGlobal(CartPlugin())
 let zip = try DebugDrawer.shared.createReport() // the same zip the button makes
-#endif
 ```
 
 A file's name is made safe for a file system, given its kind's extension when it lacks one, and
@@ -51,13 +49,11 @@ The drawer's rules, ``DebugDrawer/DebugDrawer/redaction``, start as
 API key's name. Add the app's own with ``DebugDrawer/DebugDrawer/redact(headers:keys:jsonPaths:)``:
 
 ```swift
-#if DEBUG
 DebugDrawer.shared.redact(
     headers: ["X-Api-Signature"],
     keys: ["pin"],
     jsonPaths: ["user.ssn", "cards.number"]
 )
-#endif
 ```
 
 The same rules mask values in the shipped plugins' copy buttons, and on screen until revealed.
@@ -85,9 +81,7 @@ struct TeamReportUploader: DebugDrawerReportUploader {
     }
 }
 
-#if DEBUG
 DebugDrawer.shared.reportUploader = TeamReportUploader(endpoint: reportsEndpoint)
-#endif
 ```
 
 The contributor and uploader protocols, ``DebugDrawerReport`` and ``DebugDrawerRedaction`` exist

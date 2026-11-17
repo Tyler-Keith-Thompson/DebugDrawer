@@ -109,11 +109,4 @@
             }
         }
     }
-
-    extension NetworkConditionProfile.Failure: Identifiable {
-        /// The failure itself.
-        public var id: Self {
-            self
-        }
-    }
 #endif

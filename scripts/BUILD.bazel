@@ -9,3 +9,11 @@ python_test(
     src = "release_test.py",
     data = ["release.py"],
 )
+
+# The check that every public symbol exists in release builds (scripts/release_api.py).
+python_test(
+    name = "release_api_test",
+    size = "small",
+    src = "release_api_test.py",
+    data = ["release_api.py"],
+)

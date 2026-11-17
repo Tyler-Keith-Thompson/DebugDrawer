@@ -1,3 +1,47 @@
+import DebugDrawer
+import SwiftUI
+
+// MARK: - Plugin
+
+// The public API compiles in every configuration; the implementation under `#if DEBUG` below does
+// not, so release builds get an empty view and an installer that samples and registers nothing.
+
+public struct PerformancePlugin: DebugDrawerPlugin {
+    public var title = "Performance"
+    public var category = "Performance"
+    public var icon = "gauge.with.dots.needle.33percent"
+
+    public init() {}
+
+    public var body: some View {
+        #if DEBUG
+            PerformancePluginView()
+        #else
+            EmptyView()
+        #endif
+    }
+
+    /// The frame rate and memory, for the floating HUD; none in release builds.
+    public var hud: PerformanceHUD? {
+        #if DEBUG
+            PerformanceHUD()
+        #else
+            nil
+        #endif
+    }
+}
+
+// MARK: - Convenience installer
+
+public extension DebugDrawer {
+    func installPerformance() {
+        #if DEBUG
+            PerformanceMonitor.shared.start()
+            registerGlobal(PerformancePlugin())
+        #endif
+    }
+}
+
 #if DEBUG
     #if os(macOS)
         import AppKit
@@ -5,9 +49,7 @@
         import UIKit
     #endif
     import Combine
-    import DebugDrawer
     import QuartzCore
-    import SwiftUI
 
     // MARK: - Performance metrics
 
@@ -110,25 +152,6 @@
         }
     }
 
-    // MARK: - Plugin
-
-    public struct PerformancePlugin: DebugDrawerPlugin {
-        public var title = "Performance"
-        public var category = "Performance"
-        public var icon = "gauge.with.dots.needle.33percent"
-
-        public init() {}
-
-        public var body: some View {
-            PerformancePluginView()
-        }
-
-        /// The frame rate and memory, for the floating HUD.
-        public var hud: PerformanceHUD? {
-            PerformanceHUD()
-        }
-    }
-
     struct PerformancePluginView: View {
         @ObservedObject private var monitor = PerformanceMonitor.shared
 
@@ -213,15 +236,6 @@
             let fraction = Double(fps) / Double(max(maximum, 1))
             if fraction >= 0.9 { return nil }
             return fraction >= 0.5 ? .warning : .error
-        }
-    }
-
-    // MARK: - Convenience installer
-
-    public extension DebugDrawer {
-        func installPerformance() {
-            PerformanceMonitor.shared.start()
-            registerGlobal(PerformancePlugin())
         }
     }
 #endif

@@ -1,13 +1,13 @@
+/// The accessibility identifier on the drawer's overlay.
+///
+/// Auditors and other tools that walk the app's views skip the subtree that carries it, so
+/// they report on the app and not on the drawer.
+public let debugDrawerOverlayIdentifier = "com.debugdrawer.overlay"
+
 #if DEBUG
     import SwiftUI
 
     // MARK: - Central registry + state
-
-    /// The accessibility identifier on the drawer's overlay.
-    ///
-    /// Auditors and other tools that walk the app's views skip the subtree that carries it, so
-    /// they report on the app and not on the drawer.
-    public let debugDrawerOverlayIdentifier = "com.debugdrawer.overlay"
 
     /// The drawer: the registry of its plugins, whether it is open, and the state it shares with
     /// them (badges, toasts, the HUD, redaction rules and the report uploader).
@@ -22,9 +22,9 @@
     /// DebugDrawer.shared.toggle()
     /// ```
     ///
-    /// The class exists in debug builds only; code that names it sits under `#if DEBUG`. The
-    /// plugin protocol, the views plugins are built from and the `debugDrawer()` and
-    /// `debugLocalPlugin(_:)` modifiers exist in every build.
+    /// Release builds get a stand-in with the same members that holds nothing: registering
+    /// drops the plugin and toggling opens nothing, so code that calls the drawer compiles
+    /// unchanged there.
     @MainActor
     public final class DebugDrawer: ObservableObject {
         /// The app's drawer, which `debugDrawer()` shows and every plugin registers with.
@@ -262,5 +262,136 @@
             revealRequest = toast.pluginID
             if !isOpen { toggle() }
         }
+    }
+#else
+    import SwiftUI
+
+    // The release stand-in: the same members, so the host's code compiles unchanged, and no drawer
+    // behind them. It registers nothing, opens nothing and keeps every value at its start.
+
+    /// Release builds have no drawer: this stand-in keeps the debug build's members and does nothing.
+    @MainActor
+    public final class DebugDrawer: ObservableObject {
+        /// The stand-in drawer.
+        public static let shared = DebugDrawer()
+
+        /// Always false: release builds have no drawer to open.
+        @Published public var isOpen = false
+
+        /// Always empty: registering drops the plugin.
+        @Published public private(set) var globalPlugins: [AnyDebugDrawerPlugin] = []
+
+        /// Always empty: registering drops the plugin.
+        @Published public private(set) var localPlugins: [AnyDebugDrawerPlugin] = []
+
+        private init() {}
+
+        /// Drops the plugin: release builds have no drawer.
+        ///
+        /// - Parameter plugin: Ignored.
+        public func registerGlobal<P: DebugDrawerPlugin>(_ plugin: P) {}
+
+        /// Does nothing.
+        ///
+        /// - Parameter id: Ignored.
+        public func unregisterGlobal(id: String) {}
+
+        /// Drops the plugin: release builds have no drawer.
+        ///
+        /// - Parameter plugin: Ignored.
+        /// - Returns: A token that unregisters nothing.
+        @discardableResult
+        public func registerLocal<P: DebugDrawerPlugin>(_ plugin: P) -> UUID {
+            UUID()
+        }
+
+        /// Does nothing.
+        ///
+        /// - Parameters:
+        ///   - id: Ignored.
+        ///   - token: Ignored.
+        public func unregisterLocal(id: String, token: UUID) {}
+
+        /// Does nothing: release builds have no drawer to open.
+        public func toggle() {}
+
+        /// Runs `action`: there is no drawer or HUD to hide.
+        ///
+        /// - Parameters:
+        ///   - hidesDrawer: Ignored.
+        ///   - action: The work to do.
+        public func performWhileHidden(drawer hidesDrawer: Bool = true, _ action: @escaping @MainActor () async -> Void) {
+            Task { await action() }
+        }
+
+        /// Always false.
+        public var hasPlugins: Bool {
+            false
+        }
+
+        /// The rules plugins would mask with; nothing reads them in release.
+        @Published public var redaction = DebugDrawerRedaction.standard
+
+        /// Does nothing: nothing in release masks anything.
+        ///
+        /// - Parameters:
+        ///   - headers: Ignored.
+        ///   - keys: Ignored.
+        ///   - jsonPaths: Ignored.
+        public func redact(
+            headers: some Sequence<String> = [String](),
+            keys: some Sequence<String> = [String](),
+            jsonPaths: some Sequence<String> = [String]()
+        ) {}
+
+        /// Kept, never called: release builds make no reports.
+        @Published public var reportUploader: (any DebugDrawerReportUploader)?
+
+        /// Always empty: release builds have no HUD.
+        @Published public internal(set) var hudLayout = HUDLayout()
+
+        /// Always false.
+        @Published public internal(set) var isHUDHidden = false
+
+        /// Does nothing.
+        ///
+        /// - Parameter id: Ignored.
+        public func toggleHUD(forPlugin id: String) {}
+
+        /// Does nothing.
+        ///
+        /// - Parameter origin: Ignored.
+        public func moveHUD(to origin: CGPoint) {}
+
+        /// Always empty.
+        public var hudPlugins: [AnyDebugDrawerPlugin] {
+            []
+        }
+
+        /// Always empty.
+        @Published public private(set) var badges: [String: Int] = [:]
+
+        /// Always nil.
+        @Published public private(set) var toast: DebugDrawerToast?
+
+        /// Does nothing.
+        ///
+        /// - Parameters:
+        ///   - count: Ignored.
+        ///   - id: Ignored.
+        public func setBadge(_ count: Int, forPlugin id: String) {}
+
+        /// Does nothing.
+        ///
+        /// - Parameters:
+        ///   - message: Ignored.
+        ///   - id: Ignored.
+        public func postToast(_ message: String, fromPlugin id: String) {}
+
+        /// Does nothing.
+        public func dismissToast() {}
+
+        /// Does nothing.
+        public func openToast() {}
     }
 #endif

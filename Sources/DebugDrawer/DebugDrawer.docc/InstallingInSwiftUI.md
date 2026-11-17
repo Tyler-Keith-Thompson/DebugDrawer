@@ -12,14 +12,12 @@ in release builds.
 ### Attach the drawer and register plugins
 
 Attach `debugDrawer()` to the root view of the app's window group, and register the global
-plugins once, at launch, under `#if DEBUG`:
+plugins once, at launch:
 
 ```swift
 struct OrdersApp: App {
     init() {
-        #if DEBUG
-            DebugDrawer.shared.registerGlobal(CachePlugin())
-        #endif
+        DebugDrawer.shared.registerGlobal(CachePlugin())
     }
 
     var body: some Scene {
@@ -45,9 +43,7 @@ struct OrdersRootView: View {
     var body: some View {
         Text("Orders")
             .onTapGesture(count: 3) {
-                #if DEBUG
-                    DebugDrawer.shared.toggle()
-                #endif
+                DebugDrawer.shared.toggle()
             }
     }
 }
