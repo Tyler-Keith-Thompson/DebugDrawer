@@ -9,12 +9,12 @@
 
         var body: some View {
             DebugDrawerSection("Mode") {
-                DebugDrawerRow("Pseudo-Localize", isOn: isOn(.pseudoLocalized))
+                DebugDrawerRow("Pseudo-Localize", systemImage: "textformat", isOn: isOn(.pseudoLocalized))
                     .accessibilityHint("Accents the app's strings and makes them about 40% longer")
                 if mode == .pseudoLocalized {
                     DebugDrawerKeyValueRow("Settings", value: PseudoLocalization.transform("Settings"))
                 }
-                DebugDrawerRow("Show Keys", isOn: isOn(.showingKeys))
+                DebugDrawerRow("Show Keys", systemImage: "key", isOn: isOn(.showingKeys))
                     .accessibilityHint("Shows each string's localization key in its place")
             } footer: {
                 Text("Live, for the app's NSLocalizedString and Bundle strings. SwiftUI's Text needs Whole App on Next Launch.")

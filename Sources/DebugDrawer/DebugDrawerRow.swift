@@ -95,12 +95,16 @@ public extension DebugDrawerRow where Details == EmptyView, Accessory == Toggle<
                 // Centred: a switch whose label is hidden reports a first baseline below itself,
                 // which dropped it under the title.
                 : AnyLayout(HStackLayout(alignment: .center, spacing: 8))
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
+            // Aligned on the title's own baseline rather than the column's first baseline, which
+            // merges every child's: on iOS a Toggle, Slider or Stepper with its label hidden
+            // reports one well above the title, which lifted the icon onto a line of its own.
+            HStack(alignment: .rowTitleBaseline, spacing: 8) {
                 if let systemImage {
                     Image(systemName: systemImage)
                         .debugDrawerFont(.body)
                         .foregroundStyle(DrawerPalette.secondaryText)
                         .frame(width: iconWidth)
+                        .alignmentGuide(.rowTitleBaseline) { $0[.firstTextBaseline] }
                         .accessibilityHidden(true)
                 }
                 VStack(alignment: .leading, spacing: 3) {
@@ -109,6 +113,7 @@ public extension DebugDrawerRow where Details == EmptyView, Accessory == Toggle<
                             .debugDrawerFont(.body)
                             .foregroundStyle(DrawerPalette.text)
                             .fixedSize(horizontal: false, vertical: true)
+                            .alignmentGuide(.rowTitleBaseline) { $0[.firstTextBaseline] }
                             // Takes the width the accessory leaves, which pushes it to the trailing edge.
                             .frame(maxWidth: stacked ? nil : .infinity, alignment: .leading)
                             .accessibilityElement(children: .combine)
@@ -125,6 +130,18 @@ public extension DebugDrawerRow where Details == EmptyView, Accessory == Toggle<
             .environment(\.isInDrawerRow, true)
             .padding(.vertical, padding)
             .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    extension VerticalAlignment {
+        /// The first baseline of a row's title, which the icon beside it sits on.
+        fileprivate static let rowTitleBaseline = VerticalAlignment(RowTitleBaseline.self)
+    }
+
+    /// The row's title baseline; a view that doesn't set it reports its first text baseline.
+    private enum RowTitleBaseline: AlignmentID {
+        static func defaultValue(in context: ViewDimensions) -> CGFloat {
+            context[.firstTextBaseline]
         }
     }
 #endif

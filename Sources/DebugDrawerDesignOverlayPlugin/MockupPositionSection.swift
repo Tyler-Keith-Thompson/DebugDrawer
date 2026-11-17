@@ -12,13 +12,13 @@
 
         var body: some View {
             DebugDrawerSection("Position") {
-                DebugDrawerRow("X") {
+                DebugDrawerRow("X", systemImage: "arrow.left.and.right") {
                     OffsetStepper(axis: "X", value: $offset.width)
                 }
-                DebugDrawerRow("Y") {
+                DebugDrawerRow("Y", systemImage: "arrow.up.and.down") {
                     OffsetStepper(axis: "Y", value: $offset.height)
                 }
-                DebugDrawerRow("Move by Dragging", isOn: $isMoving)
+                DebugDrawerRow("Move by Dragging", systemImage: "hand.draw", isOn: $isMoving)
                     .disabled(!isVisible)
                     .accessibilityHint("While on, the mockup takes every touch, and a drag moves it")
             } footer: {

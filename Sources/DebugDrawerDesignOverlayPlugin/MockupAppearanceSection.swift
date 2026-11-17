@@ -8,8 +8,8 @@
 
         var body: some View {
             DebugDrawerSection("Appearance") {
-                DebugDrawerRow("Show Mockup", isOn: $settings.isVisible)
-                DebugDrawerRow("Opacity") {
+                DebugDrawerRow("Show Mockup", systemImage: "eye", isOn: $settings.isVisible)
+                DebugDrawerRow("Opacity", systemImage: "circle.lefthalf.filled") {
                     HStack(spacing: 8) {
                         Slider(value: $settings.opacity, in: DesignOverlaySettings.opacityRange, step: 0.05)
                             // Not scaled with the text: at accessibility sizes the row stacks the
@@ -25,7 +25,7 @@
                             .accessibilityHidden(true)
                     }
                 }
-                DebugDrawerRow("Blend") {
+                DebugDrawerRow("Blend", systemImage: "circle.righthalf.filled") {
                     Picker("Blend", selection: $settings.blend) {
                         ForEach(MockupBlend.allCases, id: \.self) { Text($0.title).tag($0) }
                     }
@@ -34,7 +34,7 @@
                     .accessibilityLabel("Blend")
                     .accessibilityElement(children: .contain)
                 }
-                DebugDrawerRow("Scale") {
+                DebugDrawerRow("Scale", systemImage: "arrow.up.left.and.arrow.down.right") {
                     Picker("Scale", selection: $settings.scale) {
                         ForEach(MockupScale.allCases, id: \.self) { Text($0.title).tag($0) }
                     }
