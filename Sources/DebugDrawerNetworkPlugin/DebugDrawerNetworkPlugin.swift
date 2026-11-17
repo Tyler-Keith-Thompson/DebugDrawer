@@ -27,6 +27,9 @@
         public var mockRuleName: String?
         /// What a conditioning profile did to the request, or `nil` when none applied.
         public var conditionEffect: NetworkConditionEffect?
+        /// The id of the captured request this one resends, when the drawer's Resend or Edit and
+        /// Resend sent it; `nil` for a request the app made.
+        public var replayOf: UUID?
 
         /// Whether the request failed: the server answered with a status of 400 or more, or the
         /// request never got an answer (a transport error).

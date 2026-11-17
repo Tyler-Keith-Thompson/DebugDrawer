@@ -15,9 +15,6 @@
         let cancel: () -> Void
         let save: (NetworkMockRule) -> Void
         @State var isImporting = false
-        @ScaledMetric(relativeTo: .body) private var bodyHeight: CGFloat = 140
-        @ScaledMetric(relativeTo: .body) private var padding: CGFloat = 4
-        @Environment(\.dynamicTypeSize) private var dynamicTypeSize
         let inspection = Inspection<Self>()
 
         /// - Parameters:
@@ -51,7 +48,7 @@
                     NetworkEditorField("Methods") { methods }
                     patternField("Host", kind: $draft.hostKind, text: $draft.host, prompt: "*.example.com", problem: draft.hostProblem)
                     patternField("Path", kind: $draft.pathKind, text: $draft.path, prompt: "/v1/users/*", problem: draft.pathProblem)
-                    fieldList("Query", noun: "query item", fields: $draft.query)
+                    NetworkNameValueList("Query", noun: "query item", fields: $draft.query)
                 } footer: {
                     Text("In a wildcard, * matches within one label or segment and ** across them. A pattern matches the whole host or path.")
                 }
@@ -72,7 +69,7 @@
                             .accessibilityLabel("Content Type")
                             .autocorrectionDisabled()
                     }
-                    fieldList("Headers", noun: "header", fields: $draft.headers)
+                    NetworkNameValueList("Headers", noun: "header", fields: $draft.headers)
                     NetworkEditorField("Body", problem: draft.bodyProblem) { responseBody }
                 }
                 DebugDrawerActionRow {
@@ -149,19 +146,7 @@
             case .empty:
                 EmptyView()
             case .text:
-                TextEditor(text: $draft.bodyText)
-                    .debugDrawerFont(.code)
-                    .autocorrectionDisabled()
-                    .scrollContentBackground(.hidden)
-                    .frame(minHeight: bodyHeight)
-                    .padding(padding)
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 4).strokeBorder(.separator)
-                    }
-                    .accessibilityLabel("Body text")
-                #if os(iOS)
-                    .textInputAutocapitalization(.never)
-                #endif
+                NetworkBodyTextEditor(text: $draft.bodyText)
             case .file:
                 DebugDrawerActionRow {
                     Button(draft.bodyFile == nil ? "Choose File…" : "Replace File…") { isImporting = true }
@@ -170,44 +155,6 @@
                 if let file = draft.bodyFile {
                     DebugDrawerCodeText(file)
                         .debugDrawerForegroundStyle(.secondary)
-                }
-            }
-        }
-
-        // MARK: Layout
-
-        /// Name and value rows with a remove button each, then a button that adds one.
-        private func fieldList(_ title: String, noun: String, fields: Binding<[NetworkMockDraft.Field]>) -> some View {
-            NetworkEditorField(title) {
-                ForEach(fields) { $item in
-                    let layout = dynamicTypeSize.isAccessibilitySize
-                        ? AnyLayout(VStackLayout(alignment: .leading, spacing: padding))
-                        : AnyLayout(HStackLayout(spacing: padding))
-                    HStack(alignment: .center, spacing: padding) {
-                        layout {
-                            TextField("Name", text: $item.name)
-                                .debugDrawerFont(.code)
-                                .debugDrawerTextFieldStyle()
-                                .autocorrectionDisabled()
-                                .accessibilityLabel("\(noun.capitalized) name")
-                            TextField("Value", text: $item.value)
-                                .debugDrawerFont(.code)
-                                .debugDrawerTextFieldStyle()
-                                .autocorrectionDisabled()
-                                .accessibilityLabel("\(noun.capitalized) value")
-                        }
-                        Button {
-                            fields.wrappedValue.removeAll { $0.id == item.id }
-                        } label: {
-                            Image(systemName: "minus.circle")
-                        }
-                        .debugDrawerButtonStyle(.borderless)
-                        .accessibilityLabel("Remove \(noun) \(item.name)")
-                    }
-                }
-                DebugDrawerActionRow {
-                    Button("Add \(noun.capitalized)") { fields.wrappedValue.append(NetworkMockDraft.Field()) }
-                        .accessibilityLabel("Add \(noun)")
                 }
             }
         }

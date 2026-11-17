@@ -80,8 +80,8 @@
             var timings: Timings
             /// Why the request failed, in the format's convention for custom fields.
             var error: String?
-            /// Which mock rule answered the request, and which conditioning profile slowed or
-            /// failed it and how, when any did.
+            /// Which captured request this one resends, which mock rule answered it, and which
+            /// conditioning profile slowed or failed it and how, when any did.
             var comment: String?
         }
 
@@ -102,12 +102,17 @@
         /// The archive of `entries`, oldest first, with every value `redaction` calls sensitive
         /// masked: header values, URL query items, and values in JSON bodies.
         init(_ entries: [NetworkEntry], redaction: DebugDrawerRedaction) {
-            log = Log(entries: entries.sorted { $0.timestamp < $1.timestamp }.map { Entry($0, redaction: redaction) })
+            let byID = Dictionary(entries.map { ($0.id, $0) }) { first, _ in first }
+            log = Log(entries: entries.sorted { $0.timestamp < $1.timestamp }.map { entry in
+                Entry(entry, original: entry.replayOf.flatMap { byID[$0] }, redaction: redaction)
+            })
         }
     }
 
     extension HTTPArchive.Entry {
-        fileprivate init(_ entry: NetworkEntry, redaction: DebugDrawerRedaction) {
+        /// - Parameter original: The request `entry` resends, when it is a replay and the
+        ///   original is in the archive.
+        fileprivate init(_ entry: NetworkEntry, original: NetworkEntry?, redaction: DebugDrawerRedaction) {
             let url = redaction.redacting(url: entry.url)
             let httpVersion = entry.metrics?.protocolName.map(HTTPArchive.httpVersion) ?? "HTTP/1.1"
             let requestHeaders = redaction.redacting(headers: entry.requestHeaders)
@@ -152,11 +157,24 @@
             )
             timings = HTTPArchive.Timings(entry.metrics, total: time)
             error = entry.error
+            comment = Self.comment(on: entry, original: original, redaction: redaction)
+        }
+
+        /// What the plugin had to do with `entry`, in sentences: the request it resends, the mock
+        /// that answered it and the profile that conditioned it; `nil` when none applies.
+        private static func comment(on entry: NetworkEntry, original: NetworkEntry?, redaction: DebugDrawerRedaction) -> String? {
             let notes = [
+                entry.replayOf.map { _ in
+                    // HAR entries have no ids, so the original is named by what identifies it in
+                    // the archive: its method, URL and start.
+                    original.map {
+                        "Replay of the \($0.method) \(redaction.redacting(url: $0.url)) started \(HTTPArchive.dateStyle.format($0.timestamp))"
+                    } ?? "Replay of a request not in this archive"
+                },
                 entry.mockRuleName.map { "Answered by the network mock “\($0)”" },
                 entry.conditionEffect.map { "Conditioned by “\($0.profileName)”: \($0.summary)" }
             ].compactMap(\.self)
-            comment = notes.isEmpty ? nil : notes.joined(separator: ". ")
+            return notes.isEmpty ? nil : notes.joined(separator: ". ")
         }
     }
 

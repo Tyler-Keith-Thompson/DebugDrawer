@@ -27,19 +27,6 @@
             }
         }
 
-        /// A header or query item being edited.
-        struct Field: Identifiable, Equatable {
-            let id: UUID
-            var name: String
-            var value: String
-
-            init(id: UUID = UUID(), name: String = "", value: String = "") {
-                self.id = id
-                self.name = name
-                self.value = value
-            }
-        }
-
         /// The methods the editor offers.
         static let standardMethods = ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"]
 
@@ -53,9 +40,9 @@
         var host: String
         var pathKind: PatternKind
         var path: String
-        var query: [Field]
+        var query: [NetworkNameValue]
         var status: String
-        var headers: [Field]
+        var headers: [NetworkNameValue]
         var contentType: String
         var bodyKind: BodyKind
         var bodyText: String
@@ -73,9 +60,9 @@
             methods = rule.matcher.methods
             (hostKind, host) = Self.fields(rule.matcher.host)
             (pathKind, path) = Self.fields(rule.matcher.path)
-            query = rule.matcher.query.sorted { $0.key < $1.key }.map { Field(name: $0.key, value: $0.value) }
+            query = [NetworkNameValue](sortedByName: rule.matcher.query)
             status = String(rule.response.status)
-            headers = rule.response.headers.sorted { $0.key < $1.key }.map { Field(name: $0.key, value: $0.value) }
+            headers = [NetworkNameValue](sortedByName: rule.response.headers)
             contentType = rule.response.contentType ?? ""
             switch rule.response.body {
             case .empty:
@@ -130,7 +117,7 @@
                 methods: methods,
                 host: Self.pattern(hostKind, host.trimmingCharacters(in: .whitespaces)),
                 path: Self.pattern(pathKind, path.trimmingCharacters(in: .whitespaces)),
-                query: Self.dictionary(query)
+                query: query.dictionary
             )
             let body: NetworkMockRule.Body = switch bodyKind {
             case .empty: .empty
@@ -144,7 +131,7 @@
                 name: trimmedName,
                 isEnabled: isEnabled,
                 matcher: matcher,
-                response: .init(status: code, headers: Self.dictionary(headers), body: body, contentType: type.isEmpty ? nil : type)
+                response: .init(status: code, headers: headers.dictionary, body: body, contentType: type.isEmpty ? nil : type)
             )
             guard trimmedName.isEmpty else { return draftRule }
             var named = draftRule
@@ -169,14 +156,6 @@
             case .exact: .exact(text)
             case .wildcard: .wildcard(text)
             case .regex: .regex(text)
-            }
-        }
-
-        /// The fields with a name, by name; of two with one name, the later wins.
-        private static func dictionary(_ fields: [Field]) -> [String: String] {
-            fields.reduce(into: [:]) { result, field in
-                let name = field.name.trimmingCharacters(in: .whitespaces)
-                if !name.isEmpty { result[name] = field.value }
             }
         }
 

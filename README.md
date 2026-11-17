@@ -395,6 +395,21 @@ request shows Conditioned in the log, its detail names the profile and what it d
 rules, in `conditions.json`, and a profile passed to `installNetwork(conditions:)` is added once,
 by its `id`.
 
+### Network replay: resend a captured request
+
+A captured request's detail offers Resend, which sends it again as it was, and Edit and Resend,
+which opens its method, URL, headers and body to change first (the URL must be http or https with
+a host, and a GET or HEAD can't carry a body). A POST, PUT, PATCH, DELETE or any other method that
+isn't safe asks before it is sent, in place under the buttons; a GET, HEAD or OPTIONS is sent at
+once. The resent request goes through the plugin like any the app makes, so a mock rule can answer
+it and a conditioning profile can slow it, and it uses the app's default session configuration
+(its cookies and cache). It shows in the log as a new request marked Replay, whose detail names
+the request it resent ("Replay of GET /v1/greeting at 10:42:05") with a button that selects it;
+the original says how often it was resent. A resend that gets no answer says why in the
+original's detail, and `network.har` notes each replay's original. The mark stays inside the
+process: no header is added, so the server sees exactly the request shown. There is nothing to
+install beyond `installNetwork()`.
+
 ### Tweaks: the app's own debug settings
 
 The Tweaks plugin shows the settings the app declares: toggles, pickers over an enumeration or a
@@ -1282,7 +1297,7 @@ ContentView()
 | `DebugDrawerAccessibilityPlugin` | Runtime overrides of color scheme, Dynamic Type, layout direction, locale and the system accessibility settings SwiftUI exposes, each beside the system's value |
 | `DebugDrawerPerformancePlugin` | Live FPS and memory with sparkline graphs |
 | `DebugDrawerEnergyPlugin` | Battery level and charging, CPU load and thermal state |
-| `DebugDrawerNetworkPlugin` | URLProtocol HTTP interception: method, URL, status, timing, headers, body, cURL export, mock responses by rule, slow and failing networks per host |
+| `DebugDrawerNetworkPlugin` | URLProtocol HTTP interception: method, URL, status, timing, headers, body, cURL export, mock responses by rule, slow and failing networks per host, replay and edit-and-resend |
 | `DebugDrawerDiskIOPlugin` | FileManager reads, writes, deletes and listings, flagging main-thread I/O |
 | `DebugDrawerAppInfoPlugin` | Bundle, version, OS, memory, uptime, process, debugger, screen and reachability facts |
 | `DebugDrawerUserDefaultsPlugin` | Browse, search, edit, copy and delete UserDefaults keys |

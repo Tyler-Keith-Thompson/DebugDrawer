@@ -11,11 +11,13 @@
             case requests
             case mock(NetworkMockDraft)
             case condition(NetworkConditionDraft)
+            case resend(NetworkReplayDraft)
         }
 
         @ObservedObject private var store = NetworkStore.shared
         @ObservedObject private var mocks = NetworkMocksModel.shared
         @ObservedObject private var conditions = NetworkConditionsModel.shared
+        @ObservedObject private var replays = NetworkReplayModel.shared
         @ObservedObject private var drawer = DebugDrawer.shared
         @State private var selectedId: UUID?
         @State private var selectedRule: NetworkMockRule.ID?
@@ -50,6 +52,17 @@
                     }
                 )
                 .id(draft.id)
+            case let .resend(draft):
+                NetworkReplayEditor(
+                    draft: draft,
+                    cancel: { screen = .requests },
+                    send: { request in
+                        selectedId = draft.original
+                        screen = .requests
+                        Task { await replays.resend(request, replaying: draft.original) }
+                    }
+                )
+                .id(draft.id)
             }
         }
 
@@ -71,10 +84,17 @@
                     maxHeight: 300
                 ) {
                     ForEach(store.filteredEntries) { entry in
+                        let isSelected = selectedId == entry.id
                         NetworkRequestRow(
-                            entry: entry, redaction: drawer.redaction, isSelected: selectedId == entry.id,
-                            onSelect: { selectedId = selectedId == entry.id ? nil : entry.id },
-                            onMock: { screen = .mock(NetworkMockDraft(mocks.rule(mocking: $0), isNew: true)) }
+                            entry: entry, redaction: drawer.redaction, isSelected: isSelected,
+                            onSelect: { selectedId = isSelected ? nil : entry.id },
+                            onMock: { screen = .mock(NetworkMockDraft(mocks.rule(mocking: $0), isNew: true)) },
+                            onResend: { entry in Task { await replays.resend(entry) } },
+                            onEditAndResend: { screen = .resend(NetworkReplayDraft($0)) },
+                            onShow: { selectedId = $0 },
+                            // Only the open detail shows the links, so only its are worked out.
+                            links: isSelected ? NetworkReplayLinks(of: entry, in: store.entries) : .none,
+                            replayStatus: replays.statuses[entry.id]
                         )
                     }
                 }
@@ -137,6 +157,16 @@
         let onSelect: () -> Void
         /// Opens a new mock made from the request; `nil` offers no Mock This.
         var onMock: ((NetworkEntry) -> Void)?
+        /// Sends the request again, unchanged; `nil` offers no Resend.
+        var onResend: ((NetworkEntry) -> Void)?
+        /// Opens the request in the resend editor; `nil` offers no Edit and Resend.
+        var onEditAndResend: ((NetworkEntry) -> Void)?
+        /// Selects the request with the id, for the links to a replay's original and its replays.
+        var onShow: ((NetworkEntry.ID) -> Void)?
+        /// The requests this one is linked to by replay.
+        var links = NetworkReplayLinks.none
+        /// Where the last resend of this request stands, if one hasn't got its answer.
+        var replayStatus: NetworkReplayStatus?
         @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
         var body: some View {
@@ -159,7 +189,7 @@
                                     badges
                                 }
                             }
-                            if badgesOnOwnLine, entry.mockRuleName != nil || entry.conditionEffect != nil {
+                            if badgesOnOwnLine, badgeCount > 0 {
                                 HStack { badges }
                             }
                         }
@@ -180,7 +210,10 @@
                 .accessibilityAddTraits(isSelected ? .isSelected : [])
 
                 if isSelected {
-                    NetworkRequestDetail(entry: entry, redaction: redaction, onMock: onMock)
+                    NetworkRequestDetail(
+                        entry: entry, redaction: redaction, onMock: onMock, onResend: onResend, onEditAndResend: onEditAndResend,
+                        onShow: onShow, links: links, replayStatus: replayStatus
+                    )
                 }
             }
         }
@@ -202,14 +235,22 @@
         }
 
         /// Whether the badges take a line of their own: at accessibility text sizes, where they
-        /// would squeeze the status, and when both show, since two beside the method and status
-        /// leave the path a letter's width in a phone-wide drawer.
+        /// would squeeze the status, and when two or more show, since two beside the method and
+        /// status leave the path a letter's width in a phone-wide drawer.
         private var badgesOnOwnLine: Bool {
-            dynamicTypeSize.isAccessibilitySize || (entry.mockRuleName != nil && entry.conditionEffect != nil)
+            dynamicTypeSize.isAccessibilitySize || badgeCount > 1
         }
 
-        /// Mocked and Conditioned, for a request a mock answered or a profile conditioned.
+        private var badgeCount: Int {
+            [entry.replayOf != nil, entry.mockRuleName != nil, entry.conditionEffect != nil].count(where: \.self)
+        }
+
+        /// Replay, Mocked and Conditioned, for a request the drawer resent, a mock answered or a
+        /// profile conditioned.
         @ViewBuilder private var badges: some View {
+            if entry.replayOf != nil {
+                NetworkReplayBadge()
+            }
             if entry.mockRuleName != nil {
                 NetworkMockedBadge()
             }
@@ -234,137 +275,6 @@
             Text(entry.durationLabel)
                 .debugDrawerFont(.value)
                 .debugDrawerForegroundStyle(.tertiary)
-        }
-    }
-
-    /// A request in full: its URL, time, size and status, query parameters, timing, error, headers
-    /// and bodies, with a button to copy it as a cURL command. Values the redaction rules call
-    /// sensitive are masked in the copy, and on screen until revealed.
-    ///
-    /// A request a mock answered names the mock; any other offers Mock This once it is complete.
-    struct NetworkRequestDetail: View {
-        let entry: NetworkEntry
-        let redaction: DebugDrawerRedaction
-        /// Opens a new mock made from the request; `nil` offers no Mock This.
-        var onMock: ((NetworkEntry) -> Void)?
-
-        var body: some View {
-            VStack(alignment: .leading, spacing: 0) {
-                RedactedText(entry.url, redacted: redaction.redacting(url: entry.url))
-                    .debugDrawerFont(.code)
-                    .debugDrawerForegroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-
-                DebugDrawerKeyValueRow("Time", value: entry.durationLabel)
-                DebugDrawerKeyValueRow("Size", value: entry.responseSizeLabel)
-                if let code = entry.statusCode {
-                    DebugDrawerKeyValueRow("Status", value: String(code))
-                }
-                if let rule = entry.mockRuleName {
-                    DebugDrawerKeyValueRow("Mocked by", value: rule)
-                        .debugDrawerValueStyle(.text)
-                }
-                if let effect = entry.conditionEffect {
-                    DebugDrawerKeyValueRow("Conditioned by", value: effect.profileName)
-                        .debugDrawerValueStyle(.text)
-                    DebugDrawerKeyValueRow("Condition", value: effect.summary)
-                        .debugDrawerValueStyle(.text)
-                }
-
-                if let error = entry.error {
-                    DebugDrawerIssueRow("Request failed", severity: .error) {
-                        Text(error)
-                    }
-                }
-
-                // URL query parameters
-                if let urlObj = URL(string: entry.url),
-                   let components = URLComponents(url: urlObj, resolvingAgainstBaseURL: false),
-                   let queryItems = components.queryItems, !queryItems.isEmpty {
-                    collapsibleSection("Query Parameters") {
-                        ForEach(queryItems, id: \.name) { item in
-                            DebugDrawerKeyValueRow(
-                                item.name,
-                                value: item.value ?? "",
-                                redacted: redaction.redacting(item.value ?? "", forKey: item.name)
-                            )
-                        }
-                        .debugDrawerValueStyle(.code)
-                    }
-                }
-
-                if let metrics = entry.metrics {
-                    collapsibleSection("Timing") {
-                        NetworkTimingView(metrics: metrics)
-                    }
-                }
-
-                payload
-
-                DebugDrawerActionRow {
-                    DebugDrawerCopyButton("Copy cURL") { entry.curl(redaction: redaction) }
-                    if let onMock, entry.isComplete, entry.mockRuleName == nil {
-                        Button("Mock This") { onMock(entry) }
-                            .accessibilityLabel("Mock This")
-                            .accessibilityHint("Makes a mock that answers requests like this one with its response")
-                    }
-                }
-            }
-        }
-
-        @ViewBuilder
-        private var payload: some View {
-            if !entry.requestHeaders.isEmpty {
-                collapsibleSection("Request Headers") {
-                    headersView(entry.requestHeaders)
-                }
-            }
-
-            if let body = entry.requestBody, let pretty = body.prettyBody {
-                collapsibleSection("Request Body") {
-                    codeBlock(pretty, redacted: redaction.redacting(json: body).prettyBody ?? pretty)
-                }
-            }
-
-            if let headers = entry.responseHeaders, !headers.isEmpty {
-                collapsibleSection("Response Headers") {
-                    headersView(headers)
-                }
-            }
-
-            if let body = entry.responseBody, let pretty = body.prettyBody {
-                collapsibleSection("Response Body") {
-                    codeBlock(pretty, redacted: redaction.redacting(json: body).prettyBody ?? pretty)
-                }
-            }
-        }
-
-        private func collapsibleSection(_ title: String, @ViewBuilder content: @escaping () -> some View) -> some View {
-            DisclosureGroup {
-                VStack(alignment: .leading, spacing: 0) {
-                    content()
-                }
-            } label: {
-                Text(title)
-                    .debugDrawerFont(.heading)
-            }
-        }
-
-        @ViewBuilder
-        private func headersView(_ headers: [String: String]) -> some View {
-            ForEach(headers.keys.sorted(), id: \.self) { key in
-                let value = headers[key] ?? ""
-                DebugDrawerKeyValueRow(key, value: value, redacted: redaction.masksHeader(key) ? DebugDrawerRedaction.mask : value)
-            }
-            // A header's value is code even when it is a word ("gzip", "close").
-            .debugDrawerValueStyle(.code)
-        }
-
-        private func codeBlock(_ text: String, redacted: String) -> some View {
-            DebugDrawerCodeBlock {
-                RedactedText(text, redacted: redacted)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
         }
     }
 #endif

@@ -120,8 +120,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Installs Reset App State, which compiles in release too and does nothing there; launched with
         // -SeedResettableState, the app first writes state of every kind for it to clear.
         ExampleAppStateReset.install()
-        // Installs Network; launched with -SeedNetworkMock, it adds a mock that answers the
-        // Fetch Greeting button, and with -SeedNetworkCondition, a profile that slows example.com.
+        // Installs Network; launched with -SeedNetworkMock, it adds mocks that answer the
+        // Fetch Greeting and Place Order buttons, and with -SeedNetworkCondition, a profile that
+        // slows example.com.
         ExampleNetwork.install()
         installShippedPlugins()
 

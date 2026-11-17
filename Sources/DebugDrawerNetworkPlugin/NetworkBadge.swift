@@ -39,4 +39,11 @@
             NetworkBadge("Conditioned")
         }
     }
+
+    /// "Replay", beside the status of a request the drawer resent.
+    struct NetworkReplayBadge: View {
+        var body: some View {
+            NetworkBadge("Replay")
+        }
+    }
 #endif

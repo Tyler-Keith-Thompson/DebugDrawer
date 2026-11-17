@@ -7,10 +7,11 @@ import SwiftUI
 // share no code.
 
 /// The example's network calls: a greeting from an API that doesn't exist, which only a mock can
-/// answer, and example.com, which the network answers unless a mock is made for it.
+/// answer, example.com, which the network answers unless a mock is made for it, and an order
+/// POSTed to the same API, whose resend asks before it is sent.
 enum ExampleNetwork {
-    /// Launched with this argument, the app adds a mock that answers the greeting, so mocking can
-    /// be checked without a hand.
+    /// Launched with this argument, the app adds mocks that answer the greeting and the order, so
+    /// mocking can be checked without a hand.
     static let launchArgument = "-SeedNetworkMock"
     /// Launched with this argument, the app adds a profile that slows example.com by two seconds,
     /// and one, off, that fails the greeting with no connection, and pins Network to the HUD, so
@@ -20,6 +21,8 @@ enum ExampleNetwork {
     static let greeting = "https://api.example.com/v1/greeting"
     /// A real page, which reaches the network unless a mock matches it.
     static let page = "https://example.com/"
+    /// Orders are POSTed to the API that doesn't exist, so without a mock the request fails.
+    static let orders = "https://api.example.com/v1/orders"
 
     #if DEBUG
         /// The mock the launch argument adds. Its id is fixed, so it is added once and the drawer's
@@ -29,6 +32,14 @@ enum ExampleNetwork {
             name: "Greeting",
             matcher: .init(methods: ["GET"], host: .exact("api.example.com"), path: .wildcard("/v1/greeting*")),
             response: .init(status: 200, body: .text(#"{"message":"Hello from a mock"}"#), contentType: "application/json")
+        )
+
+        /// The mock the launch argument adds for the order, with a fixed id like the greeting's.
+        static let orderMock = NetworkMockRule(
+            id: UUID(uuidString: "9A3C5E71-4B2D-4F86-A1E9-6D7B8C0F2A35") ?? UUID(),
+            name: "Place order",
+            matcher: .init(methods: ["POST"], host: .exact("api.example.com"), path: .exact("/v1/orders")),
+            response: .init(status: 201, body: .text(#"{"id":7,"status":"placed"}"#), contentType: "application/json")
         )
 
         /// The profiles the condition argument adds, with fixed ids, so they are added once and the
@@ -57,7 +68,7 @@ enum ExampleNetwork {
     static func install() {
         #if DEBUG
             let arguments = ProcessInfo.processInfo.arguments
-            let mocks = arguments.contains(launchArgument) ? [greetingMock] : []
+            let mocks = arguments.contains(launchArgument) ? [greetingMock, orderMock] : []
             let conditions = arguments.contains(conditionArgument) ? conditionSeeds : []
             DebugDrawer.shared.installNetwork(mocks: mocks, conditions: conditions)
             if !conditions.isEmpty, !DebugDrawer.shared.hudLayout.pinned.contains(NetworkPlugin().id) {
@@ -70,10 +81,25 @@ enum ExampleNetwork {
     /// when.
     static func fetch(_ address: String) async -> String {
         guard let url = URL(string: address) else { return "Not a URL" }
+        return await send(URLRequest(url: url))
+    }
+
+    /// The status, the start of the body and the time of a POST of an order for tea, or why it
+    /// failed and when.
+    static func placeOrder() async -> String {
+        guard let url = URL(string: orders) else { return "Not a URL" }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = Data(#"{"item":"tea","quantity":1}"#.utf8)
+        return await send(request)
+    }
+
+    private static func send(_ request: URLRequest) async -> String {
         let clock = ContinuousClock()
         let start = clock.now
         do {
-            let (data, response) = try await URLSession.shared.data(from: url)
+            let (data, response) = try await URLSession.shared.data(for: request)
             let status = (response as? HTTPURLResponse)?.statusCode ?? 0
             let text = (String(bytes: data.prefix(80), encoding: .utf8) ?? "\(data.count) bytes")
                 .replacingOccurrences(of: "\n", with: " ")
@@ -90,10 +116,11 @@ enum ExampleNetwork {
     }
 }
 
-/// Buttons that fetch the greeting and example.com, each with what came back.
+/// Buttons that fetch the greeting and example.com and place an order, each with what came back.
 struct ExampleNetworkRequests: View {
     @State private var greeting = "Not fetched"
     @State private var page = "Not fetched"
+    @State private var order = "Not placed"
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -110,6 +137,12 @@ struct ExampleNetworkRequests: View {
                 .foregroundStyle(.secondary)
                 .lineLimit(2)
                 .accessibilityLabel("example.com response: \(page)")
+            Button("Place Order") {
+                Task { order = await ExampleNetwork.placeOrder() }
+            }
+            Text(order)
+                .foregroundStyle(.secondary)
+                .accessibilityLabel("Order response: \(order)")
         }
         .accessibilityElement(children: .contain)
     }

@@ -57,7 +57,8 @@
                 path: request.url?.path ?? "/",
                 requestHeaders: request.allHTTPHeaderFields ?? [:],
                 requestBody: body,
-                isComplete: false
+                isComplete: false,
+                replayOf: request.replayOf
             )
             entryId = entry.id
             startTime = CFAbsoluteTimeGetCurrent()
