@@ -28,6 +28,7 @@ import DebugDrawerBackgroundTasksPlugin
 import DebugDrawerAnalyticsPlugin
 import DebugDrawerLocalizationPlugin
 import DebugDrawerScreenRecordingPlugin
+import DebugDrawerDesignOverlayPlugin
 import SwiftUI
 
 /// Demonstrates Send Report without a server: "sends" each report by copying it into the app's
@@ -104,6 +105,10 @@ struct DebugDrawerExampleiOSApp: App {
         // Installs Screen Recording, which compiles in release too and does nothing there; launched
         // with -PinScreenRecordingToHUD, the app pins its Record button to the HUD.
         ExampleScreenRecording.install()
+        // Installs Design Overlay, which compiles in release too and does nothing there; launched
+        // with -DesignOverlaySample, the app shows a generated sample comp over itself and pins the
+        // plugin to the HUD.
+        ExampleDesignOverlay.install()
         #if DEBUG
             DebugDrawer.shared.installConsole()
             DebugDrawer.shared.installNetwork()
@@ -135,6 +140,8 @@ struct DebugDrawerExampleiOSApp: App {
                 // .debugDrawer(), so the drawer keeps its place.
                 .debugLocalization()
                 .debugAccessibilityOverrides()
+                // The design comp over the app, beneath .debugDrawer(), so the drawer stays above it.
+                .debugDesignOverlay()
                 .debugGrid()
                 .debugDrawer()
                 // Launched with -OpenDebugDrawer, the window opens with the drawer open, so it can

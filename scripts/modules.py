@@ -89,6 +89,7 @@ MODULES = [
     ("DebugDrawerDatabaseBrowserPlugin", "Plugins", "The app's SQLite, Core Data and SwiftData stores, opened read-only: tables or entities with row counts, rows paged and searched in a grid, and read-only SELECT queries, copied as CSV.", ["DebugDrawer"]),
     ("DebugDrawerLocalizationPlugin", "Plugins", "Pseudo-localization and show-keys modes over the strings the app looks up through Bundle's public API, live, and the translations missing for a language, grouped by table, searched and copied as text or CSV.", ["DebugDrawer"]),
     ("DebugDrawerScreenRecordingPlugin", "Plugins", "Records the app's windows as a QuickTime movie without the drawer, its HUD or its toasts, started and stopped from the drawer or the HUD, with optional touch indicators on iOS: the saved recordings to share or delete, and the newest in the bug report.", ["DebugDrawer"]),
+    ("DebugDrawerDesignOverlayPlugin", "Plugins", "A design mockup laid over the app's content, picked from Photos or Files on iOS or a file or the pasteboard on macOS: opacity, an offset set by steppers or by dragging in Move mode, the mockup's scale, and a difference blend that shows pixel drift; touches pass through to the app.", ["DebugDrawer"]),
 ]
 
 # Modules only iOS builds: SwiftUI views and what they draw with. Bazel builds them for the
@@ -122,7 +123,7 @@ EXTRA_PLATFORMS = {
 # beside each library compiles it for the IOS_MINIMUM Catalyst target triple instead. A module
 # listed here depends only on modules listed here, and on no C or Objective-C package, which that
 # rule would still build for macOS.
-CATALYST_MODULES = ["DebugDrawer", "DebugDrawerAnalyticsPlugin", "DebugDrawerDatabaseBrowserPlugin", "DebugDrawerLocalizationPlugin", "DebugDrawerScreenRecordingPlugin"]
+CATALYST_MODULES = ["DebugDrawer", "DebugDrawerAnalyticsPlugin", "DebugDrawerDatabaseBrowserPlugin", "DebugDrawerLocalizationPlugin", "DebugDrawerScreenRecordingPlugin", "DebugDrawerDesignOverlayPlugin"]
 
 # Executables: (name, description, dependencies). Each is an `.executableTarget` and product in
 # Package.swift and a swift_binary in Bazel (`bazel run //Sources/<name>`). Keep them thin: the
@@ -164,6 +165,7 @@ TEST_TARGETS = [
     ("DebugDrawerDatabaseBrowserPluginTests", ["DebugDrawerDatabaseBrowserPlugin", "DebugDrawer", "viewinspector/ViewInspector", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
     ("DebugDrawerLocalizationPluginTests", ["DebugDrawerLocalizationPlugin", "DebugDrawer", "viewinspector/ViewInspector", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
     ("DebugDrawerScreenRecordingPluginTests", ["DebugDrawerScreenRecordingPlugin", "DebugDrawer", "viewinspector/ViewInspector", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
+    ("DebugDrawerDesignOverlayPluginTests", ["DebugDrawerDesignOverlayPlugin", "DebugDrawer", "viewinspector/ViewInspector", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
 ]
 
 # The modules the test-support target depends on (fixtures are usually written against the
@@ -195,6 +197,7 @@ PERFORMANCE_TESTS = [
     "DebugDrawerDatabaseBrowserPluginTests",
     "DebugDrawerLocalizationPluginTests",
     "DebugDrawerScreenRecordingPluginTests",
+    "DebugDrawerDesignOverlayPluginTests",
 ]
 
 # Performance tests run up to their one-minute limits each, so their targets get "medium" (300 s).

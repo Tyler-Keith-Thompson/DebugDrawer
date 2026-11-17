@@ -307,8 +307,8 @@ DebugDrawer.shared.installLaunchTime()
 Each call needs its plugin's module imported (`import DebugDrawerConsolePlugin`, and so on).
 Tweaks takes the settings it shows and Feature Flags the adapter it reads, and Crash Reports,
 Hangs, Leaks, MetricKit, Permissions, Notifications, Background Tasks, Analytics, Databases,
-Localization and Screen Recording install outside `#if DEBUG`, so each has a section of its own,
-next.
+Localization, Screen Recording and Design Overlay install outside `#if DEBUG`, so each has a section
+of its own, next.
 
 ### Tweaks: the app's own debug settings
 
@@ -909,6 +909,48 @@ goes into the bug report's Screen Recording folder; any other can be added. The 
 app's layers hold when each frame is drawn, so an animation Core Animation runs on its own shows at
 its end, and Metal, video and web content may draw blank.
 
+### Design Overlay: the screen against the mockup
+
+The Design Overlay plugin lays a design comp over the running app, to catch pixel drift: at an
+opacity, an offset and a scale, normal or in a difference blend.
+
+```swift
+import DebugDrawerDesignOverlayPlugin
+
+struct ShopApp: App {
+    init() {
+        // At startup:
+        DesignOverlay.install()
+    }
+
+    var body: some Scene {
+        WindowGroup {
+            ContentView()
+                .debugDesignOverlay() // beneath .debugDrawer(), so the mockup lies under the drawer
+                .debugDrawer()
+        }
+    }
+}
+```
+
+`DesignOverlay` and `.debugDesignOverlay()` exist in every configuration and do nothing in
+release, so neither needs `#if DEBUG`. The mockup is picked in the drawer: from Photos or Files on
+iOS and Mac Catalyst, from a file or the pasteboard (an image, or an image file copied in the
+Finder) on macOS. Photos runs out of the app's process, so nothing asks for a permission. The
+mockup is kept in `Caches/DebugDrawer/DesignOverlay` with its settings, so it is there again on the
+next launch, until Clear. `DesignOverlay.install(mockup:)` takes an image's data instead, for a
+comp the app bundles or generates, shown for that launch without replacing the saved one.
+
+The mockup is drawn from the window's top-leading corner, under the safe area as a screen's mockup
+is: Automatic infers whether it was exported at @1x, @2x or @3x from its width against the window's,
+and Fit Width, @1x, @2x and @3x set it. Opacity runs from 5% to 100%, and Difference draws black
+where the app matches the mockup and bright where it drifts. The X and Y steppers move it a point at
+a time; with Move by Dragging on, a drag anywhere in the window moves it, and a bar at the bottom
+leading corner shows the offset and Done. Outside Move the mockup takes no touches or clicks, so the
+app under it keeps working. The plugin's header shows the opacity and blend, "Hidden" or "Moving",
+and its HUD readout (Show in HUD) hides and shows the mockup with the drawer closed, or ends Move.
+The mockup belongs to the app's content, so screenshots and screen recordings include it.
+
 ### Opening the drawer
 
 The drawer doesn't decide how it opens. Call `DebugDrawer.shared.toggle()` from whatever trigger
@@ -987,6 +1029,7 @@ menus.
 
 ```swift
 import DebugDrawerAccessibilityPlugin
+import DebugDrawerDesignOverlayPlugin
 import DebugDrawerLocalizationPlugin
 import DebugDrawerViewInspectorPlugin
 
@@ -994,6 +1037,7 @@ ContentView()
     .debugLocalization()            // redraws the app's text when the Localization mode changes
     .debugAccessibilityOverrides()  // environment overrides; must be above .debugDrawer()
     .debugGrid()                    // alignment grid, controlled from the View Inspector plugin
+    .debugDesignOverlay()           // the Design Overlay plugin's mockup, under the drawer
     .debugDrawer()
 ```
 
@@ -1032,6 +1076,7 @@ ContentView()
 | `DebugDrawerDatabaseBrowserPlugin` | The app's SQLite, Core Data and SwiftData stores, opened read-only: tables or entities with row counts, rows paged and searched in a grid, and read-only SELECT queries, copied as CSV |
 | `DebugDrawerLocalizationPlugin` | Pseudo-localization and show-keys modes over the strings the app looks up through Bundle, live, Apple's localization launch arguments to copy, and the translations missing for a language, grouped by table, searched and copied as text or CSV |
 | `DebugDrawerScreenRecordingPlugin` | The app's windows recorded as a QuickTime movie without the drawer, its HUD or its toasts, started and stopped from the drawer or the HUD, with touch indicators on iOS: the saved recordings to share or delete, and the newest in the bug report |
+| `DebugDrawerDesignOverlayPlugin` | A design mockup over the app's content, picked from Photos or Files on iOS or a file or the pasteboard on macOS: opacity, an offset set by steppers or by dragging in Move mode, the scale, and a difference blend that shows pixel drift; touches pass through to the app |
 
 ## Development
 

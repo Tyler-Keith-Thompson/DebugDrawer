@@ -28,6 +28,7 @@ import DebugDrawerNotificationsPlugin
 import DebugDrawerAnalyticsPlugin
 import DebugDrawerLocalizationPlugin
 import DebugDrawerScreenRecordingPlugin
+import DebugDrawerDesignOverlayPlugin
 import SwiftUI
 
 /// Demonstrates Send Report without a server: "sends" each report by copying it into the app's
@@ -106,6 +107,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Installs Screen Recording, which compiles in release too and does nothing there; launched
         // with -PinScreenRecordingToHUD, the app pins its Record button to the HUD.
         ExampleScreenRecording.install()
+        // Installs Design Overlay, which compiles in release too and does nothing there; launched
+        // with -DesignOverlaySample, the app shows a generated sample comp over itself and pins the
+        // plugin to the HUD.
+        ExampleDesignOverlay.install()
+        installShippedPlugins()
+
+        setupMenuBar()
+        createMainWindow()
+    }
+
+    /// The plugins installed with one call each, inside `#if DEBUG`; a function of its own to keep
+    /// launch short enough to read.
+    private func installShippedPlugins() {
         #if DEBUG
             DebugDrawer.shared.installConsole()
             DebugDrawer.shared.installNetwork()
@@ -128,9 +142,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             ExampleFeatureFlags.install()
             DebugDrawer.shared.reportUploader = FolderReportUploader()
         #endif
-
-        setupMenuBar()
-        createMainWindow()
     }
 
     func application(_: NSApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
@@ -300,6 +311,8 @@ struct ExampleContentView: View {
         // so the drawer keeps its place.
         .debugLocalization()
         .debugAccessibilityOverrides()
+        // The design comp over the app, beneath .debugDrawer(), so the drawer stays above it.
+        .debugDesignOverlay()
         .debugGrid()
         .debugDrawer()
         // Launched with -OpenDebugDrawer, the window opens with the drawer open, so it can be
