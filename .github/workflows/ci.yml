@@ -1,0 +1,80 @@
+# Bazel and SwiftPM tests on macOS, and the SwiftPM tests on an iOS simulator.
+#
+# Started by hand only (Actions > CI > Run workflow, or `gh workflow run ci.yml --ref <branch>`):
+# macOS runners bill at ten times Linux minutes and a full run takes most of an hour, so the
+# owner chose a manual trigger over running on every push and pull request.
+#
+# A failing snapshot fails its step. SnapshotTesting writes each failure's reference, the new
+# image and their difference to SNAPSHOT_ARTIFACTS (TEST_RUNNER_SNAPSHOT_ARTIFACTS through
+# xcodebuild), and the last step uploads that folder with Bazel's test logs. Bazel's sandbox keeps
+# its own copies of those images, so the SwiftPM steps, which compare against the same references,
+# run even after Bazel fails, and supply the images.
+name: CI
+
+on:
+  workflow_dispatch:
+    inputs:
+      runner:
+        description: Runner image (needs Xcode with Swift 6.3 or later)
+        default: macos-26
+      ios-destination:
+        description: xcodebuild destination for the iOS simulator tests
+        default: platform=iOS Simulator,name=iPad Pro 13-inch (M5)
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ${{ inputs.runner }}
+    timeout-minutes: 120
+    env:
+      SNAPSHOT_ARTIFACTS: ${{ github.workspace }}/.build/snapshot-artifacts
+      IOS_DESTINATION: ${{ inputs.ios-destination }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select the newest Xcode
+        run: |
+          xcode="$(ls -d /Applications/Xcode_*.app | sort -V | tail -1)"
+          sudo xcode-select -s "$xcode/Contents/Developer"
+          xcrun swift --version
+
+      - name: Install just
+        run: brew install just
+
+      # tools/bazel reads the key from the Keychain on a Mac; CI writes it to the gitignored
+      # user.bazelrc instead, which .bazelrc imports. Without the secret, Bazel builds uncached.
+      - name: BuildBuddy cache
+        env:
+          BUILDBUDDY_API_KEY: ${{ secrets.BUILDBUDDY_API_KEY }}
+        if: env.BUILDBUDDY_API_KEY != ''
+        run: |
+          sed "s/YOUR_KEY_HERE/$BUILDBUDDY_API_KEY/" user.bazelrc.example > user.bazelrc
+
+      - name: Bazel (lint, then every test)
+        id: bazel
+        run: just test
+
+      - name: SwiftPM (macOS)
+        if: ${{ !cancelled() }}
+        run: just test-spm
+
+      - name: SwiftPM (iOS simulator)
+        if: ${{ !cancelled() }}
+        run: just test-ios TEST_RUNNER_SNAPSHOT_ARTIFACTS="$SNAPSHOT_ARTIFACTS"
+
+      - name: Upload snapshot diffs and test logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-failures
+          path: |
+            .build/snapshot-artifacts/
+            bazel-testlogs/**/test.log
+            bazel-testlogs/**/test.outputs/
+          if-no-files-found: ignore

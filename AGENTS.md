@@ -227,8 +227,11 @@ Watch for these:
 Push finished work to `main` yourself; don't wait to be asked, and never end a task with
 finished commits unpushed. Push once per batch: when the work the owner gave you is done (the
 whole request, or Ready is empty when working the backlog), push everything it produced together.
-There is no CI, so nothing checks a push but you: verify the committed state in a clean worktree
-first, `bazel test //...` in debug, then `--config=release`, then `just spm-test`.
+CI (`.github/workflows/ci.yml`) runs only when started by hand (`gh workflow run ci.yml --ref
+<branch>`), so nothing checks a push but you: verify the committed state in a clean worktree
+first, `bazel test //...` in debug, then `--config=release`, then `just spm-test`. The workflow
+runs `just test`, `just test-spm` and `just test-ios` on a macOS runner and uploads failing
+snapshots' diffs; it reads BuildBuddy's key from the `BUILDBUDDY_API_KEY` secret.
 
 ## House rules
 
