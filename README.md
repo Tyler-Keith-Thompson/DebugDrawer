@@ -309,6 +309,46 @@ Browser, UserDefaults, Localization, Screen Recording, Design Overlay, Color Vis
 State install outside `#if DEBUG`, so each has a section of its own, after Network's mocks and
 conditions.
 
+### Deep links: universal links and user activities
+
+Opening an https URL goes to the browser, so a universal link, a Handoff or a Spotlight result
+can't be tested by opening a URL. The Deep Link Tester continues one in the app instead, as the
+system does: an https URL in the field is sent as an `NSUserActivity` of type
+`NSUserActivityTypeBrowsingWeb` with that `webpageURL`, and Activity mode sends an activity of the
+app's own type with a userInfo of strings, numbers and Booleans. Sent activities are listed apart
+from the URLs opened, and a tap puts one back in the form.
+
+A SwiftUI app's `onContinueUserActivity` has no public entry point, so a SwiftUI app passes the
+plugin the code that handles an activity:
+
+```swift
+import DebugDrawerDeepLinkPlugin
+import Foundation
+
+/// The app's router: `onContinueUserActivity` hands it the activities the system continues.
+@MainActor
+final class Router {
+    private(set) var path: [String] = []
+
+    func handle(_ activity: NSUserActivity) {
+        if let url = activity.webpageURL {
+            path.append(url.path)
+        }
+    }
+}
+
+let router = Router()
+
+#if DEBUG
+DebugDrawer.shared.installDeepLink(continueUserActivity: router.handle)
+#endif
+```
+
+Without a handler, an activity goes where the system sends it in a UIKit or AppKit app: on iOS,
+the first window scene delegate with `scene(_:continue:)`, else the app delegate's
+`application(_:continue:restorationHandler:)`; on the Mac, the app delegate's. When the app has
+none of these, the plugin says so rather than dropping the activity.
+
 ### Console sessions: logs from earlier launches
 
 The lines logged during a launch, or just before a crash, are kept on disk, so the next launch can
@@ -1504,7 +1544,7 @@ ContentView()
 | `DebugDrawerFileBrowserPlugin` | The app's Documents, Library, tmp, bundle and app group containers, with folder totals and dates, previews of text, JSON, property lists and images, and files imported, renamed, deleted and shared, the bundle read-only |
 | `DebugDrawerLocationPlugin` | Spoofed CLLocationManager coordinates: presets and a custom latitude and longitude |
 | `DebugDrawerLoadedLibrariesPlugin` | Every loaded image, grouped as app, third-party and system, with UUIDs and load addresses |
-| `DebugDrawerDeepLinkPlugin` | Opens deep links and keeps a history of them |
+| `DebugDrawerDeepLinkPlugin` | Opens URLs, continues universal links and activities of the app's own type with their userInfo in the app, and keeps a history of each |
 | `DebugDrawerCookiesPlugin` | Browse, search and delete HTTPCookieStorage cookies |
 | `DebugDrawerLaunchTimePlugin` | Pre-main, app-init-to-first-frame and total launch time |
 | `DebugDrawerTweaksPlugin` | The app's own debug settings: toggles, pickers, text fields, steppers and actions, in sections, read through typed accessors |

@@ -132,6 +132,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Launched with -WebSocketEchoServer, starts a WebSocket echo server on 127.0.0.1 for the
         // WebSocket buttons.
         ExampleWebSocketServer.startIfAsked()
+        // Installs the Deep Link Tester with a handler that records each activity, shown in the
+        // window as the last continued activity.
+        ExampleDeepLink.install()
         installShippedPlugins()
 
         setupMenuBar()
@@ -153,7 +156,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             DebugDrawer.shared.installKeychain()
             DebugDrawer.shared.installLocation()
             DebugDrawer.shared.installLoadedLibraries()
-            DebugDrawer.shared.installDeepLink()
             DebugDrawer.shared.installCookies()
             DebugDrawer.shared.installLaunchTime()
             ExampleTweaks.install()
@@ -302,6 +304,9 @@ struct ExampleContentView: View {
                     // Network logs each request; a mock answers the greeting, which no server does.
                     ExampleNetworkRequests()
                     ExampleWebSocketDemo()
+                        .frame(maxWidth: 480)
+                    // The Deep Link Tester's universal links and activities, as the app receives them.
+                    ExampleContinuedActivityRow()
                         .frame(maxWidth: 480)
 
                 }

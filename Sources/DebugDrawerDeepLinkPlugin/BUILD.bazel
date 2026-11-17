@@ -3,7 +3,7 @@
 load("//tools:docc.bzl", "docc_archive")
 load("//tools:swift_rules.bzl", "swift_library")
 
-# Opens deep links and keeps a history of them.
+# Opens deep links, continues universal links and user activities, and keeps a history of them.
 swift_library(
     name = "DebugDrawerDeepLinkPlugin",
     srcs = glob(["**/*.swift"]),

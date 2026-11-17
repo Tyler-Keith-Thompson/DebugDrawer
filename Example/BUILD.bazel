@@ -89,6 +89,34 @@ ios_application(
     visibility = ["//visibility:public"],
 )
 
+# ── iOS, UIKit ───────────────────────────────────────────────────────
+# A UIKit app with its own scene delegate, and the Deep Link Tester installed with no handler, so
+# an activity it sends goes to the scene delegate's scene(_:continue:).
+
+swift_library(
+    name = "ExampleAppLib_iOSUIKit",
+    srcs = glob(["iOSUIKit/*.swift"]),
+    module_name = "ExampleApp_iOSUIKit",
+    # UIKit alone: `bazel build //...` builds the library only through the app below, for the iOS
+    # simulator, and skips it on the Mac.
+    target_compatible_with = ["@platforms//os:ios"],
+    deps = [
+        "//Sources/DebugDrawer",
+        "//Sources/DebugDrawerDeepLinkPlugin",
+    ],
+)
+
+ios_application(
+    name = "ExampleApp_iOSUIKit",
+    bundle_id = "com.debugdrawer.example.uikit",
+    bundle_name = "DebugDrawerUIKitExample",
+    families = ["iphone", "ipad"],
+    infoplists = ["iOSUIKit/Info.plist"],
+    minimum_os_version = "17.0",
+    deps = [":ExampleAppLib_iOSUIKit"],
+    visibility = ["//visibility:public"],
+)
+
 # ── visionOS ─────────────────────────────────────────────────────────
 # Core alone: no plugin builds for visionOS yet (EXTRA_PLATFORMS in scripts/modules.py), so the
 # app registers plugins of its own.

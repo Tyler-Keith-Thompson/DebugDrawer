@@ -133,6 +133,9 @@ struct DebugDrawerExampleiOSApp: App {
         // Launched with -WebSocketEchoServer, starts a WebSocket echo server on 127.0.0.1 for the
         // WebSocket buttons.
         ExampleWebSocketServer.startIfAsked()
+        // Installs the Deep Link Tester with a handler that records each activity, shown under
+        // Deep Links.
+        ExampleDeepLink.install()
         installShippedPlugins()
     }
 
@@ -151,7 +154,6 @@ struct DebugDrawerExampleiOSApp: App {
             DebugDrawer.shared.installKeychain()
             DebugDrawer.shared.installLocation()
             DebugDrawer.shared.installLoadedLibraries()
-            DebugDrawer.shared.installDeepLink()
             DebugDrawer.shared.installCookies()
             DebugDrawer.shared.installLaunchTime()
             ExampleTweaks.install()
@@ -272,6 +274,11 @@ struct ExampleContentView_iOS: View {
                 // reaches it.
                 Section("Location") {
                     ExampleLocationReadout()
+                }
+
+                // The Deep Link Tester's universal links and activities, as the app receives them.
+                Section("Deep Links") {
+                    ExampleContinuedActivityRow()
                 }
 
                 // Colors the Color Vision plugin simulates.
