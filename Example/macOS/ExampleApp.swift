@@ -323,6 +323,8 @@ struct ExampleContentView: View {
                     Button("Crash the App", role: .destructive) { ExampleCrash.crash() }
                     // Hangs reports the stall with its stack and a toast.
                     Button("Block the Main Thread for 500 ms") { ExampleHang.blockMainThread() }
+                    // Performance lists the busy thread at the top of its Threads.
+                    ExampleBusyThreadRow()
                     // Leaks flags the sheet once it is closed, with a toast.
                     Button("Open a Leaking Screen") { ExampleLeak.presentLeakingScreen() }
                     // MetricKit lists the samples, clearly named as such: MetricKit itself delivers nothing

@@ -276,6 +276,15 @@ struct ExampleContentView_iOS: View {
                     ExampleLocationReadout()
                 }
 
+                // Performance lists the busy thread at the top of its Threads; its Simulate Memory
+                // Warning reaches the app's own observer.
+                Section("Performance") {
+                    ExampleBusyThreadRow()
+                    #if canImport(UIKit)
+                        ExampleMemoryWarningReadout()
+                    #endif
+                }
+
                 // The Deep Link Tester's universal links and activities, as the app receives them.
                 Section("Deep Links") {
                     ExampleContinuedActivityRow()

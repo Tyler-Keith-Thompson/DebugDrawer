@@ -1533,7 +1533,7 @@ ContentView()
 | `DebugDrawerConsolePlugin` | `os_log` entries (stdout and stderr on macOS): level filter, text or regular-expression search, subsystem and category mutes, time range, auto-follow, copy, lines kept across launches |
 | `DebugDrawerViewInspectorPlugin` | View borders by depth, alignment grid, click indicators, animation speed, SwiftUI render tracking, hierarchy snapshot |
 | `DebugDrawerAccessibilityPlugin` | Runtime overrides of color scheme, Dynamic Type, layout direction, locale and the system accessibility settings SwiftUI exposes, each beside the system's value |
-| `DebugDrawerPerformancePlugin` | Live FPS and memory with sparkline graphs |
+| `DebugDrawerPerformancePlugin` | Live FPS and memory with sparkline graphs, CPU per thread, and a simulated memory warning |
 | `DebugDrawerEnergyPlugin` | Battery level and charging, CPU load and thermal state |
 | `DebugDrawerNetworkPlugin` | URLProtocol HTTP interception: method, URL, status, timing, headers, body, cURL export, mock responses by rule, slow and failing networks per host, replay and edit-and-resend, HAR export and import, WebSocket frames, requests kept across launches, ignored hosts, GraphQL operation names |
 | `DebugDrawerDiskIOPlugin` | FileManager reads, writes, deletes and listings, flagging main-thread I/O |

@@ -22,20 +22,26 @@
         @Published var isMonitoring = false
         /// The display's highest refresh rate, read when monitoring starts.
         @Published var maximumFPS = 60
+        /// The process's threads, busiest first, sampled with the rest each second.
+        @Published var threads: [ThreadCPU] = []
 
         private var displayLink: CADisplayLink?
         private var frameCount = 0
         private var lastFPSTime: CFTimeInterval = 0
         private var cancellable: AnyCancellable?
         private let historySize = 60
+        private let threadSampler: any ThreadSampler
 
-        private init() {}
+        private init() {
+            // The monitor is made on the main actor, so this is the main thread's ID.
+            threadSampler = MachThreadSampler(mainThreadID: MachThreadSampler.currentThreadID())
+        }
 
         func start() {
             guard !isMonitoring else { return }
             isMonitoring = true
 
-            // Memory + FPS history sampled every second via Timer
+            // Memory, FPS history and threads sampled every second via Timer
             cancellable = Timer.publish(every: 1, on: .main, in: .common)
                 .autoconnect()
                 .sink { [weak self] _ in self?.sample() }
@@ -99,6 +105,8 @@
             footprintMB = MemoryFootprint.currentMB()
             footprintHistory.append(footprintMB)
             if footprintHistory.count > historySize { footprintHistory.removeFirst() }
+
+            threads = threadSampler.sample()
         }
     }
 
@@ -139,7 +147,12 @@
                         footprintHistory: monitor.footprintHistory,
                         physicalMemoryMB: PerformanceMonitor.physicalMemoryMB
                     )
+                    ThreadsSection(threads: monitor.threads)
                 }
+                // UIKit's platforms only: the Mac has no public way to simulate memory pressure.
+                #if os(iOS) || os(tvOS) || os(visionOS)
+                    MemoryWarningSection { MemoryWarningSimulator().post() }
+                #endif
             }
         }
     }
