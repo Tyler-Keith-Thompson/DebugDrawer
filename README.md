@@ -416,6 +416,76 @@ and Unmute; a time range says so the same way. The `.*` toggle beside the search
 search as a regular expression (`NSRegularExpression`, ignoring case); while the text isn't one, the
 field says so and the list keeps the last valid search.
 
+### Console: your own logger
+
+A logger that writes through swift-log, CocoaLumberjack or code of the app's own never reaches
+os_log or stdout, so the Console can't capture its lines. Send them to `ConsoleLogSink` instead,
+from any thread:
+
+```swift
+import DebugDrawerConsolePlugin
+
+ConsoleLogSink.log(
+    level: .error, message: "Payment declined", metadata: ["order": "1042"],
+    subsystem: "com.example.shop", category: "checkout"
+)
+```
+
+The line shows its metadata after its text as quiet `key=value` fields (`order=1042`), under it at
+accessibility text sizes, and the search matches metadata keys and values as it does the text. The
+subsystem and category show and mute like an os_log line's; Copy All, the bug report and the
+sessions on disk keep the metadata. `ConsoleLogSink` exists in release builds too, where `log` does
+nothing and evaluates none of its arguments, so the bridge needs no `#if DEBUG`.
+
+The plugin depends on no logging package; the app writes the bridge. For swift-log, a `LogHandler`
+that passes each entry on, with the logger's label as the subsystem and the module that logged it
+as the category:
+
+```swift
+import DebugDrawerConsolePlugin
+import Logging
+
+/// Sends each swift-log entry to the Console: the label as the subsystem, the module that logged
+/// it as the category, and the handler's and the entry's metadata as key/value fields.
+struct ConsoleLogHandler: LogHandler {
+    let label: String
+    var logLevel: Logger.Level = .trace
+    var metadata: Logger.Metadata = [:]
+
+    subscript(metadataKey key: String) -> Logger.Metadata.Value? {
+        get { metadata[key] }
+        set { metadata[key] = newValue }
+    }
+
+    func log(event: LogEvent) {
+        let merged = metadata.merging(event.metadata ?? [:]) { _, logged in logged }
+        ConsoleLogSink.log(
+            level: ConsoleLogSink.Level(event.level),
+            message: event.message.description,
+            metadata: merged.mapValues(\.description),
+            subsystem: label,
+            category: event.source
+        )
+    }
+}
+
+extension ConsoleLogSink.Level {
+    init(_ level: Logger.Level) {
+        switch level {
+        case .trace, .debug: self = .debug
+        case .info: self = .info
+        case .notice: self = .notice
+        case .warning, .error: self = .error
+        case .critical: self = .fault
+        }
+    }
+}
+
+LoggingSystem.bootstrap { label in
+    MultiplexLogHandler([StreamLogHandler.standardError(label: label), ConsoleLogHandler(label: label)])
+}
+```
+
 ### Network mocks: canned responses without changing the server
 
 The Network plugin can answer requests itself. A mock rule matches requests by method, host, path
@@ -1553,7 +1623,7 @@ ContentView()
 | Module | Holds |
 |---|---|
 | `DebugDrawer` | The drawer: its window, the plugin protocol and registry, the views plugins are built from, and release-build stand-ins |
-| `DebugDrawerConsolePlugin` | `os_log` entries (stdout and stderr on macOS): level filter, text or regular-expression search, subsystem and category mutes, time range, auto-follow, copy, lines kept across launches |
+| `DebugDrawerConsolePlugin` | `os_log` entries (stdout and stderr on macOS) and an app logger's lines through `ConsoleLogSink`, with metadata: level filter, text or regular-expression search, subsystem and category mutes, time range, auto-follow, copy, lines kept across launches |
 | `DebugDrawerViewInspectorPlugin` | View borders by depth, alignment grid, click indicators, animation speed, SwiftUI render tracking, hierarchy snapshot |
 | `DebugDrawerAccessibilityPlugin` | Runtime overrides of color scheme, Dynamic Type, layout direction, locale and the system accessibility settings SwiftUI exposes, each beside the system's value |
 | `DebugDrawerPerformancePlugin` | Live FPS and memory with sparkline graphs, CPU per thread, and a simulated memory warning |

@@ -283,6 +283,9 @@ struct ExampleContentView: View {
                         Button("Print") { print("Counter: \(counter)") }
                         Button("Log") { ExampleConsole.logSubsystems(counter) }
                             .accessibilityLabel("Log from Two Subsystems")
+                        // The app's own logger reaches the Console through ConsoleLogSink, with metadata.
+                        Button("App Logger") { ExampleLogger.logPaymentDeclined(counter) }
+                            .accessibilityHint("Logs a declined payment, with metadata, through the app's own logger")
                         Button("Reset") {
                             counter = 0
                             ExampleAnalytics.trackCounter("reset", value: counter)

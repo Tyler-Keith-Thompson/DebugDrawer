@@ -2,7 +2,8 @@
     import Foundation
 
     /// What the search field asks of a line: nothing, text it contains, or a regular expression it
-    /// matches, ignoring case either way. A line matches when its text, subsystem or category does.
+    /// matches, ignoring case either way. A line matches when its text, subsystem, category, or a
+    /// metadata key or value does.
     ///
     /// The pattern is compiled once, when the search changes, rather than for each line it's
     /// matched against.
@@ -42,13 +43,21 @@
             }
         }
 
-        /// Whether `line`'s text, subsystem or category matches.
+        /// Whether `line`'s text, subsystem, category, or a metadata key, value or `key=value` field
+        /// matches.
         func matches(_ line: LogLine) -> Bool {
             switch self {
             case .all: true
-            case let .text(query): [line.text, line.subsystem, line.category].contains { $0.range(of: query, options: .caseInsensitive) != nil }
-            case let .pattern(pattern): [line.text, line.subsystem, line.category].contains { pattern.finds(in: $0) }
+            case let .text(query): line.searchedFields.contains { $0.range(of: query, options: .caseInsensitive) != nil }
+            case let .pattern(pattern): line.searchedFields.contains { pattern.finds(in: $0) }
             }
+        }
+    }
+
+    extension LogLine {
+        /// What a search looks in: the text, subsystem and category, then the metadata.
+        fileprivate var searchedFields: [String] {
+            [text, subsystem, category] + searchableMetadata
         }
     }
 

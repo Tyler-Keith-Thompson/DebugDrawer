@@ -9,7 +9,8 @@
     // is the time in the tertiary color, the issue glyph for an error or fault (drawn from the
     // drawer's own `DebugDrawerIssueGlyph`, so it matches every other plugin's), the subsystem and
     // category, short and in the tertiary color, and the text in the drawer's monospaced code
-    // type, debug lines dimmed. The view is clear and sits in a `DebugDrawerCodeBlock`, which
+    // type, debug lines dimmed, then the metadata an app's logger attached as `key=value` fields in
+    // the tertiary color. The view is clear and sits in a `DebugDrawerCodeBlock`, which
     // gives it the panel's well. A line's context menu (the edit menu on iOS) mutes its subsystem
     // or category, or shows the lines from it on.
 
@@ -153,6 +154,14 @@
                         .font: font,
                         .foregroundColor: line.level == .debug ? NSColor.secondaryLabelColor : NSColor.labelColor
                     ]))
+
+                    // The Mac doesn't scale text, so the fields always follow the text on its line.
+                    if let metadata = line.shownMetadata {
+                        result.append(NSAttributedString(string: " " + metadata, attributes: [
+                            .font: font,
+                            .foregroundColor: NSColor.tertiaryLabelColor
+                        ]))
+                    }
                 }
                 return ConsoleDrawnText(string: result, starts: starts)
             }
@@ -329,6 +338,13 @@
                         .font: fonts.code,
                         .foregroundColor: line.level == .debug ? UIColor.secondaryLabel : UIColor.label
                     ]))
+
+                    if let metadata = line.shownMetadata {
+                        result.append(NSAttributedString(string: fonts.metadataSeparator + metadata, attributes: [
+                            .font: fonts.code,
+                            .foregroundColor: UIColor.tertiaryLabel
+                        ]))
+                    }
                 }
                 return ConsoleDrawnText(string: result, starts: starts)
             }

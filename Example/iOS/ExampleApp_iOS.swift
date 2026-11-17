@@ -231,6 +231,8 @@ struct ExampleContentView_iOS: View {
 
                     // Console shows each line's subsystem and category, and can mute either.
                     Button("Log from Two Subsystems") { ExampleConsole.logSubsystems(counter) }
+                    // The app's own logger reaches the Console through ConsoleLogSink, with metadata.
+                    Button("Log Through App Logger") { ExampleLogger.logPaymentDeclined(counter) }
                     Button("Show Sheet") {
                         isShowingSheet = true
                         ExampleAnalytics.track("sheet_shown")

@@ -9,7 +9,7 @@
     struct ConsoleFilter: Equatable {
         /// The lowest level shown.
         var level = LogLine.Level.debug
-        /// What a line's text, subsystem or category must match.
+        /// What a line's text, subsystem, category or metadata must match.
         var search = ConsoleSearch.all
         /// The subsystems and categories hidden, in the order they were muted.
         var mutes: [ConsoleMute] = []

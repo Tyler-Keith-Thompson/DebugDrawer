@@ -26,6 +26,7 @@ the entry becomes the GitHub release's notes.
 - DD-44: Network hides hosts on an ignore list and shows GraphQL operation names.
 - DD-45: Console keeps its lines on disk and shows earlier launches as Previous.
 - DD-46: Console shows subsystem and category, mutes them, searches by regular expression and limits to a time range.
+- DD-47: Console takes lines from an app's own logger (swift-log, CocoaLumberjack) through `ConsoleLogSink`, a no-op in release, and shows, searches and keeps their key/value metadata (`LogLine.metadata`, `LogLine.Source.sink`).
 - DD-48: File Browser shows Documents, Library, tmp, the app bundle and app groups, with previews, sizes, dates and import.
 - DD-49: UserDefaults shows app group suites, adds and edits keys of every property list type, and follows the app's writes.
 - DD-50: Keychain filters by access group, shows every attribute, adds and edits generic passwords, and lists certificates and keys.

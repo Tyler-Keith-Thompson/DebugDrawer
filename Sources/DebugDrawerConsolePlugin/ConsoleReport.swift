@@ -32,12 +32,14 @@
 
     extension [LogLine] {
         /// The lines as Copy All copies them: time (`HH:mm:ss.SSS`, local), level badge, the
-        /// subsystem and category in full (`[com.example.shop/networking]`) and text, one per line.
+        /// subsystem and category in full (`[com.example.shop/networking]`), text and any metadata
+        /// (`order=1042 user=7`), one per line.
         var copiedText: String {
             map { line in
                 let time = LogLine.copyDateFormatter.string(from: line.timestamp)
                 let badge = line.level.label.map { $0 + " " } ?? ""
-                return "\(time) \(badge)\(line.copiedOrigin)\(line.text)"
+                let metadata = line.shownMetadata.map { " " + $0 } ?? ""
+                return "\(time) \(badge)\(line.copiedOrigin)\(line.text)\(metadata)"
             }.joined(separator: "\n")
         }
     }

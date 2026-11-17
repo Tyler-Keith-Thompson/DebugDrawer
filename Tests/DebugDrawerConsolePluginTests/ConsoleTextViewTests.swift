@@ -30,6 +30,31 @@
             #expect(actual == ["feed/networking Timed out", "printed"])
         }
 
+        @Test("A line from the sink shows its metadata as key=value fields after its text, in the tertiary color")
+        func rowShowsMetadata() throws {
+            func textView(in view: NSView) -> NSTextView? {
+                view as? NSTextView ?? view.subviews.lazy.compactMap(textView(in:)).first
+            }
+            let time = Date(timeIntervalSince1970: 1_800_000_000)
+            let lines = [
+                LogLine(
+                    timestamp: time, text: "Payment declined", source: .sink, level: .info, subsystem: "com.example.shop",
+                    metadata: ["user": "7", "order": "1042"]
+                )
+            ]
+            let host = NSHostingView(rootView: ConsoleTextView(lines: lines, isFollowing: .constant(false)).frame(width: 316, height: 120))
+            let window = NSWindow(contentRect: CGRect(x: 0, y: 0, width: 316, height: 120), styleMask: .borderless, backing: .buffered, defer: true)
+            window.contentView = host
+            host.layoutSubtreeIfNeeded()
+            let storage = try #require(textView(in: host)?.textStorage)
+
+            let actual = storage.string.split(separator: " ", maxSplits: 1)[1]
+            let color = storage.attribute(.foregroundColor, at: storage.length - 1, effectiveRange: nil) as? NSColor
+
+            #expect(actual == "shop Payment declined order=1042 user=7")
+            #expect(color == NSColor.tertiaryLabelColor)
+        }
+
         @Test("After a filter drops lines and others arrive, the text shows exactly the new list")
         func filterChangeRedraws() throws {
             func textView(in view: NSView) -> NSTextView? {

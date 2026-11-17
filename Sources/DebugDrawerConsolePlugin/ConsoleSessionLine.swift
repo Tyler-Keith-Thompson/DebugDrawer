@@ -10,7 +10,7 @@
         var time: String
         /// `debug`, `info`, `notice`, `error` or `fault`.
         var level: String
-        /// `stdout`, `stderr` or `oslog`.
+        /// `stdout`, `stderr`, `oslog` or `sink`.
         var source: String
         /// What was logged.
         var text: String
@@ -19,6 +19,10 @@
         var subsystem: String?
         /// The os_log category; left out and read like `subsystem`.
         var category: String?
+        /// The key/value fields an app's logger attached through the sink; left out when there are
+        /// none, and read as none when absent, as in a file an earlier build wrote. The format
+        /// stays the same: a build that doesn't know the key ignores it.
+        var metadata: [String: String]?
     }
 
     extension ConsoleSessionLine {
@@ -30,7 +34,8 @@
                 source: line.source.rawValue,
                 text: line.text,
                 subsystem: line.subsystem.isEmpty ? nil : line.subsystem,
-                category: line.category.isEmpty ? nil : line.category
+                category: line.category.isEmpty ? nil : line.category,
+                metadata: line.metadata.isEmpty ? nil : line.metadata
             )
         }
 
@@ -40,7 +45,8 @@
                   let level = LogLine.Level(name: level),
                   let source = LogLine.Source(rawValue: source) else { return nil }
             return LogLine(
-                timestamp: timestamp, text: text, source: source, level: level, subsystem: subsystem ?? "", category: category ?? ""
+                timestamp: timestamp, text: text, source: source, level: level, subsystem: subsystem ?? "", category: category ?? "",
+                metadata: metadata ?? [:]
             )
         }
     }
