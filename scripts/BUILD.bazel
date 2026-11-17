@@ -1,0 +1,11 @@
+# The repository's scripts. scripts/modules.py writes no file here.
+
+load("//tools:python_test.bzl", "python_test")
+
+# The gates `just deploy` passes before tagging (scripts/release.py).
+python_test(
+    name = "release_test",
+    size = "small",
+    src = "release_test.py",
+    data = ["release.py"],
+)

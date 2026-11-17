@@ -199,20 +199,47 @@ run target="macOS" *args="":
             ;;
     esac
 
-[doc('Release origin/main as a new version: verify, tag it, push only the tag and create the GitHub release; runs from any worktree whose HEAD is origin/main, e.g. just deploy minor')]
-deploy bump="patch":
+# Before anything slow, the release gates (scripts/release.py): CHANGELOG.md must have an entry for
+# the new version, and the public API must not break the last tag's (SwiftPM's
+# diagnose-api-breaking-changes) unless the bump is major or `allow-breaking` is given. The owner
+# releases patch bumps, so a patch that knowingly carries a break says so on the command line,
+# where it is visible and never left set in a shell; the breaks it allows are listed in the
+# release notes. `dry-run` runs only the gates, on the working tree, and prints the notes.
+[doc('Release origin/main as a new version: check CHANGELOG.md and the public API, verify, tag it, push only the tag and create the GitHub release; runs from any worktree whose HEAD is origin/main, e.g. just deploy, just deploy patch allow-breaking, just deploy patch dry-run')]
+deploy bump="patch" *options="":
     #!/usr/bin/env bash
     set -euo pipefail
+    ALLOW_BREAKING=""
+    DRY_RUN=no
+    for option in {{options}}; do
+        case "$option" in
+            allow-breaking) ALLOW_BREAKING=--allow-breaking ;;
+            dry-run) DRY_RUN=yes ;;
+            *) echo "Unknown option: $option. Use allow-breaking or dry-run." >&2; exit 1 ;;
+        esac
+    done
+    NEW_VERSION=$(python3 {{PROJECT_ROOT}}/scripts/release.py next-version {{bump}})
+    NOTES="{{PROJECT_ROOT}}/.build/release-notes/${NEW_VERSION}.md"
+    gate() {
+        python3 {{PROJECT_ROOT}}/scripts/release.py gate {{bump}} --swift "{{SWIFT}}" --notes-file "$NOTES" $ALLOW_BREAKING
+    }
+    if [ "$DRY_RUN" = yes ]; then
+        gate
+        echo "Dry run: would verify, tag ${NEW_VERSION}, push the tag and create its GitHub release with these notes:"
+        cat "$NOTES"
+        exit 0
+    fi
     if [ -n "$(git status --porcelain)" ]; then
         echo "Error: working tree is dirty. Commit or stash changes first."
         exit 1
     fi
     just _require-origin-main
+    gate
     # Every drawer entry point is #if DEBUG, so the tests run in debug; release must still build.
     just verify
     just release
-    NEW_VERSION=$(just _push-version-tag {{bump}} | tail -1)
-    gh release create "${NEW_VERSION}" --title "${NEW_VERSION}" --generate-notes --verify-tag
+    just _push-version-tag "${NEW_VERSION}"
+    gh release create "${NEW_VERSION}" --title "${NEW_VERSION}" --notes-file "$NOTES" --verify-tag
     echo "Released ${NEW_VERSION}: $(gh repo view --json url -q .url)/releases/tag/${NEW_VERSION}"
 
 # Refuses unless HEAD is origin/main's tip, so a release is always of what main holds on the
@@ -226,32 +253,17 @@ _require-origin-main:
         exit 1
     fi
 
-# Tags HEAD with the next version and pushes only that tag, never a branch, so a local main that
-# is behind (or another worktree's branch) is neither pushed nor needed. Prints the new version last.
-_push-version-tag bump="patch":
+# Tags HEAD with the version deploy gated (scripts/release.py next-version) and pushes only that
+# tag, never a branch, so a local main that is behind (or another worktree's branch) is neither
+# pushed nor needed.
+_push-version-tag version:
     #!/usr/bin/env bash
     set -euo pipefail
     just _require-origin-main
-    CURRENT=$(git describe --tags --abbrev=0 --match 'v*' 2>/dev/null || echo "")
-    if [ -z "$CURRENT" ]; then
-        NEW_VERSION="v0.0.1"
-        echo "No existing version tags found. First release: ${NEW_VERSION}"
-    else
-        CURRENT="${CURRENT#v}"
-        IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT"
-        case "{{bump}}" in
-            major) MAJOR=$((MAJOR + 1)); MINOR=0; PATCH=0 ;;
-            minor) MINOR=$((MINOR + 1)); PATCH=0 ;;
-            patch) PATCH=$((PATCH + 1)) ;;
-            *) echo "Unknown bump: {{bump}}. Use major, minor, or patch."; exit 1 ;;
-        esac
-        NEW_VERSION="v${MAJOR}.${MINOR}.${PATCH}"
-        echo "Current: v${CURRENT}"
-        echo "    New: ${NEW_VERSION}"
-    fi
-    git tag -a "${NEW_VERSION}" -m "Release ${NEW_VERSION}"
-    git push origin "${NEW_VERSION}"
-    echo "${NEW_VERSION}"
+    echo "Current: $(git describe --tags --abbrev=0 --match 'v*' 2>/dev/null || echo none)"
+    echo "    New: {{version}}"
+    git tag -a "{{version}}" -m "Release {{version}}"
+    git push origin "{{version}}"
 
 [doc('Store the BuildBuddy API key in the login Keychain (asks for it), once per Mac: every project from the template then builds with the remote cache (tools/bazel)')]
 buildbuddy-key:

@@ -22,6 +22,7 @@ Tests/DebugDrawerTests/          The core's tests and the README examples, verba
 Tests/DebugDrawerTestSupport/    Shared test fixtures (data only)
 Example/                         The macOS, iOS, visionOS, tvOS and watchOS example apps (hand-written BUILD.bazel)
 scripts/modules.py               The module graph
+scripts/release.py               The release gates `just deploy` runs (changelog entry, API breaks)
 tools/                           Bazel rule wrappers (warnings as errors, Swift 6 mode), DocC rules;
                                  tools/bazel turns BuildBuddy on when the Keychain holds its key, and
                                  on macOS sweeps stale output bases once a day (tools/sweep-output-bases):
@@ -68,13 +69,18 @@ Every shell command gets a timeout. macOS has no `timeout`; use
 | `just docs` | Combined DocC site into `.build/docs` |
 | `just generate` | Xcode project from the Bazel graph |
 | `just run [macOS\|iOS\|catalyst\|visionOS\|tvOS\|watchOS]` | Build and launch an example app (`catalyst`: the iOS one as a Mac Catalyst app, through SwiftPM) |
-| `just deploy [patch\|minor\|major]` | Verify, then tag, push the tag and create the GitHub release (the owner's call) |
+| `just deploy [patch\|minor\|major] [allow-breaking] [dry-run]` | Check the release gates, verify, then tag, push the tag and create the GitHub release (the owner's call); `dry-run` runs only the gates |
 | `just buildbuddy-key` | Store the BuildBuddy key in the Keychain (once per Mac; builds then use the remote cache) |
 | `just template-update` | Merge the project template's changes since `.template.json`'s commit; resolve conflicts, then `just modules`, `just test` |
 | `just lint` | SwiftLint and a11y-check over every first-party target; `just test` runs it first |
 | `just record-snapshots` | Re-record every snapshot reference (through SwiftPM) after a change to how a view looks |
 | `bazel query 'rdeps(//Tests/..., //Sources/X)'` | Test targets affected by a change to X |
 
+- `just deploy` first runs the release gates (`scripts/release.py`, tested by
+  `//scripts:release_test`): `CHANGELOG.md` must have a `## [X.Y.Z]` entry for the new version
+  (rename Unreleased and commit before deploying), and `swift package diagnose-api-breaking-changes`
+  against the last tag must find no break unless the bump is major or `allow-breaking` is given.
+  The entry, plus any breaks allowed, becomes the GitHub release's notes.
 - Debug is the default configuration. Every test target except the `XPerformanceTests` ones is
   tagged `debug-only`, which `--config=release` filters out.
 - A test that bounds wall-clock time, or runs a large input under `.timeLimit`, belongs in
