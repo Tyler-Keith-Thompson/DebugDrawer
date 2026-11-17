@@ -118,6 +118,9 @@ struct DebugDrawerExampleiOSApp: App {
         // Installs Reset App State, which compiles in release too and does nothing there; launched with
         // -SeedResettableState, the app first writes state of every kind for it to clear.
         ExampleAppStateReset.install()
+        // Launched with -SeedKeychain, adds a password in each of the example's access groups and
+        // a private key, for the Keychain plugin to list.
+        ExampleKeychain.install()
         // Installs Network; launched with -SeedNetworkMock, it adds mocks that answer the
         // Fetch Greeting and Place Order buttons, and with -SeedNetworkCondition, a profile that
         // slows example.com.
@@ -228,6 +231,8 @@ struct ExampleContentView_iOS: View {
                     #if DEBUG
                         Button("Track Sample Event") { ExampleAnalytics.trackSample() }
                     #endif
+                    // Keychain lists both passwords, each in its access group, and the key.
+                    Button("Add Sample Keychain Items") { ExampleKeychain.seed() }
                     // Crash Reports shows the crash on the next launch.
                     Button("Crash the App", role: .destructive) { ExampleCrash.crash() }
                     // Hangs reports the stall with its stack and a toast.

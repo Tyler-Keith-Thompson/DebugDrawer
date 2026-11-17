@@ -3,7 +3,7 @@
 load("//tools:docc.bzl", "docc_archive")
 load("//tools:swift_rules.bzl", "swift_library")
 
-# Browse generic and internet passwords; copy and delete entries.
+# Browse generic and internet passwords, certificates and keys with every attribute, filter by access group, and add, edit and delete generic passwords.
 swift_library(
     name = "DebugDrawerKeychainPlugin",
     srcs = glob(["**/*.swift"]),

@@ -15,6 +15,9 @@
     <key>keychain-access-groups</key>
     <array>
         <string>FAKETEAMID.com.debugdrawer.example.ios</string>
+        <!-- A second group, so the Keychain plugin's access group filter has a choice
+             (ExampleKeychain adds a password to it). -->
+        <string>FAKETEAMID.com.debugdrawer.example.shared</string>
     </array>
 </dict>
 </plist>

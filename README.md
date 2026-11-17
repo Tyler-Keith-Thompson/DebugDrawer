@@ -1432,7 +1432,7 @@ ContentView()
 | `DebugDrawerDiskIOPlugin` | FileManager reads, writes, deletes and listings, flagging main-thread I/O |
 | `DebugDrawerAppInfoPlugin` | Bundle, version, OS, memory, uptime, process, debugger, screen and reachability facts |
 | `DebugDrawerUserDefaultsPlugin` | Browse, search, edit, copy and delete UserDefaults keys |
-| `DebugDrawerKeychainPlugin` | Generic and internet passwords: copy and delete entries |
+| `DebugDrawerKeychainPlugin` | Generic and internet passwords, certificates and keys, each with every attribute the keychain returns (a key's or certificate's data is never read), filtered by access group and text; generic passwords added and edited, any item deleted; on the Mac, the data protection keychain |
 | `DebugDrawerScreenshotPlugin` | The app window captured to a file or the clipboard, optionally without the drawer |
 | `DebugDrawerFileBrowserPlugin` | The app's Application Support and Caches directories: delete and share files |
 | `DebugDrawerLocationPlugin` | Spoofed CLLocationManager coordinates: presets and a custom latitude and longitude |
