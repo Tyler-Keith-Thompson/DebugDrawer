@@ -23,6 +23,8 @@
         public var isComplete: Bool
         /// Timing of the request's last transaction, from `URLSessionTaskMetrics`.
         public var metrics: NetworkTimingMetrics?
+        /// The name of the mock rule that answered the request, or `nil` when the network did.
+        public var mockRuleName: String?
 
         /// Whether the request failed: the server answered with a status of 400 or more, or the
         /// request never got an answer (a transport error).
@@ -175,8 +177,13 @@
     // MARK: - Convenience installer
 
     public extension DebugDrawer {
-        /// Install the network inspector. Registers a URLProtocol to capture HTTP traffic.
-        func installNetwork() {
+        /// Install the network inspector. Registers a URLProtocol to capture HTTP traffic, and
+        /// loads the saved mock rules, which answer the requests they match from then on.
+        ///
+        /// - Parameter mocks: Rules to add to the saved ones, at the end; one whose id is saved
+        ///   already is skipped, so the drawer's edits to it last from launch to launch.
+        func installNetwork(mocks: [NetworkMockRule] = []) {
+            NetworkMocksModel.shared.load(adding: mocks)
             NetworkStore.shared.install()
             registerGlobal(NetworkPlugin())
         }

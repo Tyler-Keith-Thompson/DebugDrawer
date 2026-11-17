@@ -58,6 +58,11 @@
             entryId = entry.id
             startTime = CFAbsoluteTimeGetCurrent()
 
+            if let requestURL = request.url, let answer = NetworkMockRules.shared.answer(method: entry.method, url: requestURL) {
+                respond(with: answer, to: requestURL, entry: entry)
+                return
+            }
+
             Task { @MainActor in
                 NetworkStore.shared.recordStart(entry)
             }
@@ -69,6 +74,32 @@
 
         override func stopLoading() {
             dataTask?.cancel()
+        }
+
+        /// Answers the request from a mock rule, as the network would: the response, the body and
+        /// the finish, with no request made. The log gets the request complete, marked with the
+        /// rule's name, in one record, so it never shows a mocked request in progress.
+        private func respond(with answer: NetworkMockAnswer, to url: URL, entry: NetworkEntry) {
+            guard let response = HTTPURLResponse(url: url, statusCode: answer.status, httpVersion: "HTTP/1.1", headerFields: answer.headers) else {
+                client?.urlProtocol(self, didFailWithError: URLError(.badServerResponse))
+                return
+            }
+            client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+            if !answer.body.isEmpty {
+                client?.urlProtocol(self, didLoad: answer.body)
+            }
+            client?.urlProtocolDidFinishLoading(self)
+
+            var entry = entry
+            entry.mockRuleName = answer.ruleName
+            entry.statusCode = answer.status
+            entry.responseHeaders = answer.headers
+            entry.responseBody = answer.body
+            entry.duration = CFAbsoluteTimeGetCurrent() - startTime
+            entry.isComplete = true
+            Task { @MainActor [entry] in
+                NetworkStore.shared.recordStart(entry)
+            }
         }
     }
 

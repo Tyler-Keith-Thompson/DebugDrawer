@@ -118,6 +118,9 @@ struct DebugDrawerExampleiOSApp: App {
         // Installs Reset App State, which compiles in release too and does nothing there; launched with
         // -SeedResettableState, the app first writes state of every kind for it to clear.
         ExampleAppStateReset.install()
+        // Installs Network; launched with -SeedNetworkMock, it adds a mock that answers the
+        // Fetch Greeting button.
+        ExampleNetwork.install()
         installShippedPlugins()
     }
 
@@ -126,7 +129,6 @@ struct DebugDrawerExampleiOSApp: App {
     private func installShippedPlugins() {
         #if DEBUG
             DebugDrawer.shared.installConsole()
-            DebugDrawer.shared.installNetwork()
             DebugDrawer.shared.installDiskIO()
             DebugDrawer.shared.installViewInspector()
             DebugDrawer.shared.installAccessibility()
@@ -243,6 +245,11 @@ struct ExampleContentView_iOS: View {
                     ExampleResettableState()
                 }
                 .debugColorVision()
+
+                // Network logs each request; a mock answers the greeting, which no server does.
+                Section("Network") {
+                    ExampleNetworkRequests()
+                }
 
                 // Colors the Color Vision plugin simulates.
                 Section("Colors") {

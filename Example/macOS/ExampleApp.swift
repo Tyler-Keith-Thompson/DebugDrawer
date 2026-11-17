@@ -120,6 +120,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Installs Reset App State, which compiles in release too and does nothing there; launched with
         // -SeedResettableState, the app first writes state of every kind for it to clear.
         ExampleAppStateReset.install()
+        // Installs Network; launched with -SeedNetworkMock, it adds a mock that answers the
+        // Fetch Greeting button.
+        ExampleNetwork.install()
         installShippedPlugins()
 
         setupMenuBar()
@@ -131,7 +134,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func installShippedPlugins() {
         #if DEBUG
             DebugDrawer.shared.installConsole()
-            DebugDrawer.shared.installNetwork()
             DebugDrawer.shared.installDiskIO()
             DebugDrawer.shared.installViewInspector()
             DebugDrawer.shared.installAccessibility()
@@ -283,6 +285,9 @@ struct ExampleContentView: View {
                     ExampleTweaksBanner()
                     ExampleFeatureFlagsSummary()
                     ExampleResettableState()
+                    // Network logs each request; a mock answers the greeting, which no server does.
+                    ExampleNetworkRequests()
+                        .frame(maxWidth: 480)
 
                 }
                 .debugColorVision()

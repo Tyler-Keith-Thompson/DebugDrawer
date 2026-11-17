@@ -3,7 +3,7 @@
 load("//tools:docc.bzl", "docc_archive")
 load("//tools:swift_rules.bzl", "swift_library")
 
-# URLProtocol HTTP interception: requests, responses, timing, cURL export.
+# URLProtocol HTTP interception: requests, responses, timing, cURL export, mock responses.
 swift_library(
     name = "DebugDrawerNetworkPlugin",
     srcs = glob(["**/*.swift"]),

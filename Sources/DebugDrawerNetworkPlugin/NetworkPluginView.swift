@@ -2,12 +2,37 @@
     import DebugDrawer
     import SwiftUI
 
+    /// The plugin's body: the request log and the Mocks section, or the editor of one mock while
+    /// it is open.
     struct NetworkPluginView: View {
         @ObservedObject private var store = NetworkStore.shared
+        @ObservedObject private var mocks = NetworkMocksModel.shared
         @ObservedObject private var drawer = DebugDrawer.shared
         @State private var selectedId: UUID?
+        @State private var selectedRule: NetworkMockRule.ID?
+        /// The mock being edited, which takes the plugin's place until it is saved or cancelled.
+        @State private var editing: NetworkMockDraft?
 
         var body: some View {
+            if let draft = editing {
+                NetworkMockEditor(
+                    draft: draft,
+                    importBody: { mocks.importBody(from: $0) },
+                    cancel: { editing = nil },
+                    save: { rule in
+                        mocks.save(rule)
+                        selectedRule = rule.id
+                        editing = nil
+                    }
+                )
+                // A new draft starts from its own fields, not the last one's.
+                .id(draft.id)
+            } else {
+                requests
+            }
+        }
+
+        private var requests: some View {
             VStack(alignment: .leading, spacing: 0) {
                 // The request count is in the header; the rates are an inspector form here.
                 if !store.entries.isEmpty {
@@ -25,40 +50,63 @@
                     maxHeight: 300
                 ) {
                     ForEach(store.filteredEntries) { entry in
-                        NetworkRequestRow(entry: entry, redaction: drawer.redaction, isSelected: selectedId == entry.id) {
-                            selectedId = selectedId == entry.id ? nil : entry.id
-                        }
+                        NetworkRequestRow(
+                            entry: entry, redaction: drawer.redaction, isSelected: selectedId == entry.id,
+                            onSelect: { selectedId = selectedId == entry.id ? nil : entry.id },
+                            onMock: { editing = NetworkMockDraft(mocks.rule(mocking: $0), isNew: true) }
+                        )
                     }
                 }
+
+                // Below the log, which is what the plugin is opened for most often.
+                NetworkMocksSection(
+                    rules: mocks.rules,
+                    issue: mocks.issue,
+                    selected: $selectedRule,
+                    setEnabled: { mocks.setEnabled($1, id: $0) },
+                    add: { editing = .new() },
+                    edit: { editing = NetworkMockDraft($0, isNew: false) },
+                    move: { mocks.move($0, by: $1) },
+                    delete: { mocks.delete($0) }
+                )
             }
         }
     }
 
-    /// The Network plugin's header accessory, read from the shared store as the plugin's body
-    /// reads it.
+    /// The Network plugin's header accessory, read from the shared store and mocks as the
+    /// plugin's body reads them.
     struct NetworkHeaderAccessoryView: View {
         @ObservedObject private var store = NetworkStore.shared
+        @ObservedObject private var mocks = NetworkMocksModel.shared
 
         var body: some View {
-            NetworkHeaderSummary(entries: store.entries)
+            NetworkHeaderSummary(entries: store.entries, activeMocks: mocks.enabledCount)
         }
     }
 
-    /// How many requests the plugin holds ("38 requests"), and an error glyph with the count of
-    /// those that failed, when any did.
+    /// How many requests the plugin holds ("38 requests"), after an error glyph with the count of
+    /// those that failed, when any did, and the number of mocks on, when any are ("2 mocks").
     struct NetworkHeaderSummary: View {
         let total: Int
         let failures: Int
+        let activeMocks: Int
 
-        init(entries: [NetworkEntry]) {
+        /// - Parameters:
+        ///   - entries: The requests captured.
+        ///   - activeMocks: How many mock rules are on.
+        init(entries: [NetworkEntry], activeMocks: Int = 0) {
             total = entries.count
             failures = entries.count(where: \.isFailure)
+            self.activeMocks = activeMocks
         }
 
         var body: some View {
             HStack {
                 if failures > 0 {
                     DebugDrawerIssueCount(.error, count: failures)
+                }
+                if activeMocks > 0 {
+                    Text(activeMocks == 1 ? "1 mock" : "\(activeMocks.formatted()) mocks")
                 }
                 Text(total == 1 ? "1 request" : "\(total.formatted()) requests")
             }
@@ -95,6 +143,8 @@
         let redaction: DebugDrawerRedaction
         let isSelected: Bool
         let onSelect: () -> Void
+        /// Opens a new mock made from the request; `nil` offers no Mock This.
+        var onMock: ((NetworkEntry) -> Void)?
         @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
         var body: some View {
@@ -112,6 +162,16 @@
                                 .debugDrawerFont(.code)
                                 .debugDrawerForegroundStyle(.secondary)
                             status
+                            if entry.mockRuleName != nil, !dynamicTypeSize.isAccessibilitySize {
+                                NetworkMockedBadge()
+                            }
+                        }
+                        // A few short words that never wrap: the path gives way to them instead.
+                        .fixedSize(horizontal: true, vertical: false)
+                        // At accessibility text sizes the badge would squeeze the status; it takes
+                        // a line of its own.
+                        if entry.mockRuleName != nil, dynamicTypeSize.isAccessibilitySize {
+                            NetworkMockedBadge()
                         }
                         Text(entry.path)
                             .debugDrawerFont(.code)
@@ -128,7 +188,7 @@
                 .accessibilityAddTraits(isSelected ? .isSelected : [])
 
                 if isSelected {
-                    NetworkRequestDetail(entry: entry, redaction: redaction)
+                    NetworkRequestDetail(entry: entry, redaction: redaction, onMock: onMock)
                 }
             }
         }
@@ -171,9 +231,13 @@
     /// A request in full: its URL, time, size and status, query parameters, timing, error, headers
     /// and bodies, with a button to copy it as a cURL command. Values the redaction rules call
     /// sensitive are masked in the copy, and on screen until revealed.
+    ///
+    /// A request a mock answered names the mock; any other offers Mock This once it is complete.
     struct NetworkRequestDetail: View {
         let entry: NetworkEntry
         let redaction: DebugDrawerRedaction
+        /// Opens a new mock made from the request; `nil` offers no Mock This.
+        var onMock: ((NetworkEntry) -> Void)?
 
         var body: some View {
             VStack(alignment: .leading, spacing: 0) {
@@ -186,6 +250,10 @@
                 DebugDrawerKeyValueRow("Size", value: entry.responseSizeLabel)
                 if let code = entry.statusCode {
                     DebugDrawerKeyValueRow("Status", value: String(code))
+                }
+                if let rule = entry.mockRuleName {
+                    DebugDrawerKeyValueRow("Mocked by", value: rule)
+                        .debugDrawerValueStyle(.text)
                 }
 
                 if let error = entry.error {
@@ -220,6 +288,11 @@
 
                 DebugDrawerActionRow {
                     DebugDrawerCopyButton("Copy cURL") { entry.curl(redaction: redaction) }
+                    if let onMock, entry.isComplete, entry.mockRuleName == nil {
+                        Button("Mock This") { onMock(entry) }
+                            .accessibilityLabel("Mock This")
+                            .accessibilityHint("Makes a mock that answers requests like this one with its response")
+                    }
                 }
             }
         }

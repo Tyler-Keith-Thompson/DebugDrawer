@@ -80,6 +80,8 @@
             var timings: Timings
             /// Why the request failed, in the format's convention for custom fields.
             var error: String?
+            /// Which mock rule answered the request, when one did.
+            var comment: String?
         }
 
         struct Cache: Encodable, Equatable {}
@@ -90,7 +92,7 @@
     // Declared in an extension so the type nests one level deep, not two.
     extension HTTPArchive.Entry {
         enum CodingKeys: String, CodingKey {
-            case startedDateTime, time, request, response, cache, timings
+            case startedDateTime, time, request, response, cache, timings, comment
             case error = "_error"
         }
     }
@@ -149,6 +151,7 @@
             )
             timings = HTTPArchive.Timings(entry.metrics, total: time)
             error = entry.error
+            comment = entry.mockRuleName.map { "Answered by the network mock “\($0)”" }
         }
     }
 

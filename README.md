@@ -308,7 +308,48 @@ Each call needs its plugin's module imported (`import DebugDrawerConsolePlugin`,
 Tweaks takes the settings it shows and Feature Flags the adapter it reads, and Crash Reports,
 Hangs, Leaks, MetricKit, Permissions, Notifications, Background Tasks, Analytics, Databases,
 Localization, Screen Recording, Design Overlay, Color Vision and Reset App State install outside
-`#if DEBUG`, so each has a section of its own, next.
+`#if DEBUG`, so each has a section of its own, after Network's mocks.
+
+### Network mocks: canned responses without changing the server
+
+The Network plugin can answer requests itself. A mock rule matches requests by method, host, path
+and query items, and answers with a status, headers and a body, so a developer can try an error,
+an empty list or an endpoint the server doesn't have yet. Rules are made in the drawer (Add Mock,
+or Mock This on a captured request, which starts from its method, host, exact path and the
+response the server sent), or passed to `installNetwork(mocks:)`:
+
+```swift
+import DebugDrawerNetworkPlugin
+
+#if DEBUG
+let outage = NetworkMockRule(
+    id: UUID(uuidString: "3F2B8E1C-0D4A-4B7E-9C61-5A2D7E8F9B10")!,
+    name: "Orders outage",
+    matcher: .init(methods: ["GET", "POST"], host: .wildcard("*.example.com"), path: .wildcard("/v1/orders/**")),
+    response: .init(status: 503, body: .text(#"{"error":"maintenance"}"#), contentType: "application/json")
+)
+DebugDrawer.shared.installNetwork(mocks: [outage])
+#endif
+```
+
+A host or path is matched exactly, by a wildcard or by a regular expression (`NSRegularExpression`),
+and a wildcard or regex must match the whole of it: in a host `*` matches within one label
+(`*.example.com` matches `api.example.com`) and `**` across labels; in a path `*` matches within
+one segment (`/users/*`) and `**` across segments (`/users/**`). Hosts ignore case; paths are
+compared percent-decoded. The rules are tried in the order the drawer lists them, and the first
+that is on and matches answers, with no request sent; `Content-Length` is always the body's length.
+A request no rule matches reaches the network unchanged. Rules apply only once `installNetwork()`
+has run.
+
+The Mocks section, below the request log, lists each rule with a switch, its methods, pattern and
+status; selecting one offers Edit, Move Up, Move Down and Delete, and the header counts the rules
+that are on. The editor takes the methods, the host's and path's patterns (an invalid regex says
+why below its field), query items, the status, a content type, headers, and a body as text or a
+file, which is copied into the app's storage. A rule passed to `installNetwork(mocks:)` is added
+once, by its `id`, so the drawer's edits to it last. Rules are saved as JSON in Application
+Support, in the app's folder under `DebugDrawer/NetworkMocks`, and loaded by `installNetwork()`. A
+request a rule answered shows Mocked in the log, its detail names the rule, and the bug report's
+`network.har` says which rule answered it.
 
 ### Tweaks: the app's own debug settings
 
@@ -1197,7 +1238,7 @@ ContentView()
 | `DebugDrawerAccessibilityPlugin` | Runtime overrides of color scheme, Dynamic Type, layout direction, locale and the system accessibility settings SwiftUI exposes, each beside the system's value |
 | `DebugDrawerPerformancePlugin` | Live FPS and memory with sparkline graphs |
 | `DebugDrawerEnergyPlugin` | Battery level and charging, CPU load and thermal state |
-| `DebugDrawerNetworkPlugin` | URLProtocol HTTP interception: method, URL, status, timing, headers, body, cURL export |
+| `DebugDrawerNetworkPlugin` | URLProtocol HTTP interception: method, URL, status, timing, headers, body, cURL export, mock responses by rule |
 | `DebugDrawerDiskIOPlugin` | FileManager reads, writes, deletes and listings, flagging main-thread I/O |
 | `DebugDrawerAppInfoPlugin` | Bundle, version, OS, memory, uptime, process, debugger, screen and reachability facts |
 | `DebugDrawerUserDefaultsPlugin` | Browse, search, edit, copy and delete UserDefaults keys |
