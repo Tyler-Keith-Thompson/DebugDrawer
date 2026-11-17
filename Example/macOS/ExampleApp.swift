@@ -26,6 +26,7 @@ import DebugDrawerMetricKitPlugin
 import DebugDrawerPermissionsPlugin
 import DebugDrawerNotificationsPlugin
 import DebugDrawerAnalyticsPlugin
+import DebugDrawerLocalizationPlugin
 import SwiftUI
 
 /// Demonstrates Send Report without a server: "sends" each report by copying it into the app's
@@ -58,6 +59,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // First, so a crash in the rest of startup is recorded. It compiles in release, where it
         // installs nothing; launched with -CrashOnLaunch, the app crashes right after it.
         CrashReports.install()
+        // Next, before the first string is looked up, so the lookups at launch are recorded. It
+        // compiles in release too, where it does nothing; launched with -PseudoLocalize or
+        // -ShowLocalizationKeys, the app starts in that mode.
+        ExampleLocalization.install()
         if ProcessInfo.processInfo.arguments.contains(ExampleCrash.launchArgument) {
             ExampleCrash.crash()
         }
@@ -250,6 +255,8 @@ struct ExampleContentView: View {
                 ExampleTweaksBanner()
                 ExampleFeatureFlagsSummary()
 
+                ExampleLocalizedStrings()
+
                 // Crash Reports shows the crash on the next launch.
                 Button("Crash the App", role: .destructive) { ExampleCrash.crash() }
                 // Hangs reports the stall with its stack and a toast.
@@ -285,6 +292,9 @@ struct ExampleContentView: View {
             .padding(40)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
+        // Redraws the app's own strings when a Localization mode changes; beneath .debugDrawer(),
+        // so the drawer keeps its place.
+        .debugLocalization()
         .debugAccessibilityOverrides()
         .debugGrid()
         .debugDrawer()

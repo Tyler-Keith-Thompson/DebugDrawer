@@ -36,6 +36,7 @@ _SHARED_DEPS = [
     "//Sources/DebugDrawerBackgroundTasksPlugin",
     "//Sources/DebugDrawerAnalyticsPlugin",
     "//Sources/DebugDrawerDatabaseBrowserPlugin",
+    "//Sources/DebugDrawerLocalizationPlugin",
 ]
 
 # ── macOS ────────────────────────────────────────────────────────────
@@ -52,6 +53,8 @@ macos_application(
     bundle_id = "com.debugdrawer.example",
     bundle_name = "DebugDrawerExample",
     infoplists = ["macOS/Info.plist"],
+    # English and German tables, German missing a few keys, for the Localization plugin.
+    resources = glob(["macOS/Resources/**"]),
     minimum_os_version = "15.0",
     entitlements = "macOS/ExampleApp.entitlements",
     deps = [":ExampleAppLib_macOS"],
@@ -74,6 +77,8 @@ ios_application(
     bundle_name = "DebugDrawerExample",
     families = ["iphone", "ipad"],
     infoplists = ["iOS/Info.plist"],
+    # English and German tables, German missing a few keys, for the Localization plugin.
+    resources = glob(["iOS/Resources/**"]),
     minimum_os_version = "17.0",
     entitlements = "iOS/ExampleApp_iOS.entitlements",
     deps = [":ExampleAppLib_iOS"],

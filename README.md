@@ -305,7 +305,7 @@ DebugDrawer.shared.installLaunchTime()
 
 Each call needs its plugin's module imported (`import DebugDrawerConsolePlugin`, and so on).
 Tweaks takes the settings it shows and Feature Flags the adapter it reads, and Crash Reports,
-Hangs, Leaks, MetricKit, Permissions, Notifications, Background Tasks, Analytics and Databases install outside `#if DEBUG`, so each has a
+Hangs, Leaks, MetricKit, Permissions, Notifications, Background Tasks, Analytics, Databases and Localization install outside `#if DEBUG`, so each has a
 section of its own, next.
 
 ### Tweaks: the app's own debug settings
@@ -824,6 +824,58 @@ holds locked shows "Store busy, try again". Reading a WAL store needs to write i
 browser says when it can't. The bug report carries `databases.txt`: each store with its tables and
 row counts, never their rows. tvOS and watchOS have no pasteboard, so there it offers no copy.
 
+### Localization: text that doesn't fit, and strings nobody translated
+
+The Localization plugin pseudo-localizes the app's strings or shows their keys, while the app runs,
+and lists the translations a language is missing:
+
+```swift
+import DebugDrawerLocalizationPlugin
+
+// At startup, before the first string is looked up:
+Localization.install()
+
+// Or, for a launch argument of the app's own, starting pseudo-localized:
+Localization.install(mode: ProcessInfo.processInfo.arguments.contains("-PseudoLocalize") ? .pseudoLocalized : .standard)
+```
+
+`Localization` exists in every configuration and does nothing in release, so the call needs no
+`#if DEBUG`. In debug builds `install()` replaces `Bundle`'s public lookup,
+`localizedString(forKey:value:table:)`, which `NSLocalizedString` calls. Pseudo-Localize turns
+"Settings" into "[Šéţţîñĝš····]": every letter accented, about 40% longer, and bracketed, so
+clipped or concatenated text shows. Format specifiers (`%@`, `%1$lld`, `%.2f`) are kept, and a
+plural from a `.stringsdict` keeps its rules: each variant is rewritten and looked up again, so
+"1 order" and "3 orders" still differ. Show Keys draws each string's key in its place. Both apply
+only to the app's own bundles (the main bundle and the bundles and frameworks inside it), never to
+the drawer's or the system's, and only to strings the app's tables hold or that pass a default
+value; SwiftUI's own strings that it resolves against the main bundle are left alone.
+
+SwiftUI's `Text("key")`, `String(localized:)` and `LocalizedStringResource` don't go through that
+lookup, so the live modes don't reach them. For those, Whole App on Next Launch stores Foundation's
+own settings in the app's defaults: Accented and Doubled sets `NSAccentuateLocalizedStrings` and
+`NSDoubleLocalizedStrings`, Untranslated in Capitals sets `NSShowNonLocalizedStrings`, and turning
+one off removes its keys. Foundation reads them at launch, so they take effect when the app is next
+launched, and they change every string, the drawer's and the system's included. Until then the
+plugin shows "Relaunch to apply", and its header says "relaunch to apply" or, while the app runs
+with them, "whole app", so an app that comes up accented says why. The plugin also lists Apple's
+launch arguments, to copy into the scheme: `-NSDoubleLocalizedStrings YES`,
+`-NSAccentuateLocalizedStrings YES`, `-NSShowNonLocalizedStrings YES`,
+`-NSForceRightToLeftWritingDirection YES` and `-AppleLanguages (de)`. Show Keys has no Foundation
+setting, so it is live only. Foundation's accenting marks the letters of format specifiers too, so
+a string formatted from an accented format can lose its arguments (`Delivery: @`); the live mode
+keeps them.
+
+Text already on screen is redrawn when the mode changes under `.debugLocalization()`, which gives
+the views below it a new identity (and so resets their `@State`); text elsewhere changes the next
+time it is looked up.
+
+Missing Translations compares each language's `.strings` and `.stringsdict` tables in the app's
+`.lproj` folders with the development language's (and `Base.lproj`), by table, and adds the keys the
+app looked up while running and got no translation for, marked "Looked up". The list has a language
+picker and a filter, copies as text or CSV, and the plugin's header shows how many are missing for
+the current language. The bug report carries `localization.txt`: the mode, the languages and what
+each is missing. tvOS and watchOS have no pasteboard, so there it offers no copy.
+
 ### Opening the drawer
 
 The drawer doesn't decide how it opens. Call `DebugDrawer.shared.toggle()` from whatever trigger
@@ -902,9 +954,11 @@ menus.
 
 ```swift
 import DebugDrawerAccessibilityPlugin
+import DebugDrawerLocalizationPlugin
 import DebugDrawerViewInspectorPlugin
 
 ContentView()
+    .debugLocalization()            // redraws the app's text when the Localization mode changes
     .debugAccessibilityOverrides()  // environment overrides; must be above .debugDrawer()
     .debugGrid()                    // alignment grid, controlled from the View Inspector plugin
     .debugDrawer()
@@ -943,6 +997,7 @@ ContentView()
 | `DebugDrawerBackgroundTasksPlugin` | The BGTaskScheduler identifiers the Info.plist permits and the pending task requests, with their kind and earliest begin date, each cancellable; a request scheduled on demand, and the LLDB commands that simulate a launch or an expiration |
 | `DebugDrawerAnalyticsPlugin` | The analytics events the app records, live, newest first, with their time and properties: search by name, key or value, each open as inspector rows and JSON to copy, all exported as a JSON file |
 | `DebugDrawerDatabaseBrowserPlugin` | The app's SQLite, Core Data and SwiftData stores, opened read-only: tables or entities with row counts, rows paged and searched in a grid, and read-only SELECT queries, copied as CSV |
+| `DebugDrawerLocalizationPlugin` | Pseudo-localization and show-keys modes over the strings the app looks up through Bundle, live, Apple's localization launch arguments to copy, and the translations missing for a language, grouped by table, searched and copied as text or CSV |
 
 ## Development
 

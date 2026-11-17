@@ -1,0 +1,23 @@
+/* The example's localized section, which the Localization plugin pseudo-localizes and shows the keys of. */
+"localization.section" = "Localized Strings";
+
+/* A greeting. */
+"welcome.title" = "Welcome back";
+
+/* Below the greeting. */
+"welcome.subtitle" = "Your orders are on their way";
+
+/* The delivery day, a weekday. German has no translation yet. */
+"checkout.delivery" = "Delivery: %@";
+
+/* German has no translation yet. */
+"checkout.promo" = "Have a promo code?";
+
+/* German has no translation yet. */
+"settings.privacy" = "Privacy Policy";
+
+/* Drawn by SwiftUI from its key, so only Whole App on Next Launch reaches it. */
+"swiftui.text" = "Drawn by SwiftUI's Text";
+
+/* Looked up with String(localized:), so only Whole App on Next Launch reaches it. */
+"swiftui.resource" = "Looked up with String(localized:)";

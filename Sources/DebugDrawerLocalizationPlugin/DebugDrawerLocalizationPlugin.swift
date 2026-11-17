@@ -1,0 +1,85 @@
+#if DEBUG
+    import DebugDrawer
+    import SwiftUI
+
+    /// Pseudo-localization and show-keys for the strings the app looks up through `Bundle`, the
+    /// translations a language is missing, and Apple's launch arguments for the rest. The header
+    /// counts the translations missing for the language the app runs in, after a pending relaunch.
+    public struct LocalizationPlugin: DebugDrawerPlugin {
+        public var id: String {
+            "LocalizationPlugin"
+        }
+
+        public var title = "Localization"
+        public var category = "Interface"
+        public var icon = "character.bubble"
+
+        let model: LocalizationModel
+
+        init(model: LocalizationModel) {
+            self.model = model
+        }
+
+        public var body: some View {
+            LocalizationPluginView(model: model)
+        }
+
+        /// How many translations the current language is missing, so the gap shows while the
+        /// plugin is closed.
+        public var headerAccessory: some View {
+            LocalizationHeaderAccessory(model: model)
+        }
+
+        /// Each mode, found by "pseudo", "keys" and "translations" too.
+        public var actions: [DebugDrawerAction] {
+            [
+                DebugDrawerAction("Pseudo-localize strings", keywords: ["localization", "pseudo", "accents", "longer"]) { [model] in
+                    model.mode = model.mode == .pseudoLocalized ? .standard : .pseudoLocalized
+                },
+                DebugDrawerAction("Show localization keys", keywords: ["localization", "keys", "strings"]) { [model] in
+                    model.mode = model.mode == .showingKeys ? .standard : .showingKeys
+                },
+                DebugDrawerAction("Show translations", keywords: ["localization", "translations", "standard", "reset"]) { [model] in
+                    model.mode = .standard
+                }
+            ]
+        }
+    }
+
+    /// Reads the model and hands its values to `LocalizationView`; it reads the tables again
+    /// each time it appears, so a table the app downloaded since shows.
+    struct LocalizationPluginView: View {
+        @ObservedObject var model: LocalizationModel
+
+        var body: some View {
+            LocalizationView(
+                mode: $model.mode,
+                bundles: model.bundles,
+                lookups: model.lookups,
+                nextLaunch: model.nextLaunch,
+                launchedWith: model.launchedWith,
+                onNextLaunchChange: { model.setNextLaunch($0, isOn: $1) },
+                onRefresh: { Task { await model.refresh() } }
+            )
+            .task { await model.refresh() }
+        }
+    }
+
+    /// A pending relaunch or Foundation's pseudo-localization in effect, so an accented app
+    /// says why while the plugin is closed, then the number of translations the current
+    /// language is missing ("3 missing"); nothing when there's neither.
+    struct LocalizationHeaderAccessory: View {
+        @ObservedObject var model: LocalizationModel
+
+        var body: some View {
+            let count = model.currentMissing.count
+            let parts = [
+                model.isRelaunchPending ? "relaunch to apply" : model.nextLaunch.isEmpty ? nil : "whole app",
+                count > 0 ? "\(count.formatted()) missing" : nil
+            ].compactMap(\.self)
+            if !parts.isEmpty {
+                Text(parts.joined(separator: " · "))
+            }
+        }
+    }
+#endif

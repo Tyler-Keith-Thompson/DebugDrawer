@@ -1,0 +1,10 @@
+/* The example's German strings, deliberately missing checkout.delivery, checkout.promo and settings.privacy, which the Localization plugin lists. */
+"localization.section" = "Lokalisierte Texte";
+
+"welcome.title" = "Willkommen zurück";
+
+"welcome.subtitle" = "Deine Bestellungen sind unterwegs";
+
+"swiftui.text" = "Von SwiftUIs Text gezeichnet";
+
+"swiftui.resource" = "Mit String(localized:) nachgeschlagen";
