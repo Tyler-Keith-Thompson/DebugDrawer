@@ -1,9 +1,11 @@
 #if DEBUG
     import DebugDrawer
     import SwiftUI
+    import UniformTypeIdentifiers
 
     /// The plugin's body: the request log, the Mocks section and the Conditions section, or the
-    /// editor of one mock or condition while it is open.
+    /// editor of one mock or condition while it is open. The log shows the captured requests, or
+    /// those of an imported HAR file, read-only, until it is cleared.
     struct NetworkPluginView: View {
         /// What the plugin shows: the log and its sections, or one editor in their place until it
         /// is saved or cancelled.
@@ -23,6 +25,7 @@
         @State private var selectedRule: NetworkMockRule.ID?
         @State private var selectedProfile: NetworkConditionProfile.ID?
         @State private var screen = Screen.requests
+        @State private var isImporting = false
 
         var body: some View {
             switch screen {
@@ -69,13 +72,32 @@
         private var requests: some View {
             VStack(alignment: .leading, spacing: 0) {
                 // The request count is in the header; the rates are an inspector form here.
-                if !store.entries.isEmpty {
-                    let stats = NetworkStats(store.entries)
+                let shown = store.shownEntries
+                if !shown.isEmpty {
+                    let stats = NetworkStats(shown)
                     DebugDrawerKeyValueRow("Succeeded", value: stats.successRate)
                     DebugDrawerKeyValueRow("Average", value: stats.averageTime)
                 }
 
-                NetworkToolbar(filterStatus: $store.filterStatus) { store.clear() }
+                if let imported = store.importedLog {
+                    NetworkLogSourcePicker(source: $store.source, fileName: imported.fileName, count: imported.entries.count)
+                }
+
+                let filtered = store.filteredEntries
+                NetworkToolbar(
+                    filterStatus: $store.filterStatus,
+                    clear: { store.clearShown() },
+                    export: NetworkArchiveFile(entries: filtered, redaction: drawer.redaction),
+                    isFiltered: filtered.count < shown.count,
+                    importArchive: { isImporting = true },
+                    source: store.source
+                )
+
+                if let issue = store.importIssue {
+                    DebugDrawerIssueRow("Not imported", severity: .error) {
+                        Text(issue.message)
+                    }
+                }
 
                 DebugDrawerSearchableList(
                     "Filter URL...",
@@ -83,19 +105,28 @@
                     accessibilityLabel: "Filter requests by URL, method or response",
                     maxHeight: 300
                 ) {
-                    ForEach(store.filteredEntries) { entry in
+                    // Imported requests are read-only: they can be mocked, but not resent, since
+                    // an archive's credentials are usually masked and a replay belongs with the
+                    // captured requests, apart from its original.
+                    let isImported = store.source == .imported
+                    ForEach(filtered) { entry in
                         let isSelected = selectedId == entry.id
                         NetworkRequestRow(
                             entry: entry, redaction: drawer.redaction, isSelected: isSelected,
                             onSelect: { selectedId = isSelected ? nil : entry.id },
                             onMock: { screen = .mock(NetworkMockDraft(mocks.rule(mocking: $0), isNew: true)) },
-                            onResend: { entry in Task { await replays.resend(entry) } },
-                            onEditAndResend: { screen = .resend(NetworkReplayDraft($0)) },
+                            onResend: isImported ? nil : { entry in Task { await replays.resend(entry) } },
+                            onEditAndResend: isImported ? nil : { screen = .resend(NetworkReplayDraft($0)) },
                             onShow: { selectedId = $0 },
                             // Only the open detail shows the links, so only its are worked out.
-                            links: isSelected ? NetworkReplayLinks(of: entry, in: store.entries) : .none,
-                            replayStatus: replays.statuses[entry.id]
+                            links: isSelected && !isImported ? NetworkReplayLinks(of: entry, in: store.entries) : .none,
+                            replayStatus: isImported ? nil : replays.statuses[entry.id]
                         )
+                    }
+                }
+                .fileImporter(isPresented: $isImporting, allowedContentTypes: UTType.importableArchives) { result in
+                    if case let .success(url) = result {
+                        store.importArchive(from: url)
                     }
                 }
 

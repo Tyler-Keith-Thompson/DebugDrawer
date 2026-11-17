@@ -100,17 +100,40 @@
             case errors = "Errors"
         }
 
+        /// The requests the log shows that pass the status filter and the filter text: the
+        /// captured ones, or the imported ones while they show.
         public var filteredEntries: [NetworkEntry] {
+            Self.entries(shownEntries, matching: filterStatus, text: filterText)
+        }
+
+        /// Which requests the log shows: the captured ones, or the imported file's while
+        /// `source` is `.imported`.
+        var shownEntries: [NetworkEntry] {
+            source == .imported ? importedLog?.entries ?? [] : entries
+        }
+
+        /// The requests a HAR file held, while one is imported.
+        @Published private(set) var importedLog: NetworkImportedLog?
+        /// Whether the log shows the captured requests or the imported ones; it is `.captured`
+        /// whenever nothing is imported.
+        @Published var source = NetworkLogSource.captured
+        /// The last file that couldn't be imported, until another is imported or the log cleared.
+        @Published private(set) var importIssue: NetworkImportIssue?
+
+        /// The requests in `entries` that pass the status filter `status` and contain `text`
+        /// (ignoring case) in the URL, the method or the response body. Empty text matches every
+        /// request.
+        nonisolated static func entries(_ entries: [NetworkEntry], matching status: StatusFilter, text: String) -> [NetworkEntry] {
             var result = entries
-            switch filterStatus {
+            switch status {
             case .all: break
             case .success: result = result.filter { ($0.statusCode ?? 0) >= 200 && ($0.statusCode ?? 0) < 300 }
             case .clientError: result = result.filter { ($0.statusCode ?? 0) >= 400 && ($0.statusCode ?? 0) < 500 }
             case .serverError: result = result.filter { ($0.statusCode ?? 0) >= 500 }
             case .errors: result = result.filter(\.isFailure)
             }
-            if !filterText.isEmpty {
-                let query = filterText.lowercased()
+            if !text.isEmpty {
+                let query = text.lowercased()
                 result = result.filter {
                     $0.url.lowercased().contains(query) ||
                         $0.method.lowercased().contains(query) ||
@@ -118,6 +141,32 @@
                 }
             }
             return result
+        }
+
+        /// Reads the HAR file at `url` and shows its requests in the log in place of the captured
+        /// ones, replacing any imported before; a file that can't be read leaves the log as it is
+        /// and becomes `importIssue`.
+        func importArchive(from url: URL) {
+            do throws(HTTPArchive.ReadError) {
+                importedLog = try NetworkImportedLog(contentsOf: url)
+                importIssue = nil
+                source = .imported
+            } catch {
+                importIssue = NetworkImportIssue(fileName: url.lastPathComponent, error: error)
+            }
+        }
+
+        /// Clears the requests the log shows: the captured ones, or the imported file, after which
+        /// the log shows the captured ones again.
+        func clearShown() {
+            importIssue = nil
+            switch source {
+            case .captured:
+                clear()
+            case .imported:
+                importedLog = nil
+                source = .captured
+            }
         }
 
         private var installed = false

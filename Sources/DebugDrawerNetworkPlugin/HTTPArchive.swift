@@ -6,34 +6,50 @@
     /// http://www.softwareishard.com/blog/har-12-spec/
     ///
     /// Only what the plugin captures is filled in; sizes it doesn't know are `-1`, as the format
-    /// asks.
-    struct HTTPArchive: Encodable, Equatable {
-        struct Log: Encodable, Equatable {
+    /// asks. It reads the archives other tools write too, which leave out fields the format calls
+    /// optional and add their own (`HTTPArchive+Decoding.swift`).
+    struct HTTPArchive: Codable, Equatable {
+        struct Log: Codable, Equatable {
             var version = "1.2"
             var creator = Creator()
             var entries: [Entry]
         }
 
-        struct Creator: Encodable, Equatable {
+        struct Creator: Codable, Equatable {
             var name = "DebugDrawer"
             var version = "1.0"
         }
 
-        struct NameValue: Encodable, Equatable {
+        struct NameValue: Codable, Equatable {
             var name: String
             var value: String
         }
 
-        struct PostData: Encodable, Equatable {
-            var mimeType: String
-            var text: String
+        /// A cookie a request sent or a response set; the attributes are a response's only.
+        struct Cookie: Codable, Equatable {
+            var name: String
+            var value: String
+            var path: String?
+            var domain: String?
+            /// When the cookie expires, in ISO 8601; `nil` for one that lasts the session.
+            var expires: String?
+            var httpOnly: Bool?
+            var secure: Bool?
         }
 
-        struct Request: Encodable, Equatable {
+        struct PostData: Codable, Equatable {
+            var mimeType: String
+            var text: String
+            /// `base64` for a body that isn't text, whose `text` is then its base64. The format has
+            /// no such field for a request body, so it is a custom field, `_encoding`.
+            var encoding: String?
+        }
+
+        struct Request: Codable, Equatable {
             var method: String
             var url: String
             var httpVersion: String
-            var cookies: [NameValue] = []
+            var cookies: [Cookie] = []
             var headers: [NameValue]
             var queryString: [NameValue]
             var postData: PostData?
@@ -41,18 +57,18 @@
             var bodySize: Int
         }
 
-        struct Content: Encodable, Equatable {
+        struct Content: Codable, Equatable {
             var size: Int
             var mimeType: String
             var text: String?
             var encoding: String?
         }
 
-        struct Response: Encodable, Equatable {
+        struct Response: Codable, Equatable {
             var status: Int
             var statusText: String
             var httpVersion: String
-            var cookies: [NameValue] = []
+            var cookies: [Cookie] = []
             var headers: [NameValue]
             var content: Content
             var redirectURL = ""
@@ -61,7 +77,7 @@
         }
 
         /// Milliseconds per phase; `-1` for a phase that didn't happen or wasn't measured.
-        struct Timings: Encodable, Equatable {
+        struct Timings: Codable, Equatable {
             var blocked = -1.0
             var dns: Double
             var connect: Double
@@ -71,7 +87,7 @@
             var receive: Double
         }
 
-        struct Entry: Encodable, Equatable {
+        struct Entry: Codable, Equatable {
             var startedDateTime: String
             var time: Double
             var request: Request
@@ -85,7 +101,7 @@
             var comment: String?
         }
 
-        struct Cache: Encodable, Equatable {}
+        struct Cache: Codable, Equatable {}
 
         var log: Log
     }
@@ -95,6 +111,13 @@
         enum CodingKeys: String, CodingKey {
             case startedDateTime, time, request, response, cache, timings, comment
             case error = "_error"
+        }
+    }
+
+    extension HTTPArchive.PostData {
+        enum CodingKeys: String, CodingKey {
+            case mimeType, text
+            case encoding = "_encoding"
         }
     }
 
@@ -115,8 +138,10 @@
         fileprivate init(_ entry: NetworkEntry, original: NetworkEntry?, redaction: DebugDrawerRedaction) {
             let url = redaction.redacting(url: entry.url)
             let httpVersion = entry.metrics?.protocolName.map(HTTPArchive.httpVersion) ?? "HTTP/1.1"
-            let requestHeaders = redaction.redacting(headers: entry.requestHeaders)
-            let responseHeaders = redaction.redacting(headers: entry.responseHeaders ?? [:])
+            let requestCookies = HTTPArchive.requestCookies(in: entry.requestHeaders)
+            let responseCookies = HTTPArchive.responseCookies(in: entry.responseHeaders ?? [:], url: entry.url)
+            let requestHeaders = redaction.redacting(headers: entry.requestHeaders, cookies: requestCookies)
+            let responseHeaders = redaction.redacting(headers: entry.responseHeaders ?? [:], cookies: responseCookies)
             let requestBody = entry.requestBody.map { redaction.redacting(json: $0) }
             let responseBody = entry.responseBody.map { redaction.redacting(json: $0) }
             let time = (entry.duration ?? 0) * 1000
@@ -127,14 +152,17 @@
                 method: entry.method,
                 url: url,
                 httpVersion: httpVersion,
+                cookies: requestCookies.map { redaction.redacting($0, header: "Cookie") },
                 headers: requestHeaders.harNameValues,
                 queryString: (URLComponents(string: url)?.queryItems ?? []).map {
                     HTTPArchive.NameValue(name: $0.name, value: $0.value ?? "")
                 },
-                postData: requestBody.map {
-                    HTTPArchive.PostData(
+                postData: requestBody.map { body in
+                    let text = String(bytes: body, encoding: .utf8)
+                    return HTTPArchive.PostData(
                         mimeType: requestHeaders.value(named: "Content-Type") ?? "",
-                        text: String(bytes: $0, encoding: .utf8) ?? $0.base64EncodedString()
+                        text: text ?? body.base64EncodedString(),
+                        encoding: text == nil ? "base64" : nil
                     )
                 },
                 bodySize: entry.requestBody?.count ?? 0
@@ -146,6 +174,7 @@
                 status: entry.statusCode ?? 0,
                 statusText: entry.statusCode.map { HTTPURLResponse.localizedString(forStatusCode: $0) } ?? "",
                 httpVersion: httpVersion,
+                cookies: responseCookies.map { redaction.redacting($0, header: "Set-Cookie") },
                 headers: responseHeaders.harNameValues,
                 content: HTTPArchive.Content(
                     size: entry.responseBody?.count ?? 0,
@@ -202,7 +231,7 @@
 
     extension HTTPArchive {
         /// HAR's dates: ISO 8601 with milliseconds.
-        fileprivate static let dateStyle = Date.ISO8601FormatStyle(includingFractionalSeconds: true)
+        static let dateStyle = Date.ISO8601FormatStyle(includingFractionalSeconds: true)
 
         /// The HTTP version HAR names for an ALPN protocol name (`h2` is `HTTP/2`).
         fileprivate static func httpVersion(_ protocolName: String) -> String {
@@ -211,6 +240,62 @@
             case "h3": "HTTP/3"
             case "http/1.0": "HTTP/1.0"
             default: "HTTP/1.1"
+            }
+        }
+    }
+
+    extension HTTPArchive {
+        /// The cookies a `Cookie` header in `headers` sends.
+        fileprivate static func requestCookies(in headers: [String: String]) -> [Cookie] {
+            guard let header = headers.value(named: "Cookie") else { return [] }
+            return header.split(separator: ";").compactMap { pair in
+                let parts = pair.split(separator: "=", maxSplits: 1)
+                guard let name = parts.first?.trimmingCharacters(in: .whitespaces), !name.isEmpty else { return nil }
+                let value = parts.count > 1 ? parts[1].trimmingCharacters(in: .whitespaces) : ""
+                return Cookie(name: name, value: value)
+            }
+        }
+
+        /// The cookies the `Set-Cookie` headers in `headers` set for `url`, with their attributes.
+        fileprivate static func responseCookies(in headers: [String: String], url: String) -> [Cookie] {
+            guard let url = URL(string: url), let header = headers.value(named: "Set-Cookie") else { return [] }
+            return HTTPCookie.cookies(withResponseHeaderFields: ["Set-Cookie": header], for: url).map { cookie in
+                Cookie(
+                    name: cookie.name,
+                    value: cookie.value,
+                    path: cookie.path,
+                    domain: cookie.domain,
+                    expires: cookie.expiresDate.map(dateStyle.format),
+                    httpOnly: cookie.isHTTPOnly,
+                    secure: cookie.isSecure
+                )
+            }
+        }
+    }
+
+    extension DebugDrawerRedaction {
+        /// The cookie with its value masked when the rules mask the header that carries it or a
+        /// key in its name.
+        fileprivate func redacting(_ cookie: HTTPArchive.Cookie, header: String) -> HTTPArchive.Cookie {
+            var cookie = cookie
+            if masksHeader(header) || masksKey(cookie.name) {
+                cookie.value = Self.mask
+            }
+            return cookie
+        }
+
+        /// The headers with every sensitive header's value masked, and in the `Cookie` and
+        /// `Set-Cookie` headers the rules leave, the value of each of `cookies` whose name they
+        /// mask, so a cookie masked in the archive's cookie list doesn't show in its header.
+        fileprivate func redacting(headers: [String: String], cookies: [HTTPArchive.Cookie]) -> [String: String] {
+            let masked = cookies.filter { masksKey($0.name) && !$0.value.isEmpty }
+            return redacting(headers: headers).reduce(into: [:]) { result, header in
+                let carriesCookies = ["cookie", "set-cookie"].contains(header.key.lowercased())
+                result[header.key] = carriesCookies
+                    ? masked.reduce(header.value) { value, cookie in
+                        value.replacing("\(cookie.name)=\(cookie.value)", with: "\(cookie.name)=\(Self.mask)")
+                    }
+                    : header.value
             }
         }
     }

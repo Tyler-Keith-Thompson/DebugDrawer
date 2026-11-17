@@ -410,6 +410,26 @@ original's detail, and `network.har` notes each replay's original. The mark stay
 process: no header is added, so the server sees exactly the request shown. There is nothing to
 install beyond `installNetwork()`.
 
+### Network archives: HAR export and import
+
+The Network log exports as an HTTP Archive (HAR 1.2), the file Charles, Proxyman and browsers'
+network inspectors read. Export All shares every request the log holds; while the status filter or
+the filter text hides some, the button reads Export Shown and the file holds only the requests
+listed. The file has each request's start, time, method, URL, headers, query, cookies and body, and
+the response's status, headers, cookies and body (in base64 when it isn't text), with timings where
+the request was measured and `-1` for sizes the plugin doesn't know. The redaction rules apply as
+they do to Copy cURL: masked headers, query items and JSON body values, and the cookies whose
+names the rules match, in the cookie lists and in the `Cookie` and `Set-Cookie` headers.
+
+Import HAR… opens a `.har` or `.json` file and shows its requests in the log in place of the
+captured ones, under Captured and Imported, which switch between the two. Archives from Chrome
+DevTools, Charles and Proxyman read as well as the drawer's own: fields they leave out are unknown,
+and fields of their own are ignored. Imported requests are read-only: their detail offers Copy cURL
+and Mock This, which makes a mock that answers like the archive's response, but not Resend. Clear
+removes the imported file and shows the captured requests again. A file that isn't a HAR 1.x
+archive is refused with the reason under the buttons ("The file isn't JSON.") and leaves the log as
+it was. The bug report's `network.har` holds the captured requests only.
+
 ### Tweaks: the app's own debug settings
 
 The Tweaks plugin shows the settings the app declares: toggles, pickers over an enumeration or a
@@ -1297,7 +1317,7 @@ ContentView()
 | `DebugDrawerAccessibilityPlugin` | Runtime overrides of color scheme, Dynamic Type, layout direction, locale and the system accessibility settings SwiftUI exposes, each beside the system's value |
 | `DebugDrawerPerformancePlugin` | Live FPS and memory with sparkline graphs |
 | `DebugDrawerEnergyPlugin` | Battery level and charging, CPU load and thermal state |
-| `DebugDrawerNetworkPlugin` | URLProtocol HTTP interception: method, URL, status, timing, headers, body, cURL export, mock responses by rule, slow and failing networks per host, replay and edit-and-resend |
+| `DebugDrawerNetworkPlugin` | URLProtocol HTTP interception: method, URL, status, timing, headers, body, cURL export, mock responses by rule, slow and failing networks per host, replay and edit-and-resend, HAR export and import |
 | `DebugDrawerDiskIOPlugin` | FileManager reads, writes, deletes and listings, flagging main-thread I/O |
 | `DebugDrawerAppInfoPlugin` | Bundle, version, OS, memory, uptime, process, debugger, screen and reachability facts |
 | `DebugDrawerUserDefaultsPlugin` | Browse, search, edit, copy and delete UserDefaults keys |

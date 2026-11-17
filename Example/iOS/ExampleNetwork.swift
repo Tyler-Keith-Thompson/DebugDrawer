@@ -85,12 +85,14 @@ enum ExampleNetwork {
     }
 
     /// The status, the start of the body and the time of a POST of an order for tea, or why it
-    /// failed and when.
+    /// failed and when. It carries a made-up bearer token, which the drawer masks in Copy cURL and
+    /// HAR exports.
     static func placeOrder() async -> String {
         guard let url = URL(string: orders) else { return "Not a URL" }
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("Bearer example-token", forHTTPHeaderField: "Authorization")
         request.httpBody = Data(#"{"item":"tea","quantity":1}"#.utf8)
         return await send(request)
     }
