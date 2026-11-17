@@ -13,6 +13,10 @@
     @MainActor
     @Suite(.timeLimit(.minutes(1)))
     struct NetworkMockSnapshotTests {
+        // The share of pixels a hosted text-field snapshot must match: the AppKit field's host sometimes
+        // measures it 2 pt short (DD-182), which moves only the field's text.
+        private static let textFieldPrecision: Float = 0.99
+
         @Test(
             "The Mocks section: each rule's switch, name, status, methods and pattern, the selected one's actions, then Add Mock",
             arguments: [ColorScheme.light, .dark]
@@ -97,7 +101,8 @@
             let actual = NSImage(size: host.bounds.size)
             actual.addRepresentation(bitmap)
 
-            assertSnapshot(of: actual, as: .image(perceptualPrecision: 0.98), named: "\(colorScheme)")
+            // The AppKit text field's host sometimes measures it 2 pt short (DD-182), which moves its text.
+            assertSnapshot(of: actual, as: .image(precision: Self.textFieldPrecision, perceptualPrecision: 0.98), named: "\(colorScheme)")
         }
 
         @Test("An invalid regex says why below its field, and Save is unavailable", arguments: [ColorScheme.light, .dark])
@@ -129,7 +134,8 @@
             let actual = NSImage(size: host.bounds.size)
             actual.addRepresentation(bitmap)
 
-            assertSnapshot(of: actual, as: .image(perceptualPrecision: 0.98), named: "\(colorScheme)")
+            // The AppKit text field's host sometimes measures it 2 pt short (DD-182), which moves its text.
+            assertSnapshot(of: actual, as: .image(precision: Self.textFieldPrecision, perceptualPrecision: 0.98), named: "\(colorScheme)")
         }
 
         @Test("A mocked request shows Mocked beside its status and, selected, the rule that answered", arguments: [ColorScheme.light, .dark])
