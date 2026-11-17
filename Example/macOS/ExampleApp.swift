@@ -296,6 +296,9 @@ struct ExampleContentView: View {
                     ExampleResettableState()
                     // UserDefaults lists the key as it is written, without a reload.
                     ExampleUserDefaultsWriter()
+                    // The app's own location manager: the Location plugin's spoofed coordinate or
+                    // route reaches it.
+                    ExampleLocationReadout()
                     // Network logs each request; a mock answers the greeting, which no server does.
                     ExampleNetworkRequests()
                     ExampleWebSocketDemo()

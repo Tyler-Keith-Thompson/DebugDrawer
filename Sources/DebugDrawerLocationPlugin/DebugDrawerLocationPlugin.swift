@@ -2,7 +2,9 @@
     import CoreLocation
     import DebugDrawer
     import ObjectiveC
+    import os
     import SwiftUI
+    import UniformTypeIdentifiers
 
     // MARK: - Location toolkit
 
@@ -14,23 +16,30 @@
         private static let lonKey = "com.debugdrawer.location.longitude"
         private static let enabledKey = "com.debugdrawer.location.enabled"
 
-        private var swizzled = false
+        private let defaults: UserDefaults
 
         /// All tracked CLLocationManager instances for re-delivery.
         private var managers: [WeakManager] = []
+
+        // A lock rather than an actor: the swizzled `location` getter reads it synchronously, on
+        // whatever thread the app asks from. The standard library's Mutex needs iOS 18; the package supports 17.
+        private let routeLocation = OSAllocatedUnfairLock<CLLocation?>(initialState: nil)
 
         private struct WeakManager {
             weak var manager: CLLocationManager?
         }
 
-        private init() {}
+        /// - Parameter defaults: Where the switch and the fixed coordinate are kept.
+        init(defaults: UserDefaults = .standard) {
+            self.defaults = defaults
+        }
 
         // MARK: - State
 
         var isEnabled: Bool {
-            get { UserDefaults.standard.bool(forKey: Self.enabledKey) }
+            get { defaults.bool(forKey: Self.enabledKey) }
             set {
-                UserDefaults.standard.set(newValue, forKey: Self.enabledKey)
+                defaults.set(newValue, forKey: Self.enabledKey)
                 if newValue {
                     installSwizzlesIfNeeded()
                     deliverToAll()
@@ -39,24 +48,42 @@
         }
 
         var latitude: Double {
-            get { UserDefaults.standard.double(forKey: Self.latKey) }
+            get { defaults.double(forKey: Self.latKey) }
             set {
-                UserDefaults.standard.set(newValue, forKey: Self.latKey)
+                defaults.set(newValue, forKey: Self.latKey)
                 if isEnabled { deliverToAll() }
             }
         }
 
         var longitude: Double {
-            get { UserDefaults.standard.double(forKey: Self.lonKey) }
+            get { defaults.double(forKey: Self.lonKey) }
             set {
-                UserDefaults.standard.set(newValue, forKey: Self.lonKey)
+                defaults.set(newValue, forKey: Self.lonKey)
                 if isEnabled { deliverToAll() }
             }
         }
 
+        /// The location apps are given: the route's latest point while one plays, else the fixed
+        /// coordinate, while spoofing is on.
         var simulatedLocation: CLLocation? {
-            guard isEnabled, latitude != 0 || longitude != 0 else { return nil }
+            guard isEnabled else { return nil }
+            if let route = routeLocation.withLock({ $0 }) { return route }
+            guard latitude != 0 || longitude != 0 else { return nil }
             return CLLocation(latitude: latitude, longitude: longitude)
+        }
+
+        // MARK: - Route playback
+
+        /// Gives every tracked manager a route's next point, and keeps it in effect until the next.
+        func deliverRoute(_ location: CLLocation) {
+            routeLocation.withLock { $0 = location }
+            deliver(location)
+        }
+
+        /// Ends a route: the fixed coordinate, if one is set, is in effect again.
+        func endRoute() {
+            routeLocation.withLock { $0 = nil }
+            deliverToAll()
         }
 
         // MARK: - Presets
@@ -86,17 +113,25 @@
 
         private func deliverToAll() {
             guard let location = simulatedLocation else { return }
+            deliver(location)
+        }
+
+        private func deliver(_ location: CLLocation) {
             managers.removeAll { $0.manager == nil }
-            for weak in managers {
-                weak.manager?.delegate?.locationManager?(weak.manager!, didUpdateLocations: [location])
+            for manager in managers.compactMap(\.manager) {
+                manager.delegate?.locationManager?(manager, didUpdateLocations: [location])
             }
         }
 
         // MARK: - Swizzling
 
+        /// Swaps CLLocationManager's methods for the simulator's, once per process: a second swap
+        /// would put the originals back.
         func installSwizzlesIfNeeded() {
-            guard !swizzled else { return }
-            swizzled = true
+            _ = Self.swizzles
+        }
+
+        private static let swizzles: Void = {
 
             // Swizzle init to track instances
             if let original = class_getInstanceMethod(CLLocationManager.self, #selector(CLLocationManager.init)),
@@ -121,7 +156,7 @@
                let swizzledM = class_getInstanceMethod(CLLocationManager.self, #selector(CLLocationManager.debugDrawerSwizzledLocation)) {
                 method_exchangeImplementations(original, swizzledM)
             }
-        }
+        }()
     }
 
     // MARK: - CLLocationManager swizzled methods
@@ -171,8 +206,11 @@
         }
     }
 
-    /// Reads and writes `LocationSimulator.shared`; `LocationForm` draws it.
+    /// Reads and writes `LocationSimulator.shared` and `RoutePlayer.shared`; `LocationForm` and
+    /// `RouteSection` draw them. It presents the file importer for Import GPX….
     private struct LocationPluginView: View {
+        @ObservedObject private var player = RoutePlayer.shared
+        @State private var isImporting = false
         @State private var isEnabled: Bool = LocationSimulator.shared.isEnabled
         @State private var latText: String = {
             let latitude = LocationSimulator.shared.latitude
@@ -184,6 +222,32 @@
         }()
 
         var body: some View {
+            VStack(alignment: .leading, spacing: 0) {
+                form
+                if isEnabled {
+                    RouteSection(
+                        routes: player.routes,
+                        selection: Binding(get: { player.route.id }, set: { player.select($0) }),
+                        speed: $player.speed,
+                        playback: player.playback,
+                        importFailure: player.importFailure,
+                        actions: RouteActions(
+                            play: player.play,
+                            pause: player.pause,
+                            stop: player.stop,
+                            importFile: { isImporting = true }
+                        )
+                    )
+                }
+            }
+            .fileImporter(isPresented: $isImporting, allowedContentTypes: [.gpx, .xml]) { result in
+                if case let .success(url) = result {
+                    player.importFile(Result { () throws(GPXError) in try GPXTrack(contentsOf: url) }, from: url)
+                }
+            }
+        }
+
+        private var form: some View {
             LocationForm(
                 isEnabled: $isEnabled,
                 latitudeText: $latText,
@@ -199,6 +263,8 @@
                 LocationSimulator.shared.longitude = preset.longitude
             }
             .onChange(of: isEnabled) { _, newValue in
+                // The Route section goes with the switch, so a route stops with it.
+                if !newValue { player.stop() }
                 LocationSimulator.shared.isEnabled = newValue
             }
             .onChange(of: latText) { _, newValue in
@@ -300,10 +366,18 @@
         }
     }
 
+    extension UTType {
+        /// GPX files, by their extension: the system declares no type for them.
+        fileprivate static let gpx = UTType(filenameExtension: "gpx", conformingTo: .xml) ?? .xml
+    }
+
     // MARK: - Convenience installer
 
     public extension DebugDrawer {
         func installLocation() {
+            // At install, so a manager the app creates before spoofing is turned on is tracked too,
+            // and a route's points reach it. Until then each swapped method calls the original.
+            LocationSimulator.shared.installSwizzlesIfNeeded()
             registerGlobal(LocationPlugin())
         }
     }

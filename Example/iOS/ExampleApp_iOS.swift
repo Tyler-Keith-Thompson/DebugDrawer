@@ -268,6 +268,12 @@ struct ExampleContentView_iOS: View {
                     ExampleWebSocketDemo()
                 }
 
+                // The app's own location manager: the Location plugin's spoofed coordinate or route
+                // reaches it.
+                Section("Location") {
+                    ExampleLocationReadout()
+                }
+
                 // Colors the Color Vision plugin simulates.
                 Section("Colors") {
                     ExampleColorSwatches()
