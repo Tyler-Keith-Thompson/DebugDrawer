@@ -27,6 +27,8 @@ public struct DebugDrawerRow<Details: View, Accessory: View>: View {
     let details: Details
     let accessory: Accessory
 
+    /// A row with details below the title and an accessory at the trailing edge.
+    ///
     /// - Parameters:
     ///   - title: What the row is ("Camera").
     ///   - systemImage: An SF Symbol beside the title, or `nil` for none.

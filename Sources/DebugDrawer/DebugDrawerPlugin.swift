@@ -2,23 +2,39 @@ import SwiftUI
 
 // MARK: - Plugin protocol
 
-/// A plugin that contributes a section to the debug drawer.
+/// A tool in the debug drawer: a title, an icon and a view, shown as a collapsible section.
 ///
-/// Conform to this protocol to register custom debug panels.
-/// Each plugin gets its own collapsible section in the drawer.
+/// A plugin needs a ``title``, an ``icon`` and a ``body``; everything else has a default.
 ///
-/// Plugins come in two flavors:
-/// - **Global**: registered once via `DebugDrawer.shared.registerGlobal()`, always present.
-/// - **Local**: attached to a view via `.debugLocalPlugin()`, present only while that view is.
+/// ```swift
+/// struct BuildInfoPlugin: DebugDrawerPlugin {
+///     let title = "Build Info"
+///     let icon = "info.circle"
 ///
-/// The protocol exists in all builds so conformances compile everywhere.
-/// In release builds, `.debugLocalPlugin()` and `.debugDrawer()` are no-ops.
+///     var body: some View {
+///         DebugDrawerSection {
+///             DebugDrawerKeyValueRow("Version", value: "1.4.2 (88)")
+///         }
+///     }
+/// }
+/// ```
 ///
-/// `id` is auto-derived from the type name — you don't need to provide one.
-/// The drawer persists each plugin's expand/collapse state via UserDefaults.
+/// Plugins come in two kinds:
+/// - **Global**: registered once with `DebugDrawer.shared.registerGlobal(_:)`, always present.
+/// - **Local**: attached to a view with `debugLocalPlugin(_:)`, present only while that view is.
+///
+/// ``id`` defaults to the type's name. The drawer saves whether each plugin's section is
+/// collapsed in `UserDefaults`, under its ``id``.
+///
+/// The protocol exists in every build so conformances compile everywhere. In release builds
+/// `debugLocalPlugin(_:)` and `debugDrawer()` return the view unchanged, and nothing reads the
+/// plugin.
 public protocol DebugDrawerPlugin: Identifiable {
+    /// The type of the view the plugin shows in its section.
     associatedtype Body: View
+    /// The type of the plugin's HUD readout; `EmptyView` for a plugin with none.
     associatedtype HUD: View = EmptyView
+    /// The type of the plugin's header accessory; `EmptyView` for a plugin with none.
     associatedtype HeaderAccessory: View = EmptyView
 
     /// Identifies the plugin in the drawer: registration, saved state and search. Defaults to the
@@ -112,18 +128,27 @@ let defaultPluginCategory = "General"
 
     // MARK: - Type-erased wrapper
 
-    /// Type-erased wrapper so the drawer can hold heterogeneous plugins.
+    /// A plugin of any type, as the drawer holds it: its properties read once, and its views
+    /// built on demand.
     public struct AnyDebugDrawerPlugin: Identifiable {
+        /// The plugin's ``DebugDrawerPlugin/id``.
         public let id: String
+        /// The plugin's ``DebugDrawerPlugin/title``.
         public let title: String
+        /// The plugin's ``DebugDrawerPlugin/icon``.
         public let icon: String
+        /// The plugin's ``DebugDrawerPlugin/category``.
         public let category: String
+        /// The plugin's ``DebugDrawerPlugin/actions``.
         public let actions: [DebugDrawerAction]
         private let _body: @MainActor () -> AnyView
         private let _hud: (@MainActor () -> AnyView)?
         private let _headerAccessory: (@MainActor () -> AnyView)?
         private let _contribute: (@MainActor (inout DebugDrawerReport, DebugDrawerRedaction) -> Void)?
 
+        /// Wraps `plugin`, reading its properties now and keeping it to build its views later.
+        ///
+        /// - Parameter plugin: The plugin to wrap.
         @MainActor public init<P: DebugDrawerPlugin>(_ plugin: P) {
             id = plugin.id
             title = plugin.title
@@ -160,6 +185,7 @@ let defaultPluginCategory = "General"
             _contribute?(&report, redaction)
         }
 
+        /// The plugin's ``DebugDrawerPlugin/body``, built now.
         @MainActor public var body: AnyView {
             _body()
         }

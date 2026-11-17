@@ -30,3 +30,16 @@ config_setting(
     values = {"compilation_mode": "dbg"},
     visibility = ["//visibility:public"],
 )
+
+# docc_archive's check that every public symbol is documented (tools/docc.bzl), and its tests.
+exports_files(
+    ["documentation_coverage.py"],
+    visibility = ["//visibility:public"],
+)
+
+python_test(
+    name = "documentation_coverage_test",
+    size = "small",
+    src = "documentation_coverage_test.py",
+    data = ["documentation_coverage.py"],
+)

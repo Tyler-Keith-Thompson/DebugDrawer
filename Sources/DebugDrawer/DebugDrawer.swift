@@ -3,20 +3,41 @@
 
     // MARK: - Central registry + state
 
-    /// Central registry for debug drawer plugins and visibility state.
+    /// The accessibility identifier on the drawer's overlay.
     ///
-    /// **Global plugins** live for the app's lifetime — register them once at startup.
-    /// **Local plugins** are tied to a view's lifecycle — use the `.debugLocalPlugin()` modifier.
-    /// Accessibility identifier used on the drawer overlay.
-    /// Auditors and other tools should skip views inside this subtree.
+    /// Auditors and other tools that walk the app's views skip the subtree that carries it, so
+    /// they report on the app and not on the drawer.
     public let debugDrawerOverlayIdentifier = "com.debugdrawer.overlay"
 
+    /// The drawer: the registry of its plugins, whether it is open, and the state it shares with
+    /// them (badges, toasts, the HUD, redaction rules and the report uploader).
+    ///
+    /// There is one, ``shared``. **Global plugins** live for the app's lifetime: register them
+    /// once at startup with ``registerGlobal(_:)``. **Local plugins** follow a view's lifetime:
+    /// attach them with `debugLocalPlugin(_:)`, which registers on appear and unregisters on
+    /// disappear.
+    ///
+    /// ```swift
+    /// DebugDrawer.shared.registerGlobal(BuildInfoPlugin())
+    /// DebugDrawer.shared.toggle()
+    /// ```
+    ///
+    /// The class exists in debug builds only; code that names it sits under `#if DEBUG`. The
+    /// plugin protocol, the views plugins are built from and the `debugDrawer()` and
+    /// `debugLocalPlugin(_:)` modifiers exist in every build.
     @MainActor
     public final class DebugDrawer: ObservableObject {
+        /// The app's drawer, which `debugDrawer()` shows and every plugin registers with.
         public static let shared = DebugDrawer()
 
+        /// Whether the drawer is on screen. Set it, or call ``toggle()`` to animate the change.
         @Published public var isOpen = false
+
+        /// The plugins registered with ``registerGlobal(_:)``, in the order they were registered.
         @Published public private(set) var globalPlugins: [AnyDebugDrawerPlugin] = []
+
+        /// The plugins attached with `debugLocalPlugin(_:)` whose views are on screen, in the order
+        /// they first appeared.
         @Published public private(set) var localPlugins: [AnyDebugDrawerPlugin] = []
 
         /// Tracks the token that owns each local plugin registration.
@@ -29,23 +50,33 @@
 
         // MARK: - Global
 
-        /// Register a global plugin. Always visible in the drawer. Duplicate IDs are ignored.
+        /// Registers a plugin that stays in the drawer for the app's lifetime.
+        ///
+        /// A plugin whose ``DebugDrawerPlugin/id`` is already registered as global is ignored.
+        ///
+        /// - Parameter plugin: The plugin to add.
         public func registerGlobal<P: DebugDrawerPlugin>(_ plugin: P) {
             guard !globalPlugins.contains(where: { $0.id == plugin.id }) else { return }
             globalPlugins.append(AnyDebugDrawerPlugin(plugin))
         }
 
-        /// Remove a global plugin by ID.
+        /// Removes the global plugin with this ID; does nothing if there is none.
+        ///
+        /// - Parameter id: The plugin's ``DebugDrawerPlugin/id``.
         public func unregisterGlobal(id: String) {
             globalPlugins.removeAll { $0.id == id }
         }
 
         // MARK: - Local
 
-        /// Register a local plugin (called by the view modifier on appear).
-        /// If a plugin with the same ID already exists, it is replaced.
-        /// Returns a token that the caller must pass to `unregisterLocal` —
-        /// only the current owner can remove the plugin.
+        /// Registers a plugin tied to a view, replacing any local plugin with the same ID.
+        ///
+        /// `debugLocalPlugin(_:)` calls this when its view appears; call it directly only to tie a
+        /// plugin to something other than a SwiftUI view.
+        ///
+        /// - Parameter plugin: The plugin to add.
+        /// - Returns: The token that owns the registration; pass it to
+        ///   ``unregisterLocal(id:token:)``. Only the latest registration's token removes the plugin.
         @discardableResult
         public func registerLocal<P: DebugDrawerPlugin>(_ plugin: P) -> UUID {
             let token = UUID()
@@ -58,9 +89,14 @@
             return token
         }
 
-        /// Remove a local plugin, but only if the token matches the current registration.
-        /// This prevents a stale view's onDisappear from removing a plugin that a new view
-        /// already re-registered.
+        /// Removes a local plugin if `token` is its current registration's.
+        ///
+        /// A view that disappears after a newer view registered the same plugin holds a stale
+        /// token, so the newer registration stays.
+        ///
+        /// - Parameters:
+        ///   - id: The plugin's ``DebugDrawerPlugin/id``.
+        ///   - token: What ``registerLocal(_:)`` returned.
         public func unregisterLocal(id: String, token: UUID) {
             guard localTokens[id] == token else { return }
             localTokens.removeValue(forKey: id)
@@ -69,7 +105,8 @@
 
         // MARK: - Visibility
 
-        /// Toggle drawer visibility.
+        /// Opens the drawer if it is closed and closes it if it is open, animated unless the system
+        /// reduces motion.
         public func toggle() {
             withAnimation(Self.motion(.easeInOut(duration: 0.25))) {
                 isOpen.toggle()
@@ -78,6 +115,10 @@
 
         /// Hides the HUD, and the drawer unless `drawer` is false, runs `action` once that has
         /// rendered, then shows them again. For screenshots and anything else that needs a clean view.
+        ///
+        /// - Parameters:
+        ///   - hidesDrawer: Whether to close the drawer too; it reopens afterwards if it was open.
+        ///   - action: The work to do while they are hidden.
         public func performWhileHidden(drawer hidesDrawer: Bool = true, _ action: @escaping @MainActor () async -> Void) {
             let reopens = hidesDrawer && isOpen
             let hidesHUD = !hudLayout.pinned.isEmpty
@@ -122,6 +163,11 @@
 
         /// Masks more header names, keys containing these patterns, and JSON paths, on top of
         /// the current rules.
+        ///
+        /// - Parameters:
+        ///   - headers: Header names to mask, matched without regard to case.
+        ///   - keys: Patterns that mask any key containing one, without regard to case.
+        ///   - jsonPaths: Dotted paths into JSON bodies to mask.
         public func redact(
             headers: some Sequence<String> = [String](),
             keys: some Sequence<String> = [String](),
@@ -145,12 +191,16 @@
         @Published public internal(set) var isHUDHidden = false
 
         /// Pins the plugin's readout to the HUD, or removes it if it is pinned, and saves the change.
+        ///
+        /// - Parameter id: The plugin's ``DebugDrawerPlugin/id``.
         public func toggleHUD(forPlugin id: String) {
             hudLayout.togglePin(id)
             hudLayout.save(to: .standard)
         }
 
         /// Moves the HUD's top-leading corner to `origin` and saves it.
+        ///
+        /// - Parameter origin: The new corner, in the window's coordinates.
         public func moveHUD(to origin: CGPoint) {
             hudLayout.origin = origin
             hudLayout.save(to: .standard)
@@ -174,6 +224,10 @@
         @Published var revealRequest: String?
 
         /// Shows `count` on the plugin's section header; zero or less clears it.
+        ///
+        /// - Parameters:
+        ///   - count: The number to show.
+        ///   - id: The plugin's ``DebugDrawerPlugin/id``.
         public func setBadge(_ count: Int, forPlugin id: String) {
             if count > 0 {
                 badges[id] = count
@@ -186,6 +240,10 @@
         /// already has the toast replaces its message and adds to its count, so a burst shows as
         /// one toast; a post from another plugin replaces the toast. While the drawer is open the
         /// post is dropped: the drawer is on screen, and a badge is the lasting signal.
+        ///
+        /// - Parameters:
+        ///   - message: What the toast says.
+        ///   - id: The posting plugin's ``DebugDrawerPlugin/id``.
         public func postToast(_ message: String, fromPlugin id: String) {
             guard !isOpen else { return }
             let count = toast.map { $0.pluginID == id ? $0.count + 1 : 1 } ?? 1

@@ -27,10 +27,12 @@ extension CGFloat {
         import WatchKit
     #endif
 
-    /// Cross-platform clipboard helper.
+    /// Puts `string` on the general pasteboard, replacing what was there.
     ///
     /// Unavailable on tvOS and watchOS, which have no pasteboard: a call there fails to compile
     /// rather than silently copying nothing.
+    ///
+    /// - Parameter string: The text to copy.
     @available(tvOS, unavailable)
     @available(watchOS, unavailable)
     public func debugDrawerCopyToClipboard(_ string: String) {
@@ -43,9 +45,11 @@ extension CGFloat {
         #endif
     }
 
-    /// Cross-platform image copy.
+    /// Puts `image` on the general pasteboard, replacing what was there.
     ///
     /// Unavailable on tvOS and watchOS, which have no pasteboard.
+    ///
+    /// - Parameter image: The image to copy.
     @available(tvOS, unavailable)
     @available(watchOS, unavailable)
     public func debugDrawerCopyImageToClipboard(_ image: PlatformImage) {
@@ -88,13 +92,19 @@ extension CGFloat {
     }
 
     #if os(macOS)
+        /// The platform's image type: `NSImage` on the Mac, `UIImage` elsewhere.
         public typealias PlatformImage = NSImage
+        /// The platform's color type: `NSColor` on the Mac, `UIColor` elsewhere.
         public typealias PlatformColor = NSColor
+        /// The platform's font type: `NSFont` on the Mac, `UIFont` elsewhere.
         public typealias PlatformFont = NSFont
     #elseif os(iOS) || os(visionOS) || os(tvOS) || os(watchOS)
         // UIKit's types on Mac Catalyst too, whose views and pasteboard are UIKit's.
+        /// The platform's image type: `UIImage` here, `NSImage` on the Mac.
         public typealias PlatformImage = UIImage
+        /// The platform's color type: `UIColor` here, `NSColor` on the Mac.
         public typealias PlatformColor = UIColor
+        /// The platform's font type: `UIFont` here, `NSFont` on the Mac.
         public typealias PlatformFont = UIFont
     #endif
 #endif

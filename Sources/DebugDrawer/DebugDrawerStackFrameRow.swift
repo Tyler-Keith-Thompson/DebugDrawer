@@ -28,6 +28,8 @@ public struct DebugDrawerStackFrameRow: View {
     let isOwnCode: Bool
     let isSelected: Bool
 
+    /// A row for one frame of a stack trace.
+    ///
     /// - Parameters:
     ///   - index: The frame's place in the stack, 0 for the innermost.
     ///   - symbol: The function ("OrdersViewModel.load()").

@@ -151,9 +151,28 @@ rm -rf "$graphs"
     )
     return generated.path, [generated]
 
+def _check_documentation(ctx, module_name, symbol_graph_dir):
+    """Runs tools/documentation_coverage.py over the symbol graph; its stamp is the action's output.
+
+    `docc convert --warnings-as-errors` passes a public symbol with no documentation, so this
+    check is what fails on one.
+    """
+    stamp = ctx.actions.declare_file(module_name + ".documented")
+    ctx.actions.run_shell(
+        command = 'python3 "$1" "$2" "$3"',
+        arguments = [ctx.file._documentation_coverage.path, symbol_graph_dir.path, stamp.path],
+        inputs = [ctx.file._documentation_coverage, symbol_graph_dir],
+        outputs = [stamp],
+        env = {"PYTHONDONTWRITEBYTECODE": "1"},
+        mnemonic = "DoccDocumentationCoverage",
+        progress_message = "Checking every public symbol in " + module_name + " is documented",
+    )
+    return [stamp]
+
 def _docc_archive_impl(ctx):
     module_name = ctx.attr.module[SwiftInfo].direct_modules[0].name
     symbol_graph_dir = _extract_symbol_graph(ctx, module_name)
+    checks = _check_documentation(ctx, module_name, symbol_graph_dir) if ctx.attr.require_documentation else []
 
     catalog = ctx.files.catalog
     catalog_path = _catalog_path(catalog)
@@ -188,7 +207,8 @@ def _docc_archive_impl(ctx):
     ctx.actions.run_shell(
         command = 'output="$(' + docc.command + ' "$@" 2>&1)" || { printf "%s\\n" "$output"; exit 1; }',
         arguments = [args],
-        inputs = depset([symbol_graph_dir] + catalog + dependencies),
+        # The documentation check is an input so the archive isn't built while it fails.
+        inputs = depset([symbol_graph_dir] + catalog + dependencies + checks),
         outputs = [archive],
         env = docc.env,
         execution_requirements = docc.execution_requirements,
@@ -224,6 +244,13 @@ docc_archive = rule(
         "catalog_generator_srcs": attr.label_list(
             allow_files = [".py"],
             doc = "Modules the generator imports.",
+        ),
+        "require_documentation": attr.bool(
+            doc = "Fail when a public symbol has no doc comment (tools/documentation_coverage.py).",
+        ),
+        "_documentation_coverage": attr.label(
+            allow_single_file = [".py"],
+            default = "//tools:documentation_coverage.py",
         ),
     },
     fragments = ["cpp"],

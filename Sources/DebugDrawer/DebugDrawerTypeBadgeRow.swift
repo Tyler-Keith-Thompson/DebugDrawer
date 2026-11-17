@@ -28,6 +28,8 @@ public struct DebugDrawerTypeBadgeRow: View {
     let detail: String?
     let version: String?
 
+    /// A row for one loaded binary, its kind shown as a badge.
+    ///
     /// - Parameters:
     ///   - name: The binary's name ("Charts").
     ///   - kind: Which badge it gets.

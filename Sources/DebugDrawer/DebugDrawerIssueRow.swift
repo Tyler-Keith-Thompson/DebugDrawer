@@ -27,6 +27,8 @@ public struct DebugDrawerIssueRow<Details: View, Accessory: View>: View {
     let details: Details
     let accessory: Accessory
 
+    /// An issue row with details and an accessory.
+    ///
     /// - Parameters:
     ///   - title: What the row is ("Camera").
     ///   - status: Its state in a word or two ("Allowed"), shown after a dash; `nil` for none.

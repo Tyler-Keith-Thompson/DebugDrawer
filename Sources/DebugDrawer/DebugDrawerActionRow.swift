@@ -25,6 +25,8 @@ public struct DebugDrawerActionRow<Leading: View, Trailing: View>: View {
     let leading: Leading
     let trailing: Trailing
 
+    /// An action row with everyday actions and one kept apart at the trailing edge.
+    ///
     /// - Parameters:
     ///   - leading: The everyday actions, in reading order.
     ///   - trailing: An action kept apart at the trailing edge, typically a destructive one.

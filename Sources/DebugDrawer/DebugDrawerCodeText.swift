@@ -19,6 +19,8 @@ public struct DebugDrawerCodeText: View {
         let inspection = Inspection<Self>() // from/for ViewInspector.
     #endif
 
+    /// A token on one line, cut in the middle until tapped.
+    ///
     /// - Parameter text: The value, shown in full when expanded.
     public init(_ text: String) {
         self.text = text

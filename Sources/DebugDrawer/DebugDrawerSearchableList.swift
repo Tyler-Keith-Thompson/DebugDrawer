@@ -15,6 +15,8 @@ public struct DebugDrawerSearchableList<Content: View>: View {
     let maxHeight: CGFloat
     let content: Content
 
+    /// A filter field above a list of `content` that scrolls past `maxHeight`.
+    ///
     /// - Parameters:
     ///   - prompt: The field's placeholder ("Filter...").
     ///   - text: The filter text.

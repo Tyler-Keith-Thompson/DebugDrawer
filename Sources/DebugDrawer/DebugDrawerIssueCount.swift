@@ -18,6 +18,8 @@ public struct DebugDrawerIssueCount: View {
     let severity: DebugDrawerIssueGlyph.Severity
     let count: Int
 
+    /// An issue glyph and a count beside it.
+    ///
     /// - Parameters:
     ///   - severity: Which glyph to draw.
     ///   - count: How many there are.

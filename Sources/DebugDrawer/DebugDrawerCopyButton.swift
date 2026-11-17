@@ -15,6 +15,8 @@ public struct DebugDrawerCopyButton: View {
     let title: String
     let value: @MainActor () -> String?
 
+    /// A button that copies the text `value` returns.
+    ///
     /// - Parameters:
     ///   - title: The button's title, which names what it copies ("Copy Value").
     ///   - value: The text to copy, read on each press; `nil` copies nothing and leaves the

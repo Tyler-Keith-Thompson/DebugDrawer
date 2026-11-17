@@ -21,6 +21,8 @@ public struct DebugDrawerGaugeRow: View {
     let fraction: Double
     let severity: DebugDrawerIssueGlyph.Severity?
 
+    /// A gauge row of a label, a bar filled to `fraction`, and the value.
+    ///
     /// - Parameters:
     ///   - label: What is measured ("Memory").
     ///   - value: The measure as shown, a figure and its unit ("182.4 MB").

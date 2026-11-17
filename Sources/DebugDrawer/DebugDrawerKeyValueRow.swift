@@ -27,6 +27,8 @@ public struct DebugDrawerKeyValueRow: View {
         @Environment(\.debugDrawerValueStyle) private var valueStyle
     #endif
 
+    /// A row of a label and its value.
+    ///
     /// - Parameters:
     ///   - label: What the value is ("Version").
     ///   - value: The value itself.

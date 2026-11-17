@@ -21,6 +21,11 @@
         @State private var result: Result?
         @State private var isLoading = false
 
+        /// A view that runs `task` when it appears and then shows `content` of its result.
+        ///
+        /// - Parameters:
+        ///   - task: The work to do; it is cancelled if the view disappears first.
+        ///   - content: The view of the result.
         public init(
             task: @escaping @Sendable () async -> Result,
             @ViewBuilder content: @escaping (Result) -> Content
@@ -68,6 +73,13 @@
         @State private var result: Result?
         @State private var isLoading = false
 
+        /// A view that shows a button titled `loadLabel`, runs `task` when it is pressed, and then
+        /// shows `content` of its result.
+        ///
+        /// - Parameters:
+        ///   - loadLabel: The button's title.
+        ///   - task: The work to do.
+        ///   - content: The view of the result.
         public init(
             loadLabel: String = "Load",
             task: @escaping @Sendable () async -> Result,

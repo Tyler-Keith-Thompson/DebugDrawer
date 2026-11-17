@@ -14,6 +14,8 @@ public struct DebugDrawerSparkline: View {
     let severity: DebugDrawerIssueGlyph.Severity?
     let height: CGFloat
 
+    /// A sparkline of `data`.
+    ///
     /// - Parameters:
     ///   - label: What the samples are, for VoiceOver ("Frame rate history").
     ///   - data: The samples, oldest first.

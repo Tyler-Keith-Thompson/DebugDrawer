@@ -24,6 +24,8 @@ public struct DebugDrawerSection<Content: View, Footer: View>: View {
     let content: Content
     let footer: Footer
 
+    /// A section with a footer below the rows.
+    ///
     /// - Parameters:
     ///   - title: The section's name, shown above the rows and read by VoiceOver as a
     ///     heading; `nil` for none.

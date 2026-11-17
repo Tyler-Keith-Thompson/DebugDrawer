@@ -20,6 +20,7 @@ docc_archive(
     name = "DebugDrawerDocumentation",
     module = ":DebugDrawer",
     catalog = glob(["*.docc/**"], allow_empty = True),
+    require_documentation = True,
     tags = ["manual"],
     visibility = ["//visibility:public"],
 )

@@ -26,6 +26,8 @@ public struct DebugDrawerIssueGlyph: View {
 
     let severity: Severity
 
+    /// The glyph for `severity`.
+    ///
     /// - Parameter severity: Which glyph to draw.
     public init(_ severity: Severity) {
         self.severity = severity

@@ -12,6 +12,8 @@
         @State private var isRevealed = false
         let inspection = Inspection<Self>() // from/for ViewInspector.
 
+        /// Text that shows `redacted` until the eye button beside it reveals `value`.
+        ///
         /// - Parameters:
         ///   - value: The value itself.
         ///   - redacted: What to show until revealed, such as ``DebugDrawerRedaction/mask``.

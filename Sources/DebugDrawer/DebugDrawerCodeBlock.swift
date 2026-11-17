@@ -14,6 +14,8 @@ import SwiftUI
 public struct DebugDrawerCodeBlock<Content: View>: View {
     let content: Content
 
+    /// A code block of `content`.
+    ///
     /// - Parameter content: The lines.
     public init(@ViewBuilder content: () -> Content) {
         self.content = content()

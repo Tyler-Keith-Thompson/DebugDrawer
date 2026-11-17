@@ -202,16 +202,30 @@
     // MARK: - Public API
 
     public extension View {
-        /// Attaches the debug drawer overlay to this view.
-        /// Place once at the root of your view hierarchy. While the drawer is open, Cmd-K focuses its
-        /// search field, which finds plugins and their ``DebugDrawerPlugin/actions``; Cmd-Option-Down
-        /// and Cmd-Option-Up move to the next and previous plugin; Escape clears the search, then
-        /// closes the drawer. Opening it is the app's job: call ``DebugDrawer/toggle()``.
+        /// Attaches the debug drawer to this view.
+        ///
+        /// Place it once, at the root of the app's view hierarchy. While the drawer is open, Cmd-K
+        /// focuses its search field, which finds plugins and their ``DebugDrawerPlugin/actions``;
+        /// Cmd-Option-Down and Cmd-Option-Up move to the next and previous plugin; Escape clears the
+        /// search, then closes the drawer. Opening it is the app's job: call
+        /// ``DebugDrawer/toggle()``.
+        ///
+        /// In release builds it returns the view unchanged.
+        ///
+        /// - Returns: The view with the drawer, its HUD and its toasts over it.
         func debugDrawer() -> some View {
             modifier(DebugDrawerModifier())
         }
 
-        /// Registers a local debug plugin that is active while this view is on screen.
+        /// Adds `plugin` to the drawer while this view is on screen.
+        ///
+        /// The plugin is registered when the view appears, registered again when its
+        /// ``DebugDrawerPlugin/contentIdentifier`` changes, and removed when the view disappears,
+        /// unless a newer view has registered a plugin with the same ID since. In release builds it
+        /// returns the view unchanged.
+        ///
+        /// - Parameter plugin: The plugin to show.
+        /// - Returns: The view, unchanged in how it looks.
         func debugLocalPlugin<P: DebugDrawerPlugin>(_ plugin: P) -> some View {
             modifier(LocalPluginModifier(plugin: plugin))
         }
@@ -219,11 +233,20 @@
 #else
     import SwiftUI
 
+    // The release stand-ins: the same signatures, so the host's code compiles unchanged, and no
+    // drawer behind them.
     public extension View {
+        /// Returns the view unchanged: release builds have no drawer.
+        ///
+        /// - Returns: This view.
         func debugDrawer() -> some View {
             self
         }
 
+        /// Returns the view unchanged: release builds have no drawer, so the plugin is never read.
+        ///
+        /// - Parameter plugin: Ignored.
+        /// - Returns: This view.
         func debugLocalPlugin<P: DebugDrawerPlugin>(_: P) -> some View {
             self
         }
