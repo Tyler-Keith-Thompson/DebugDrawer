@@ -63,7 +63,9 @@
                 drawerPanel(isOpen: drawer.isOpen) {
                     DebugDrawerOverlay(drawer: drawer)
                         .accessibilityIdentifier(debugDrawerOverlayIdentifier)
-                        .background(DebugDrawerTagView())
+                        // The tag fills the window, so it takes no hits (DebugDrawerTagView): the
+                        // open drawer's touches and clicks beside the panel belong to the app.
+                        .background(DebugDrawerTagView().allowsHitTesting(false))
                         .allowsHitTesting(drawer.isOpen)
                 }
             #endif
@@ -127,15 +129,30 @@
     /// can skip the debug drawer subtree without relying on class names.
     public let debugDrawerViewTag = 0xDDB6 // "DDB" = DebugDrawerBoundary
 
+    // The tag view fills the drawer's full-window overlay, so it refuses every touch and click at
+    // both levels: SwiftUI's (allowsHitTesting(false) where it is attached, without which SwiftUI
+    // routes a touch beside the open panel to it on iOS) and the platform view's (a UIKit or AppKit
+    // hit test, which on the Mac would otherwise return it). Otherwise, once the open drawer turns hit
+    // testing on, it would take the touches beside the panel that belong to the app. The panel's own
+    // controls are SwiftUI views above it and still get theirs.
+
     #if os(macOS)
         struct DebugDrawerTagView: NSViewRepresentable {
-            func makeNSView(context _: Context) -> NSView {
-                let view = NSView()
+            func makeNSView(context _: Context) -> DebugDrawerTagNSView {
+                let view = DebugDrawerTagNSView()
                 view.setAccessibilityIdentifier(debugDrawerOverlayIdentifier)
                 return view
             }
 
-            func updateNSView(_: NSView, context _: Context) {}
+            func updateNSView(_: DebugDrawerTagNSView, context _: Context) {}
+        }
+
+        /// The drawer's tag view on the Mac, which no click hits. AppKit has no
+        /// `isUserInteractionEnabled`; a hit test that finds nothing is its equivalent.
+        final class DebugDrawerTagNSView: NSView {
+            override func hitTest(_: NSPoint) -> NSView? {
+                nil
+            }
         }
     #elseif os(iOS) || os(visionOS) || os(tvOS)
         // watchOS has no UIView to tag, and its drawer is a SwiftUI list (DrawerWatchList). Mac
@@ -145,6 +162,7 @@
                 let view = UIView()
                 view.tag = debugDrawerViewTag
                 view.accessibilityIdentifier = debugDrawerOverlayIdentifier
+                view.isUserInteractionEnabled = false
                 return view
             }
 
