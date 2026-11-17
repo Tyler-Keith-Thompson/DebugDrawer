@@ -56,11 +56,6 @@
                 isLoading = false
             }
         }
-
-        /// Trigger a reload (clears current result and re-runs the task).
-        public mutating func reload() {
-            result = nil
-        }
     }
 
     /// A variant that loads on demand (e.g. when a button is pressed) rather than
