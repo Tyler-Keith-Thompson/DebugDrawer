@@ -102,7 +102,11 @@
                     try view.find(button: "Add Key").tap()
                 }
                 try await sut.inspection.inspect { view in
-                    rowsAfterAdding = view.findAll(UserInfoFieldRow.self).count
+                    // The editor holds its rows in columns and, for when those don't fit, stacked;
+                    // the inspector sees both, so the rows are counted in columns.
+                    rowsAfterAdding = view.findAll(UserInfoFieldRow.self) { row in
+                        if case .columns = try row.actualView().layout { true } else { false }
+                    }.count
                 }
             }
 
