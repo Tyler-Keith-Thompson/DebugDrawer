@@ -6,10 +6,10 @@
     // Lines reach the store through an earlier session shown under Previous, which shows them at
     // once; captured lines arrive through the store's batching, on a timer the tests can't steer.
     @MainActor
-    @Suite
+    @Suite(.timeLimit(.minutes(1)))
     struct ConsoleMuteTests {
         @Test("Muting a subsystem hides its lines, and the mute holds in a new store over the same storage")
-        func muteSurvivesANewStore() throws {
+        func muteSurvivesANewStore() async throws {
             let storage = FakeConsoleMuteStorage()
             let header = #"{"debugDrawerConsoleSession":1,"started":"2027-01-15T08:00:00.000Z","app":"Shop","appVersion":""}"#
             let rows = [
@@ -23,12 +23,12 @@
             )))
             let log = ConsoleSessionLog(summary: summary, data: data)
             let first = ConsoleLogStore(muteStorage: storage)
-            first.showPrevious(log)
+            await first.showPrevious(log)
             let expected = ["Cart", "printed"]
 
             first.mute(.subsystem("com.example.feed"))
             let sut = ConsoleLogStore(muteStorage: storage)
-            sut.showPrevious(log)
+            await sut.showPrevious(log)
             let actual = sut.shownLines.map(\.text)
 
             #expect(first.shownLines.map(\.text) == expected)
@@ -55,7 +55,7 @@
         }
 
         @Test("Unmuting shows the lines again and is saved; muting twice adds one mute")
-        func unmute() throws {
+        func unmute() async throws {
             let storage = FakeConsoleMuteStorage()
             let header = #"{"debugDrawerConsoleSession":1,"started":"2027-01-15T08:00:00.000Z","app":"Shop","appVersion":""}"#
             let rows = [
@@ -67,7 +67,7 @@
             )))
             let log = ConsoleSessionLog(summary: summary, data: data)
             let sut = ConsoleLogStore(muteStorage: storage)
-            sut.showPrevious(log)
+            await sut.showPrevious(log)
 
             sut.mute(.subsystem("com.example.feed"))
             sut.mute(.subsystem("com.example.feed"))
@@ -96,7 +96,7 @@
         }
 
         @Test("Show passes the muted lines for now, without forgetting the mute")
-        func showMuted() throws {
+        func showMuted() async throws {
             let header = #"{"debugDrawerConsoleSession":1,"started":"2027-01-15T08:00:00.000Z","app":"Shop","appVersion":""}"#
             let rows = [
                 #"{"level":"info","source":"oslog","subsystem":"com.example.feed","text":"Feed loaded","time":"2027-01-15T08:00:01.000Z"}"#
@@ -107,7 +107,7 @@
             )))
             let log = ConsoleSessionLog(summary: summary, data: data)
             let sut = ConsoleLogStore(muteStorage: FakeConsoleMuteStorage())
-            sut.showPrevious(log)
+            await sut.showPrevious(log)
             sut.mute(.subsystem("com.example.feed"))
 
             sut.showsMuted = true

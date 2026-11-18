@@ -117,5 +117,57 @@
             #expect(clears == 1)
             #expect((try? sut.inspect().find(button: "Delete")) == nil)
         }
+
+        @Test("Under Previous, where nothing is live, the toolbar offers no Resume, even while the log doesn't follow")
+        func noResumeUnderPrevious() throws {
+            let sut = ConsoleToolbarView(
+                isFollowing: .constant(false), filterLevel: .constant(.debug),
+                clear: {}, source: .previous
+            )
+
+            let actual = try? sut.inspect().find(button: "Resume")
+
+            #expect(actual == nil)
+        }
+
+        @Test("Under Captured, the toolbar offers Resume while the log doesn't follow new lines, and taps follow again")
+        func resumeUnderCaptured() throws {
+            final class Following {
+                var value = false
+            }
+            let following = Following()
+            let sut = ConsoleToolbarView(
+                isFollowing: Binding(get: { following.value }, set: { following.value = $0 }), filterLevel: .constant(.debug),
+                clear: {}, source: .captured
+            )
+
+            try sut.inspect().find(button: "Resume").tap()
+
+            #expect(following.value)
+        }
+
+        @Test("Under a page of an earlier session, the hint counts the older lines left out, and Show Earlier asks for them")
+        func earlierLinesHint() throws {
+            var asks = 0
+            let sut = ConsoleEarlierLinesHint(count: 95433) { asks += 1 }
+            let expected = "\(95433.formatted()) earlier lines not listed"
+
+            let view = try sut.inspect()
+            try view.find(button: "Show Earlier").tap()
+
+            #expect(throws: Never.self) { try view.find(text: expected) }
+            #expect(asks == 1)
+        }
+
+        @Test("With every matching line listed, the hint shows nothing; one left out reads in the singular")
+        func earlierLinesHintBoundaries() throws {
+            let none = ConsoleEarlierLinesHint(count: 0) {}
+            let one = ConsoleEarlierLinesHint(count: 1) {}
+
+            let actual = try? none.inspect().find(button: "Show Earlier")
+
+            #expect(actual == nil)
+            #expect(one.title == "1 earlier line not listed")
+        }
     }
 #endif

@@ -22,7 +22,15 @@ import SwiftUI
         /// Which lines the console lists. The level, time range and whether muted lines show are
         /// set through their own properties, the search through `searchText`, and the mutes
         /// through `mute(_:)`, which saves them.
-        @Published private(set) var filter = ConsoleFilter()
+        @Published private(set) var filter = ConsoleFilter() {
+            // The earlier session's page follows the filter, on the main actor, so a change lists
+            // its lines at once.
+            didSet {
+                if let page = previousPage, page.filter != filter {
+                    previousPage = page.filtered(by: filter)
+                }
+            }
+        }
 
         /// The lowest level the console shows.
         public var filterLevel: LogLine.Level {
@@ -92,24 +100,29 @@ import SwiftUI
             filter.apply(to: lines)
         }
 
-        /// The lines the console lists: the captured ones, or the earlier session's while `source`
-        /// is `.previous`, that the filter passes.
+        /// The lines the console lists: the captured ones the filter passes, or, while `source` is
+        /// `.previous`, the earlier session's page of them.
         var shownLines: [LogLine] {
-            filter.apply(to: sourceLines)
+            switch source {
+            case .captured: filteredLines
+            case .previous: previousPage?.lines ?? []
+            }
         }
 
         /// How many of the source's lines the mutes hide, of those the other filters pass; while
         /// `showsMuted`, how many they would hide.
         var mutedCount: Int {
-            filter.mutedCount(in: sourceLines)
+            switch source {
+            case .captured: filter.mutedCount(in: lines)
+            case .previous: previousPage?.mutedCount ?? 0
+            }
         }
 
-        /// Every line of the source, before the filter: the captured ones, or the earlier
-        /// session's while `source` is `.previous`.
-        var sourceLines: [LogLine] {
+        /// The mutes the menu offers for the source's lines.
+        var muteChoices: [ConsoleMute] {
             switch source {
-            case .captured: lines
-            case .previous: previousLog?.lines ?? []
+            case .captured: ConsoleMute.choices(in: lines, excluding: filter.mutes)
+            case .previous: previousPage?.muteChoices ?? []
             }
         }
 
@@ -123,8 +136,14 @@ import SwiftUI
             }
         }
 
+        /// The page of the session an earlier launch kept that shows under Previous, once one is
+        /// read.
+        @Published private(set) var previousPage: ConsoleSessionPage?
+
         /// The session an earlier launch kept that shows under Previous, once one is read.
-        @Published private(set) var previousLog: ConsoleSessionLog?
+        var previousLog: ConsoleSessionLog? {
+            previousPage?.log
+        }
         /// Writes each line to the current session on disk as it is captured; `nil` until
         /// `installConsole()` starts one.
         private(set) var recorder: ConsoleSessionRecorder?
@@ -296,15 +315,26 @@ import SwiftUI
         }
 
         /// Shows the lines of `log`, a session an earlier launch kept, read-only, in place of the
-        /// captured ones.
-        func showPrevious(_ log: ConsoleSessionLog) {
-            previousLog = log
+        /// captured ones; its page is worked out off the main actor first.
+        func showPrevious(_ log: ConsoleSessionLog) async {
+            await showPrevious(ConsoleSessionPage.prepared(log: log, filter: filter))
+        }
+
+        /// Shows `page`, of a session an earlier launch kept, read-only, in place of the captured
+        /// lines. It is filtered again only when the filter changed while it was worked out.
+        func showPrevious(_ page: ConsoleSessionPage) {
+            previousPage = page.filter == filter ? page : page.filtered(by: filter)
             source = .previous
+        }
+
+        /// Lists up to ``ConsoleSessionPage/lineCount`` more of the earlier session's older lines.
+        func showEarlierPreviousLines() {
+            previousPage = previousPage?.showingEarlier()
         }
 
         /// Stops showing the earlier session; the console shows the captured lines again.
         func hidePrevious() {
-            previousLog = nil
+            previousPage = nil
             if source == .previous {
                 source = .captured
             }
@@ -359,42 +389,5 @@ import SwiftUI
             buffer.removeAll()
             publishBuffer()
         }
-    }
-#else
-    // The release stand-in: the same members, so the host's code compiles unchanged, and no
-    // stdout, stderr or os_log capture behind them.
-
-    /// Release builds capture nothing: this stand-in keeps the debug build's members.
-    @MainActor
-    public final class ConsoleLogStore: ObservableObject {
-        /// The stand-in store.
-        public static let shared = ConsoleLogStore()
-
-        /// Always empty: release builds capture nothing.
-        @Published public private(set) var lines: [LogLine] = []
-        /// How many older lines the bounds dropped since the store was made or last cleared.
-        @Published private(set) var droppedLineCount = 0
-
-        /// Kept, never read: release builds list nothing.
-        public var filterLevel: LogLine.Level = .debug
-
-        /// Kept, never read: release builds keep no lines.
-        public var capacity = 2000
-
-        /// Kept, never read: release builds keep no lines.
-        public var byteCapacity = 4 * 1_048_576
-
-        /// Always empty.
-        public var filteredLines: [LogLine] {
-            []
-        }
-
-        private init() {}
-
-        /// Does nothing: release builds capture nothing.
-        public func install() {}
-
-        /// Does nothing.
-        public func clear() {}
     }
 #endif

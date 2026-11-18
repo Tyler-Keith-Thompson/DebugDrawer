@@ -30,7 +30,7 @@
             await sessions.reload()
             let session = try #require(sessions.sessions.first)
             let log = try #require(await sessions.log(of: session.id))
-            sut.showPrevious(log)
+            await sut.showPrevious(log)
             let actual = sut.shownLines
 
             #expect(firstSees.isEmpty)

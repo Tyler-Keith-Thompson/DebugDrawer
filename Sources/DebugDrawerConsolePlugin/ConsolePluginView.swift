@@ -23,7 +23,7 @@
                     ConsoleMoreMenu(
                         timeRange: $store.timeRange,
                         mutes: store.filter.mutes,
-                        muteChoices: ConsoleMute.choices(in: store.sourceLines, excluding: store.filter.mutes),
+                        muteChoices: store.muteChoices,
                         mute: { store.mute($0) },
                         unmute: { store.unmute($0) },
                         copyAll: { debugDrawerCopyToClipboard(visibleLines.copiedText) }
@@ -78,8 +78,11 @@
                     .frame(minHeight: 120, maxHeight: 300)
                 }
 
-                if store.source == .captured {
+                switch store.source {
+                case .captured:
                     ConsoleDroppedHint(count: store.droppedLineCount)
+                case .previous:
+                    ConsoleEarlierLinesHint(count: store.previousPage?.earlierCount ?? 0) { store.showEarlierPreviousLines() }
                 }
                 ConsoleTimeRangeHint(timeRange: store.timeRange) { store.timeRange = .all }
                 ConsoleMutedHint(
@@ -103,6 +106,9 @@
             .onChange(of: sessions.sessions) { _, kept in
                 if kept.isEmpty { store.hidePrevious() }
             }
+            // Each source and session opens at its end. Under Previous there is no Resume to
+            // follow again, so scrolling up in one session doesn't leave the next scrolled up too.
+            .onChange(of: shownSession) { isFollowing = true }
         }
 
         /// The session the lines are from: `nil` for the captured ones.
@@ -121,7 +127,7 @@
         /// Reads the earlier session with `id` and shows its lines.
         private func showPrevious(_ id: ConsoleSessionSummary.ID) async {
             if let log = await sessions.log(of: id) {
-                store.showPrevious(log)
+                await store.showPrevious(log)
             }
         }
 
@@ -138,7 +144,8 @@
     }
 
     /// Extracted toolbar so the segmented picker doesn't get rebuilt on every log update: the
-    /// level, Resume while the log doesn't follow new lines, and Clear at the trailing edge. Copy
+    /// level, Resume while the captured log doesn't follow new lines (an earlier session gets
+    /// none), and Clear at the trailing edge. Copy
     /// All, the time range and the mutes are in More, beside the search field. The line count is
     /// the header's accessory, so the toolbar doesn't repeat it.
     struct ConsoleToolbarView: View {
@@ -154,7 +161,7 @@
             DebugDrawerActionRow {
                 ConsoleFilterPicker(filterLevel: $filterLevel)
 
-                if !isFollowing {
+                if source == .captured, !isFollowing {
                     Button("Resume") { isFollowing = true }
                         .debugDrawerButtonStyle(.borderless)
                         .accessibilityHint("Scrolls to the newest line and follows new ones")

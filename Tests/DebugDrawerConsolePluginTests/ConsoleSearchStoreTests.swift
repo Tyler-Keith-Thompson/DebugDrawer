@@ -6,10 +6,10 @@
     // Lines reach the store through an earlier session shown under Previous, which shows them at
     // once; captured lines arrive through the store's batching, on a timer the tests can't steer.
     @MainActor
-    @Suite
+    @Suite(.timeLimit(.minutes(1)))
     struct ConsoleSearchStoreTests {
         @Test("A regular-expression search lists only the lines that fit the pattern")
-        func regularExpression() throws {
+        func regularExpression() async throws {
             let header = #"{"debugDrawerConsoleSession":1,"started":"2027-01-15T08:00:00.000Z","app":"Shop","appVersion":""}"#
             let rows = [
                 #"{"level":"info","source":"oslog","text":"GET /feed 200","time":"2027-01-15T08:00:01.000Z"}"#,
@@ -21,7 +21,7 @@
                 name: ConsoleSessionSummary.name(started: Date(timeIntervalSince1970: 1_800_000_000), id: UUID()), byteCount: data.count
             )))
             let sut = ConsoleLogStore(muteStorage: FakeConsoleMuteStorage())
-            sut.showPrevious(ConsoleSessionLog(summary: summary, data: data))
+            await sut.showPrevious(ConsoleSessionLog(summary: summary, data: data))
             let expected = ["GET /feed 503"]
 
             sut.searchIsRegularExpression = true
@@ -32,7 +32,7 @@
         }
 
         @Test("An invalid pattern names the problem and leaves the list as the last valid search had it")
-        func invalidPatternKeepsTheList() throws {
+        func invalidPatternKeepsTheList() async throws {
             let header = #"{"debugDrawerConsoleSession":1,"started":"2027-01-15T08:00:00.000Z","app":"Shop","appVersion":""}"#
             let rows = [
                 #"{"level":"info","source":"oslog","text":"feed loaded","time":"2027-01-15T08:00:01.000Z"}"#,
@@ -43,7 +43,7 @@
                 name: ConsoleSessionSummary.name(started: Date(timeIntervalSince1970: 1_800_000_000), id: UUID()), byteCount: data.count
             )))
             let sut = ConsoleLogStore(muteStorage: FakeConsoleMuteStorage())
-            sut.showPrevious(ConsoleSessionLog(summary: summary, data: data))
+            await sut.showPrevious(ConsoleSessionLog(summary: summary, data: data))
             sut.searchIsRegularExpression = true
             sut.searchText = "fe+d"
             let expected = ["feed loaded"]

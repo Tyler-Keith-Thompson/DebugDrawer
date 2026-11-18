@@ -91,7 +91,7 @@
         }
 
         @Test("The store shows the captured lines until an earlier session is shown, and the captured ones again once it is hidden")
-        func storeSources() throws {
+        func storeSources() async throws {
             let started = Date(timeIntervalSince1970: 1_800_000_000)
             let data = Data(#"{"level":"error","source":"stderr","text":"Earlier crash","time":"2027-01-15T08:00:01.000Z"}"#.utf8)
             let summary = try #require(ConsoleSessionSummary(ConsoleSessionFile(
@@ -100,7 +100,7 @@
             let sut = ConsoleLogStore(muteStorage: FakeConsoleMuteStorage())
 
             let before = sut.source
-            sut.showPrevious(ConsoleSessionLog(summary: summary, data: data))
+            await sut.showPrevious(ConsoleSessionLog(summary: summary, data: data))
             let shown = sut.shownLines.map(\.text)
             sut.filterLevel = .fault
             let filtered = sut.shownLines.map(\.text)
