@@ -84,7 +84,12 @@
 
         @Test("Clearing empties the log")
         func clear() {
-            let sut = NetworkStore(ignoreStorage: FakeNetworkIgnoreListStorage())
+            // A recorder of its own: clearing the shared one would drop the connections the
+            // WebSocket tests, running beside this one, are recording.
+            let sut = NetworkStore(
+                ignoreStorage: FakeNetworkIgnoreListStorage(),
+                webSocketRecorder: NetworkWebSocketRecorder(connectionCapacity: 10, frameCapacity: 10)
+            )
             sut.recordStart(NetworkEntry(
                 timestamp: Date(timeIntervalSinceReferenceDate: 800_000_000), method: "GET", url: "https://api.example.com/a",
                 host: "api.example.com", path: "/a", requestHeaders: [:], requestBody: nil, isComplete: false

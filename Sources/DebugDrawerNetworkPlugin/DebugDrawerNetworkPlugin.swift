@@ -182,10 +182,17 @@ public extension NetworkStore {
 
         private var installed = false
 
-        /// - Parameter ignoreStorage: Where the ignore list is kept between launches; nothing is
-        ///   read until `loadIgnoreList(adding:)`.
-        init(ignoreStorage: any NetworkIgnoreListStorage) {
+        /// The WebSocket recorder `clear()` empties: the app's shared one, or a test's own, so a
+        /// test clearing a store of its own leaves other tests' connections alone.
+        private let webSocketRecorder: NetworkWebSocketRecorder
+
+        /// - Parameters:
+        ///   - ignoreStorage: Where the ignore list is kept between launches; nothing is read
+        ///     until `loadIgnoreList(adding:)`.
+        ///   - webSocketRecorder: The recorder whose connections `clear()` empties.
+        init(ignoreStorage: any NetworkIgnoreListStorage, webSocketRecorder: NetworkWebSocketRecorder = .shared) {
             self.ignoreStorage = ignoreStorage
+            self.webSocketRecorder = webSocketRecorder
         }
 
         /// Starts capturing: registers the plugin's URL protocol for `URLSession.shared`, adds it
@@ -274,7 +281,7 @@ public extension NetworkStore {
             buffer.removeAll()
             publishBuffer()
             webSockets.removeAll()
-            NetworkWebSocketRecorder.shared.clear()
+            webSocketRecorder.clear()
         }
 
         // MARK: Ignore list
