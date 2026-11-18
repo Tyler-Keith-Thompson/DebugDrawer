@@ -143,5 +143,65 @@
             // The AppKit text field's host sometimes measures it 2 pt short (DD-182), which moves its text.
             assertSnapshot(of: actual, as: .image(precision: Self.textFieldPrecision, perceptualPrecision: 0.98), named: "\(colorScheme)")
         }
+
+        @Test(
+            "A request whose body the log cut short has Resend unavailable, and says why under the actions",
+            arguments: [ColorScheme.light, .dark]
+        )
+        func resendUnavailable(colorScheme: ColorScheme) throws {
+            let entry = NetworkEntry(
+                timestamp: Date(timeIntervalSinceReferenceDate: 800_000_000), method: "POST", url: "https://api.example.com/v1/upload",
+                host: "api.example.com", path: "/v1/upload", requestHeaders: [:], requestBody: Data(repeating: 0x61, count: 1024),
+                requestBodySize: 4096, statusCode: 201, duration: 0.18, isComplete: true
+            )
+            let sut = NetworkRequestDetail(entry: entry, redaction: .standard, onMock: { _ in }, onResend: { _ in }, onEditAndResend: { _ in })
+            let renderer = ImageRenderer(content: sut
+                .environment(\.locale, Locale(identifier: "en_US"))
+                .frame(width: 316, alignment: .leading)
+                .padding()
+                .background(.background)
+                .environment(\.colorScheme, colorScheme))
+            renderer.scale = 2
+
+            let actual = try #require(renderer.nsImage)
+
+            assertSnapshot(of: actual, as: .image(perceptualPrecision: 0.98), named: "\(colorScheme)")
+        }
+
+        @Test(
+            "Edit and Resend of a body the log cut short says how much was kept of how much, offers Edit Kept Part and Remove Body, and Send waits",
+            arguments: [ColorScheme.light, .dark]
+        )
+        func editorTruncatedBody(colorScheme: ColorScheme) throws {
+            let entry = NetworkEntry(
+                timestamp: Date(timeIntervalSinceReferenceDate: 800_000_000), method: "POST", url: "https://api.example.com/v1/upload",
+                host: "api.example.com", path: "/v1/upload", requestHeaders: ["Content-Type": "application/json"],
+                requestBody: Data(String(repeating: "a", count: 1024).utf8), requestBodySize: 4096, statusCode: 201, isComplete: true
+            )
+            let sut = NetworkReplayEditor(draft: NetworkReplayDraft(entry), cancel: {}, send: { _ in })
+            let host = NSHostingView(rootView: sut
+                .environment(\.locale, Locale(identifier: "en_US"))
+                .frame(width: 316, alignment: .leading)
+                .padding()
+                .background(.background))
+            host.appearance = NSAppearance(named: colorScheme == .dark ? .darkAqua : .aqua)
+            let window = NSWindow(contentRect: .zero, styleMask: .borderless, backing: .buffered, defer: true)
+            window.contentView = host
+            host.frame = CGRect(origin: .zero, size: host.fittingSize)
+            host.layoutSubtreeIfNeeded()
+            let bitmap = try #require(NSBitmapImageRep(
+                bitmapDataPlanes: nil, pixelsWide: Int(host.bounds.width) * 2, pixelsHigh: Int(host.bounds.height) * 2,
+                bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
+                colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0
+            ))
+            bitmap.size = host.bounds.size
+            host.cacheDisplay(in: host.bounds, to: bitmap)
+
+            let actual = NSImage(size: host.bounds.size)
+            actual.addRepresentation(bitmap)
+
+            // The AppKit text field's host sometimes measures it 2 pt short (DD-182), which moves its text.
+            assertSnapshot(of: actual, as: .image(precision: Self.textFieldPrecision, perceptualPrecision: 0.98), named: "\(colorScheme)")
+        }
     }
 #endif

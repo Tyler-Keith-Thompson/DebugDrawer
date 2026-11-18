@@ -8,7 +8,8 @@
     ///
     /// A request a mock answered names the mock; any other offers Mock This once it is complete.
     /// Every request offers Resend and Edit and Resend; one the server may act on asks before it
-    /// is sent again. A replay names its original, and a request that was resent says how often,
+    /// is sent again. One whose body the log cut short can't be resent unchanged, and says so under
+    /// the actions. A replay names its original, and a request that was resent says how often,
     /// each with a button that selects the other.
     ///
     /// A response whose body the log cut short says how much of it the log keeps, and its body
@@ -120,7 +121,7 @@
                         Button("Resend") {
                             if NetworkReplayDraft.isSafe(entry.method) { onResend(entry) } else { isConfirming = true }
                         }
-                        .disabled(isConfirming || replayStatus == .sending)
+                        .disabled(isConfirming || replayStatus == .sending || resendProblem != nil)
                         .accessibilityLabel("Resend")
                         .accessibilityHint("Sends the request again, unchanged")
                     }
@@ -141,9 +142,18 @@
                         isConfirming = false
                     }
                 }
+                if onResend != nil, let resendProblem {
+                    DebugDrawerIssueRow("Resend unavailable", severity: .warning) {
+                        Text(resendProblem)
+                    }
+                }
                 NetworkReplayStatusRow(status: replayStatus)
             }
             .onReceive(inspection.notice) { inspection.visit(self, $0) }
+        }
+
+        private var resendProblem: String? {
+            NetworkReplayDraft.resendProblem(of: entry)
         }
 
         @ViewBuilder

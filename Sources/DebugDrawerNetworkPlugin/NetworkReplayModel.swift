@@ -32,8 +32,13 @@
             self.sender = sender
         }
 
-        /// Sends `entry` again, unchanged.
+        /// Sends `entry` again, unchanged. One whose body the log cut short isn't sent, and its
+        /// status says why.
         func resend(_ entry: NetworkEntry) async {
+            if let problem = NetworkReplayDraft.resendProblem(of: entry) {
+                statuses[entry.id] = .failed(problem)
+                return
+            }
             guard let request = NetworkReplayDraft(entry).request else {
                 statuses[entry.id] = .failed("The captured request can't be sent again: its URL or body isn't one a request can carry.")
                 return

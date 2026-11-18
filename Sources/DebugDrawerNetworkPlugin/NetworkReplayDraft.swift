@@ -3,7 +3,9 @@
 
     /// A captured request as the resend editor holds it while it is changed: its method, URL,
     /// headers and body as text, checked when sent. Made from a captured request, it describes
-    /// that request exactly, so Resend sends it unchanged.
+    /// that request exactly, so Resend sends it unchanged; when the log kept only the first bytes
+    /// of its body, it holds them marked as cut, and sends nothing until the body is replaced or
+    /// removed.
     struct NetworkReplayDraft: Equatable {
         /// The body to send.
         enum Body: Equatable {
@@ -12,6 +14,9 @@
             /// A captured body that isn't UTF-8 text, sent as captured; the editor can only remove
             /// it.
             case binary(Data)
+            /// The first bytes of a captured body the log cut short, which had `size` bytes in
+            /// all. It can't be sent: the editor can only edit the kept part as text, or remove it.
+            case truncated(kept: Data, size: Int)
         }
 
         /// Identifies the draft, so the editor of a new one starts from its own fields.
@@ -30,7 +35,9 @@
             method = entry.method
             url = entry.url
             headers = [NetworkNameValue](sortedByName: entry.requestHeaders.filter { $0.key.lowercased() != "content-length" })
-            body = if let data = entry.requestBody, !data.isEmpty {
+            body = if let data = entry.requestBody, entry.isRequestBodyTruncated {
+                .truncated(kept: data, size: entry.requestBodySize ?? data.count)
+            } else if let data = entry.requestBody, !data.isEmpty {
                 String(data: data, encoding: .utf8).map(Body.text) ?? .binary(data)
             } else {
                 .text("")
@@ -49,6 +56,14 @@
             !Self.isSafe(method)
         }
 
+        /// Why `entry` can't be sent again unchanged, or `nil` when it can: the log kept only the
+        /// first bytes of its body, and sending them would send a different request.
+        static func resendProblem(of entry: NetworkEntry) -> String? {
+            guard entry.isRequestBodyTruncated, let kept = entry.requestBody else { return nil }
+            return "The log kept only the first \(NetworkEntry.sizeLabel(kept.count)) of its \(entry.requestSizeLabel) body. "
+                + "Use Edit and Resend to replace or remove the body."
+        }
+
         /// Whether `method` is safe, in RFC 9110's sense: GET, HEAD, OPTIONS and TRACE only read.
         static func isSafe(_ method: String) -> Bool {
             ["GET", "HEAD", "OPTIONS", "TRACE"].contains(method.uppercased())
@@ -61,9 +76,13 @@
             parsedURL == nil ? "Enter an http or https URL with a host." : nil
         }
 
-        /// Why the body can't be sent, or `nil` when it can. The URL loading system refuses a GET
+        /// Why the body can't be sent, or `nil` when it can. A body the log cut short isn't the
+        /// request's, so it waits to be replaced or removed. The URL loading system refuses a GET
         /// or HEAD with a body, so the editor says so rather than letting the send fail.
         var bodyProblem: String? {
+            if case .truncated = body {
+                return "Only part of the body was kept, so it can't be sent. Edit the kept part, or remove the body."
+            }
             guard hasBody, ["GET", "HEAD"].contains(method.uppercased()) else { return nil }
             return "A \(method.uppercased()) can't carry a body. Remove it, or choose another method."
         }
@@ -79,6 +98,8 @@
             request.httpBody = switch body {
             case let .text(text): text.isEmpty ? nil : Data(text.utf8)
             case let .binary(data): data
+            // Never reached: `bodyProblem` refuses a cut body above.
+            case .truncated: nil
             }
             return request
         }
@@ -86,7 +107,7 @@
         private var hasBody: Bool {
             switch body {
             case let .text(text): !text.isEmpty
-            case .binary: true
+            case .binary, .truncated: true
             }
         }
 

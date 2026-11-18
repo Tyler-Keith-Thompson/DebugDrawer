@@ -169,5 +169,61 @@
             #expect(actualStandard == standard)
             #expect(actualCustom == standard + ["PURGE"])
         }
+
+        @Test("A body the log cut short is held as cut, with its full size, and nothing is sent until it is edited or removed")
+        func truncatedBody() throws {
+            let kept = Data(#"{"items":["tea","#.utf8)
+            let entry = NetworkEntry(
+                timestamp: Date(), method: "POST", url: "https://api.example.com/v1/orders", host: "api.example.com", path: "/v1/orders",
+                requestHeaders: [:], requestBody: kept, requestBodySize: 4096, isComplete: true
+            )
+            let expectedProblem = "Only part of the body was kept, so it can't be sent. Edit the kept part, or remove the body."
+
+            var sut = NetworkReplayDraft(entry)
+            let body = sut.body
+            let problem = sut.bodyProblem
+            let request = sut.request
+            sut.body = .text(#"{"items":["tea","coffee"]}"#)
+            let replaced = try #require(sut.request)
+            sut.body = .text("")
+            let removed = try #require(sut.request)
+
+            #expect(body == .truncated(kept: kept, size: 4096))
+            #expect(problem == expectedProblem)
+            #expect(request == nil)
+            #expect(replaced.httpBody == Data(#"{"items":["tea","coffee"]}"#.utf8))
+            #expect(removed.httpBody == nil)
+        }
+
+        @Test("A cut body stays unsendable whatever the method: a GET is told the body was cut, not that it can't carry one")
+        func truncatedBodyAnyMethod() {
+            var sut = NetworkReplayDraft(NetworkEntry(
+                timestamp: Date(), method: "PUT", url: "https://example.com/a", host: "example.com", path: "/a",
+                requestHeaders: [:], requestBody: Data([0xFF, 0xFE]), requestBodySize: 10, isComplete: true
+            ))
+            let methods = ["PUT", "POST", "GET"]
+
+            let actual = methods.map { method in
+                sut.method = method
+                return sut.request == nil && sut.bodyProblem?.hasPrefix("Only part of the body was kept") == true
+            }
+
+            #expect(actual == [true, true, true])
+        }
+
+        @Test("A body the log kept whole is no different from one with no size: it is sent as captured")
+        func wholeBodyWithSize() throws {
+            let body = Data("name=Ada".utf8)
+            let entry = NetworkEntry(
+                timestamp: Date(), method: "POST", url: "https://example.com/a", host: "example.com", path: "/a",
+                requestHeaders: [:], requestBody: body, requestBodySize: body.count, isComplete: true
+            )
+
+            let sut = NetworkReplayDraft(entry)
+            let actual = try #require(sut.request)
+
+            #expect(sut.body == .text("name=Ada"))
+            #expect(actual.httpBody == body)
+        }
     }
 #endif

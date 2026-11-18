@@ -4,7 +4,8 @@
 
     /// Edit and Resend: a captured request's method, URL, headers and body, to change before it is
     /// sent again. A field that can't be sent says why below it, and Send waits until none does; a
-    /// request the server may act on asks first, in place.
+    /// request the server may act on asks first, in place. A body the log cut short shows how much
+    /// was kept of how much, and Send waits until it is edited or removed.
     ///
     /// It keeps the draft and whether the question is open; the caller sends the request.
     struct NetworkReplayEditor: View {
@@ -101,6 +102,21 @@
                     .debugDrawerForegroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
                 DebugDrawerActionRow {
+                    Button("Remove Body") { draft.body = .text("") }
+                        .accessibilityLabel("Remove Body")
+                }
+            case let .truncated(kept, size):
+                Text("The log kept the first \(NetworkEntry.sizeLabel(kept.count)) of this \(NetworkEntry.sizeLabel(size)) body.")
+                    .debugDrawerFont(.secondary)
+                    .debugDrawerForegroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                DebugDrawerActionRow {
+                    // A cut can split a character, so a kept part that isn't UTF-8 offers no editing.
+                    if let text = String(data: kept, encoding: .utf8) {
+                        Button("Edit Kept Part") { draft.body = .text(text) }
+                            .accessibilityLabel("Edit Kept Part")
+                            .accessibilityHint("Opens the kept part of the body as text, to edit into the body to send")
+                    }
                     Button("Remove Body") { draft.body = .text("") }
                         .accessibilityLabel("Remove Body")
                 }

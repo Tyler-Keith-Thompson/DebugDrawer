@@ -151,5 +151,89 @@
 
             assertSnapshot(of: actual, as: .image(perceptualPrecision: 0.98), named: size == .large ? "large" : "accessibility3")
         }
+
+        @Test(
+            "In an iPad's drawer, a request whose body the log cut short says why Resend is unavailable, under the actions",
+            arguments: [DynamicTypeSize.large, .accessibility3]
+        )
+        func resendUnavailable(size: DynamicTypeSize) {
+            let entry = NetworkEntry(
+                timestamp: Date(timeIntervalSinceReferenceDate: 800_000_000), method: "POST", url: "https://api.example.com/v1/upload",
+                host: "api.example.com", path: "/v1/upload", requestHeaders: [:], requestBody: Data(repeating: 0x61, count: 1024),
+                requestBodySize: 4096, statusCode: 201, duration: 0.18, isComplete: true
+            )
+            let sut = NetworkRequestDetail(entry: entry, redaction: .standard, onMock: { _ in }, onResend: { _ in }, onEditAndResend: { _ in })
+                .environment(\.locale, Locale(identifier: "en_US"))
+
+            let controller = UIHostingController(rootView: sut
+                .frame(width: 316, alignment: .leading)
+                // No height proposed, as the drawer's scroll view proposes none.
+                .fixedSize(horizontal: false, vertical: true)
+                .background(Color(uiColor: .systemBackground))
+                .environment(\.dynamicTypeSize, size))
+            // No safe area: the window's status bar inset would lay the view out shorter than it
+            // measured, overlapping its rows.
+            controller.safeAreaRegions = []
+            let measured = controller.sizeThatFits(in: CGSize(width: 316, height: 8000))
+            let scene = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first
+            let window = scene.map(UIWindow.init(windowScene:)) ?? UIWindow()
+            window.frame = CGRect(origin: .zero, size: measured)
+            window.rootViewController = controller
+            window.overrideUserInterfaceStyle = .light
+            window.isHidden = false
+            controller.view.frame = window.bounds
+            window.layoutIfNeeded()
+            let format = UIGraphicsImageRendererFormat()
+            format.scale = 2
+
+            let actual = UIGraphicsImageRenderer(size: measured, format: format).image { context in
+                controller.view.layer.render(in: context.cgContext)
+            }
+            window.isHidden = true
+
+            assertSnapshot(of: actual, as: .image(perceptualPrecision: 0.98), named: size == .large ? "large" : "accessibility3")
+        }
+
+        @Test(
+            "In an iPad's drawer, Edit and Resend of a body the log cut short keeps its note, Edit Kept Part and Remove Body readable",
+            arguments: [DynamicTypeSize.large, .accessibility3]
+        )
+        func editorTruncatedBody(size: DynamicTypeSize) {
+            let entry = NetworkEntry(
+                timestamp: Date(timeIntervalSinceReferenceDate: 800_000_000), method: "POST", url: "https://api.example.com/v1/upload",
+                host: "api.example.com", path: "/v1/upload", requestHeaders: ["Content-Type": "application/json"],
+                requestBody: Data(String(repeating: "a", count: 1024).utf8), requestBodySize: 4096, statusCode: 201, isComplete: true
+            )
+            let sut = NetworkReplayEditor(draft: NetworkReplayDraft(entry), cancel: {}, send: { _ in })
+                .environment(\.locale, Locale(identifier: "en_US"))
+
+            let controller = UIHostingController(rootView: sut
+                .frame(width: 316, alignment: .leading)
+                // No height proposed, as the drawer's scroll view proposes none.
+                .fixedSize(horizontal: false, vertical: true)
+                .background(Color(uiColor: .systemBackground))
+                .environment(\.dynamicTypeSize, size))
+            // No safe area: the window's status bar inset would lay the view out shorter than it
+            // measured, overlapping its rows.
+            controller.safeAreaRegions = []
+            let measured = controller.sizeThatFits(in: CGSize(width: 316, height: 8000))
+            let scene = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first
+            let window = scene.map(UIWindow.init(windowScene:)) ?? UIWindow()
+            window.frame = CGRect(origin: .zero, size: measured)
+            window.rootViewController = controller
+            window.overrideUserInterfaceStyle = .light
+            window.isHidden = false
+            controller.view.frame = window.bounds
+            window.layoutIfNeeded()
+            let format = UIGraphicsImageRendererFormat()
+            format.scale = 2
+
+            let actual = UIGraphicsImageRenderer(size: measured, format: format).image { context in
+                controller.view.layer.render(in: context.cgContext)
+            }
+            window.isHidden = true
+
+            assertSnapshot(of: actual, as: .image(perceptualPrecision: 0.98), named: size == .large ? "large" : "accessibility3")
+        }
     }
 #endif

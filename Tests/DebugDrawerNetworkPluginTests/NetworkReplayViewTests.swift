@@ -345,5 +345,123 @@
             #expect(note == "3 bytes that aren't text, sent as captured.")
             #expect(editorAfter)
         }
+
+        @Test("Resend of a request whose body the log cut short is unavailable, and says why under the actions")
+        func truncatedResendUnavailable() throws {
+            let entry = NetworkEntry(
+                timestamp: Date(timeIntervalSinceReferenceDate: 800_000_000), method: "POST", url: "https://api.example.com/v1/upload",
+                host: "api.example.com", path: "/v1/upload", requestHeaders: [:], requestBody: Data(repeating: 0x61, count: 1024),
+                requestBodySize: 4096, statusCode: 201, isComplete: true
+            )
+            var resent: [UUID] = []
+            let sut = NetworkRequestDetail(entry: entry, redaction: .standard, onResend: { resent.append($0.id) }, onEditAndResend: { _ in })
+            let expectedReason = "The log kept only the first 1 KB of its 4 KB body. Use Edit and Resend to replace or remove the body."
+
+            let isDisabled = try sut.inspect().find(button: "Resend").isDisabled()
+            let title = try sut.inspect().find(text: "Resend unavailable").string()
+            let reason = try sut.inspect().find(text: expectedReason).string()
+            let editIsDisabled = try sut.inspect().find(button: "Edit and Resend…").isDisabled()
+
+            #expect(isDisabled)
+            #expect(title == "Resend unavailable")
+            #expect(reason == expectedReason)
+            #expect(!editIsDisabled)
+            #expect(resent.isEmpty)
+        }
+
+        @Test("A request whose body was kept whole has Resend available, with no reason under the actions")
+        func wholeBodyResendAvailable() throws {
+            let body = Data("{}".utf8)
+            let entry = NetworkEntry(
+                timestamp: Date(timeIntervalSinceReferenceDate: 800_000_000), method: "GET", url: "https://api.example.com/v1/orders",
+                host: "api.example.com", path: "/v1/orders", requestHeaders: [:], requestBody: body, requestBodySize: body.count,
+                statusCode: 200, isComplete: true
+            )
+            let sut = NetworkRequestDetail(entry: entry, redaction: .standard, onResend: { _ in })
+
+            let isDisabled = try sut.inspect().find(button: "Resend").isDisabled()
+
+            #expect(!isDisabled)
+            #expect(throws: (any Error).self) { try sut.inspect().find(text: "Resend unavailable") }
+        }
+
+        @Test("Edit and Resend says the captured body was cut, with its full size; Send waits until the kept part is edited")
+        func editorTruncatedBodyEdited() async throws {
+            let entry = NetworkEntry(
+                timestamp: Date(timeIntervalSinceReferenceDate: 800_000_000), method: "POST", url: "https://api.example.com/v1/orders",
+                host: "api.example.com", path: "/v1/orders", requestHeaders: [:], requestBody: Data(String(repeating: "a", count: 2048).utf8),
+                requestBodySize: 5 * 1024 * 1024, statusCode: 201, isComplete: true
+            )
+            var sent: [URLRequest] = []
+            let sut = NetworkReplayEditor(draft: NetworkReplayDraft(entry), cancel: {}, send: { sent.append($0) })
+            let expectedProblem = "Only part of the body was kept, so it can't be sent. Edit the kept part, or remove the body."
+            var note = ""
+            var problem = false
+            var editorBefore = true
+            var disabled = false
+            var keptText = ""
+            var disabledAfter = true
+
+            try await ViewHosting.host(sut) {
+                try await sut.inspection.inspect { view in
+                    note = try view.find(textWhere: { text, _ in text.hasPrefix("The log kept the first") }).string()
+                    problem = (try? view.find(text: expectedProblem)) != nil
+                    editorBefore = (try? view.find(ViewType.TextEditor.self)) != nil
+                    disabled = try view.find(button: "Send").isDisabled()
+                    try view.find(button: "Edit Kept Part").tap()
+                }
+                try await sut.inspection.inspect { view in
+                    let editor = try view.find(ViewType.TextEditor.self)
+                    keptText = try editor.input()
+                    try editor.setInput("name=Ada")
+                }
+                try await sut.inspection.inspect { view in
+                    disabledAfter = try view.find(button: "Send").isDisabled()
+                    try view.find(button: "Send").tap()
+                }
+                try await sut.inspection.inspect { view in
+                    try view.find(NetworkResendConfirmation.self).find(button: "Send").tap()
+                }
+            }
+
+            #expect(note == "The log kept the first 2 KB of this 5.0 MB body.")
+            #expect(problem)
+            #expect(!editorBefore)
+            #expect(disabled)
+            #expect(keptText == String(repeating: "a", count: 2048))
+            #expect(!disabledAfter)
+            #expect(sent.map(\.httpBody) == [Data("name=Ada".utf8)])
+        }
+
+        @Test("Edit and Resend of a cut body that isn't text offers only Remove Body, which makes the request sendable with no body")
+        func editorTruncatedBodyRemoved() async throws {
+            let entry = NetworkEntry(
+                timestamp: Date(timeIntervalSinceReferenceDate: 800_000_000), method: "PUT", url: "https://example.com/upload",
+                host: "example.com", path: "/upload", requestHeaders: [:], requestBody: Data([0xFF, 0xFE, 0x00]), requestBodySize: 2048,
+                isComplete: true
+            )
+            let sut = NetworkReplayEditor(draft: NetworkReplayDraft(entry), cancel: {}, send: { _ in })
+            var editOffered = true
+            var disabled = false
+            var disabledAfter = true
+            var problemAfter = true
+
+            try await ViewHosting.host(sut) {
+                try await sut.inspection.inspect { view in
+                    editOffered = (try? view.find(button: "Edit Kept Part")) != nil
+                    disabled = try view.find(button: "Send").isDisabled()
+                    try view.find(button: "Remove Body").tap()
+                }
+                try await sut.inspection.inspect { view in
+                    disabledAfter = try view.find(button: "Send").isDisabled()
+                    problemAfter = (try? view.find(textWhere: { text, _ in text.hasPrefix("Only part of the body was kept") })) != nil
+                }
+            }
+
+            #expect(!editOffered)
+            #expect(disabled)
+            #expect(!disabledAfter)
+            #expect(!problemAfter)
+        }
     }
 #endif
