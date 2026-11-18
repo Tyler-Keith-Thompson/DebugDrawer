@@ -112,7 +112,7 @@
         }
 
         @Test("Edit and Resend: the method, the URL, each header and the body, then Send and Cancel", arguments: [ColorScheme.light, .dark])
-        func editor(colorScheme: ColorScheme) throws {
+        func replayEditor(colorScheme: ColorScheme) throws {
             let entry = NetworkEntry(
                 timestamp: Date(timeIntervalSinceReferenceDate: 800_000_000), method: "POST", url: "https://api.example.com/v1/orders",
                 host: "api.example.com", path: "/v1/orders", requestHeaders: ["Content-Type": "application/json", "X-Client": "app"],

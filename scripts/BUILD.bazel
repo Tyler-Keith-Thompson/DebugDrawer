@@ -26,3 +26,12 @@ python_test(
     src = "catalyst_example_test.py",
     data = ["catalyst_example.py"],
 )
+
+# The module graph's check that no two snapshot references of one test target share a base name
+# (scripts/modules.py, which `just modules` and `just record-snapshots` run).
+python_test(
+    name = "modules_test",
+    size = "small",
+    src = "modules_test.py",
+    data = ["modules.py"],
+)

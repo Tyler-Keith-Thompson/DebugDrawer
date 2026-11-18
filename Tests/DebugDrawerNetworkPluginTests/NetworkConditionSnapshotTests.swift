@@ -66,7 +66,7 @@
             "The editor: name and switch, the host's match and pattern, a preset, latency, bandwidth, failure rate and failure",
             arguments: [ColorScheme.light, .dark]
         )
-        func editor(colorScheme: ColorScheme) throws {
+        func conditionEditor(colorScheme: ColorScheme) throws {
             let profile = NetworkConditionProfile(
                 id: UUID(uuidString: "00000000-0000-0000-0000-000000000001") ?? UUID(),
                 name: "Slow API", host: .exact("api.example.com"), latency: .milliseconds(2000), bandwidth: 50000, failureRate: 10,

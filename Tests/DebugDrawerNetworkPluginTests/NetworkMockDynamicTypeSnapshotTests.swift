@@ -59,7 +59,7 @@
         }
 
         @Test("The editor stays readable at an accessibility text size: each header's name above its value")
-        func editor() throws {
+        func mockEditor() throws {
             let rule = NetworkMockRule(
                 id: UUID(uuidString: "00000000-0000-0000-0000-000000000001") ?? UUID(),
                 name: "Greeting",

@@ -69,7 +69,7 @@
             "The editor: name and switch, methods, host and path patterns, query, status, content type, headers and a text body",
             arguments: [ColorScheme.light, .dark]
         )
-        func editor(colorScheme: ColorScheme) throws {
+        func mockEditor(colorScheme: ColorScheme) throws {
             let rule = NetworkMockRule(
                 id: UUID(uuidString: "00000000-0000-0000-0000-000000000001") ?? UUID(),
                 name: "Greeting",

@@ -55,7 +55,7 @@
             "The WebSockets section: an open connection, one that failed with its glyph, and one closed by the app",
             arguments: [ColorScheme.light, .dark]
         )
-        func section(colorScheme: ColorScheme) throws {
+        func webSocketSection(colorScheme: ColorScheme) throws {
             let start = Date(timeIntervalSinceReferenceDate: 800_000_000)
             var open = NetworkWebSocketConnection(url: "wss://chat.example.com/v1/room", opened: start)
             for index in 0 ..< 12 {

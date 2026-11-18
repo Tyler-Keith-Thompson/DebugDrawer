@@ -109,7 +109,7 @@
             "In an iPad's drawer, the Ignored hosts section keeps each domain, Remove, the field and its problem readable",
             arguments: [DynamicTypeSize.large, .accessibility3]
         )
-        func section(size: DynamicTypeSize) throws {
+        func ignoreSection(size: DynamicTypeSize) throws {
             let domains = try ["analytics.example.net", "cdn.example.com", "10.0.0.1"].map { try NetworkIgnoredDomain(parsing: $0) }
             let sut = NetworkIgnoreListSection(
                 domains: domains, issue: nil, add: { _ in }, remove: { _ in }, text: "*.example.com", problem: .wildcard

@@ -365,6 +365,21 @@ def check():
                 assert d not in IOS_MODULES, f"{name} depends on the iOS module {d}, so it must be in IOS_MODULES"
 
 
+def snapshot_name_clashes(root, name):
+    """The snapshot references of test target `name` (under `root`/Tests) that share a base name.
+
+    rules_xcodeproj copies a test target's references into one flat bundle, so two with the same
+    base name (`editor-colorScheme.light.png` under two suites) make `bazel run //:xcodeproj`
+    fail with conflicting actions. Returns one sorted list of paths relative to `root` per shared
+    name, sorted by name; empty when every name is unique.
+    """
+    paths = {}
+    for parent, _, files in os.walk(os.path.join(root, "Tests", name, "__Snapshots__")):
+        for file in files:
+            paths.setdefault(file, []).append(os.path.relpath(os.path.join(parent, file), root))
+    return [sorted(paths[file]) for file in sorted(paths) if len(paths[file]) > 1]
+
+
 def simulator_test(name):
     """Whether test target `name` runs in the iOS simulator: it depends on an iOS module or a Bazel label."""
     deps = dict(TEST_TARGETS)[name]
@@ -1025,6 +1040,11 @@ def main():
         has_performance = any(fn.endswith(".swift") for _, _, fns in os.walk(performance) for fn in fns)
         assert has_performance == (name in PERFORMANCE_TESTS), \
             f"{name}: Performance/ holds Swift sources exactly when the target is in PERFORMANCE_TESTS"
+        clashes = snapshot_name_clashes(ROOT, name)
+        assert not clashes, (
+            f"{name}: snapshot references share a base name, which the Xcode project's flat test bundle can't hold; "
+            "rename a test so each name is unique: " + "; ".join(" and ".join(paths) for paths in clashes)
+        )
     for name, description, deps in EXECUTABLES:
         d = os.path.join(ROOT, "Sources", name)
         write(os.path.join(d, "BUILD.bazel"), executable_build_bazel(name, description, deps))

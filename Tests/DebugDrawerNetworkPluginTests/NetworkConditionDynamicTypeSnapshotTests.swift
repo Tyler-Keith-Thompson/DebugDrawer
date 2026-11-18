@@ -57,7 +57,7 @@
         }
 
         @Test("The editor stays readable at an accessibility text size: each choice a menu, each number beside its unit")
-        func editor() throws {
+        func conditionEditor() throws {
             let profile = NetworkConditionProfile(
                 id: UUID(uuidString: "00000000-0000-0000-0000-000000000001") ?? UUID(),
                 name: "Slow API", host: .exact("api.example.com"), latency: .milliseconds(2000), bandwidth: 50000, failureRate: 10,

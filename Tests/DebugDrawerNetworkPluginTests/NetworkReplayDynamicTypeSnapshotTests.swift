@@ -114,7 +114,7 @@
             "In an iPad's drawer, Edit and Resend keeps every field readable: each header's name above its value at a large size",
             arguments: [DynamicTypeSize.large, .accessibility3]
         )
-        func editor(size: DynamicTypeSize) {
+        func replayEditor(size: DynamicTypeSize) {
             let entry = NetworkEntry(
                 timestamp: Date(timeIntervalSinceReferenceDate: 800_000_000), method: "POST", url: "https://api.example.com/v1/orders",
                 host: "api.example.com", path: "/v1/orders", requestHeaders: ["Content-Type": "application/json"],

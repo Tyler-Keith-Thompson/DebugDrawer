@@ -106,7 +106,7 @@
             "The Ignored hosts section: each domain with Remove, the note, then the field and Ignore Host",
             arguments: [ColorScheme.light, .dark]
         )
-        func section(colorScheme: ColorScheme) throws {
+        func ignoreSection(colorScheme: ColorScheme) throws {
             let domains = try ["analytics.example.net", "cdn.example.com", "10.0.0.1"].map { try NetworkIgnoredDomain(parsing: $0) }
             let sut = NetworkIgnoreListSection(domains: domains, issue: nil, add: { _ in }, remove: { _ in })
 
