@@ -59,7 +59,7 @@
             assertSnapshot(of: actual, as: .image(perceptualPrecision: 0.98), named: "\(colorScheme)")
         }
 
-        @Test("An imported request's detail offers Copy cURL and Mock This, and no Resend", arguments: [ColorScheme.light, .dark])
+        @Test("An imported request's detail offers no Resend, only More", arguments: [ColorScheme.light, .dark])
         func importedRow(colorScheme: ColorScheme) throws {
             let entry = NetworkEntry(
                 timestamp: Date(timeIntervalSinceReferenceDate: 800_000_000), method: "GET", url: "https://shop.example.com/api/cart?id=12",

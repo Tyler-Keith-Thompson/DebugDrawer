@@ -84,7 +84,7 @@
             #expect(actual == nil)
         }
 
-        @Test("An imported request offers Copy cURL and Mock This, but neither Resend nor Edit and Resend")
+        @Test("An imported request offers Copy cURL and Mock This under More, but neither Resend nor Edit and Resend")
         func importedEntryReadOnly() throws {
             let entry = NetworkEntry(
                 timestamp: Date(timeIntervalSince1970: 0), method: "GET", url: "https://shop.example.com/api/cart",

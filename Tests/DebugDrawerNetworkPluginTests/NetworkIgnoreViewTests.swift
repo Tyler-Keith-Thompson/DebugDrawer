@@ -19,7 +19,7 @@
             var ignored: [String] = []
             let sut = NetworkRequestDetail(entry: entry, redaction: .standard, onIgnore: { ignored.append($0.name) })
 
-            let menu = try sut.inspect().find(ViewType.Menu.self)
+            let menu = try sut.inspect().find(ViewType.Menu.self) { try $0.accessibilityLabel().string() == "Ignore Host" }
             let choices = try menu.findAll(ViewType.Button.self).map { try $0.labelView().text().string() }
             try menu.find(button: "Ignore example.com").tap()
 
@@ -38,7 +38,7 @@
 
             try sut.inspect().find(button: "Ignore 10.0.0.1").tap()
 
-            #expect((try? sut.inspect().find(ViewType.Menu.self)) == nil)
+            #expect((try? sut.inspect().find(ViewType.Menu.self) { try $0.accessibilityLabel().string() == "Ignore Host" }) == nil)
             #expect(ignored == ["10.0.0.1"])
         }
 

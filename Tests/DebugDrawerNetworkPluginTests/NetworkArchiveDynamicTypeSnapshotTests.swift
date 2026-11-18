@@ -67,7 +67,7 @@
         }
 
         @Test(
-            "In an iPad's drawer, an imported request's row keeps its path, and its detail's Copy cURL and Mock This wrap without squeezing",
+            "In an iPad's drawer, an imported request's row keeps its path, and its detail offers More alone",
             arguments: [DynamicTypeSize.large, .accessibility3]
         )
         func importedRow(size: DynamicTypeSize) {

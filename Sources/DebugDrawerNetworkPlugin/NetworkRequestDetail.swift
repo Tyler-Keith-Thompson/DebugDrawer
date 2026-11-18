@@ -3,14 +3,16 @@
     import SwiftUI
 
     /// A request in full: its URL, time, size and status, query parameters, timing, error, headers
-    /// and bodies, with a button to copy it as a cURL command. Values the redaction rules call
-    /// sensitive are masked in the copy, and on screen until revealed.
+    /// and bodies, then Resend and a More menu (``NetworkRequestMoreMenu``) that copies it as a cURL
+    /// command. Values the redaction rules call sensitive are masked in the copy, and on screen
+    /// until revealed.
     ///
     /// A request a mock answered names the mock; any other offers Mock This once it is complete.
     /// Every request offers Resend and Edit and Resend; one the server may act on asks before it
-    /// is sent again. One whose body the log cut short can't be resent unchanged, and says so under
-    /// the actions. A replay names its original, and a request that was resent says how often,
-    /// each with a button that selects the other.
+    /// is sent again. One whose body the log cut short can't be resent unchanged: Resend stays in
+    /// its place, unavailable, and the reason shows under the actions. A replay names its
+    /// original, and a request that was resent says how often, each with a button that selects
+    /// the other.
     ///
     /// A response whose body the log cut short says how much of it the log keeps, and its body
     /// stays masked until revealed when the redaction rules can't be read against it.
@@ -38,6 +40,7 @@
         /// Ignore, as for a host the list ignores already.
         var onIgnore: ((NetworkIgnoredDomain) -> Void)?
         @State var isConfirming = false
+        @ScaledMetric(relativeTo: .body) var actionGap: CGFloat = 8
         let inspection = Inspection<Self>()
 
         var body: some View {
@@ -111,27 +114,24 @@
                 payload
 
                 DebugDrawerActionRow {
-                    DebugDrawerCopyButton("Copy cURL") { entry.curl(redaction: redaction) }
-                    if let onMock, entry.isComplete, entry.mockRuleName == nil {
-                        Button("Mock This") { onMock(entry) }
-                            .accessibilityLabel("Mock This")
-                            .accessibilityHint("Makes a mock that answers requests like this one with its response")
-                    }
-                    if let onResend {
-                        Button("Resend") {
-                            if NetworkReplayDraft.isSafe(entry.method) { onResend(entry) } else { isConfirming = true }
+                    // One item in the row, so Resend and More stay on one line at accessibility
+                    // sizes too, where the row stacks its items.
+                    HStack(spacing: actionGap) {
+                        if let onResend {
+                            Button("Resend") {
+                                if NetworkReplayDraft.isSafe(entry.method) { onResend(entry) } else { isConfirming = true }
+                            }
+                            .disabled(isConfirming || replayStatus == .sending || resendProblem != nil)
+                            .accessibilityLabel("Resend")
+                            .accessibilityHint("Sends the request again, unchanged")
                         }
-                        .disabled(isConfirming || replayStatus == .sending || resendProblem != nil)
-                        .accessibilityLabel("Resend")
-                        .accessibilityHint("Sends the request again, unchanged")
-                    }
-                    if let onEditAndResend {
-                        Button("Edit and Resend…") { onEditAndResend(entry) }
-                            .accessibilityLabel("Edit and Resend…")
-                            .accessibilityHint("Opens the request to change its method, URL, headers or body before sending it again")
-                    }
-                    if let onIgnore {
-                        NetworkIgnoreHostButton(host: entry.host, ignore: onIgnore)
+                        NetworkRequestMoreMenu(
+                            copyCURL: { debugDrawerCopyToClipboard(entry.curl(redaction: redaction)) },
+                            mock: mock,
+                            editAndResend: editAndResend,
+                            host: entry.host,
+                            ignore: onIgnore
+                        )
                     }
                 }
                 if isConfirming, let onResend {
@@ -150,6 +150,17 @@
                 NetworkReplayStatusRow(status: replayStatus)
             }
             .onReceive(inspection.notice) { inspection.visit(self, $0) }
+        }
+
+        /// Mock This, for a complete request no mock answered.
+        private var mock: (() -> Void)? {
+            guard let onMock, entry.isComplete, entry.mockRuleName == nil else { return nil }
+            return { [entry] in onMock(entry) }
+        }
+
+        private var editAndResend: (() -> Void)? {
+            guard let onEditAndResend else { return nil }
+            return { [entry] in onEditAndResend(entry) }
         }
 
         private var resendProblem: String? {

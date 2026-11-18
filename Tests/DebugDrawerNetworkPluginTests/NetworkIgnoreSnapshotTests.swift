@@ -20,7 +20,7 @@
         private static let textFieldPrecision: Float = 0.99
 
         @Test(
-            "A GraphQL request's row and detail: the path with GetUser, Operation, and Ignore Host among the actions",
+            "A GraphQL request's row and detail: the path with GetUser, Operation, then Resend and More, which holds Ignore Host",
             arguments: [ColorScheme.light, .dark]
         )
         func graphQLRequest(colorScheme: ColorScheme) throws {
