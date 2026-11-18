@@ -217,6 +217,11 @@ import SwiftUI
             // On iOS, dup2 on stdout breaks Xcode's debugger attachment.
             #if os(macOS)
                 originalStdoutFd = dup(STDOUT_FILENO)
+                // Swift's `print` writes through C's `stdout`, which buffers fully once it finds a
+                // pipe behind it, so printed lines would reach the console in chunks. Line
+                // buffering keeps each line whole and on time. Set before the redirect: setvbuf
+                // flushes what was buffered to where it was headed. stderr stays unbuffered.
+                setvbuf(stdout, nil, _IOLBF, 0)
                 redirectStream(source: .stdout, fd: STDOUT_FILENO)
                 redirectStream(source: .stderr, fd: STDERR_FILENO)
             #endif
