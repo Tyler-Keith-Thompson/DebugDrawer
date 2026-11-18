@@ -1,8 +1,8 @@
 import DebugDrawer
 import UIKit
 
-/// The UIKit example's screen: the activity the scene continued last, and a bar button that
-/// toggles the drawer.
+/// The UIKit example's screen: the activity the scene continued last, a bar button that toggles
+/// the drawer and one that shows the test bench.
 final class ExampleUIKitViewController: UIViewController {
     private let continued = UILabel()
 
@@ -15,6 +15,12 @@ final class ExampleUIKitViewController: UIViewController {
             primaryAction: UIAction { _ in DebugDrawer.shared.toggle() }
         )
         navigationItem.rightBarButtonItem?.accessibilityLabel = "Debug Drawer"
+        navigationItem.leftBarButtonItem = UIBarButtonItem(
+            title: "Test Bench",
+            primaryAction: UIAction { [weak self] _ in
+                self?.navigationController?.pushViewController(ExampleUIKitTestBenchViewController(), animated: true)
+            }
+        )
 
         let heading = UILabel()
         heading.text = "Last Continued Activity"

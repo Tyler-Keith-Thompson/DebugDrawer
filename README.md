@@ -1908,7 +1908,7 @@ Bazel is the development build; SwiftPM is the published package. Both are gener
 | `just lint` | SwiftLint and a11y-check over every first-party target |
 | `just record-snapshots` | Every snapshot reference, re-recorded into the workspace |
 | `just generate` | An Xcode project from the Bazel graph |
-| `just run [macOS\|iOS\|catalyst\|visionOS\|tvOS\|watchOS]` | Build and launch the example app |
+| `just run [macOS\|iOS\|appkit\|uikit\|catalyst\|visionOS\|tvOS\|watchOS]` | Build and launch an example app; each has a Test Bench of actions that give every plugin something to show (`-RunTestBench all` runs them at launch) |
 
 `AGENTS.md` describes the layout, the workflow and the house rules in full.
 

@@ -20,7 +20,9 @@ Sources/DebugDrawer<Name>Plugin/ One module per shipped plugin
 Tests/<Module>Tests/             One test target per module; Performance/ holds speed-reliant tests
 Tests/DebugDrawerTests/          The core's tests and the README examples, verbatim
 Tests/DebugDrawerTestSupport/    Shared test fixtures (data only)
-Example/                         The macOS, iOS, visionOS, tvOS and watchOS example apps (hand-written BUILD.bazel)
+Example/                         The macOS, iOS, visionOS, tvOS and watchOS example apps, a UIKit-only and an
+                                 AppKit-only one, and the libraries they share: TestBench (actions that give each
+                                 plugin data) and Plugins (every plugin with its defaults) (hand-written BUILD.bazel)
 Benchmarks/                      The interception benchmarks: a SwiftPM package of its own (ordo-one/benchmark),
                                  generated from BENCHMARKS, with the committed main baseline (Benchmarks/README.md)
 scripts/modules.py               The module graph
@@ -75,7 +77,7 @@ Every shell command gets a timeout. macOS has no `timeout`; use
 | `just resolve` | Re-resolve Bazel's SwiftPM dependencies after editing `PACKAGES` |
 | `just docs` | Combined DocC site into `.build/docs` |
 | `just generate` | Xcode project from the Bazel graph |
-| `just run [macOS\|iOS\|catalyst\|visionOS\|tvOS\|watchOS]` | Build and launch an example app (`catalyst`: the iOS one as a Mac Catalyst app, through SwiftPM) |
+| `just run [macOS\|iOS\|appkit\|uikit\|catalyst\|visionOS\|tvOS\|watchOS]` | Build and launch an example app (`catalyst`: the iOS one as a Mac Catalyst app, through SwiftPM); `-RunTestBench all` runs the test bench at launch |
 | `just deploy [patch\|minor\|major] [allow-breaking] [dry-run]` | Check the release gates, verify, then tag, push the tag and create the GitHub release (the owner's call); `dry-run` runs only the gates |
 | `just buildbuddy-key` | Store the BuildBuddy key in the Keychain (once per Mac; builds then use the remote cache) |
 | `just template-update` | Merge the project template's changes since `.template.json`'s commit; resolve conflicts, then `just modules`, `just test` |

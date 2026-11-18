@@ -17,6 +17,7 @@ the entry becomes the GitHub release's notes.
 ### Changed
 
 - DD-4: the UIKit example (`Example/iOSUIKit`) has no SwiftUI root and installs every global plugin, and the macOS example opens an AppKit-only window (Debug > Show AppKit Window, or `-AppKitWindow` at launch), each attaching the drawer with `DebugDrawer.shared.attach(to:)`; the docs say a window with no SwiftUI view under `debugDrawer()` shows the drawer without the HUD and toasts.
+- DD-60: every example app has a Test Bench, actions grouped by plugin that give each one data (requests that succeed, fail with 404 and never resolve, a WebSocket, a line at every log level, main-thread file I/O, defaults, keychain and cookie writes, a leak, a hang and a crash), run at launch with `-RunTestBench <ids>|all`; an AppKit-only Mac example joins the UIKit one (`just run appkit`, `just run uikit`).
 
 ### Fixed
 

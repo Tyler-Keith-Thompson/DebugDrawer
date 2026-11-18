@@ -184,7 +184,7 @@ VISIONOS_DEVICE := env("VISIONOS_DEVICE", "Apple Vision Pro")
 TVOS_DEVICE := env("TVOS_DEVICE", "Apple TV 4K (4th generation)")
 WATCHOS_DEVICE := env("WATCHOS_DEVICE", "Apple Watch Series 12 (46mm)")
 
-[doc('Build and launch an example app: just run, just run iOS, just run catalyst, just run visionOS, just run tvOS or just run watchOS')]
+[doc('Build and launch an example app: just run, just run iOS, just run appkit, just run uikit, just run catalyst, just run visionOS, just run tvOS or just run watchOS')]
 run target="macOS" *args="":
     #!/usr/bin/env bash
     set -euo pipefail
@@ -224,6 +224,20 @@ run target="macOS" *args="":
         iOS|ios)
             {{BAZEL}} run //Example:ExampleApp_iOS
             ;;
+        appkit|AppKit)
+            # The AppKit-only Mac example: no SwiftUI root, the test bench in its Debug menu.
+            RUN_DIR="/tmp/debugdrawer-example-appkit"
+            rm -rf "$RUN_DIR"
+            mkdir -p "$RUN_DIR"
+            {{BAZEL}} build //Example:ExampleApp_macOSAppKit
+            APP_ZIP=$({{BAZEL}} cquery //Example:ExampleApp_macOSAppKit --output=files 2>/dev/null | grep '\.zip$')
+            unzip -qo "$APP_ZIP" -d "$RUN_DIR"
+            open "$RUN_DIR/DebugDrawerAppKitExample.app" --args {{args}}
+            ;;
+        uikit|UIKit)
+            # The UIKit-only iOS example: no SwiftUI root, the test bench behind its Test Bench button.
+            {{BAZEL}} run //Example:ExampleApp_iOSUIKit
+            ;;
         catalyst|Catalyst)
             # The iOS example as a Mac Catalyst app, built through SwiftPM (Bazel has no Catalyst).
             bash {{PROJECT_ROOT}}/scripts/run-catalyst-example.sh {{args}}
@@ -241,7 +255,7 @@ run target="macOS" *args="":
                 /tmp/debugdrawer-example-watchos
             ;;
         *)
-            echo "Unknown target: {{target}}. Use 'macOS', 'iOS', 'catalyst', 'visionOS', 'tvOS' or 'watchOS'"
+            echo "Unknown target: {{target}}. Use 'macOS', 'iOS', 'appkit', 'uikit', 'catalyst', 'visionOS', 'tvOS' or 'watchOS'"
             exit 1
             ;;
     esac

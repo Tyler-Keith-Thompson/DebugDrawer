@@ -30,6 +30,7 @@ import DebugDrawerScreenRecordingPlugin
 import DebugDrawerDesignOverlayPlugin
 import DebugDrawerColorVisionPlugin
 import DebugDrawerAppStateResetPlugin
+import ExampleTestBench
 import SwiftUI
 
 /// Demonstrates Send Report without a server: "sends" each report by copying it into the app's
@@ -137,6 +138,9 @@ struct DebugDrawerExampleiOSApp: App {
         // Deep Links.
         ExampleDeepLink.install()
         installShippedPlugins()
+        // Launched with -RunTestBench and action identifiers (or all), runs those test bench actions
+        // once the app has started, then opens the drawer at the plugin -OpenDebugDrawerPlugin names.
+        TestBench.runFromLaunchArguments()
     }
 
     /// The plugins installed with one call each, which compile in release too and do nothing there;
@@ -203,6 +207,8 @@ struct ExampleContentView_iOS: View {
     // checked above it without a hand (with -OpenDebugDrawer).
     @State private var isShowingAlert = ProcessInfo.processInfo.arguments.contains("-ShowSampleAlert")
     @AccessibilityFocusState private var isAlertTriggerFocused: Bool
+    // Launched with -ShowTestBench, the screen opens on the test bench.
+    @State private var isShowingTestBench = ProcessInfo.processInfo.arguments.contains("-ShowTestBench")
 
     var body: some View {
         NavigationStack {
@@ -214,6 +220,13 @@ struct ExampleContentView_iOS: View {
 
                 // First, so its strings show beside the drawer.
                 ExampleLocalizedSection()
+
+                // An action for each plugin that records something, grouped by plugin.
+                Section {
+                    Button("Test Bench") { isShowingTestBench = true }
+                } footer: {
+                    Text("Requests that fail, a WebSocket, a line at every log level, main-thread file I/O, writes, a leak, a hang and a crash.")
+                }
 
                 Section("Controls") {
                     HStack {
@@ -247,6 +260,8 @@ struct ExampleContentView_iOS: View {
                     Button("Add Sample Keychain Items") { ExampleKeychain.seed() }
                     // File Browser lists them under Documents/Samples, one folder five levels down.
                     Button("Create Sample Files") { ExampleFileBrowser.seed() }
+                    // Databases lists the SQLite shop and the Core Data pets, written afresh.
+                    Button("Write Sample Databases") { ExampleDatabase.seed() }
                     // Crash Reports shows the crash on the next launch.
                     Button("Crash the App", role: .destructive) { ExampleCrash.crash() }
                     // Hangs reports the stall with its stack and a toast.
@@ -317,6 +332,9 @@ struct ExampleContentView_iOS: View {
                 .debugColorVision()
             }
             .navigationTitle("DebugDrawer Example")
+            .navigationDestination(isPresented: $isShowingTestBench) {
+                TestBenchList()
+            }
             .sheet(isPresented: $isShowingSheet) {
                 ExampleSheet_iOS()
             }

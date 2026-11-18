@@ -33,15 +33,17 @@ import DebugDrawerTweaksPlugin
 import DebugDrawerUserDefaultsPlugin
 import DebugDrawerViewInspectorPlugin
 
-// The same global plugins the SwiftUI iOS example installs, each with its defaults: this app shows
-// that a UIKit host gets every one of them. The examples share no code, so the few that need the
-// app's own values (tweaks, flags) declare small ones here.
+// Every global plugin, each with its defaults, for the examples with no SwiftUI root: the UIKit app
+// and the AppKit app link this one library rather than each keeping a copy, and show that such a
+// host gets every plugin. The few that need the app's own values (tweaks, flags) get small ones here.
+// The SwiftUI examples install the same plugins with their own sample data and launch arguments.
 
-/// The plugins the UIKit example installs.
+/// The plugins the UIKit and AppKit examples install.
 @MainActor
-enum ExampleUIKitPlugins {
-    /// Installs every global plugin. Each compiles in release too, where it does nothing.
-    static func install() {
+public enum ExamplePlugins {
+    /// Installs every global plugin. Each compiles in release too, where it does nothing; Background
+    /// Tasks does nothing on macOS either, which has no BGTaskScheduler.
+    public static func install() {
         // First, so a crash in the rest of startup is recorded.
         CrashReports.install()
         Localization.install()
@@ -59,8 +61,8 @@ enum ExampleUIKitPlugins {
         AppStateReset.install()
         UserDefaultsBrowser.install()
         FileBrowser.install()
-        // No handler: an activity the Deep Link Tester sends goes to the scene delegate's
-        // scene(_:continue:).
+        // No handler: an activity the Deep Link Tester sends goes where the system sends it, to the
+        // UIKit app's scene(_:continue:) or the AppKit app's application(_:continue:restorationHandler:).
         DebugDrawer.shared.installDeepLink()
         DebugDrawer.shared.installNetwork()
         DebugDrawer.shared.installConsole()
@@ -85,17 +87,17 @@ enum ExampleUIKitPlugins {
     }
 
     /// The text the screen's greeting would read.
-    static let greeting = Tweak.text("Greeting", key: "uikitGreeting", default: "Hello from UIKit")
+    static let greeting = Tweak.text("Greeting", key: "exampleGreeting", default: "Hello from the example")
 
     /// The example's feature flags, held in memory.
-    static let flags = ExampleUIKitFeatureFlags([
+    static let flags = ExampleFeatureFlagAdapter([
         FeatureFlag(key: "new-checkout", liveValue: .bool(false), title: "New checkout", detail: "The one-page payment sheet")
     ])
 }
 
 /// A sample adapter, standing in for a flag service's SDK: the flags' live values held in memory,
 /// with the overrides the drawer applies winning over them.
-final class ExampleUIKitFeatureFlags: FeatureFlagProvider {
+final class ExampleFeatureFlagAdapter: FeatureFlagProvider {
     private let live: [FeatureFlag]
     private var overrides: [String: FeatureFlagValue] = [:]
 

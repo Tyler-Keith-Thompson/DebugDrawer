@@ -1,5 +1,7 @@
 import DebugDrawer
 import DebugDrawerNotificationsPlugin
+import ExamplePlugins
+import ExampleTestBench
 import UIKit
 
 // A UIKit app with no SwiftUI root: a scene delegate, a navigation controller and a view
@@ -12,7 +14,7 @@ import UIKit
 @main
 final class ExampleUIKitAppDelegate: UIResponder, UIApplicationDelegate {
     func application(_: UIApplication, didFinishLaunchingWithOptions _: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
-        ExampleUIKitPlugins.install()
+        ExamplePlugins.install()
         return true
     }
 
@@ -51,6 +53,9 @@ final class ExampleUIKitSceneDelegate: UIResponder, UIWindowSceneDelegate {
         if ProcessInfo.processInfo.arguments.contains("-OpenDebugDrawer"), !DebugDrawer.shared.isOpen {
             DebugDrawer.shared.toggle()
         }
+        // Launched with -RunTestBench, runs those test bench actions, then opens the drawer at the
+        // plugin -OpenDebugDrawerPlugin names.
+        TestBench.runFromLaunchArguments()
     }
 
     func scene(_: UIScene, continue userActivity: NSUserActivity) {

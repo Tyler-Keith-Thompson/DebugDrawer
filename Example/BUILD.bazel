@@ -43,6 +43,33 @@ _SHARED_DEPS = [
     "//Sources/DebugDrawerAppStateResetPlugin",
 ]
 
+# ── Shared by the examples ───────────────────────────────────────────
+# The test bench: actions that give each plugin something to show (a failing request, a WebSocket,
+# a line at every log level, main-thread file I/O, defaults, keychain and cookie writes, a leak, a
+# hang, a crash), as a SwiftUI list, a Mac menu and plain data for UIKit. Every example links it
+# rather than keeping a copy.
+
+swift_library(
+    name = "ExampleTestBench",
+    srcs = glob(["TestBench/*.swift"]),
+    module_name = "ExampleTestBench",
+    deps = [
+        "//Sources/DebugDrawer",
+        "//Sources/DebugDrawerAnalyticsPlugin",
+        "//Sources/DebugDrawerLeakDetectorPlugin",
+    ],
+)
+
+# Every global plugin installed with its defaults, for the examples with no SwiftUI root (the UIKit
+# and AppKit apps).
+
+swift_library(
+    name = "ExamplePlugins",
+    srcs = glob(["Plugins/*.swift"]),
+    module_name = "ExamplePlugins",
+    deps = _SHARED_DEPS,
+)
+
 # ── macOS ────────────────────────────────────────────────────────────
 
 swift_library(
@@ -51,7 +78,7 @@ swift_library(
     module_name = "ExampleApp_macOS",
     # The interposer's dylib, which macos_application copies into Contents/Frameworks, so
     # unsafeInstallDiskIOWithInterposing() records Swift's Data and FileHandle calls too.
-    deps = _SHARED_DEPS + ["//Sources/DebugDrawerDiskIOInterposer"],
+    deps = _SHARED_DEPS + [":ExampleTestBench", "//Sources/DebugDrawerDiskIOInterposer"],
 )
 
 macos_application(
@@ -74,7 +101,7 @@ swift_library(
     name = "ExampleAppLib_iOS",
     srcs = glob(["iOS/*.swift"]),
     module_name = "ExampleApp_iOS",
-    deps = _SHARED_DEPS,
+    deps = _SHARED_DEPS + [":ExampleTestBench"],
 )
 
 ios_application(
@@ -107,8 +134,9 @@ ios_framework(
 
 # ── iOS, UIKit ───────────────────────────────────────────────────────
 # A UIKit app with no SwiftUI root: its scene delegate attaches the drawer with attach(to:), and it
-# installs every global plugin. The Deep Link Tester has no handler, so an activity it sends goes
-# to the scene delegate's scene(_:continue:).
+# installs every global plugin (ExamplePlugins). The Deep Link Tester has no handler, so an activity
+# it sends goes to the scene delegate's scene(_:continue:). Its Test Bench button lists the test
+# bench in a table.
 
 swift_library(
     name = "ExampleAppLib_iOSUIKit",
@@ -117,7 +145,12 @@ swift_library(
     # UIKit alone: `bazel build //...` builds the library only through the app below, for the iOS
     # simulator, and skips it on the Mac.
     target_compatible_with = ["@platforms//os:ios"],
-    deps = _SHARED_DEPS,
+    deps = [
+        ":ExamplePlugins",
+        ":ExampleTestBench",
+        "//Sources/DebugDrawer",
+        "//Sources/DebugDrawerNotificationsPlugin",
+    ],
 )
 
 ios_application(
@@ -128,6 +161,36 @@ ios_application(
     infoplists = ["iOSUIKit/Info.plist"],
     minimum_os_version = "17.0",
     deps = [":ExampleAppLib_iOSUIKit"],
+    visibility = ["//visibility:public"],
+)
+
+# ── macOS, AppKit ────────────────────────────────────────────────────
+# An AppKit app with no SwiftUI root: its window attaches the drawer with attach(to:), and it
+# installs every global plugin (ExamplePlugins), as the UIKit app does. Its Debug menu holds the
+# test bench. No source of its own imports SwiftUI, so building it shows an AppKit-only host
+# compiles; the macOS example's Debug > Show AppKit Window shows the same inside a SwiftUI app.
+
+swift_library(
+    name = "ExampleAppLib_macOSAppKit",
+    srcs = glob(["macOSAppKit/*.swift"]),
+    module_name = "ExampleApp_macOSAppKit",
+    target_compatible_with = ["@platforms//os:macos"],
+    deps = [
+        ":ExamplePlugins",
+        ":ExampleTestBench",
+        "//Sources/DebugDrawer",
+    ],
+)
+
+macos_application(
+    name = "ExampleApp_macOSAppKit",
+    bundle_id = "com.debugdrawer.example.appkit",
+    bundle_name = "DebugDrawerAppKitExample",
+    infoplists = ["macOSAppKit/Info.plist"],
+    minimum_os_version = "15.0",
+    entitlements = "macOSAppKit/ExampleAppKit.entitlements",
+    deps = [":ExampleAppLib_macOSAppKit"],
+    linkopts = ["-framework", "IOKit"],
     visibility = ["//visibility:public"],
 )
 

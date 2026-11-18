@@ -30,6 +30,7 @@ import DebugDrawerScreenRecordingPlugin
 import DebugDrawerDesignOverlayPlugin
 import DebugDrawerColorVisionPlugin
 import DebugDrawerAppStateResetPlugin
+import ExampleTestBench
 import SwiftUI
 
 /// Demonstrates Send Report without a server: "sends" each report by copying it into the app's
@@ -147,6 +148,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             createMainWindow()
         }
         ExamplePresentations.runAppModalAlertIfAsked()
+        // Launched with -RunTestBench and action identifiers (or all), runs those test bench actions,
+        // then opens the drawer at the plugin -OpenDebugDrawerPlugin names.
+        TestBench.runFromLaunchArguments()
     }
 
     /// The plugins installed with one call each, which compile in release too and do nothing there;
@@ -257,9 +261,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 // MARK: - Example content
 
 struct ExampleContentView: View {
-    @State private var selectedItem: String?
-    // Kept in the defaults, so the Tweaks plugin's Reset counter action can clear it.
-    @AppStorage(ExampleTweaks.counterKey) private var counter = 0
+    // Launched with -ShowTestBench, the window opens on the test bench.
+    @State private var selectedItem: String? = ProcessInfo.processInfo.arguments.contains("-ShowTestBench") ? Self.testBench : nil
+    private static let testBench = "Test Bench"
 
     var body: some View {
         NavigationSplitView {
@@ -274,112 +278,22 @@ struct ExampleContentView: View {
                         Text(item)
                     }
                 }
+                // An action for each plugin that records something, grouped by plugin.
+                Section("Debug") {
+                    Label(Self.testBench, systemImage: "hammer")
+                        .tag(Self.testBench)
+                }
             }
             .listStyle(.sidebar)
         } detail: {
-            VStack(spacing: 20) {
-                // The screen's content, under the Color Vision simulation. The inputs below stay
-                // outside it, and the stepper's control too (ExampleLocalizedStrings): AppKit draws
-                // them, and a shader can't, so they would show SwiftUI's placeholder.
-                Group {
-                    Text("DebugDrawer Example")
-                        .font(.largeTitle)
-                        .accessibilityAddTraits(.isHeader)
-
-                    Text("Press Ctrl+D to open the debug drawer")
-                        .foregroundStyle(.secondary)
-
-                    Divider()
-
-                    HStack(spacing: 16) {
-                        Button("Increment") {
-                            counter += ExampleTweaks.counterStep.value
-                            ExampleAnalytics.trackCounter("increment", value: counter)
-                        }
-                        Button("Print") { print("Counter: \(counter)") }
-                        Button("Log") { ExampleConsole.logSubsystems(counter) }
-                            .accessibilityLabel("Log from Two Subsystems")
-                        // The app's own logger reaches the Console through ConsoleLogSink, with metadata.
-                        Button("App Logger") { ExampleLogger.logPaymentDeclined(counter) }
-                            .accessibilityHint("Logs a declined payment, with metadata, through the app's own logger")
-                        Button("Reset") {
-                            counter = 0
-                            ExampleAnalytics.trackCounter("reset", value: counter)
-                        }
-                    }
-                    .accessibilityElement(children: .contain)
-                    .accessibilityLabel("Counter actions")
-
-                    // The drawer opens above each of these (Ctrl+D or the Debug menu while one is up).
-                    ExamplePresentationButtons()
-
-                    Text("Counter: \(counter)")
-                        .font(.title2.monospacedDigit())
-                        .accessibilityAddTraits(.isHeader)
-
-                    ExampleTweaksBanner()
-                    ExampleFeatureFlagsSummary()
-                    ExampleResettableState()
-                    // UserDefaults lists the key as it is written, without a reload.
-                    ExampleUserDefaultsWriter()
-                    // The app's own location manager: the Location plugin's spoofed coordinate or
-                    // route reaches it.
-                    ExampleLocationReadout()
-                    // Network logs each request; a mock answers the greeting, which no server does.
-                    ExampleNetworkRequests()
-                    ExampleWebSocketDemo()
-                        .frame(maxWidth: 480)
-                    // The Deep Link Tester's universal links and activities, as the app receives them.
-                    ExampleContinuedActivityRow()
-                        .frame(maxWidth: 480)
-
-                }
-                .debugColorVision()
-
-                ExampleLocalizedStrings()
-
-                Group {
-                    // Colors the Color Vision plugin simulates.
-                    ExampleColorSwatches()
-                        .frame(maxWidth: 480)
-
-                    // Crash Reports shows the crash on the next launch.
-                    Button("Crash the App", role: .destructive) { ExampleCrash.crash() }
-                    // Hangs reports the stall with its stack and a toast.
-                    Button("Block the Main Thread for 500 ms") { ExampleHang.blockMainThread() }
-                    // Performance lists the busy thread at the top of its Threads.
-                    ExampleBusyThreadRow()
-                    // Leaks flags the sheet once it is closed, with a toast.
-                    Button("Open a Leaking Screen") { ExampleLeak.presentLeakingScreen() }
-                    // MetricKit lists the samples, clearly named as such: MetricKit itself delivers nothing
-                    // to a debug run in time to see. Adding does nothing in release, so neither does the button.
-                    Button("Add Sample MetricKit Payloads") { ExampleMetricKit.addSamples() }
-                    // Analytics lists each event as it is recorded. Recording does nothing in release,
-                    // so neither does the button.
-                    Button("Track Sample Event") { ExampleAnalytics.trackSample() }
-                }
-                .debugColorVision()
-
-                HStack {
-                    TextField("Sample text field", text: .constant(""))
-                        .textFieldStyle(.roundedBorder)
-                        .frame(width: 200)
-                        .accessibilityLabel("Sample text")
-
-                    Slider(value: .constant(0.5))
-                        .frame(width: 150)
-                        .accessibilityLabel("Sample slider")
-
-                    Toggle("Toggle", isOn: .constant(true))
-                }
-
-                Spacer()
+            if selectedItem == Self.testBench {
+                TestBenchList()
+            } else {
+                ExampleMainScreen()
             }
-            .padding(40)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        // Listed in the View Inspector's SwiftUI Renders: the screen renders again when the counter
-        // or the selection changes, and not while the app sits idle.
+        // Listed in the View Inspector's SwiftUI Renders: the window renders again when the
+        // selection changes (ExampleMainScreen when the counter does), and not while the app sits idle.
         .trackRenders("ExampleContentView")
         // Redraws the app's own strings when a Localization mode changes; beneath .debugDrawer(),
         // so the drawer keeps its place.
