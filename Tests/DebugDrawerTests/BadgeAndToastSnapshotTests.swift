@@ -44,5 +44,20 @@
 
             assertSnapshot(of: actual, as: .image(perceptualPrecision: 0.98), named: "\(colorScheme)")
         }
+
+        @Test("A silenced plugin's header shows a crossed-out bell after its pin, 316 pt wide", arguments: [ColorScheme.light, .dark])
+        func silencedHeader(colorScheme: ColorScheme) throws {
+            let plugin = AnyDebugDrawerPlugin(SnapshotNoticePlugin())
+            let sut = PluginHeaderLabel(plugin: plugin, isExpanded: false, isPinned: true, isNoticesMuted: true)
+            let renderer = ImageRenderer(content: sut
+                .frame(width: 316)
+                .background(.background)
+                .environment(\.colorScheme, colorScheme))
+            renderer.scale = 2
+
+            let actual = try #require(renderer.nsImage)
+
+            assertSnapshot(of: actual, as: .image(perceptualPrecision: 0.98), named: "\(colorScheme)")
+        }
     }
 #endif

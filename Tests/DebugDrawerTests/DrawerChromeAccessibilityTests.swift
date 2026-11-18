@@ -173,7 +173,7 @@
             #expect(actual == expected)
         }
 
-        @Test("A global plugin's header hints that its actions pin and move it; a local one's doesn't")
+        @Test("A global plugin's header hints that its actions pin, move and silence it; a local one's that they silence it")
         func hints() throws {
             let plugin = AnyDebugDrawerPlugin(ChromePlugin())
             let global = PluginSectionHeader(plugin: plugin, isExpanded: true, isPinned: false, badge: nil, isMovable: true, toggle: {})
@@ -182,8 +182,8 @@
             let globalHint = try global.inspect().find(ViewType.Button.self).accessibilityHint().string()
             let localHint = try local.inspect().find(ViewType.Button.self).accessibilityHint().string()
 
-            #expect(globalHint == "Toggles the section. Its actions pin it or move it.")
-            #expect(localHint == "Toggles the section.")
+            #expect(globalHint == "Toggles the section. Its actions pin it, move it or silence its notices.")
+            #expect(localHint == "Toggles the section. Its actions silence its notices.")
         }
 
         @Test("Pressing a plugin's section header toggles the section")

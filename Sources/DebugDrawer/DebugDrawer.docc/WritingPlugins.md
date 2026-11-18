@@ -111,6 +111,14 @@ uploads.postToast("Upload of report.pdf failed")
 uploads.clearBadge()
 ```
 
+The person using the drawer can silence a plugin that posts too often: Silence Notices, in the
+context menu of its section header, removes its badge and toast and drops the ones it posts from
+then on, and a crossed-out bell on the header shows it is silenced; Allow Notices undoes it. The
+choice is saved across launches. Code does the same with
+``DebugDrawer/DebugDrawer/setNoticesMuted(_:forPlugin:)`` and reads it with
+``DebugDrawer/DebugDrawer/isNoticesMuted(forPlugin:)``, both keyed by the plugin's
+``DebugDrawerPlugin/id``. A plugin's own calls stay the same either way.
+
 ### A readout in the header or the HUD
 
 A plugin can show something while its section is closed. Its

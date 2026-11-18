@@ -2,7 +2,7 @@
     import SwiftUI
 
     /// A plugin's section header: a button that expands or collapses the section. VoiceOver reads
-    /// it as a heading named for the plugin, with whether it is expanded, pinned and badged.
+    /// it as a heading named for the plugin, with whether it is expanded, pinned, silenced and badged.
     struct PluginSectionHeader: View {
         let plugin: AnyDebugDrawerPlugin
         let isExpanded: Bool
@@ -14,11 +14,14 @@
         /// Whether the button shows the plugin alone rather than expanding the section, as in the
         /// compact panel's list.
         var opensAlone = false
+        /// Whether the plugin's badges and toasts are silenced, which the header marks with a
+        /// crossed-out bell.
+        var isNoticesMuted = false
         let toggle: () -> Void
 
         var body: some View {
             Button(action: toggle) {
-                PluginHeaderLabel(plugin: plugin, isExpanded: isExpanded, isPinned: isPinned, badge: badge)
+                PluginHeaderLabel(plugin: plugin, isExpanded: isExpanded, isPinned: isPinned, badge: badge, isNoticesMuted: isNoticesMuted)
             }
             .debugDrawerButtonStyle(.plain)
             #if os(tvOS)
@@ -32,17 +35,19 @@
             .accessibilityAddTraits(.isHeader)
         }
 
-        /// The label names the plugin only, so the pin and badge the label draws are read here.
+        /// The label names the plugin only, so the pin, silenced bell and badge the label draws are
+        /// read here.
         private var state: String {
             let expansion = opensAlone ? [] : [isExpanded ? "Expanded" : "Collapsed"]
             let pin = isPinned ? ["Pinned"] : []
+            let muted = isNoticesMuted ? ["Notices silenced"] : []
             let count = badge.map { ["\($0) new"] } ?? []
-            return (expansion + pin + count).joined(separator: ", ")
+            return (expansion + pin + muted + count).joined(separator: ", ")
         }
 
         private var hint: String {
             let action = opensAlone ? "Shows the plugin." : "Toggles the section."
-            return isMovable ? "\(action) Its actions pin it or move it." : action
+            return isMovable ? "\(action) Its actions pin it, move it or silence its notices." : "\(action) Its actions silence its notices."
         }
     }
 #endif

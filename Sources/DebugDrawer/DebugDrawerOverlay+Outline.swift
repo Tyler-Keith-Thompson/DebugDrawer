@@ -139,7 +139,8 @@
                     isPinned: pinned,
                     badge: drawer.badges[plugin.id],
                     isMovable: isGlobal,
-                    opensAlone: compact
+                    opensAlone: compact,
+                    isNoticesMuted: drawer.isNoticesMuted(forPlugin: plugin.id)
                 ) {
                     if compact {
                         navigate(to: .plugin(plugin.id))
@@ -153,8 +154,8 @@
             .id(plugin.id)
         }
 
-        /// The header's context menu: show the plugin alone, pin and move a global plugin, and
-        /// show it in the HUD.
+        /// The header's context menu: show the plugin alone, pin and move a global plugin, show it
+        /// in the HUD, and silence or allow its notices.
         @ViewBuilder
         func pluginMenu(_ plugin: AnyDebugDrawerPlugin, isGlobal: Bool, pinned: Bool) -> some View {
             Button("Show Alone", systemImage: "chevron.forward") {
@@ -176,6 +177,10 @@
                 Button(inHUD ? "Remove from HUD" : "Show in HUD", systemImage: inHUD ? "rectangle.slash" : "rectangle.inset.topleft.filled") {
                     drawer.toggleHUD(forPlugin: plugin.id)
                 }
+            }
+            let muted = drawer.isNoticesMuted(forPlugin: plugin.id)
+            Button(muted ? "Allow Notices" : "Silence Notices", systemImage: muted ? "bell" : "bell.slash") {
+                drawer.setNoticesMuted(!muted, forPlugin: plugin.id)
             }
         }
     }

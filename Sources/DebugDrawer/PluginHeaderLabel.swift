@@ -3,7 +3,7 @@
 
     /// The face of a plugin's header row, as a group in Xcode's navigators: a filled disclosure
     /// triangle, pointing down while the plugin is open and right while closed, the title in bold,
-    /// a pin when it's pinned, and its count in a gray capsule at the trailing edge. A plugin with
+    /// a pin when it's pinned, a crossed-out bell while its notices are silenced, and its count in a gray capsule at the trailing edge. A plugin with
     /// a header accessory shows no count: the accessory, beside this label, replaces it, so the
     /// header never draws two numbers. At accessibility text sizes the title wraps between words.
     struct PluginHeaderLabel: View {
@@ -12,6 +12,8 @@
         let isPinned: Bool
         /// The plugin's badge count, if it has one.
         var badge: Int?
+        /// Whether the plugin's badges and toasts are silenced.
+        var isNoticesMuted = false
         @ScaledMetric(relativeTo: .body) private var minHeight = DrawerSpacing.sectionHeaderHeight
         @ScaledMetric(relativeTo: .body) private var triangle = DrawerSpacing.disclosure
         @ScaledMetric(relativeTo: .body) private var scaledIndent = DrawerSpacing.contentIndent
@@ -58,7 +60,7 @@
             .contentShape(Rectangle())
         }
 
-        /// The pin and the count.
+        /// The pin, the silenced bell and the count.
         @ViewBuilder private var marks: some View {
             if isPinned {
                 Image(systemName: "pin.fill")
@@ -66,6 +68,13 @@
                     .foregroundStyle(DrawerPalette.tertiaryText)
                     .fixedSize()
                     .accessibilityLabel("Pinned")
+            }
+            if isNoticesMuted {
+                Image(systemName: "bell.slash")
+                    .debugDrawerFont(.secondary)
+                    .foregroundStyle(DrawerPalette.tertiaryText)
+                    .fixedSize()
+                    .accessibilityLabel("Notices silenced")
             }
             if let badge, !plugin.hasHeaderAccessory {
                 Text(badge, format: .number)

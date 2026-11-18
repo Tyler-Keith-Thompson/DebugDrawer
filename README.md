@@ -164,8 +164,12 @@ A plugin can raise a problem while the drawer is closed. A badge puts a count on
 section header until the plugin clears it. A toast appears in the window's corner while the drawer
 is closed; tapping it opens the drawer with that plugin expanded and scrolled into view, and its
 close button dismisses it. Posts from one plugin coalesce into one toast that shows the latest
-message and how many posts it stands for; a post while the drawer is open is dropped. In release
-builds these calls compile and do nothing.
+message and how many posts it stands for; a post while the drawer is open is dropped. To quiet a
+plugin that posts too often, choose Silence Notices from its section header's context menu: its
+badge and toast go away, what it posts afterwards is dropped, and a crossed-out bell marks its
+header until Allow Notices. The choice is remembered across launches;
+`DebugDrawer.shared.setNoticesMuted(_:forPlugin:)` and `isNoticesMuted(forPlugin:)` do the same
+from code. In release builds these calls compile and do nothing.
 
 ```swift
 struct UploadsPlugin: DebugDrawerPlugin {

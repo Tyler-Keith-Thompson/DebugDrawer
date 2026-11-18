@@ -20,6 +20,7 @@ plugins call, as stand-ins, so the same code compiles in both configurations wit
 | `debugLocalPlugin(_:)` | Returns the view unchanged; the plugin is never read |
 | ``DebugDrawerPlugin`` and its defaults | Compile; nothing reads a plugin |
 | ``DebugDrawerPlugin/setBadge(_:)``, ``DebugDrawerPlugin/clearBadge()``, ``DebugDrawerPlugin/postToast(_:)`` | Do nothing |
+| ``DebugDrawer/DebugDrawer/setNoticesMuted(_:forPlugin:)``, ``DebugDrawer/DebugDrawer/isNoticesMuted(forPlugin:)`` | Do nothing; every plugin reads as allowed |
 | ``DebugDrawerAction`` | Compiles; there is no search field to offer it |
 | ``CaptureBuffer`` | Keeps nothing: appends store nothing and every snapshot is empty |
 | The rows, buttons and code views, such as ``DebugDrawerSection`` and ``DebugDrawerKeyValueRow`` | Draw nothing |

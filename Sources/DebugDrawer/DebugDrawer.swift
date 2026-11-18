@@ -70,7 +70,17 @@
             didSet { localPlugins = localRegistrations.map(\.plugin) }
         }
 
-        private init() {}
+        /// Where the drawer saves what it keeps across launches: the HUD's layout and which
+        /// plugins' notices are silenced.
+        let defaults: UserDefaults
+
+        /// Makes a drawer that saves to `defaults`; the app's is ``shared``, saving to `.standard`.
+        /// Tests pass a suite of their own so nothing they save reaches another test or the app.
+        init(defaults: UserDefaults = .standard) {
+            self.defaults = defaults
+            hudLayout = HUDLayout(from: defaults)
+            noticesMutedPlugins = Set(defaults.stringArray(forKey: Self.noticesMutedDefaultsKey) ?? [])
+        }
 
         // MARK: - Global
 
@@ -179,7 +189,7 @@
         // MARK: - HUD
 
         /// Which plugins are pinned to the floating HUD, and where it sits. Saved in `UserDefaults`.
-        @Published public internal(set) var hudLayout = HUDLayout(from: .standard)
+        @Published public internal(set) var hudLayout: HUDLayout
 
         /// Whether the HUD is hidden for a moment, as while ``performWhileHidden(drawer:_:)`` runs.
         @Published public internal(set) var isHUDHidden = false
@@ -189,7 +199,7 @@
         /// - Parameter id: The plugin's ``DebugDrawerPlugin/id``.
         public func toggleHUD(forPlugin id: String) {
             hudLayout.togglePin(id)
-            hudLayout.save(to: .standard)
+            hudLayout.save(to: defaults)
         }
 
         /// Moves the HUD's top-leading corner to `origin` and saves it.
@@ -197,7 +207,7 @@
         /// - Parameter origin: The new corner, in the window's coordinates.
         public func moveHUD(to origin: CGPoint) {
             hudLayout.origin = origin
-            hudLayout.save(to: .standard)
+            hudLayout.save(to: defaults)
         }
 
         /// The registered plugins pinned to the HUD that offer one, in the order they were pinned.
@@ -209,56 +219,13 @@
         // MARK: - Badges and toasts
 
         /// Badge counts shown on plugins' section headers, by plugin ID.
-        @Published public private(set) var badges: [String: Int] = [:]
+        @Published public internal(set) var badges: [String: Int] = [:]
 
         /// The notice shown while the drawer is closed, if a plugin has raised one.
-        @Published public private(set) var toast: DebugDrawerToast?
+        @Published public internal(set) var toast: DebugDrawerToast?
 
-        /// A plugin the key window's drawer should show the next time it can.
-        var revealRequest: String? {
-            get { keyPresentation.revealRequest }
-            set { keyPresentation.revealRequest = newValue }
-        }
-
-        /// Shows `count` on the plugin's section header; zero or less clears it.
-        ///
-        /// - Parameters:
-        ///   - count: The number to show.
-        ///   - id: The plugin's ``DebugDrawerPlugin/id``.
-        public func setBadge(_ count: Int, forPlugin id: String) {
-            if count > 0 {
-                badges[id] = count
-            } else {
-                badges.removeValue(forKey: id)
-            }
-        }
-
-        /// Raises a toast for the plugin while the drawer is closed. A post from the plugin that
-        /// already has the toast replaces its message and adds to its count, so a burst shows as
-        /// one toast; a post from another plugin replaces the toast. While the drawer is open the
-        /// post is dropped: the drawer is on screen, and a badge is the lasting signal.
-        ///
-        /// - Parameters:
-        ///   - message: What the toast says.
-        ///   - id: The posting plugin's ``DebugDrawerPlugin/id``.
-        public func postToast(_ message: String, fromPlugin id: String) {
-            guard !isOpen else { return }
-            let count = toast.map { $0.pluginID == id ? $0.count + 1 : 1 } ?? 1
-            toast = DebugDrawerToast(pluginID: id, message: message, count: count)
-        }
-
-        /// Removes the toast without opening the drawer.
-        public func dismissToast() {
-            toast = nil
-        }
-
-        /// Opens the drawer at the toast's plugin, expanded and scrolled into view, and removes the toast.
-        public func openToast() {
-            guard let toast else { return }
-            self.toast = nil
-            revealRequest = toast.pluginID
-            if !isOpen { toggle() }
-        }
+        /// The IDs of the plugins whose badges and toasts are silenced, saved in ``defaults``.
+        @Published var noticesMutedPlugins: Set<String>
     }
 #else
     import SwiftUI
@@ -370,25 +337,5 @@
 
         /// Always nil.
         @Published public private(set) var toast: DebugDrawerToast?
-
-        /// Does nothing.
-        ///
-        /// - Parameters:
-        ///   - count: Ignored.
-        ///   - id: Ignored.
-        public func setBadge(_ count: Int, forPlugin id: String) {}
-
-        /// Does nothing.
-        ///
-        /// - Parameters:
-        ///   - message: Ignored.
-        ///   - id: Ignored.
-        public func postToast(_ message: String, fromPlugin id: String) {}
-
-        /// Does nothing.
-        public func dismissToast() {}
-
-        /// Does nothing.
-        public func openToast() {}
     }
 #endif

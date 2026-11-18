@@ -46,5 +46,20 @@
 
             assertSnapshot(of: actual, as: .image(perceptualPrecision: 0.98), named: "accessibility3")
         }
+
+        @Test("A silenced section header's crossed-out bell stays readable at a large accessibility text size")
+        func silencedHeader() throws {
+            let sut = PluginHeaderLabel(plugin: AnyDebugDrawerPlugin(SnapshotNoticePlugin()), isExpanded: false, isPinned: true, isNoticesMuted: true)
+            let renderer = ImageRenderer(content: sut
+                .frame(width: 316, alignment: .leading)
+                .padding()
+                .background(.background)
+                .environment(\.dynamicTypeSize, .accessibility3))
+            renderer.scale = 2
+
+            let actual = try #require(renderer.uiImage)
+
+            assertSnapshot(of: actual, as: .image(perceptualPrecision: 0.98), named: "accessibility3")
+        }
     }
 #endif
