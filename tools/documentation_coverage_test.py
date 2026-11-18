@@ -60,6 +60,16 @@ class DocumentationCoverageTests(unittest.TestCase):
 
         self.assertEqual(actual, (0, "", True))
 
+    def test_a_property_wrappers_projected_value_is_skipped(self):
+        symbols = [
+            symbol(["Activity", "isDrawerWork"], kind="swift.type.property", doc=["Whether it is the drawer's work."]),
+            symbol(["Activity", "$isDrawerWork"], kind="swift.type.property", precise="s:4Test8ActivityV13$isDrawerWork"),
+        ]
+
+        actual = run(symbols)
+
+        self.assertEqual(actual, (0, "", True))
+
     def test_an_empty_directory_fails(self):
         with tempfile.TemporaryDirectory() as directory:
             result = subprocess.run(

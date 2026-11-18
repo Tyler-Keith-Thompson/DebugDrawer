@@ -12,7 +12,8 @@ A symbol counts as documented when it has a doc comment of its own, or one it in
 requirement it implements in another module (a view's `body` takes SwiftUI's `View.body`), which
 DocC shows on its page. Left out: extension blocks, which DocC lists under the extended type, and
 the members a protocol extension or the compiler supplies (`::SYNTHESIZED::`), which are
-documented where they are declared.
+documented where they are declared, and a property wrapper's projected value (`$name`), which the
+compiler generates beside the wrapped property and which can't carry a doc comment of its own.
 
 On success the stamp file is written, as the action's output; on failure each undocumented
 symbol is printed and the exit status is 1.
@@ -33,6 +34,8 @@ def undocumented(symbol_graph):
     for symbol in symbol_graph.get("symbols", []):
         kind = symbol["kind"]["identifier"]
         if kind == EXTENSION_BLOCK or "::SYNTHESIZED::" in symbol["identifier"]["precise"]:
+            continue
+        if symbol["pathComponents"][-1].startswith("$"):
             continue
         lines = symbol.get("docComment", {}).get("lines", [])
         if not any(line.get("text", "").strip() for line in lines):
