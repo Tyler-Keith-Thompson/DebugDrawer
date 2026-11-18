@@ -28,18 +28,12 @@
                 }.value
                 guard let recorder else { exit(EXIT_FAILURE) }
                 _ = await recorder.previousSessions()
-                // The session is in the test runner's folder of Application Support, beside other
-                // children's, so only this one is removed. Bazel's sandbox doesn't let a test write
-                // there, so the write is checked only where the folder can be made, as under
-                // SwiftPM; the recorder's own tests check writing in a folder of their own.
-                let canWrite = (try? FileManager.default.createDirectory(
-                    at: _NetworkSessionStorage.defaultDirectory, withIntermediateDirectories: true
-                )) != nil
+                // The session is in Application Support, under the home folder the test runners
+                // point at a temporary one (CFFIXED_USER_HOME).
                 let written = (try? recorder.persistence.storage.contents(ofSessionNamed: recorder.currentName)) ?? Data()
-                try? recorder.persistence.storage.deleteSession(named: recorder.currentName)
                 let isWritten = (String(bytes: written, encoding: .utf8) ?? "").contains("https://sessions.invalid/v1/ping")
                 let isExpected = recorder.persistence.maxSessions == 3 && recorder.persistence.maxBytes == 5_000_000
-                    && (isWritten || !canWrite)
+                    && isWritten
                 exit(isExpected ? EXIT_SUCCESS : EXIT_FAILURE)
             }
         }

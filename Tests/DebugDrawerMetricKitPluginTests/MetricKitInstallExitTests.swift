@@ -90,12 +90,9 @@
 
         @Test("README: MetricKit")
         func readme() async {
-            let home = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString).path(percentEncoded: false)
-
-            await #expect(processExitsWith: .success) { [home = home as String] in
-                // The default directory is in Application Support, under the home folder, which
-                // the child moves to a temporary one.
-                setenv("HOME", home, 1)
+            await #expect(processExitsWith: .success) {
+                // The default directory is in Application Support, under the home folder the test
+                // runners point at a temporary one (CFFIXED_USER_HOME).
                 let isInstalled = await MainActor.run {
                     // At startup:
                     MetricKitPayloads.install()
@@ -109,8 +106,6 @@
                 }
                 exit(isInstalled ? EXIT_SUCCESS : EXIT_FAILURE)
             }
-
-            try? FileManager.default.removeItem(atPath: home)
         }
     }
 #endif

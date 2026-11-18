@@ -13,10 +13,8 @@
         @Test("Network mocks: the installed rule answers a matching request through URLSession.shared")
         func networkMocks() async {
             await #expect(processExitsWith: .success) {
-                // The rules are saved in the test runner's folder of Application Support: the home
-                // folder can't be moved once the process has read it (HOME set here is ignored), so
-                // the child removes what it saved before it exits.
-                let saved = _NetworkMockStorage.defaultDirectory
+                // The rules are saved in Application Support, under the home folder the test
+                // runners point at a temporary one (CFFIXED_USER_HOME).
                 await MainActor.run {
                     let outage = NetworkMockRule(
                         id: UUID(uuidString: "3F2B8E1C-0D4A-4B7E-9C61-5A2D7E8F9B10")!,
@@ -30,7 +28,6 @@
                 let answer = try? await URLSession.shared.data(from: url)
                 let status = (answer?.1 as? HTTPURLResponse)?.statusCode
                 let isExpected = status == 503 && answer?.0 == Data(#"{"error":"maintenance"}"#.utf8)
-                try? FileManager.default.removeItem(at: saved)
                 exit(isExpected ? EXIT_SUCCESS : EXIT_FAILURE)
             }
         }

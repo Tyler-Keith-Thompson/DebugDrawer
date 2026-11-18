@@ -27,7 +27,7 @@ test: lint
 # generator runs, since a target's first __Snapshots__ needs excluding from Package.swift.
 [doc('Re-record every snapshot reference into the workspace, after a change to how a view looks')]
 record-snapshots:
-    -SNAPSHOT_TESTING_RECORD=all {{SWIFT}} test
+    -SNAPSHOT_TESTING_RECORD=all just spm-test-mac
     -just test-ios TEST_RUNNER_SNAPSHOT_TESTING_RECORD=all
     python3 {{PROJECT_ROOT}}/scripts/modules.py
 
@@ -165,15 +165,37 @@ spm-catalyst-example:
 # Every test target, built for Mac Catalyst and run in a Mac window's process, so the
 # targetEnvironment(macCatalyst) branches run as well as build. Snapshot tests sit out
 # (APPLE_ONLY_PACKAGE_EXCLUDED_PLATFORMS in scripts/modules.py), and so do tests that make a UIKit
-# window: xctest runs them without an NSApplication.
+# window: xctest runs them without an NSApplication. The test process runs on the Mac, so it gets
+# a temporary home folder as spm-test-mac's does; xcodebuild hands it the variables prefixed
+# TEST_RUNNER_.
 [doc('Run every test target through SwiftPM for Mac Catalyst')]
 spm-catalyst-test:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    home=$(mktemp -d)
+    trap 'rm -rf "$home"' EXIT
     xcodebuild test -quiet -scheme DebugDrawer-Package -destination 'platform=macOS,variant=Mac Catalyst' \
-        -derivedDataPath {{PROJECT_ROOT}}/.build/xcode-catalyst-test
+        -derivedDataPath {{PROJECT_ROOT}}/.build/xcode-catalyst-test TEST_RUNNER_CFFIXED_USER_HOME="$home"
+
+# Plugins keep their files in Application Support and Caches under the home folder, which on macOS
+# Foundation reads from CFFIXED_USER_HOME (never HOME), so the test process and every exit test's
+# child get a temporary one, removed afterwards. SwiftPM keeps its own caches and configuration
+# under the home folder too, so the tests are built with the real one and only the run moves.
+# The arguments pass through as given (positional), so a quoted filter such as "A|B" stays one.
+[doc('Run the SwiftPM tests on the Mac, in a temporary home folder (arguments go to swift test)')]
+[positional-arguments]
+spm-test-mac *args="":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    {{SWIFT}} build --build-tests
+    home=$(mktemp -d)
+    trap 'rm -rf "$home"' EXIT
+    CFFIXED_USER_HOME="$home" {{SWIFT}} test --skip-build "$@"
 
 [doc('Run the tests via SwiftPM: on the Mac (arguments go to swift test), then the visionOS ones in its simulator and every one for Mac Catalyst')]
+[positional-arguments]
 spm-test *args="":
-    {{SWIFT}} test {{args}}
+    just spm-test-mac "$@"
     just spm-visionos-test
     just spm-catalyst-test
 

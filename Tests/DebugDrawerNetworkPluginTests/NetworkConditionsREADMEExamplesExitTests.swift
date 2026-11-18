@@ -13,10 +13,8 @@
         @Test("Network conditions: the installed offline profile fails a request to its host through URLSession.shared")
         func networkConditions() async {
             await #expect(processExitsWith: .success) {
-                // The profiles are saved in the test runner's folder of Application Support: the
-                // home folder can't be moved once the process has read it (HOME set here is
-                // ignored), so the child removes what it saved before it exits.
-                let saved = _NetworkMockStorage.defaultDirectory
+                // The profiles are saved in Application Support, under the home folder the test
+                // runners point at a temporary one (CFFIXED_USER_HOME).
                 await MainActor.run {
                     let slowImages = NetworkConditionProfile(
                         id: UUID(uuidString: "8C4F2A61-7B3D-4E59-A1C8-2D6E9F0B3A47")!,
@@ -45,7 +43,6 @@
                 }
                 let profiles = await MainActor.run { NetworkConditionsModel.shared.profiles.map(\.name) }
                 let isExpected = code == .notConnectedToInternet && profiles == ["Slow images", "Payments offline"]
-                try? FileManager.default.removeItem(at: saved)
                 exit(isExpected ? EXIT_SUCCESS : EXIT_FAILURE)
             }
         }
