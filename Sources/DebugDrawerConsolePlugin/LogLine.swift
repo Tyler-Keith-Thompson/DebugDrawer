@@ -70,3 +70,11 @@ public struct LogLine: Identifiable, Sendable {
         }
     }
 }
+
+extension LogLine {
+    /// What the line costs the console's byte bound: its text and the fields beside it.
+    var capturedByteCount: Int {
+        text.utf8.count + subsystem.utf8.count + category.utf8.count
+            + metadata.reduce(0) { $0 + $1.key.utf8.count + $1.value.utf8.count }
+    }
+}

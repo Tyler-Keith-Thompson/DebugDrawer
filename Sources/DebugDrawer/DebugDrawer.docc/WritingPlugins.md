@@ -145,3 +145,43 @@ A plugin is a value the drawer reads, not a view, so it holds no `@State`. Keep 
 state in a view its body returns, or in an observable store the plugin and the app share, and
 pass the services it uses (storage, a clock, the network) in through its initializer, so a test
 can hand it fakes.
+
+### Capturing what the app does
+
+A plugin that records events as the app makes them (log lines, requests, file calls) keeps them
+in a ``CaptureBuffer``, as the Console, Network and Disk I/O plugins do, rather than an array of
+its own. The buffer keeps the newest elements within a count and a byte total, evicting the
+oldest, so a long session costs bounded memory, and it counts what it evicted, so the plugin can
+say how many older entries were dropped. Appending is safe from any thread, so a hook that runs
+on the app's threads appends at once and returns.
+
+```swift
+@MainActor
+final class EventStore: ObservableObject {
+    @Published private(set) var events: [AnalyticsEvent] = []
+    @Published private(set) var droppedCount = 0
+    private let buffer = CaptureBuffer<AnalyticsEvent>(maxCount: 1_000, maxByteCount: 1_048_576) {
+        $0.payload.count
+    }
+
+    /// Called from any thread.
+    nonisolated func record(_ event: AnalyticsEvent) {
+        buffer.append(event)
+        Task { @MainActor in self.refresh() }
+    }
+
+    func refresh() {
+        let snapshot = buffer.snapshot()
+        events = snapshot.elements
+        droppedCount = snapshot.evictedCount
+    }
+}
+```
+
+Each element gets a stable ``CaptureBuffer/ElementID`` when it is appended, so a plugin can change it in
+place later with ``CaptureBuffer/update(_:_:)`` (a request's response arriving) and the buffer
+counts its new size against the byte bound. ``CaptureBuffer/generation`` grows with every
+change, so a view compares it to skip work when nothing changed. A ``CaptureBuffer/Snapshot`` is a
+value, `Codable` when the elements are, for a bug report or an export. In release builds the
+buffer keeps nothing.
+

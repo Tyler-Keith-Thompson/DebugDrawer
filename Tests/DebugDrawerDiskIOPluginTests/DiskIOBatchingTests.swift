@@ -31,7 +31,7 @@
             subscription?.cancel()
 
             #expect(deliveredWhileRecording == 0)
-            #expect(first.events.map(\.path) == paths)
+            #expect(first.events.elements.map(\.path) == paths)
             #expect(first.totals.reads == 3)
         }
 
@@ -50,7 +50,8 @@
             }
             subscription?.cancel()
 
-            #expect(batch.events.map(\.path) == ["/d", "/e"])
+            #expect(batch.events.elements.map(\.path) == ["/d", "/e"])
+            #expect(batch.events.evictedCount == 3)
             #expect(batch.totals.writes == 5)
             let expectedBytes: Int64 = 50
             #expect(batch.totals.bytesWritten == expectedBytes)
@@ -65,7 +66,7 @@
 
             await withCheckedContinuation { continuation in
                 subscription = sut.batches.sink { batch in
-                    batches.append(batch.events.map(\.path))
+                    batches.append(batch.events.elements.map(\.path))
                     if batches.count == 1 {
                         sut.record(IOEvent(timestamp: start, operation: .read, path: "/second", size: 0, duration: 0, isMainThread: true))
                     } else {
@@ -99,6 +100,26 @@
             #expect(sut.totalReads == 5)
             let expectedBytes: Int64 = 10
             #expect(sut.totalBytesRead == expectedBytes)
+        }
+
+        @Test("Past byteCapacity the store drops the oldest calls until their paths fit, and its totals still count every call")
+        func storeKeepsByteCapacity() async {
+            let start = Date(timeIntervalSinceReferenceDate: 800_000_000)
+            let recorder = DiskIORecorder()
+            let sut = DiskIOStore(recorder: recorder)
+            sut.byteCapacity = 10
+            var subscription: AnyCancellable?
+
+            for path in ["/aaaa", "/bbbb", "/cccc"] {
+                recorder.record(IOEvent(timestamp: start, operation: .write, path: path, size: 1, duration: 0, isMainThread: false))
+            }
+            let events = await withCheckedContinuation { continuation in
+                subscription = sut.$events.first { !$0.isEmpty }.sink { continuation.resume(returning: $0) }
+            }
+            subscription?.cancel()
+
+            #expect(events.map(\.path) == ["/cccc", "/bbbb"])
+            #expect(sut.totalWrites == 3)
         }
 
         @Test("Clearing the store empties the list and the totals")

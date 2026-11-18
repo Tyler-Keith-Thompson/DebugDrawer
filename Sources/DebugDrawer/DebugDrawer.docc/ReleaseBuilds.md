@@ -21,6 +21,7 @@ plugins call, as stand-ins, so the same code compiles in both configurations wit
 | ``DebugDrawerPlugin`` and its defaults | Compile; nothing reads a plugin |
 | ``DebugDrawerPlugin/setBadge(_:)``, ``DebugDrawerPlugin/clearBadge()``, ``DebugDrawerPlugin/postToast(_:)`` | Do nothing |
 | ``DebugDrawerAction`` | Compiles; there is no search field to offer it |
+| ``CaptureBuffer`` | Keeps nothing: appends store nothing and every snapshot is empty |
 | The rows, buttons and code views, such as ``DebugDrawerSection`` and ``DebugDrawerKeyValueRow`` | Draw nothing |
 | `debugDrawerButtonStyle(_:)`, `debugDrawerFont(_:)` and the other style modifiers | Return the view unchanged |
 | ``DebugDrawerReportContributor``, ``DebugDrawerReportUploader``, ``DebugDrawerReport``, ``DebugDrawerRedaction`` | Compile; there is no report and nothing calls them |

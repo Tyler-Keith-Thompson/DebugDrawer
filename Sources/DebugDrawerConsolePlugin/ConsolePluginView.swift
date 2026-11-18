@@ -78,6 +78,9 @@
                     .frame(minHeight: 120, maxHeight: 300)
                 }
 
+                if store.source == .captured {
+                    ConsoleDroppedHint(count: store.droppedLineCount)
+                }
                 ConsoleTimeRangeHint(timeRange: store.timeRange) { store.timeRange = .all }
                 ConsoleMutedHint(
                     count: store.mutedCount,

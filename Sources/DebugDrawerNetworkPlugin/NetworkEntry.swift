@@ -197,3 +197,11 @@ struct NetworkCompletion {
     var duration: TimeInterval?
     var error: String?
 }
+
+extension NetworkEntry {
+    /// What the request costs the log's byte bound: its body and its response's as the log kept
+    /// them, with the response's search text, which holds the body again.
+    var capturedByteCount: Int {
+        (requestBody?.count ?? 0) + (response?.data.count ?? 0) + (response?.searchText?.utf8.count ?? 0)
+    }
+}

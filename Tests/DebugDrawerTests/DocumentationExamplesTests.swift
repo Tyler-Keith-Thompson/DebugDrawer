@@ -4,6 +4,7 @@
 
 #if DEBUG
     import DebugDrawer
+    import Foundation
     import SwiftUI
     import Testing
 
@@ -98,9 +99,51 @@
         }
     }
 
+    /// An event the WritingPlugins.md example captures.
+    struct AnalyticsEvent: Sendable {
+        let name: String
+        let payload: Data
+    }
+
+    // WritingPlugins.md
+    @MainActor
+    final class EventStore: ObservableObject {
+        @Published private(set) var events: [AnalyticsEvent] = []
+        @Published private(set) var droppedCount = 0
+        private let buffer = CaptureBuffer<AnalyticsEvent>(maxCount: 1_000, maxByteCount: 1_048_576) {
+            $0.payload.count
+        }
+
+        /// Called from any thread.
+        nonisolated func record(_ event: AnalyticsEvent) {
+            buffer.append(event)
+            Task { @MainActor in self.refresh() }
+        }
+
+        func refresh() {
+            let snapshot = buffer.snapshot()
+            events = snapshot.elements
+            droppedCount = snapshot.evictedCount
+        }
+    }
+
     @MainActor
     @Suite("Documentation examples")
     struct DocumentationExamplesTests {
+        @Test("Writing plugins: a store keeps its events in a capture buffer and counts the ones it dropped")
+        func captureBuffer() {
+            let sut = EventStore()
+            let expected = ["opened", "closed"]
+
+            for name in ["launched", "opened", "closed"] {
+                sut.record(AnalyticsEvent(name: name, payload: Data(repeating: 0, count: 524_288)))
+            }
+            sut.refresh()
+
+            #expect(sut.events.map(\.name) == expected)
+            #expect(sut.droppedCount == 1)
+        }
+
         @Test("Installing in SwiftUI: the app registers its global plugins when it starts")
         func installingInSwiftUI() {
             let expectedTitle = "Cache"

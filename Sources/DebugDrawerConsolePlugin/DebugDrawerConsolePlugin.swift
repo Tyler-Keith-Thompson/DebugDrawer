@@ -8,14 +8,17 @@ import SwiftUI
 #if DEBUG
     // MARK: - Log store
 
-    /// Captures stdout, stderr, and os_log output into a ring buffer.
+    /// Captures stdout, stderr, and os_log output into a bounded `CaptureBuffer`.
     @MainActor
     public final class ConsoleLogStore: ObservableObject {
         /// The store `installConsole()` fills and the plugin shows, its mutes in the app's
         /// Application Support folder.
         public static let shared = ConsoleLogStore(muteStorage: _ConsoleMuteStorage(directory: _ConsoleMuteStorage.defaultDirectory))
 
+        /// The captured lines, oldest first, within ``capacity`` and ``byteCapacity``.
         @Published public private(set) var lines: [LogLine] = []
+        /// How many older lines the bounds dropped since the store was made or last cleared.
+        @Published private(set) var droppedLineCount = 0
         /// Which lines the console lists. The level, time range and whether muted lines show are
         /// set through their own properties, the search through `searchText`, and the mutes
         /// through `mute(_:)`, which saves them.
@@ -58,8 +61,28 @@ import SwiftUI
         /// Where the mutes are kept between launches.
         let muteStorage: any ConsoleMuteStorage
 
-        /// Maximum number of lines retained in the ring buffer.
-        public var capacity = 2000
+        /// How many lines ``lines`` keeps, 2,000 unless set; the oldest go first.
+        public var capacity: Int {
+            get { buffer.maxCount }
+            set {
+                buffer.maxCount = newValue
+                publishBuffer()
+            }
+        }
+
+        /// How many bytes of text ``lines`` keeps, 4 MiB unless set; the oldest lines go first.
+        public var byteCapacity: Int {
+            get { buffer.maxByteCount }
+            set {
+                buffer.maxByteCount = newValue
+                publishBuffer()
+            }
+        }
+
+        /// The captured lines, bounded by ``capacity`` and ``byteCapacity``.
+        private let buffer = CaptureBuffer<LogLine>(maxCount: 2000, maxByteCount: 4 * 1_048_576) { $0.capturedByteCount }
+        /// The buffer's ID after the newest line in ``lines``.
+        private var shownEnd = CaptureBuffer<LogLine>.ElementID(rawValue: 0)
 
         /// The captured lines the console lists: those the level, search, mutes and time range
         /// pass.
@@ -126,12 +149,22 @@ import SwiftUI
                 .receive(on: DispatchQueue.main)
                 .sink { [weak self] batch in
                     guard let self, !batch.isEmpty else { return }
-                    self.lines.append(contentsOf: batch)
-                    if self.lines.count > self.capacity {
-                        self.lines.removeFirst(self.lines.count - self.capacity)
-                    }
+                    self.buffer.append(contentsOf: batch)
+                    self.publishBuffer()
                 }
             loadMutes()
+        }
+
+        /// Brings ``lines`` and ``droppedLineCount`` up to the buffer with only what changed: the
+        /// lines evicted since leave the start and the new ones join the end.
+        private func publishBuffer() {
+            let change = buffer.snapshot(from: shownEnd)
+            let kept = change.keptCount(of: lines.count, before: shownEnd)
+            if kept < lines.count || !change.elements.isEmpty {
+                lines = lines.suffix(kept) + change.elements
+            }
+            shownEnd = change.endID
+            droppedLineCount = change.evictedCount
         }
 
         /// Compiles the search field's text into the filter, or, when it isn't a pattern, names
@@ -319,9 +352,10 @@ import SwiftUI
             }
         }
 
-        /// Forgets the captured lines; an earlier launch's session on disk stays.
+        /// Forgets the captured lines and the dropped count; earlier sessions on disk stay.
         public func clear() {
-            lines.removeAll()
+            buffer.removeAll()
+            publishBuffer()
         }
     }
 #else
@@ -335,13 +369,19 @@ import SwiftUI
         public static let shared = ConsoleLogStore()
 
         /// Always empty.
+        /// The captured lines, oldest first, within ``capacity`` and ``byteCapacity``.
         @Published public private(set) var lines: [LogLine] = []
+        /// How many older lines the bounds dropped since the store was made or last cleared.
+        @Published private(set) var droppedLineCount = 0
 
         /// Kept, never read: release builds list nothing.
         public var filterLevel: LogLine.Level = .debug
 
         /// Kept, never read: release builds keep no lines.
         public var capacity = 2000
+
+        /// Kept, never read: release builds keep no lines.
+        public var byteCapacity = 4 * 1_048_576
 
         /// Always empty.
         public var filteredLines: [LogLine] {

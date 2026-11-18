@@ -10,6 +10,7 @@ the entry becomes the GitHub release's notes.
 
 ### Added
 
+- DD-90: `CaptureBuffer`, a bounded capture buffer in the plugin contract: the newest elements within a count and a byte total, appended from any thread, each with a stable ID, a generation that grows with every change, counts of what it evicted, and `Codable` snapshots for export. Console, Network and Disk I/O keep their captures in it, with new `byteCapacity` properties on `ConsoleLogStore` (4 MiB), `NetworkStore` (32 MiB of bodies) and `DiskIOStore` (1 MiB of paths).
 - DD-85: `installDeepLink(presets:continueUserActivity:openURL:)` and `DeepLinkPreset`: an app passes the Deep Link Tester its own presets and an `openURL` handler, which receives each URL the plugin opens in place of the system and returns whether it handled it. Presets default to `DeepLinkPreset.bundleURLSchemes`, one per scheme the app's Info.plist declares, with an empty state saying how to add some when there are none. `installDeepLink(continueUserActivity:)` remains, deprecated, and forwards to it.
 - DD-199: `NetworkEntry.requestBodySize`, `isRequestBodyTruncated` and `requestSizeLabel`: Network keeps each request body to `installNetwork(bodyLimit:)`, as it does each response body, marked truncated with its full size.
 - DD-5: `DebugDrawer.toggle(in:)` opens or closes the drawer in the `NSWindow` (macOS) or `UIWindowScene` (iOS) it is given, attaching it first if it isn't yet, whichever window is key; the macOS example opens a second window (Debug > New Window, or `-NewWindow` at launch).
@@ -24,6 +25,7 @@ the entry becomes the GitHub release's notes.
 
 ### Fixed
 
+- DD-90: Network bounds the bodies it keeps in total, not only each one, so 200 large requests no longer hold hundreds of megabytes; Console says how many older lines it dropped once it passes its capacity.
 - DD-85: the Deep Link Tester reports each opened URL honestly: handled or not handled by `openURL`, opened by the system, or an error saying why the system couldn't open it, where the Mac reported Opened whatever `NSWorkspace` did. On the Mac a scheme the app declares opens in the running copy rather than another installed one, and the presets no longer include `myapp://` or the private `App-prefs:` scheme.
 - DD-5: with several windows or scenes, a local plugin is listed only in the drawer of the window whose views registered it, rather than in every window's drawer; the same plugin registered from two windows stays in each until its own view leaves. On iPadOS, `toggle()` acts on the scene holding the key window when two scenes are foreground-active, and on macOS, while the app isn't active, on its frontmost window rather than the last one attached.
 - DD-199: with Network installed, a request whose body is a stream reaches the server with every byte of it, rather than an empty body; a body past the body limit is sent from a temporary file, with its `Content-Length`.

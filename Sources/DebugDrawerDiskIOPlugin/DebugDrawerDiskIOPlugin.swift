@@ -92,12 +92,29 @@ public extension DebugDrawer {
         @Published public var mainThreadOnly = false
 
         /// How many calls ``events`` keeps, 500 unless set; the totals count every call regardless.
-        public var capacity = 500 {
-            didSet { recorder.setLimit(capacity) }
+        public var capacity: Int {
+            get { recorder.limit }
+            set {
+                recorder.limit = newValue
+                show(recorder.snapshot(from: shownEnd))
+            }
+        }
+
+        /// How many bytes of paths ``events`` keeps, 1 MiB unless set; the oldest calls go when a
+        /// new one would pass it, and the totals count every call regardless.
+        public var byteCapacity: Int {
+            get { recorder.byteLimit }
+            set {
+                recorder.byteLimit = newValue
+                show(recorder.snapshot(from: shownEnd))
+            }
         }
 
         private var installed = false
         private let recorder: DiskIORecorder
+        /// The recorder's buffer ID after the newest call in ``events``; the others count down
+        /// from it.
+        private var shownEnd = CaptureBuffer<IOEvent>.ElementID(rawValue: 0)
         private var cancellable: AnyCancellable?
 
         /// The reads since the last clear.
@@ -165,18 +182,29 @@ public extension DebugDrawer {
 
         /// Forgets the recorded calls and starts the totals over.
         public func clear() {
-            events.removeAll()
+            recorder.clear()
+            show(recorder.snapshot(from: shownEnd))
             totals = DiskIOTotals()
         }
 
         private func receive(_ batch: DiskIOBatch) {
             totals += batch.totals
-            guard !batch.events.isEmpty else { return }
-            // Built whole and assigned once: `@Published` has no in-place mutation, so inserting
-            // and trimming in place would copy the list twice.
-            var newest = Array(batch.events.reversed().prefix(capacity))
-            newest.append(contentsOf: events.prefix(max(capacity - newest.count, 0)))
-            events = newest
+            show(batch.events)
+        }
+
+        /// Brings the list up to `change`, newest first: the calls the buffer evicted leave its
+        /// end and the new ones join its start, so a delivery copies the list once rather than
+        /// the buffer whole as well.
+        private func show(_ change: CaptureBuffer<IOEvent>.Snapshot) {
+            // `events` holds the buffer's IDs below `shownEnd`; a change can start before it when
+            // the store asked for one itself since the recorder's last delivery.
+            let shownAlready = shownEnd.rawValue - min(change.firstID.rawValue, shownEnd.rawValue)
+            let new = change.elements.dropFirst(Int(min(shownAlready, UInt64(change.elements.count))))
+            let kept = change.keptCount(of: events.count, before: shownEnd)
+            if kept < events.count || !new.isEmpty {
+                events = new.reversed() + events.prefix(kept)
+            }
+            shownEnd = max(shownEnd, change.endID)
         }
     }
 #else
@@ -199,6 +227,9 @@ public extension DebugDrawer {
 
         /// Kept, never used.
         public var capacity = 500
+
+        /// Kept, never used.
+        public var byteCapacity = 1_048_576
 
         /// Always zero.
         public var totalReads: Int {

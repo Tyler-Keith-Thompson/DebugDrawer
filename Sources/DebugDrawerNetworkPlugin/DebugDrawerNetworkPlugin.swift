@@ -23,7 +23,8 @@ public extension NetworkStore {
         /// storage beside the mock rules.
         public static let shared = NetworkStore(ignoreStorage: _NetworkIgnoreListStorage(directory: _NetworkMockStorage.defaultDirectory))
 
-        /// The captured requests, newest first, at most ``capacity``.
+        /// The captured requests, newest first: at most ``capacity`` of them, whose bodies add up
+        /// to at most ``byteCapacity``.
         @Published public private(set) var entries: [NetworkEntry] = []
         /// The log's filter text, matched, ignoring case, against each request's method, URL,
         /// GraphQL operation name and response body.
@@ -33,7 +34,29 @@ public extension NetworkStore {
 
         /// How many requests ``entries`` keeps, 200 unless set; the oldest goes when a new one
         /// would pass it.
-        public var capacity = 200
+        public var capacity: Int {
+            get { buffer.maxCount }
+            set {
+                buffer.maxCount = newValue
+                publishBuffer()
+            }
+        }
+
+        /// How many bytes of bodies ``entries`` keeps, 32 MiB unless set: each request's body and
+        /// its response's, as the log kept them. The oldest requests go when a new one, or a
+        /// response arriving, would pass it.
+        public var byteCapacity: Int {
+            get { buffer.maxByteCount }
+            set {
+                buffer.maxByteCount = newValue
+                publishBuffer()
+            }
+        }
+
+        /// The captured requests, oldest first, bounded by ``capacity`` and ``byteCapacity``.
+        private let buffer = CaptureBuffer<NetworkEntry>(maxCount: 200, maxByteCount: 32 * 1_048_576) { $0.capturedByteCount }
+        /// The buffer's ID after the newest request in ``entries``; the others count down from it.
+        private var shownEnd = CaptureBuffer<NetworkEntry>.ElementID(rawValue: 0)
 
         /// The requests the log shows that pass the status filter and the filter text, without
         /// those to an ignored host unless `showsIgnored`: the captured ones, or the earlier
@@ -94,64 +117,6 @@ public extension NetworkStore {
         private var recordedWebSockets: Set<NetworkWebSocketConnection.ID> = []
         /// The last file that couldn't be imported, until another is imported or the log cleared.
         @Published private(set) var importIssue: NetworkImportIssue?
-
-        /// The requests in `entries` to a host none of `ignored` matches that pass the status
-        /// filter `status` and contain `text` (ignoring case) in the URL, the method, the GraphQL
-        /// operation name or the response body. Empty text matches every request. The body is
-        /// searched as it was pretty-printed when it arrived.
-        ///
-        /// - Complexity: O(*n*) in the text of `entries`; no body is parsed.
-        nonisolated static func entries(
-            _ entries: [NetworkEntry],
-            matching status: StatusFilter,
-            text: String,
-            ignoring ignored: [NetworkIgnoredDomain] = []
-        ) -> [NetworkEntry] {
-            var result = ignored.isEmpty ? entries : entries.filter { !ignored.ignores(host: $0.host) }
-            switch status {
-            case .all: break
-            case .success: result = result.filter { ($0.statusCode ?? 0) >= 200 && ($0.statusCode ?? 0) < 300 }
-            case .clientError: result = result.filter { ($0.statusCode ?? 0) >= 400 && ($0.statusCode ?? 0) < 500 }
-            case .serverError: result = result.filter { ($0.statusCode ?? 0) >= 500 }
-            case .errors: result = result.filter(\.isFailure)
-            }
-            if !text.isEmpty {
-                let query = text.lowercased()
-                result = result.filter {
-                    $0.url.lowercased().contains(query) ||
-                        $0.method.lowercased().contains(query) ||
-                        ($0.graphQLOperationName?.lowercased().contains(query) ?? false) ||
-                        ($0.response?.searchText?.contains(query) ?? false)
-                }
-            }
-            return result
-        }
-
-        /// The connections in `connections` to a host none of `ignored` matches that pass the
-        /// status filter `status` and contain `text` (ignoring case) in the URL, the method ("WS")
-        /// or a text frame. A connection has no HTTP status, so All shows every one, Errors those
-        /// that failed, and the others none.
-        nonisolated static func connections(
-            _ connections: [NetworkWebSocketConnection],
-            matching status: StatusFilter,
-            text: String,
-            ignoring ignored: [NetworkIgnoredDomain] = []
-        ) -> [NetworkWebSocketConnection] {
-            var result = ignored.isEmpty ? connections : connections.filter { !ignored.ignores(host: $0.host) }
-            switch status {
-            case .all: break
-            case .success, .clientError, .serverError: result = []
-            case .errors: result = result.filter(\.isFailure)
-            }
-            if !text.isEmpty {
-                let query = text.lowercased()
-                result = result.filter { connection in
-                    connection.url.lowercased().contains(query) || "ws".contains(query)
-                        || connection.frames.contains { $0.text?.lowercased().contains(query) ?? false }
-                }
-            }
-            return result
-        }
 
         /// Shows `connections` as the WebSocket connections the app opened, and writes each that
         /// has ended to the current session, once.
@@ -238,10 +203,8 @@ public extension NetworkStore {
         }
 
         func recordStart(_ entry: NetworkEntry) {
-            entries.insert(entry, at: 0)
-            if entries.count > capacity {
-                entries.removeLast(entries.count - capacity)
-            }
+            buffer.append(entry)
+            publishBuffer()
             // A mock's answer is recorded complete in one step.
             if entry.isComplete {
                 persist(entry)
@@ -249,14 +212,49 @@ public extension NetworkStore {
         }
 
         func recordCompletion(id: UUID, _ completion: NetworkCompletion) {
-            guard let idx = entries.firstIndex(where: { $0.id == id }) else { return }
-            entries[idx].statusCode = completion.statusCode
-            entries[idx].responseHeaders = completion.headers
-            entries[idx].response = completion.body
-            entries[idx].duration = completion.duration
-            entries[idx].error = completion.error
-            entries[idx].isComplete = true
-            persist(entries[idx])
+            var completed: NetworkEntry?
+            update(id) { entry in
+                entry.statusCode = completion.statusCode
+                entry.responseHeaders = completion.headers
+                entry.response = completion.body
+                entry.duration = completion.duration
+                entry.error = completion.error
+                entry.isComplete = true
+                completed = entry
+            }
+            if let completed {
+                persist(completed)
+            }
+        }
+
+        /// Changes the kept request with `id` in place, in the buffer and in ``entries``; does
+        /// nothing when the log no longer keeps it.
+        private func update(_ id: UUID, _ body: (inout NetworkEntry) -> Void) {
+            guard let index = entries.firstIndex(where: { $0.id == id }) else { return }
+            var changed: NetworkEntry?
+            let bufferID = CaptureBuffer<NetworkEntry>.ElementID(rawValue: shownEnd.rawValue - 1 - UInt64(index))
+            buffer.update(bufferID) { entry in
+                body(&entry)
+                changed = entry
+            }
+            guard let changed else { return }
+            entries[index] = changed
+            // The change can pass the byte bound, which evicts the oldest.
+            publishBuffer()
+        }
+
+        /// Shows what changed in the buffer in ``entries``, newest first.
+        ///
+        /// Takes only what changed since the last time: `entries` holds the buffer's IDs below
+        /// `shownEnd`, so the requests the buffer evicted since leave its end and the new ones
+        /// join its start, without copying the buffer whole on every request.
+        private func publishBuffer() {
+            let change = buffer.snapshot(from: shownEnd)
+            let kept = change.keptCount(of: entries.count, before: shownEnd)
+            if kept < entries.count || !change.elements.isEmpty {
+                entries = change.elements.reversed() + entries.prefix(kept)
+            }
+            shownEnd = change.endID
         }
 
         /// Writes `entry`, complete, to the current session, masked by the drawer's rules as they
@@ -268,13 +266,13 @@ public extension NetworkStore {
         }
 
         func recordMetrics(id: UUID, metrics: NetworkTimingMetrics) {
-            guard let idx = entries.firstIndex(where: { $0.id == id }) else { return }
-            entries[idx].metrics = metrics
+            update(id) { $0.metrics = metrics }
         }
 
         /// Clears the captured requests and WebSocket connections.
         public func clear() {
-            entries.removeAll()
+            buffer.removeAll()
+            publishBuffer()
             webSockets.removeAll()
             NetworkWebSocketRecorder.shared.clear()
         }
@@ -363,6 +361,9 @@ public extension NetworkStore {
 
         /// Kept, never used.
         public var capacity = 200
+
+        /// Kept, never used.
+        public var byteCapacity = 32 * 1_048_576
 
         /// Always empty.
         public var filteredEntries: [NetworkEntry] {
