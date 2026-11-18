@@ -2,41 +2,35 @@
     import Foundation
     import os
 
-    /// The one session every intercepted request is sent on through, which hands each task's
-    /// events to the `DebugNetworkProtocol` that started it, and lets go of that protocol when the
-    /// task completes.
+    /// The delegate of every session intercepted requests are sent on (``NetworkAppSessions``),
+    /// which hands each task's events to the `DebugNetworkProtocol` that started it, and lets go of
+    /// that protocol when the task completes.
     ///
-    /// One session for the process, rather than one per request: a session holds its delegate
-    /// until it is invalidated, and making a session costs more than the request it carries. The
-    /// session lives as long as the app, and holds only the protocols of requests in flight.
+    /// Redirects and authentication challenges are not decided here: they are handed to the
+    /// protocol, which asks the app's task, so the app's own session delegate decides them.
     final class NetworkForwardingSession: NSObject, Sendable {
         static let shared = NetworkForwardingSession()
 
-        /// The protocol of each task in flight, by task identifier. Behind a lock rather than in
-        /// an actor: tasks start on the loading system's threads and report on the session's
-        /// queue, and each hop to an actor would cost more than the lookup.
-        private let protocols = OSAllocatedUnfairLock<[Int: DebugNetworkProtocol]>(initialState: [:])
-
-        /// Made on first use, with the shared forwarder as its delegate. Its configuration gets
-        /// the URL protocol too once `installNetwork()` swizzles configurations; the requests sent
-        /// on it are marked handled, so the protocol passes them by.
-        private static let session = URLSession(configuration: .default, delegate: shared, delegateQueue: nil)
+        /// The protocol of each task in flight, by task. Behind a lock rather than in an actor:
+        /// tasks start on the loading system's threads and report on their sessions' queues, and
+        /// each hop to an actor would cost more than the lookup. Keyed by the task itself, as
+        /// task identifiers repeat across sessions.
+        private let protocols = OSAllocatedUnfairLock<[ObjectIdentifier: DebugNetworkProtocol]>(initialState: [:])
 
         override private init() {}
 
-        /// Starts `request` on the shared session, for `owner` to hear its events until it
-        /// completes.
+        /// Starts `request` on `session`, for `owner` to hear its events until it completes.
         ///
         /// - Returns: The task, which `owner` cancels when its own loading stops.
-        func start(_ request: URLRequest, for owner: DebugNetworkProtocol) -> URLSessionDataTask {
-            let task = Self.session.dataTask(with: request)
-            protocols.withLock { $0[task.taskIdentifier] = owner }
+        func start(_ request: URLRequest, on session: URLSession, for owner: DebugNetworkProtocol) -> URLSessionDataTask {
+            let task = session.dataTask(with: request)
+            protocols.withLock { $0[ObjectIdentifier(task)] = owner }
             task.resume()
             return task
         }
 
         private func owner(of task: URLSessionTask) -> DebugNetworkProtocol? {
-            protocols.withLock { $0[task.taskIdentifier] }
+            protocols.withLock { $0[ObjectIdentifier(task)] }
         }
     }
 
@@ -55,6 +49,33 @@
             owner(of: dataTask)?.forwardingDidLoad(data)
         }
 
+        func urlSession(
+            _: URLSession,
+            task: URLSessionTask,
+            willPerformHTTPRedirection response: HTTPURLResponse,
+            newRequest request: URLRequest,
+            completionHandler: @escaping @Sendable (URLRequest?) -> Void
+        ) {
+            // Not followed here: the app's task is told of the redirect, and its session follows
+            // it with a request of its own, which the protocol intercepts anew, or refuses it and
+            // gets this response, which this task goes on to load.
+            owner(of: task)?.forwardingWasRedirected(to: request, by: response)
+            completionHandler(nil)
+        }
+
+        func urlSession(
+            _: URLSession,
+            task: URLSessionTask,
+            didReceive challenge: URLAuthenticationChallenge,
+            completionHandler: @escaping @Sendable (URLSession.AuthChallengeDisposition, URLCredential?) -> Void
+        ) {
+            guard let owner = owner(of: task) else {
+                completionHandler(.performDefaultHandling, nil)
+                return
+            }
+            owner.forwardingDidReceive(challenge, answer: completionHandler)
+        }
+
         func urlSession(_: URLSession, task: URLSessionTask, needNewBodyStream completionHandler: @escaping @Sendable (InputStream?) -> Void) {
             completionHandler(owner(of: task)?.forwardingNeedsNewBodyStream())
         }
@@ -64,7 +85,7 @@
         }
 
         func urlSession(_: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
-            let owner = protocols.withLock { $0.removeValue(forKey: task.taskIdentifier) }
+            let owner = protocols.withLock { $0.removeValue(forKey: ObjectIdentifier(task)) }
             owner?.forwardingDidComplete(error: error)
         }
     }

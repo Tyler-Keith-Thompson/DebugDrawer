@@ -604,18 +604,32 @@ LoggingSystem.bootstrap { label in
 ### Network: what it captures
 
 `installNetwork()` registers a URL protocol for `URLSession.shared` and adds it to every
-`URLSessionConfiguration` made from then on, so the log shows the http and https requests of the
-shared session and of every session made after the call, those of networking libraries built on
-`URLSession` included. A session made before the call keeps the configuration it had, so install at
-startup. What doesn't go through a URL protocol isn't seen: background sessions, web views,
-AVFoundation's streaming, Network.framework's connections and stream tasks. WebSocket tasks are
-recorded on the tasks themselves (Network WebSockets, below).
+`URLSessionConfiguration`, so the log shows the http and https requests of the shared session and
+of the app's other sessions, those of networking libraries built on `URLSession` included.
 
-The plugin sends each request it captures on a session of its own, with the default
-configuration, and hands the response to the app's task. The request goes out as the app made it,
-with no header added, but the app's own session's delegate, cache, cookie storage and timeouts
-don't apply to it, and redirects are followed for it. A body the app streams is sent with its
-length (`Content-Length`) rather than in chunks. The log keeps the newest 200 requests (set
+The plugin sends each request it captures on a session of its own, made from a copy of the app
+session's configuration, and hands what it hears to the app's task. So the request gets the app
+session's cookie storage, cache, credentials, extra headers, timeouts, proxy and TLS settings, and
+an ephemeral session's cookies and cached responses stay its own. Redirects and authentication
+challenges go to the app's task, so the app's session delegate decides them as it does without the
+plugin: a redirect it refuses isn't followed, and a delegate that pins certificates or answers with
+a client certificate gets the server's challenge, and its answer is used. The request goes out as
+the app made it, with no header added; a body the app streams is sent with its length
+(`Content-Length`) rather than in chunks.
+
+What the plugin doesn't capture, or can't keep as it was:
+
+- Requests that don't go through a URL protocol aren't seen: background sessions' (the system
+  loads them outside the app), web views' (`WKWebView`), AVFoundation's streaming (`AVPlayer`),
+  Network.framework's connections and `URLSession` stream tasks. WebSocket tasks don't go through
+  it either; their frames are recorded on the tasks themselves (Network WebSockets, below).
+- A session made before `installNetwork()` is captured, but the plugin can't learn its
+  configuration, so its requests are sent with the default one: the shared cookie storage, cache
+  and credentials. Install at startup.
+- The app's session delegate isn't told of upload progress (`didSendBodyData`) or of waiting for
+  connectivity, which a URL protocol has no way to report.
+
+The log keeps the newest 200 requests (set
 `NetworkStore.shared.capacity` for another number) and the first megabyte of each request and
 response body, marked truncated with its full size beyond that; `installNetwork(bodyLimit:)` takes
 another limit. The server and the app always get the whole body.

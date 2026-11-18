@@ -205,6 +205,8 @@ public extension NetworkStore {
             URLProtocol.registerClass(DebugNetworkProtocol.self)
             // Swizzle URLSessionConfiguration so custom sessions also get intercepted
             URLSessionConfiguration.swizzleProtocolClasses()
+            // Note each session the app makes, so its requests are sent with its configuration.
+            NetworkAppSessions.install()
             // WebSocket tasks bypass URL protocols, so their traffic is recorded on the tasks.
             NetworkWebSocketInterception.install()
         }

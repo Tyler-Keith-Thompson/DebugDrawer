@@ -3,25 +3,44 @@
 
     // MARK: - URLProtocol interceptor
 
+    /// Captures a request, then answers it from a mock rule, or sends it on the forwarding session
+    /// of the app session that made it (``NetworkAppSessions``) and hands the app's task what that
+    /// session hears, conditioned when a profile applies. Redirects and authentication challenges
+    /// go to the app's task, so its own session delegate decides them.
+    ///
+    /// `@unchecked Sendable`: its state is kept on the thread it was started on
+    /// (``NetworkClientThread``), where URL loading calls `startLoading()` and `stopLoading()`.
+    /// What the forwarding session and a conditioned delivery report is handed to that thread
+    /// before it touches the state or the client, so nothing races `stopLoading()`.
     final class DebugNetworkProtocol: URLProtocol, @unchecked Sendable {
         private static let handledKey = "com.debugdrawer.network.handled"
 
+        /// Where `startLoading()` was called; the client is called there, and the state changed.
+        private var clientThread: NetworkClientThread?
+        /// Set by `stopLoading()`, after which the client hears nothing more.
+        private var isStopped = false
         private var entryId: UUID?
         private var startTime: CFAbsoluteTime = 0
         /// The response body the log keeps: its first bytes, up to the limit `installNetwork()`
         /// set when the request started.
         private var capture = NetworkBodyCapture(limit: NetworkBodyCapture.limit.withLock { $0 })
-        /// A conditioned request's whole body, which its delivery hands the client once it has
-        /// all arrived; unused otherwise, as the client gets each chunk as it comes.
-        private var deliveryBody = Data()
+        /// The whole body of a conditioned or redirected request, handed to the client once it
+        /// has all arrived; unused otherwise, as the client gets each chunk as it comes.
+        private var heldBody = Data()
         private var httpResponse: HTTPURLResponse?
+        /// The redirect the server answered with, which the app's task is told of once the
+        /// redirect's own response has arrived whole (``complete(error:)``).
+        private var redirect: (request: URLRequest, response: HTTPURLResponse)?
+        /// The authentication challenge the app's task was asked to answer, until loading stops.
+        private var pendingChallenge: NetworkChallengeSender?
         private var dataTask: URLSessionDataTask?
         /// Times the request when a conditioning profile applies to it; `nil` leaves it alone.
         private var delivery: NetworkConditionedDelivery?
         /// The log's record of a conditioned request, completed when its delivery ends.
         private var conditionedEntry: NetworkEntry?
         /// The temporary file of a request body past the body limit, which the forwarded request
-        /// streams from; held for as long as the request is, and removed with it.
+        /// streams from; held for as long as the request is, and removed with it. Set before the
+        /// forwarded request starts, so its session may read it from its own queue.
         private var requestBodyFile: NetworkBodyFile?
 
         override static func canInit(with request: URLRequest) -> Bool {
@@ -42,6 +61,7 @@
         }
 
         override func startLoading() {
+            clientThread = .current
             // An NSURLRequest's mutableCopy is an NSMutableURLRequest.
             guard let mutable = (request as NSURLRequest).mutableCopy() as? NSMutableURLRequest else {
                 client?.urlProtocol(self, didFailWithError: URLError(.unknown))
@@ -97,14 +117,34 @@
         }
 
         override func stopLoading() {
-            // Cancelled first: once it returns no step of the delivery runs, so none starts the
-            // data task after it is read here, and the client hears nothing more.
+            isStopped = true
             delivery?.cancel()
             dataTask?.cancel()
+            pendingChallenge?.cancelUnanswered()
+            pendingChallenge = nil
         }
 
+        /// Sends `request` on the forwarding session of the app session that made this task, once
+        /// that session is found, unless loading stopped meanwhile.
         private func startNetwork(_ request: URLRequest) {
-            dataTask = NetworkForwardingSession.shared.start(request, for: self)
+            let appTask = task
+            let send: @Sendable () async -> Void = { [self] in
+                let session = await NetworkAppSessions.shared.forwardingSession(for: appTask)
+                onClientThread { [self] in
+                    guard !isStopped else {
+                        complete(error: URLError(.cancelled))
+                        return
+                    }
+                    dataTask = NetworkForwardingSession.shared.start(request, on: session, for: self)
+                }
+            }
+            Task(operation: send)
+        }
+
+        /// Runs `body` on the thread this protocol was started on, after the work handed there
+        /// before it.
+        private func onClientThread(_ body: @escaping @Sendable () -> Void) {
+            clientThread?.perform(body)
         }
 
         /// Conditions the request by `plan`: the latency first, then the failure the plan decided,
@@ -119,7 +159,9 @@
                 NetworkStore.shared.recordStart(entry)
             }
             let delivery = NetworkConditionedDelivery(plan: plan) { [weak self] event in
-                self?.forward(event)
+                self?.onClientThread { [weak self] in
+                    self?.forward(event)
+                }
             }
             self.delivery = delivery
             delivery.start(url: url) { [weak self] in
@@ -133,8 +175,11 @@
                     delivery.fail(URLError(.badServerResponse) as NSError)
                     return
                 }
-                // What the log records as the body, as the network's would be.
-                capture.append(answer.body)
+                // What the log records as the body, as the network's would be. Appended on the
+                // client thread, where the rest of the capture is.
+                onClientThread { [self] in
+                    capture.append(answer.body)
+                }
                 delivery.deliver(response, body: answer.body)
             }
         }
@@ -142,6 +187,7 @@
         /// Tells the client of a conditioned request's event, and completes its log record at the
         /// end.
         private func forward(_ event: NetworkConditionedDelivery.Event) {
+            guard !isStopped else { return }
             switch event {
             case let .response(response):
                 httpResponse = response as? HTTPURLResponse
@@ -180,6 +226,8 @@
                 client?.urlProtocol(self, didFailWithError: URLError(.badServerResponse))
                 return
             }
+            // A mock's answer never enters the app's cache, so the next request asks the rules
+            // again.
             client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
             if !answer.body.isEmpty {
                 client?.urlProtocol(self, didLoad: answer.body)
@@ -200,50 +248,123 @@
         }
     }
 
-    // The forwarding session's events for this protocol's request (NetworkForwardingSession).
+    // The forwarding session's events for this protocol's request (NetworkForwardingSession), each
+    // reported on the session's queue and handled on the client thread.
     extension DebugNetworkProtocol {
         func forwardingDidReceive(_ response: URLResponse) {
-            httpResponse = response as? HTTPURLResponse
-            // A conditioned request's answer is read whole, then delivered at the profile's pace.
-            if delivery == nil {
-                client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+            onClientThread { [self] in
+                httpResponse = response as? HTTPURLResponse
+                // A conditioned request's answer is read whole, then delivered at the profile's
+                // pace; a redirect's, whole with the redirect. Not stored by the app's loading:
+                // the forwarding session, whose configuration is the app session's, has already
+                // stored it in the app's cache.
+                if delivery == nil, redirect == nil, !isStopped {
+                    client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+                }
             }
         }
 
         func forwardingDidLoad(_ data: Data) {
-            capture.append(data)
-            if delivery == nil {
-                client?.urlProtocol(self, didLoad: data)
-            } else {
-                deliveryBody.append(data)
+            onClientThread { [self] in
+                capture.append(data)
+                if delivery != nil || redirect != nil {
+                    heldBody.append(data)
+                } else if !isStopped {
+                    client?.urlProtocol(self, didLoad: data)
+                }
             }
         }
 
-        /// A new stream of the request's body, for the session to send it over again (a redirect,
-        /// an authentication challenge); `nil` when the body isn't a stream.
+        /// Keeps the redirect to `request` for the app's task, which is told of it with its
+        /// response once that has arrived; the forwarding session goes on to load that response.
+        func forwardingWasRedirected(to request: URLRequest, by response: HTTPURLResponse) {
+            onClientThread { [self] in
+                // The redirect's request is the app's to send: unmarked, so this protocol captures
+                // it as a request of its own.
+                guard let unmarked = (request as NSURLRequest).mutableCopy() as? NSMutableURLRequest else { return }
+                URLProtocol.removeProperty(forKey: Self.handledKey, in: unmarked)
+                redirect = (unmarked as URLRequest, response)
+            }
+        }
+
+        /// Asks the app's task to answer `challenge`, and hands its session delegate's decision to
+        /// the forwarded request through `answer`.
+        func forwardingDidReceive(_ challenge: URLAuthenticationChallenge, answer: @escaping NetworkChallengeSender.Answer) {
+            onClientThread { [self] in
+                guard !isStopped, let client else {
+                    answer(.cancelAuthenticationChallenge, nil)
+                    return
+                }
+                let sender = NetworkChallengeSender(answer: answer)
+                pendingChallenge = sender
+                client.urlProtocol(self, didReceive: URLAuthenticationChallenge(authenticationChallenge: challenge, sender: sender))
+            }
+        }
+
+        /// A new stream of the request's body, for the session to send it over again (an
+        /// authentication challenge); `nil` when the body isn't a stream.
         func forwardingNeedsNewBodyStream() -> InputStream? {
             requestBodyFile?.stream
         }
 
         func forwardingDidCollect(_ metrics: URLSessionTaskMetrics) {
-            guard let id = entryId, let timing = NetworkTimingMetrics(metrics) else { return }
-            Task { @MainActor in
-                NetworkStore.shared.recordMetrics(id: id, metrics: timing)
+            onClientThread { [self] in
+                guard let id = entryId, let timing = NetworkTimingMetrics(metrics) else { return }
+                Task { @MainActor in
+                    NetworkStore.shared.recordMetrics(id: id, metrics: timing)
+                }
             }
         }
 
         func forwardingDidComplete(error: Error?) {
+            onClientThread { [self] in
+                complete(error: error)
+            }
+        }
+
+        /// Ends the request: completes its log record and tells the client, or hands a conditioned
+        /// request's answer to its delivery. Called on the client thread.
+        private func complete(error: Error?) {
+            if let redirect, error == nil, let httpResponse {
+                // URL loading asks the app's delegate about a redirect on a queue of its own, and
+                // adds what it hears after the delegate chose to follow to the target's body. So
+                // the redirect, its response and its body go over together, before the delegate
+                // is asked: loading keeps them if the delegate refuses, and drops them if it
+                // follows. A conditioned request's latency has been waited out; its redirect's
+                // short body isn't paced.
+                delivery?.cancel()
+                record(error: nil)
+                guard !isStopped else { return }
+                client?.urlProtocol(self, wasRedirectedTo: redirect.request, redirectResponse: redirect.response)
+                client?.urlProtocol(self, didReceive: httpResponse, cacheStoragePolicy: .notAllowed)
+                if !heldBody.isEmpty {
+                    client?.urlProtocol(self, didLoad: heldBody)
+                }
+                client?.urlProtocolDidFinishLoading(self)
+                return
+            }
             if let delivery {
                 // The delivery tells the client, and completes the log record when it ends.
                 if let error {
                     delivery.fail(error as NSError)
                 } else if let httpResponse {
-                    delivery.deliver(httpResponse, body: deliveryBody)
+                    delivery.deliver(httpResponse, body: heldBody)
                 } else {
                     delivery.fail(URLError(.badServerResponse) as NSError)
                 }
                 return
             }
+            record(error: error)
+            guard !isStopped else { return }
+            if let error {
+                client?.urlProtocol(self, didFailWithError: error)
+            } else {
+                client?.urlProtocolDidFinishLoading(self)
+            }
+        }
+
+        /// Completes the request's log record with its response, the body kept, and `error`.
+        private func record(error: Error?) {
             let completion = NetworkCompletion(
                 statusCode: httpResponse?.statusCode,
                 headers: httpResponse?.allHeaderFields as? [String: String],
@@ -251,45 +372,10 @@
                 duration: CFAbsoluteTimeGetCurrent() - startTime,
                 error: error?.localizedDescription
             )
-            let id = entryId
-
+            guard let id = entryId else { return }
             Task { @MainActor in
-                if let id {
-                    NetworkStore.shared.recordCompletion(id: id, completion)
-                }
+                NetworkStore.shared.recordCompletion(id: id, completion)
             }
-
-            if let error {
-                client?.urlProtocol(self, didFailWithError: error)
-            } else {
-                client?.urlProtocolDidFinishLoading(self)
-            }
-        }
-    }
-
-    // MARK: - URLSessionConfiguration swizzle
-
-    extension URLSessionConfiguration {
-        /// Swizzle the `protocolClasses` getter so every new `URLSessionConfiguration`
-        /// (`.default`, `.ephemeral`, custom) automatically includes our interceptor.
-        /// This is the same technique FLEX/Netfox use — `URLProtocol.registerClass`
-        /// alone only covers `URLSession.shared`.
-        static func swizzleProtocolClasses() {
-            guard let original = class_getInstanceMethod(self, #selector(getter: protocolClasses)),
-                  let swizzled = class_getInstanceMethod(self, #selector(getter: debugDrawerProtocolClasses))
-            else { return }
-            method_exchangeImplementations(original, swizzled)
-        }
-
-        @objc private var debugDrawerProtocolClasses: [AnyClass]? {
-            // After the swizzle, this calls the original getter
-            guard var classes = self.debugDrawerProtocolClasses else {
-                return [DebugNetworkProtocol.self]
-            }
-            if !classes.contains(where: { $0 == DebugNetworkProtocol.self }) {
-                classes.insert(DebugNetworkProtocol.self, at: 0)
-            }
-            return classes
         }
     }
 #endif
