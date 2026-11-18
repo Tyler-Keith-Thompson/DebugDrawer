@@ -211,17 +211,18 @@
             #expect(sut.entries.map(\.key) == ["groupKey"])
         }
 
-        @Test("System keys hide unless shown, and the search matches a key or a value without regard to case")
+        @Test("Other domains' keys hide unless shown, and the search matches a key or a value without regard to case")
         func filters() {
-            let storage = FakeUserDefaultsStorage(suites: [.standard: [
-                "NSLanguages": ["en"], "launchCount": 3, "username": "Ada"
-            ]])
+            let storage = FakeUserDefaultsStorage(
+                suites: [.standard: ["launchCount": 3, "username": "Ada"]],
+                otherDomains: [.global: ["NSLanguages": ["en"]]]
+            )
             let sut = UserDefaultsModel(suites: [], storage: storage)
             sut.reload()
             let hidden = sut.filteredEntries.map(\.key)
-            sut.showSystemKeys = true
+            sut.showOtherDomains = true
             let shown = sut.filteredEntries.map(\.key)
-            sut.showSystemKeys = false
+            sut.showOtherDomains = false
             sut.searchText = "ADA"
             let byValue = sut.filteredEntries.map(\.key)
             sut.searchText = "launch"
@@ -236,7 +237,7 @@
 
         @Test("A registered default that no property list can hold is left out of the list")
         func nonPropertyListLeftOut() {
-            let storage = FakeUserDefaultsStorage(suites: [.standard: ["odd": NSObject(), "fine": "yes"]])
+            let storage = FakeUserDefaultsStorage(otherDomains: [.registration: ["odd": NSObject(), "fine": "yes"]])
             let sut = UserDefaultsModel(suites: [], storage: storage)
 
             sut.reload()
@@ -244,11 +245,134 @@
             #expect(sut.entries.map(\.key) == ["fine"])
         }
 
-        @Test("The system's keys are not the app's")
-        func systemKeys() {
-            #expect(UserDefaultsModel.isSystemKey("NSLanguages"))
-            #expect(UserDefaultsModel.isSystemKey("com.apple.something"))
-            #expect(!UserDefaultsModel.isSystemKey("launchCount"))
+        @Test("Keys the app wrote that look like the system's, such as CountryCode and NSFWFilterEnabled, are listed")
+        func systemLookingKeysListed() throws {
+            let name = "DebugDrawerTests.\(UUID().uuidString)"
+            let suite = try #require(UserDefaults(suiteName: name))
+            defer { suite.removePersistentDomain(forName: name) }
+            suite.set("NZ", forKey: "CountryCode")
+            suite.set(true, forKey: "NSFWFilterEnabled")
+            suite.set("Ada", forKey: "AppleIDName")
+            let storage = _UserDefaultsStorage(standard: suite, standardDomainName: name)
+            let sut = UserDefaultsModel(suites: [], storage: storage)
+            let expected = [
+                DefaultsEntry(key: "AppleIDName", value: .string("Ada")),
+                DefaultsEntry(key: "CountryCode", value: .string("NZ")),
+                DefaultsEntry(key: "NSFWFilterEnabled", value: .bool(true))
+            ]
+
+            sut.reload()
+
+            #expect(sut.filteredEntries == expected)
+        }
+
+        @Test("The list is the persistent domain's: a registered default and the global domain's keys stay out unless shown")
+        func persistentDomainOnly() throws {
+            let name = "DebugDrawerTests.\(UUID().uuidString)"
+            let suite = try #require(UserDefaults(suiteName: name))
+            defer { suite.removePersistentDomain(forName: name) }
+            // The registration domain is the process's, so the key is one no other test uses.
+            let registered = "DebugDrawerTests.registered.\(UUID().uuidString)"
+            suite.register(defaults: [registered: 7])
+            suite.set("ada", forKey: "username")
+            let storage = _UserDefaultsStorage(standard: suite, standardDomainName: name)
+            let sut = UserDefaultsModel(suites: [], storage: storage)
+            let expected = [DefaultsEntry(key: "username", value: .string("ada"))]
+
+            sut.reload()
+            let hidden = sut.filteredEntries
+            sut.showOtherDomains = true
+            let shown = sut.filteredEntries
+
+            #expect(hidden == expected)
+            #expect(shown.first { $0.key == registered } == DefaultsEntry(key: registered, value: .number(7), domain: .registration))
+            #expect(shown.first { $0.key == "username" }?.domain == .persistent)
+            #expect(shown.filter { $0.domain == .persistent } == expected)
+            #expect(sut.persistentKeys == ["username"])
+        }
+
+        @Test("Deleting a key that is also registered removes the app's value; the registered default then shows read-only")
+        func deleteOverRegisteredDefault() throws {
+            let name = "DebugDrawerTests.\(UUID().uuidString)"
+            let suite = try #require(UserDefaults(suiteName: name))
+            defer { suite.removePersistentDomain(forName: name) }
+            let key = "DebugDrawerTests.registered.\(UUID().uuidString)"
+            suite.register(defaults: [key: "fallback"])
+            suite.set("chosen", forKey: key)
+            let storage = _UserDefaultsStorage(standard: suite, standardDomainName: name)
+            let sut = UserDefaultsModel(suites: [], storage: storage)
+            sut.showOtherDomains = true
+            sut.reload()
+            let before = sut.filteredEntries.first { $0.key == key }
+
+            sut.remove(key)
+
+            let actual = sut.filteredEntries.first { $0.key == key }
+            #expect(before == DefaultsEntry(key: key, value: .string("chosen")))
+            #expect(suite.persistentDomain(forName: name)?[key] == nil)
+            #expect(actual == DefaultsEntry(key: key, value: .string("fallback"), domain: .registration))
+        }
+
+        @Test("A key in several domains shows once, from the first of persistent, argument, global and registration")
+        func domainPrecedence() {
+            let storage = FakeUserDefaultsStorage(
+                suites: [.standard: ["a": "persistent"]],
+                otherDomains: [
+                    .argument: ["a": "argument", "b": "argument"],
+                    .global: ["b": "global", "c": "global"],
+                    .registration: ["c": "registration", "d": "registration"]
+                ]
+            )
+            let sut = UserDefaultsModel(suites: [], storage: storage)
+            sut.showOtherDomains = true
+            let expected = [
+                DefaultsEntry(key: "a", value: .string("persistent")),
+                DefaultsEntry(key: "b", value: .string("argument"), domain: .argument),
+                DefaultsEntry(key: "c", value: .string("global"), domain: .global),
+                DefaultsEntry(key: "d", value: .string("registration"), domain: .registration)
+            ]
+
+            sut.reload()
+
+            #expect(sut.filteredEntries == expected)
+        }
+
+        @Test("Editing an integer stores an integer, a real a real, and a Boolean a Boolean, read back from the suite")
+        func editsKeepTheStoredType() throws {
+            let name = "DebugDrawerTests.\(UUID().uuidString)"
+            let suite = try #require(UserDefaults(suiteName: name))
+            defer { suite.removePersistentDomain(forName: name) }
+            suite.set(3, forKey: "launchCount")
+            suite.set(2.5, forKey: "volume")
+            suite.set(true, forKey: "sync")
+            suite.set(NSNumber(value: 1), forKey: "flag")
+            let sut = UserDefaultsModel(suites: [name])
+            sut.selectedSuite = .named(name)
+            let launchCount = try #require(sut.entries.first { $0.key == "launchCount" }?.value)
+            let volume = try #require(sut.entries.first { $0.key == "volume" }?.value)
+            let flag = try #require(sut.entries.first { $0.key == "flag" }?.value)
+            let booleanTypeID = CFBooleanGetTypeID()
+
+            sut.set(try launchCount.replacement(parsing: "4", encoding: .hex), forKey: "launchCount")
+            sut.set(try volume.replacement(parsing: "3", encoding: .hex), forKey: "volume")
+            sut.set(try flag.replacement(parsing: "0", encoding: .hex), forKey: "flag")
+            sut.set(.bool(false), forKey: "sync")
+
+            let integer = try #require(suite.object(forKey: "launchCount") as? NSNumber)
+            let real = try #require(suite.object(forKey: "volume") as? NSNumber)
+            let zero = try #require(suite.object(forKey: "flag") as? NSNumber)
+            let boolean = try #require(suite.object(forKey: "sync") as? NSNumber)
+            #expect(integer == 4)
+            #expect(!CFNumberIsFloatType(integer as CFNumber))
+            #expect(CFGetTypeID(integer) != booleanTypeID)
+            #expect(real == 3)
+            #expect(CFNumberIsFloatType(real as CFNumber))
+            #expect(zero == 0)
+            #expect(!CFNumberIsFloatType(zero as CFNumber))
+            #expect(CFGetTypeID(zero) != booleanTypeID)
+            #expect(CFGetTypeID(boolean) == booleanTypeID)
+            #expect(boolean == false)
+            #expect(flag.type == .number)
         }
     }
 #endif

@@ -50,9 +50,9 @@ public struct UserDefaultsPlugin: DebugDrawerPlugin {
                 suites: model.suites,
                 selectedSuite: $model.selectedSuite,
                 entries: model.filteredEntries,
-                keys: Set(model.entries.map(\.key)),
+                keys: model.persistentKeys,
                 searchText: $model.searchText,
-                showSystemKeys: $model.showSystemKeys,
+                showOtherDomains: $model.showOtherDomains,
                 redaction: drawer.redaction,
                 actions: UserDefaultsBrowserActions(
                     set: { model.set($0, forKey: $1) },

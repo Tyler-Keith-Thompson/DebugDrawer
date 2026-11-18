@@ -5,35 +5,56 @@
     /// The suites' values, read and written, and word of a change to any of them.
     @MainActor
     protocol UserDefaultsStorage {
-        /// Every key `suite` resolves and its value, the system's and the registered defaults
-        /// included, as `UserDefaults.dictionaryRepresentation()` gives them.
-        func values(in suite: UserDefaultsSuite) -> [String: Any]
-        /// The keys a named suite's own domain holds, without the global domain's or the
-        /// registered defaults; for the standard defaults, the keys of the app's domain.
-        func ownKeys(in suite: UserDefaultsSuite) -> Set<String>
-        /// Writes `value`, a property-list object, for `key` in `suite`.
+        /// The keys and values `suite` finds in `domain`.
+        func values(in suite: UserDefaultsSuite, domain: DefaultsDomain) -> [String: Any]
+        /// Writes `value`, a property-list object, for `key` in `suite`'s persistent domain.
         func set(_ value: Any, forKey key: String, in suite: UserDefaultsSuite)
-        /// Removes `key` from `suite`.
+        /// Removes `key` from `suite`'s persistent domain.
         func removeValue(forKey key: String, in suite: UserDefaultsSuite)
         /// Calls `onChange`, on whichever thread wrote, after any suite in the process changes,
         /// until the returned value is cancelled or released.
         func observeChanges(_ onChange: @escaping @Sendable () -> Void) -> AnyCancellable
     }
 
-    /// The real defaults: `UserDefaults.standard`, and `UserDefaults(suiteName:)` for a named
-    /// suite. A name UserDefaults refuses (the app's own bundle identifier, or
+    /// The real defaults: `standard` for the standard defaults, and `UserDefaults(suiteName:)` for
+    /// a named suite. A name UserDefaults refuses (the app's own bundle identifier, or
     /// `NSGlobalDomain`) reads as empty and ignores writes.
     struct _UserDefaultsStorage: UserDefaultsStorage {
-        func values(in suite: UserDefaultsSuite) -> [String: Any] {
-            defaults(for: suite)?.dictionaryRepresentation() ?? [:]
+        /// The standard defaults.
+        let standard: UserDefaults
+        /// The name of the standard defaults' persistent domain.
+        let standardDomainName: String
+
+        /// - Parameters:
+        ///   - standard: The defaults the Standard suite reads and writes.
+        ///   - standardDomainName: The name of `standard`'s persistent domain: the app's bundle
+        ///     identifier, or the process name when it has none; a suite's name for a suite.
+        init(
+            standard: UserDefaults = .standard,
+            standardDomainName: String = Bundle.main.bundleIdentifier ?? ProcessInfo.processInfo.processName
+        ) {
+            self.standard = standard
+            self.standardDomainName = standardDomainName
         }
 
-        func ownKeys(in suite: UserDefaultsSuite) -> Set<String> {
-            let domain = switch suite {
-            case .standard: Bundle.main.bundleIdentifier ?? ProcessInfo.processInfo.processName
-            case let .named(name): name
+        func values(in suite: UserDefaultsSuite, domain: DefaultsDomain) -> [String: Any] {
+            guard let defaults = defaults(for: suite) else { return [:] }
+            switch domain {
+            case .persistent:
+                return defaults.persistentDomain(forName: domainName(of: suite)) ?? [:]
+            case .argument:
+                return defaults.volatileDomain(forName: UserDefaults.argumentDomain)
+            case .registration:
+                return defaults.volatileDomain(forName: UserDefaults.registrationDomain)
+            case .global:
+                // The search list's other domains, the global domain for this host among them,
+                // have no public name to read them by, so they are what the merged view holds
+                // beyond the three named ones.
+                let named = [DefaultsDomain.persistent, .argument, .registration].map { values(in: suite, domain: $0) }
+                return defaults.dictionaryRepresentation().filter { key, _ in
+                    !named.contains { $0[key] != nil }
+                }
             }
-            return Set((defaults(for: suite)?.persistentDomain(forName: domain) ?? [:]).keys)
         }
 
         func set(_ value: Any, forKey key: String, in suite: UserDefaultsSuite) {
@@ -58,8 +79,15 @@
 
         private func defaults(for suite: UserDefaultsSuite) -> UserDefaults? {
             switch suite {
-            case .standard: .standard
+            case .standard: standard
             case let .named(name): UserDefaults(suiteName: name)
+            }
+        }
+
+        private func domainName(of suite: UserDefaultsSuite) -> String {
+            switch suite {
+            case .standard: standardDomainName
+            case let .named(name): name
             }
         }
     }

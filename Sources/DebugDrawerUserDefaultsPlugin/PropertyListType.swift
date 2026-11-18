@@ -35,35 +35,13 @@
             }
         }
 
-        /// The value a field's `text` holds: a string as typed; a number as an integer when it is
-        /// one and a real otherwise, ignoring surrounding whitespace; data in `encoding`.
-        ///
-        /// - Throws: ``PropertyListTextError`` saying why the text isn't a value of the type, or
-        ///   that the type isn't edited as text (Boolean, Date, Array and Dictionary).
-        func value(parsing text: String, encoding: DataTextEncoding) throws(PropertyListTextError) -> PropertyListValue {
-            switch self {
-            case .string:
-                return .string(text)
-            case .number:
-                let trimmed = text.trimmingCharacters(in: .whitespaces)
-                if let integer = Int(trimmed) { return .number(NSNumber(value: integer)) }
-                guard let real = Double(trimmed), real.isFinite else { throw .notNumber }
-                return .number(NSNumber(value: real))
-            case .data:
-                do {
-                    return try .data(encoding.data(from: text))
-                } catch {
-                    throw .data(error)
-                }
-            case .boolean, .date, .array, .dictionary:
-                throw .notText
-            }
-        }
     }
 
     /// Why a field's text isn't a value of its type.
     enum PropertyListTextError: Error, Equatable {
-        /// Text that isn't an integer or a finite real.
+        /// Text that isn't a whole number, for an integer.
+        case notInteger
+        /// Text that isn't a finite number, for a real.
         case notNumber
         /// Text that isn't bytes in the chosen encoding.
         case data(DataTextError)
@@ -73,6 +51,7 @@
         /// The problem as the editor shows it under the field.
         var message: String {
             switch self {
+            case .notInteger: "That isn't a whole number: the value is an integer, so use digits and a sign."
             case .notNumber: "That isn't a number: use digits, a sign and a decimal point."
             case let .data(error): error.message
             case .notText: "This type isn't edited as text."

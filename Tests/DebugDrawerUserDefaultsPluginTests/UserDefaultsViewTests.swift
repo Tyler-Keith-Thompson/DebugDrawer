@@ -20,7 +20,7 @@
             let sut = UserDefaultsBrowserView(
                 suites: [.standard, group], selectedSuite: Binding(get: { selection.suite }, set: { selection.suite = $0 }),
                 entries: [DefaultsEntry(key: "launchCount", value: .number(3))], keys: ["launchCount"],
-                searchText: .constant(""), showSystemKeys: .constant(false), redaction: .standard,
+                searchText: .constant(""), showOtherDomains: .constant(false), redaction: .standard,
                 actions: UserDefaultsBrowserActions(set: { _, _ in }, add: { _, _ in }, remove: { _ in }, reload: {})
             )
 
@@ -37,7 +37,7 @@
         func noSuitePicker() throws {
             let sut = UserDefaultsBrowserView(
                 suites: [.standard], selectedSuite: .constant(.standard), entries: [], keys: [],
-                searchText: .constant(""), showSystemKeys: .constant(false), redaction: .standard,
+                searchText: .constant(""), showOtherDomains: .constant(false), redaction: .standard,
                 actions: UserDefaultsBrowserActions(set: { _, _ in }, add: { _, _ in }, remove: { _ in }, reload: {})
             )
 
@@ -51,7 +51,7 @@
             var reloads = 0
             let sut = UserDefaultsBrowserView(
                 suites: [.standard], selectedSuite: .constant(.standard), entries: [], keys: [],
-                searchText: .constant(""), showSystemKeys: .constant(false), redaction: .standard,
+                searchText: .constant(""), showOtherDomains: .constant(false), redaction: .standard,
                 actions: UserDefaultsBrowserActions(set: { _, _ in }, add: { _, _ in }, remove: { _ in }, reload: { reloads += 1 })
             )
 
@@ -65,7 +65,7 @@
             var added: [String] = []
             let sut = UserDefaultsBrowserView(
                 suites: [.standard], selectedSuite: .constant(.standard), entries: [], keys: ["taken"],
-                searchText: .constant(""), showSystemKeys: .constant(false), redaction: .standard,
+                searchText: .constant(""), showOtherDomains: .constant(false), redaction: .standard,
                 actions: UserDefaultsBrowserActions(set: { _, _ in }, add: { added.append("\($0) \($1.title)") }, remove: { _ in }, reload: {})
             )
             var formKeys: Set<String>?
@@ -186,9 +186,9 @@
             #expect(saved == [.data(Data([0xDE, 0xAD, 0xBE, 0xEF]))])
         }
 
-        @Test("A number that isn't one says why and holds Save back")
+        @Test("A real that isn't a number says why and holds Save back")
         func numberValidation() async throws {
-            let sut = PropertyListScalarEditor(value: .number(3), title: "launchCount") { _ in }
+            let sut = PropertyListScalarEditor(value: .number(NSNumber(value: 2.5)), title: "volume") { _ in }
             var isSaveDisabled = false
             var problem = ""
 
@@ -204,6 +204,88 @@
 
             #expect(isSaveDisabled)
             #expect(problem == PropertyListTextError.notNumber.message)
+        }
+
+        @Test("An integer given a fraction says it needs a whole number, keeps the field and holds Save back")
+        func integerValidation() async throws {
+            var saved: [PropertyListValue] = []
+            let sut = PropertyListScalarEditor(value: .number(NSNumber(value: 3)), title: "launchCount") { saved.append($0) }
+            let expected = PropertyListTextError.notInteger.message
+            var isSaveDisabled = false
+            var problem = ""
+            var fieldText = ""
+
+            try await ViewHosting.host(sut) {
+                try await sut.inspection.inspect { view in
+                    try view.find(ViewType.TextField.self).setInput("3.5")
+                }
+                try await sut.inspection.inspect { view in
+                    // A disabled button refuses the tap, so nothing is saved either way.
+                    try? view.find(button: "Save").tap()
+                }
+                try await sut.inspection.inspect { view in
+                    isSaveDisabled = try view.find(button: "Save").isDisabled()
+                    problem = try view.find(text: expected).string()
+                    fieldText = try view.find(ViewType.TextField.self).input()
+                }
+            }
+
+            #expect(isSaveDisabled)
+            #expect(problem == expected)
+            #expect(fieldText == "3.5")
+            #expect(saved.isEmpty)
+        }
+
+        @Test("Saving an integer's field saves an integer, and a real's a real, though both read 4")
+        func numberSavesKeepKind() async throws {
+            var saved: [PropertyListValue] = []
+            let integer = PropertyListScalarEditor(value: .number(NSNumber(value: 3)), title: "launchCount") { saved.append($0) }
+            let real = PropertyListScalarEditor(value: .number(NSNumber(value: 2.5)), title: "volume") { saved.append($0) }
+
+            for sut in [integer, real] {
+                try await ViewHosting.host(sut) {
+                    try await sut.inspection.inspect { view in
+                        try view.find(ViewType.TextField.self).setInput("4")
+                    }
+                    try await sut.inspection.inspect { view in
+                        try view.find(button: "Save").tap()
+                    }
+                }
+            }
+
+            let kinds = saved.map { value -> String in
+                guard case let .number(number) = value else { return "not a number" }
+                return String(cString: number.objCType)
+            }
+            #expect(saved == [.number(4), .number(4)])
+            #expect(kinds == ["q", "d"])
+        }
+
+        @Test("A key from another domain names it, shows why it is read-only, and offers no editor or Delete Key")
+        func readOnlyRow() throws {
+            let entry = DefaultsEntry(key: "AppleLanguages", value: .array([.string("en")]), domain: .global)
+            let sut = DefaultsEntryRow(entry: entry, redaction: .standard, isSelected: true, onSelect: {}, onSet: { _ in }, onDelete: {})
+            let expectedReason = DefaultsDomain.global.readOnlyReason ?? ""
+
+            let view = try sut.inspect()
+
+            #expect(throws: Never.self) { try view.find(text: "Array · Global") }
+            #expect(throws: Never.self) { try view.find(text: expectedReason) }
+            #expect(throws: Never.self) { try view.find(button: "Copy Value") }
+            #expect((try? view.find(button: "Delete Key")) == nil)
+            #expect((try? view.find(PropertyListEditor.self)) == nil)
+        }
+
+        @Test("A key of the persistent domain names only its type and offers Delete Key")
+        func persistentRow() throws {
+            let entry = DefaultsEntry(key: "launchCount", value: .number(3))
+            let sut = DefaultsEntryRow(entry: entry, redaction: .standard, isSelected: true, onSelect: {}, onSet: { _ in }, onDelete: {})
+
+            let view = try sut.inspect()
+
+            #expect(throws: Never.self) { try view.find(text: "Number") }
+            #expect(throws: Never.self) { try view.find(button: "Delete Key") }
+            #expect(throws: Never.self) { try view.find(PropertyListEditor.self) }
         }
 
         @Test("Picking false for a Boolean saves it at once")

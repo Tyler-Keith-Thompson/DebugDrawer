@@ -31,6 +31,25 @@
             assertSnapshot(of: actual, as: .image(perceptualPrecision: 0.98), named: "accessibility3")
         }
 
+        @Test(
+            "A selected registered default, its domain and why it is read-only stay readable at the default and an accessibility text size",
+            arguments: [DynamicTypeSize.large, .accessibility3]
+        )
+        func readOnlyRow(size: DynamicTypeSize) throws {
+            let entry = DefaultsEntry(key: "maxUploadCount", value: .number(5), domain: .registration)
+            let sut = DefaultsEntryRow(entry: entry, redaction: .standard, isSelected: true, onSelect: {}, onSet: { _ in }, onDelete: {})
+            let renderer = ImageRenderer(content: sut
+                .frame(width: 316, alignment: .leading)
+                .padding()
+                .background(.background)
+                .environment(\.dynamicTypeSize, size))
+            renderer.scale = 2
+
+            let actual = try #require(renderer.uiImage)
+
+            assertSnapshot(of: actual, as: .image(perceptualPrecision: 0.98), named: "\(size)")
+        }
+
         @Test("A selected string row, its field and Save stay readable at a large accessibility text size")
         func selectedStringRow() throws {
             let entry = DefaultsEntry(key: "username", value: .string("ada"))
@@ -111,7 +130,7 @@
             ]
             let sut = UserDefaultsBrowserView(
                 suites: [.standard, suite], selectedSuite: .constant(suite), entries: entries, keys: Set(entries.map(\.key)),
-                searchText: .constant(""), showSystemKeys: .constant(false), redaction: .standard,
+                searchText: .constant(""), showOtherDomains: .constant(false), redaction: .standard,
                 actions: UserDefaultsBrowserActions(set: { _, _ in }, add: { _, _ in }, remove: { _ in }, reload: {})
             )
             let controller = UIHostingController(rootView: sut

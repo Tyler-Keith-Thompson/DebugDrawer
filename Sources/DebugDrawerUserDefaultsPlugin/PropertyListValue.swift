@@ -133,6 +133,37 @@
             }
         }
 
+        /// The value of the same type that a field's `text` holds, to replace this one: a string
+        /// as typed; data in `encoding`; a number of the same kind, ignoring surrounding
+        /// whitespace, so an integer stays an integer ("3" is 3) and a real a real ("3" is 3.0).
+        ///
+        /// - Throws: ``PropertyListTextError`` saying why the text isn't a value of the type, or
+        ///   that the type isn't edited as text (Boolean, Date, Array and Dictionary).
+        func replacement(parsing text: String, encoding: DataTextEncoding) throws(PropertyListTextError) -> PropertyListValue {
+            switch self {
+            case .string:
+                return .string(text)
+            case let .number(number):
+                let trimmed = text.trimmingCharacters(in: .whitespaces)
+                if number.isReal {
+                    guard let real = Double(trimmed), real.isFinite else { throw .notNumber }
+                    return .number(NSNumber(value: real))
+                }
+                // An unsigned integer past `Int.max` is one a property list holds too.
+                if let integer = Int(trimmed) { return .number(NSNumber(value: integer)) }
+                guard let unsigned = UInt64(trimmed) else { throw .notInteger }
+                return .number(NSNumber(value: unsigned))
+            case .data:
+                do {
+                    return try .data(encoding.data(from: text))
+                } catch {
+                    throw .data(error)
+                }
+            case .bool, .date, .array, .dictionary:
+                throw .notText
+            }
+        }
+
         /// The element at an index of an array, or the value for a key of a dictionary.
         private func child(_ component: PropertyListPathComponent) -> PropertyListValue? {
             switch (self, component) {
@@ -178,6 +209,11 @@
         /// Whether the number is a property list's Boolean, which bridges to `NSNumber` too.
         fileprivate var isBoolean: Bool {
             CFGetTypeID(self) == CFBooleanGetTypeID()
+        }
+
+        /// Whether the number is a real (a float or a double) rather than an integer.
+        fileprivate var isReal: Bool {
+            CFNumberIsFloatType(self as CFNumber)
         }
     }
 #endif

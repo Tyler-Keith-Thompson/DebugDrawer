@@ -153,13 +153,13 @@
 
         /// The value the field holds; `nil` while it holds none.
         private var parsed: PropertyListValue? {
-            try? value.type.value(parsing: text, encoding: encoding)
+            try? value.replacement(parsing: text, encoding: encoding)
         }
 
         /// Why the field holds no value.
         private var problem: PropertyListTextError? {
             do {
-                _ = try value.type.value(parsing: text, encoding: encoding)
+                _ = try value.replacement(parsing: text, encoding: encoding)
                 return nil
             } catch {
                 return error

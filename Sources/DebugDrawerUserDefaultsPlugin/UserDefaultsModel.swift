@@ -14,12 +14,12 @@
             didSet { if selectedSuite != oldValue { reload() } }
         }
 
-        /// The shown suite's keys, sorted, as last read.
+        /// The shown suite's keys, sorted, as last read: the persistent domain's, then each key
+        /// only another domain holds, from the domain whose value the suite reads.
         @Published private(set) var entries: [DefaultsEntry] = []
-        /// The keys of the shown suite's own domain, read with ``entries``.
-        private var ownKeys: Set<String> = []
         @Published var searchText = ""
-        @Published var showSystemKeys = false
+        /// Whether keys only the argument, global or registration domain holds show, read-only.
+        @Published var showOtherDomains = false
 
         private let storage: any UserDefaultsStorage
         private let now: () -> Date
@@ -43,48 +43,35 @@
             self.now = now
         }
 
-        /// The entries the filters let through: unless system keys show, only the app's (in a
-        /// named suite, only the suite's own, not the global domain's or registered defaults),
-        /// and only those whose key or value contains the search text, ignoring case.
+        /// The entries the filters let through: unless other domains show, only the persistent
+        /// domain's, and only those whose key or value contains the search text, ignoring case.
         var filteredEntries: [DefaultsEntry] {
-            let shown = showSystemKeys ? entries : entries.filter { !isSystemKeyOfShownSuite($0.key) }
+            let shown = showOtherDomains ? entries : entries.filter { $0.domain == .persistent }
             guard !searchText.isEmpty else { return shown }
             return shown.filter { $0.matches(searchText) }
         }
 
-        private static let systemPrefixes = [
-            "NS", "Apple", "AK", "com.apple.", "WebKit",
-            "Country", "AddressBook", "PKLog", "INNext",
-            "METAL_", "MTL", "CTDirtyCount"
-        ]
-
-        /// Whether the system or a framework, not the app, wrote the key, judged by its prefix.
-        static func isSystemKey(_ key: String) -> Bool {
-            systemPrefixes.contains { key.hasPrefix($0) }
-        }
-
-        /// Whether the key is the system's: in the standard defaults, by its prefix; in a named
-        /// suite, any key outside the suite's own domain.
-        private func isSystemKeyOfShownSuite(_ key: String) -> Bool {
-            switch selectedSuite {
-            case .standard: Self.isSystemKey(key)
-            case .named: !ownKeys.contains(key)
-            }
+        /// The keys of the shown suite's persistent domain, which a new key mustn't be.
+        var persistentKeys: Set<String> {
+            Set(entries.lazy.filter { $0.domain == .persistent }.map(\.key))
         }
 
         /// Reads the shown suite's keys again.
         func reload() {
-            ownKeys = storage.ownKeys(in: selectedSuite)
             entries = entries(in: selectedSuite)
         }
 
-        /// `suite`'s keys, sorted, read now; a value no property list holds, which only a
-        /// registered default can be, is left out.
+        /// `suite`'s keys, sorted, read now: each from the first domain of persistent, argument,
+        /// global and registration that holds it. A value no property list can hold, which only
+        /// a registered default can be, is left out.
         func entries(in suite: UserDefaultsSuite) -> [DefaultsEntry] {
-            let values = storage.values(in: suite)
-            return values.keys.sorted().compactMap { key in
-                values[key].flatMap(PropertyListValue.init(propertyList:)).map { DefaultsEntry(key: key, value: $0) }
+            var found: [String: DefaultsEntry] = [:]
+            for domain in DefaultsDomain.allCases {
+                for (key, object) in storage.values(in: suite, domain: domain) where found[key] == nil {
+                    found[key] = PropertyListValue(propertyList: object).map { DefaultsEntry(key: key, value: $0, domain: domain) }
+                }
             }
+            return found.keys.sorted().compactMap { found[$0] }
         }
 
         /// Reads the suite, then reads it again after each change to any suite, until each call
@@ -120,7 +107,7 @@
             if observers == 0 { observation = nil }
         }
 
-        /// Writes `value` for `key` in the shown suite.
+        /// Writes `value` for `key` in the shown suite's persistent domain.
         func set(_ value: PropertyListValue, forKey key: String) {
             storage.set(value.propertyList, forKey: key, in: selectedSuite)
             reload()
@@ -132,7 +119,7 @@
             set(type.initialValue(now: now()), forKey: key)
         }
 
-        /// Removes `key` from the shown suite.
+        /// Removes `key` from the shown suite's persistent domain.
         func remove(_ key: String) {
             storage.removeValue(forKey: key, in: selectedSuite)
             reload()

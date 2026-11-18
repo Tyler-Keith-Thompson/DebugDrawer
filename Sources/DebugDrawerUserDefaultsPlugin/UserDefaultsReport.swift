@@ -3,9 +3,10 @@
     import Foundation
 
     extension UserDefaultsPlugin: DebugDrawerReportContributor {
-        /// Adds the app's own keys in the standard defaults, read now, as `user-defaults.json`.
+        /// Adds the keys of the standard defaults' persistent domain, read now, as
+        /// `user-defaults.json`.
         public func contribute(to report: inout DebugDrawerReport, redaction: DebugDrawerRedaction) {
-            let entries = model.entries(in: .standard).filter { !UserDefaultsModel.isSystemKey($0.key) }
+            let entries = model.entries(in: .standard).filter { $0.domain == .persistent }
             Self.contribute(entries, to: &report, redaction: redaction)
         }
 

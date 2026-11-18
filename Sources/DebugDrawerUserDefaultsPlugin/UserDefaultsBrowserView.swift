@@ -21,10 +21,11 @@
         @Binding var selectedSuite: UserDefaultsSuite
         /// The keys the filters let through.
         let entries: [DefaultsEntry]
-        /// Every key the suite has, which a new key mustn't be.
+        /// The keys of the suite's persistent domain, which a new key mustn't be.
         let keys: Set<String>
         @Binding var searchText: String
-        @Binding var showSystemKeys: Bool
+        /// Whether keys only other domains hold show, read-only.
+        @Binding var showOtherDomains: Bool
         let redaction: DebugDrawerRedaction
         let actions: UserDefaultsBrowserActions
         @State private var selectedKey: String?
@@ -68,8 +69,9 @@
                     .accessibilityHint("Adds a key to \(selectedSuite.title)")
             } trailing: {
                 Menu {
-                    Toggle("Show System Keys", isOn: $showSystemKeys)
-                        .accessibilityLabel("Show System Keys")
+                    Toggle("Show Other Domains", isOn: $showOtherDomains)
+                        .accessibilityLabel("Show Other Domains")
+                        .accessibilityHint("Shows keys from launch arguments, the global domain and registered defaults, read-only")
                     Button("Reload", action: actions.reload)
                         .accessibilityLabel("Reload")
                 } label: {
@@ -81,7 +83,7 @@
                 .debugDrawerButtonStyle(.borderless)
                 .fixedSize()
                 .accessibilityLabel("More")
-                .help("Show system keys, or reload")
+                .help("Show keys from other domains, or reload")
             }
         }
 
