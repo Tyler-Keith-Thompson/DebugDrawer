@@ -509,6 +509,14 @@ and Unmute; a time range says so the same way. The `.*` toggle beside the search
 search as a regular expression (`NSRegularExpression`, ignoring case); while the text isn't one, the
 field says so and the list keeps the last valid search.
 
+### Console: Apple's framework logs
+
+Apple's frameworks log debug and info lines fast enough to push the app's own lines out of the
+Console's 2,000 within seconds, so the Console leaves out the debug and info lines of every
+subsystem starting with `com.apple.`. Their notice, error and fault lines are kept, as is every line
+of the app's own, stdout and stderr. To keep Apple's debug and info lines too, install with
+`installConsole(includeSystemDebugLogs: true)`.
+
 ### Console: your own logger
 
 The Console captures the process's os_log entries and, on macOS, its stdout and stderr; on iOS

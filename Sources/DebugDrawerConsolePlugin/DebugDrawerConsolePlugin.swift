@@ -60,6 +60,8 @@ import SwiftUI
         @Published var muteIssue: ConsoleMuteIssue?
         /// Where the mutes are kept between launches.
         let muteStorage: any ConsoleMuteStorage
+        /// Which lines ``ingest(_:)`` keeps at all; `installConsole(sessions:includeSystemDebugLogs:)` sets it.
+        var ingestFilter = ConsoleIngestFilter()
 
         /// How many lines ``lines`` keeps, 2,000 unless set; the oldest go first.
         public var capacity: Int {
@@ -279,9 +281,9 @@ import SwiftUI
             }
         }
 
-        /// Writes the line to the current session at once, and pushes it into the throttled
-        /// pipeline that shows it.
+        /// Writes the line to the current session at once and pushes it into the throttled pipeline that shows it.
         func ingest(_ line: LogLine) {
+            guard ingestFilter.keeps(line) else { return }
             // Recorded before the pipeline's batching, so a crash costs only what the recorder's
             // queue hadn't written yet.
             recorder?.record(line)
@@ -368,8 +370,7 @@ import SwiftUI
         /// The stand-in store.
         public static let shared = ConsoleLogStore()
 
-        /// Always empty.
-        /// The captured lines, oldest first, within ``capacity`` and ``byteCapacity``.
+        /// Always empty: release builds capture nothing.
         @Published public private(set) var lines: [LogLine] = []
         /// How many older lines the bounds dropped since the store was made or last cleared.
         @Published private(set) var droppedLineCount = 0

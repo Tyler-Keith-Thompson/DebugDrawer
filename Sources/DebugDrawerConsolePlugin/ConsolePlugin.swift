@@ -35,11 +35,20 @@ public extension DebugDrawer {
     /// Installs the Console plugin. Call it once, at startup. It captures the process's os_log
     /// entries, the lines sent to ``ConsoleLogSink`` and, on macOS, stdout and stderr.
     ///
-    /// - Parameter sessions: How many earlier launches' lines are kept on disk, in how many
-    ///   bytes, and where; each line is written as it is captured, and the console shows the
-    ///   earlier sessions under Previous. ``ConsoleSessionPersistence/off`` writes none.
-    func installConsole(sessions: ConsoleSessionPersistence = .standard) {
+    /// Apple's frameworks log debug and info lines (subsystems starting with `com.apple.`) fast
+    /// enough to push the app's own lines out of the console within seconds, so the console
+    /// leaves them out unless `includeSystemDebugLogs` is `true`. Their notice, error and fault
+    /// lines, and every line of the app's own, are always kept.
+    ///
+    /// - Parameters:
+    ///   - sessions: How many earlier launches' lines are kept on disk, in how many bytes, and
+    ///     where; each line is written as it is captured, and the console shows the earlier
+    ///     sessions under Previous. ``ConsoleSessionPersistence/off`` writes none.
+    ///   - includeSystemDebugLogs: Whether the console keeps the debug and info lines of Apple's
+    ///     subsystems too; `false` by default.
+    func installConsole(sessions: ConsoleSessionPersistence = .standard, includeSystemDebugLogs: Bool = false) {
         #if DEBUG
+            ConsoleLogStore.shared.ingestFilter.includesSystemDebugLogs = includeSystemDebugLogs
             // Started before capture begins, so the first line is written too, and once a launch,
             // so a second install doesn't start a second session.
             if ConsoleLogStore.shared.recorder == nil {
@@ -50,6 +59,19 @@ public extension DebugDrawer {
             ConsoleLogStore.shared.install()
             registerGlobal(ConsolePlugin())
         #endif
+    }
+
+    /// Installs the Console plugin without Apple subsystems' debug and info lines.
+    ///
+    /// Calls resolve to ``installConsole(sessions:includeSystemDebugLogs:)``, which takes the
+    /// same arguments.
+    ///
+    /// - Parameter sessions: How many earlier launches' lines are kept on disk, in how many
+    ///   bytes, and where.
+    @available(*, deprecated, message: "Use installConsole(sessions:includeSystemDebugLogs:)")
+    @_disfavoredOverload
+    func installConsole(sessions: ConsoleSessionPersistence = .standard) {
+        installConsole(sessions: sessions, includeSystemDebugLogs: false)
     }
 }
 
