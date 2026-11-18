@@ -1,4 +1,6 @@
-#if DEBUG
+// ViewInspector isn't linked on visionOS (APPLE_ONLY_PACKAGE_EXCLUDED_PLATFORMS in
+// scripts/modules.py), and every test here inspects the close button.
+#if DEBUG && !os(visionOS)
     @testable import DebugDrawer
     import SwiftUI
     import Testing

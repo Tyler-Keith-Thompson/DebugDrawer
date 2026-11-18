@@ -43,6 +43,19 @@ PACKAGES = [
 # their sources sit under `#if os(macOS)`).
 APPLE_ONLY_PACKAGES = ["viewinspector", "swift-snapshot-testing", "xctest-dynamic-overlay"]
 
+# Apple platforms an Apple-only package doesn't build for, by identity: its products are linked on
+# the other Apple platforms only, and the code that uses them sits under an `#if os(...)` that
+# leaves the platform out.
+APPLE_ONLY_PACKAGE_EXCLUDED_PLATFORMS = {
+    # 0.10.5's glassEffect() inspection names GlassEffect, which visionOS 26 introduced, unguarded,
+    # so it compiles only for visionOS 26 and later. The tests that inspect views are under
+    # `#if !os(visionOS)`.
+    "viewinspector": ["visionOS"],
+    # 1.19.7's Swift Testing attachment calls Image(data:), which nothing declares for visionOS.
+    # Every snapshot test is under `#if os(macOS)` or `#if os(iOS)`.
+    "swift-snapshot-testing": ["visionOS"],
+}
+
 # Test targets with nothing to run off Apple platforms (all their tests under `#if os(macOS)`), by
 # name. Bazel runs them on macOS alone: elsewhere they are incompatible, so `bazel test //...` skips
 # them, where a test binary that ran no tests would fail. SwiftPM still builds them, empty, on Linux.
@@ -116,6 +129,15 @@ EXTRA_PLATFORMS = {
     "tvOS": ("17.0", ["DebugDrawer", "DebugDrawerAnalyticsPlugin", "DebugDrawerDatabaseBrowserPlugin", "DebugDrawerLocalizationPlugin", "DebugDrawerColorVisionPlugin", "DebugDrawerAppStateResetPlugin"]),
     # watchOS 10 shipped with iOS 17's SwiftUI.
     "watchOS": ("10.0", ["DebugDrawer", "DebugDrawerAnalyticsPlugin", "DebugDrawerDatabaseBrowserPlugin", "DebugDrawerLocalizationPlugin"]),
+}
+
+# Test targets that also run in the simulator of a platform in EXTRA_PLATFORMS, by platform, each
+# testing only modules listed for it. Bazel runs each as a `<Name>_<platform>` unit test (`just
+# test`), with //tools:<platform>_test_runner; SwiftPM runs each through a scheme of its own that
+# holds just that test target, so no unported module builds (`just spm-platform-test`, which `just
+# spm-test` runs). Tests that can't run there sit under an `#if` that says why.
+TESTED_PLATFORMS = {
+    "visionOS": ["DebugDrawerTests"],
 }
 
 # Modules that also build for Mac Catalyst, the iOS SDK's UIKit running in a Mac window, where
@@ -245,6 +267,10 @@ BENCHMARKS = [
 ]
 BENCHMARK_PACKAGE = ("https://github.com/ordo-one/benchmark", "1.38.2")
 
+# The Apple platforms, as Package.swift's `Platform` spells them: where the Apple-only packages'
+# products are linked.
+APPLE_PLATFORMS = ["macOS", "macCatalyst", "iOS", "tvOS", "watchOS", "visionOS"]
+
 # Keep in step with .bazelrc's --macos_minimum_os, IOS_MINIMUM and EXTRA_PLATFORMS.
 PLATFORMS = '[.macOS(.v15), .iOS(.v17), .visionOS(.v1), .tvOS(.v17), .watchOS(.v10)]'
 MACOS_MINIMUM = "15.0"
@@ -307,6 +333,18 @@ def check():
                 assert d.split("/")[0] in packages, f"benchmark {name} imports unknown package {d}"
             else:
                 assert d in names and d not in IOS_MODULES, f"benchmark {name} imports {d}, which isn't a module Package.swift declares"
+    for platform, targets in TESTED_PLATFORMS.items():
+        assert platform in EXTRA_PLATFORMS, f"TESTED_PLATFORMS names {platform}, which EXTRA_PLATFORMS doesn't"
+        for name in targets:
+            assert name in tests, f"TESTED_PLATFORMS[{platform!r}] names unknown test target {name}"
+            assert not simulator_test(name), f"{name} runs in the iOS simulator, so it can't run on {platform}"
+            for d in dict(TEST_TARGETS)[name]:
+                assert "/" in d or d in EXTRA_PLATFORMS[platform][1], \
+                    f"{name} runs on {platform}, so its dependency {d} must be listed for it in EXTRA_PLATFORMS"
+    for package, platforms in APPLE_ONLY_PACKAGE_EXCLUDED_PLATFORMS.items():
+        assert package in APPLE_ONLY_PACKAGES, f"APPLE_ONLY_PACKAGE_EXCLUDED_PLATFORMS names {package}, which isn't Apple-only"
+        for platform in platforms:
+            assert platform in APPLE_PLATFORMS, f"APPLE_ONLY_PACKAGE_EXCLUDED_PLATFORMS names unknown platform {platform}"
     for name in CATALYST_MODULES:
         assert name in names, f"CATALYST_MODULES names unknown module {name}"
         assert name not in IOS_MODULES, f"{name} is in IOS_MODULES, so it can't build for Mac Catalyst"
@@ -333,7 +371,9 @@ def simulator_test(name):
 def spm_dep(d):
     if "/" in d:
         package, product = d.split("/")
-        condition = ", condition: .when(platforms: applePlatforms)" if package in APPLE_ONLY_PACKAGES else ""
+        excluded = APPLE_ONLY_PACKAGE_EXCLUDED_PLATFORMS.get(package, [])
+        platforms = "applePlatforms" if not excluded else "[" + ", ".join(f".{p}" for p in APPLE_PLATFORMS if p not in excluded) + "]"
+        condition = f", condition: .when(platforms: {platforms})" if package in APPLE_ONLY_PACKAGES else ""
         return f'.product(name: "{product}", package: "{package}"{condition})'
     return f'"{d}"'
 
@@ -375,18 +415,24 @@ def apple_only(d):
     return "/" in d and d.split("/")[0] in APPLE_ONLY_PACKAGES
 
 
-def bazel_deps(deps):
-    """A `deps` attribute, or nothing when there are none; Apple-only products sit in a macOS `select`."""
+def bazel_deps(deps, platforms=()):
+    """A `deps` attribute, or nothing when there are none; Apple-only products sit in a `select` on
+    macOS and on each of `platforms` (EXTRA_PLATFORMS names) that builds them."""
     if not deps:
         return ""
     listed = "".join(f'        "{bazel_label(d)}",\n' for d in deps if not apple_only(d))
     text = f"    deps = [\n{listed}    ]"
-    apple = "".join(f'            "{bazel_label(d)}",\n' for d in deps if apple_only(d))
-    if apple:
+    branches = ""
+    for platform in ["macOS", *platforms]:
+        apple = "".join(f'            "{bazel_label(d)}",\n' for d in deps
+                        if apple_only(d) and platform not in APPLE_ONLY_PACKAGE_EXCLUDED_PLATFORMS.get(d.split("/")[0], []))
+        if apple:
+            branches += f'        "@platforms//os:{platform.lower()}": [\n{apple}        ],\n'
+    if branches:
         text += (
             " + select({\n"
             "        # Apple-only packages (APPLE_ONLY_PACKAGES in scripts/modules.py).\n"
-            f'        "@platforms//os:macos": [\n{apple}        ],\n'
+            f"{branches}"
             '        "//conditions:default": [],\n'
             "    })"
         )
@@ -436,7 +482,7 @@ def package_swift():
     if APPLE_ONLY_PACKAGES:
         lines += [
             "// Where the Apple-only packages' products are linked (APPLE_ONLY_PACKAGES in scripts/modules.py).",
-            "let applePlatforms: [Platform] = [.macOS, .macCatalyst, .iOS, .tvOS, .watchOS, .visionOS]",
+            "let applePlatforms: [Platform] = [" + ", ".join(f".{p}" for p in APPLE_PLATFORMS) + "]",
             "",
         ]
     lines += [
@@ -722,7 +768,7 @@ def test_targets_bazel(name, deps, size, srcs, tags):
         f"{tags_attr}"
         "    # Read by //:package_swift_test, which checks Package.swift against the Bazel graph.\n"
         '    visibility = ["//:__pkg__"],\n'
-        f"{bazel_deps(deps)}"
+        f"{bazel_deps(deps, [platform for platform, _ in tested_platforms(name)])}"
         ")\n\n"
         "# `bazel test` / `just test`: a standalone executable, fast to start and run in Bazel's sandbox.\n"
         "swift_test(\n"
@@ -743,6 +789,30 @@ def test_targets_bazel(name, deps, size, srcs, tags):
         '    tags = ["manual", "no-sandbox"],\n'
         "    # Visible so `//:xcodeproj` can name it as a top-level target.\n"
         '    visibility = ["//visibility:public"],\n'
+        f'    deps = [":{name}Library"],\n'
+        ")\n"
+        + "".join(platform_test_bazel(name, platform, minimum, tags) for platform, minimum in tested_platforms(name))
+    )
+
+
+def tested_platforms(name):
+    """The (platform, minimum) pairs of TESTED_PLATFORMS that run test target `name`."""
+    return [(platform, EXTRA_PLATFORMS[platform][0]) for platform, targets in TESTED_PLATFORMS.items() if name in targets]
+
+
+def platform_test_bazel(name, platform, minimum, tags):
+    """The unit test that runs test target `name`'s library in `platform`'s simulator."""
+    tags_attr = f"    tags = {tags},\n".replace("'", '"') if tags else ""
+    return (
+        f"\n# `bazel test` / `just test` on {platform}: the bundle, run in a new {platform} simulator by\n"
+        f"# //tools:{platform.lower()}_test_runner (TESTED_PLATFORMS in scripts/modules.py). Booting one takes\n"
+        "# much of a minute on its own.\n"
+        f"{platform.lower()}_unit_test(\n"
+        f'    name = "{name}_{platform}",\n'
+        '    size = "medium",\n'
+        f'    minimum_os_version = "{minimum}",\n'
+        f'    runner = "//tools:{platform.lower()}_test_runner",\n'
+        f"{tags_attr}"
         f'    deps = [":{name}Library"],\n'
         ")\n"
     )
@@ -796,9 +866,13 @@ def test_build_bazel(name, deps):
     if simulator_test(name):
         # Booting a simulator takes much of a minute on its own.
         return simulator_test_build_bazel(name, deps, TEST_SIZES.get(name, "medium"))
+    platform_loads = "".join(
+        f'load("@rules_apple//apple:{platform.lower()}.bzl", "{platform.lower()}_unit_test")\n' for platform, _ in sorted(tested_platforms(name))
+    )
     header = (
         "# GENERATED by scripts/modules.py — edit the table there, then run `just modules`.\n\n"
         'load("@rules_apple//apple:macos.bzl", "macos_unit_test")\n'
+        f"{platform_loads}"
         'load("//tools:swift_rules.bzl", "swift_library", "swift_test")\n\n'
     )
     excluded_note = (
@@ -893,6 +967,37 @@ def benchmarks_package_swift():
     )
 
 
+def test_scheme(name):
+    """An Xcode scheme for the package that tests test target `name` alone. Xcode's own schemes
+    either test nothing (a library's) or build every target (DebugDrawer-Package), so a platform
+    that builds only some modules needs one per target. `.swiftpm/` is not committed: `just
+    spm-platform-test` writes it there, where Xcode finds a package's shared schemes."""
+    reference = (
+        "            <BuildableReference\n"
+        '               BuildableIdentifier = "primary"\n'
+        f'               BlueprintIdentifier = "{name}"\n'
+        f'               BuildableName = "{name}"\n'
+        f'               BlueprintName = "{name}"\n'
+        '               ReferencedContainer = "container:">\n'
+        "            </BuildableReference>\n"
+    )
+    return (
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        "<!-- GENERATED by scripts/modules.py (TESTED_PLATFORMS) for `just spm-platform-test`. -->\n"
+        '<Scheme LastUpgradeVersion = "1600" version = "1.7">\n'
+        '   <BuildAction parallelizeBuildables = "YES" buildImplicitDependencies = "YES">\n'
+        "   </BuildAction>\n"
+        '   <TestAction buildConfiguration = "Debug" shouldUseLaunchSchemeArgsEnv = "YES">\n'
+        "      <Testables>\n"
+        '         <TestableReference skipped = "NO">\n'
+        f"{reference}"
+        "         </TestableReference>\n"
+        "      </Testables>\n"
+        "   </TestAction>\n"
+        "</Scheme>\n"
+    )
+
+
 def write(path, text):
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w") as f:
@@ -947,5 +1052,11 @@ if __name__ == "__main__":
         print("\n".join(EXTRA_PLATFORMS[sys.argv[2]][1]))
     elif sys.argv[1:2] == ["catalyst-modules"]:
         print("\n".join(CATALYST_MODULES))
+    # `just spm-platform-test` asks for the schemes to test on a platform, which
+    # `modules.py platform-test-schemes visionOS` writes and names.
+    elif sys.argv[1:2] == ["platform-test-schemes"]:
+        for name in TESTED_PLATFORMS[sys.argv[2]]:
+            write(os.path.join(ROOT, ".swiftpm", "xcode", "xcshareddata", "xcschemes", f"{name}.xcscheme"), test_scheme(name))
+            print(name)
     else:
         main()

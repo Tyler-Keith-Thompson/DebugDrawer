@@ -2,7 +2,12 @@
     @testable import DebugDrawer
     import SwiftUI
     import Testing
-    import ViewInspector
+
+    // ViewInspector isn't linked on visionOS (APPLE_ONLY_PACKAGE_EXCLUDED_PLATFORMS in
+    // scripts/modules.py), so the tests that inspect views run everywhere else.
+    #if !os(visionOS)
+        import ViewInspector
+    #endif
 
     struct SearchFixture: DebugDrawerPlugin {
         var title: String
@@ -127,36 +132,38 @@
         }
     }
 
-    @MainActor
-    @Suite("Drawer search shortcut")
-    struct DrawerSearchShortcutTests {
-        @Test("Cmd-K is not bound while the drawer is closed, so it can't open it")
-        func commandKIsUnboundWhileClosed() throws {
-            let presentation = DrawerPresentation()
-            let sut = DebugDrawerOverlay(drawer: .shared, presentation: presentation)
+    #if !os(visionOS)
+        @MainActor
+        @Suite("Drawer search shortcut")
+        struct DrawerSearchShortcutTests {
+            @Test("Cmd-K is not bound while the drawer is closed, so it can't open it")
+            func commandKIsUnboundWhileClosed() throws {
+                let presentation = DrawerPresentation()
+                let sut = DebugDrawerOverlay(drawer: .shared, presentation: presentation)
 
-            let actual = try sut.inspect().findAll(ViewType.Button.self) {
-                // ViewInspector can't read a shortcut; the Cmd-K button is the one with this label.
-                try $0.labelView().text().string() == "Search Plugins"
+                let actual = try sut.inspect().findAll(ViewType.Button.self) {
+                    // ViewInspector can't read a shortcut; the Cmd-K button is the one with this label.
+                    try $0.labelView().text().string() == "Search Plugins"
+                }
+
+                #expect(actual.isEmpty)
             }
 
-            #expect(actual.isEmpty)
-        }
+            @Test("While the drawer is open, Cmd-K is bound and the search field is shown")
+            func commandKIsBoundWhileOpen() throws {
+                let presentation = DrawerPresentation()
+                presentation.isOpen = true
+                let sut = DebugDrawerOverlay(drawer: .shared, presentation: presentation)
 
-        @Test("While the drawer is open, Cmd-K is bound and the search field is shown")
-        func commandKIsBoundWhileOpen() throws {
-            let presentation = DrawerPresentation()
-            presentation.isOpen = true
-            let sut = DebugDrawerOverlay(drawer: .shared, presentation: presentation)
+                let shortcuts = try sut.inspect().findAll(ViewType.Button.self) {
+                    // ViewInspector can't read a shortcut; the Cmd-K button is the one with this label.
+                    try $0.labelView().text().string() == "Search Plugins"
+                }
+                let field = try sut.inspect().find(ViewType.TextField.self)
 
-            let shortcuts = try sut.inspect().findAll(ViewType.Button.self) {
-                // ViewInspector can't read a shortcut; the Cmd-K button is the one with this label.
-                try $0.labelView().text().string() == "Search Plugins"
+                #expect(shortcuts.count == 1)
+                #expect(try field.labelView().text().string() == "Filter")
             }
-            let field = try sut.inspect().find(ViewType.TextField.self)
-
-            #expect(shortcuts.count == 1)
-            #expect(try field.labelView().text().string() == "Filter")
         }
-    }
+    #endif
 #endif

@@ -3,7 +3,12 @@
     import Foundation
     import SwiftUI
     import Testing
-    import ViewInspector
+
+    // ViewInspector isn't linked on visionOS (APPLE_ONLY_PACKAGE_EXCLUDED_PLATFORMS in
+    // scripts/modules.py), so the tests that inspect views run everywhere else.
+    #if !os(visionOS)
+        import ViewInspector
+    #endif
 
     struct ReadoutPlugin: DebugDrawerPlugin {
         var id = "ReadoutPlugin"
@@ -132,38 +137,40 @@
             #expect(hiddenDuringAction)
         }
 
-        // Synchronous for the same reason as the HUD list test.
-        @Test("While the HUD is hidden, the app's drawer modifier draws it fully transparent, so a capture leaves it out")
-        func theModifierDrawsNoHUDWhileHidden() {
-            let sut = DebugDrawer.shared
-            let previous = sut.hudLayout
-            sut.registerGlobal(ReadoutPlugin())
-            sut.hudLayout.pinned = ["ReadoutPlugin"]
-            let app = Text("App").debugDrawer()
+        #if !os(visionOS)
+            // Synchronous for the same reason as the HUD list test.
+            @Test("While the HUD is hidden, the app's drawer modifier draws it fully transparent, so a capture leaves it out")
+            func theModifierDrawsNoHUDWhileHidden() {
+                let sut = DebugDrawer.shared
+                let previous = sut.hudLayout
+                sut.registerGlobal(ReadoutPlugin())
+                sut.hudLayout.pinned = ["ReadoutPlugin"]
+                let app = Text("App").debugDrawer()
 
-            let shownOpacity = try? app.inspect().find(DrawerHUDView.self).opacity()
-            sut.isHUDHidden = true
-            let hiddenOpacity = try? app.inspect().find(DrawerHUDView.self).opacity()
+                let shownOpacity = try? app.inspect().find(DrawerHUDView.self).opacity()
+                sut.isHUDHidden = true
+                let hiddenOpacity = try? app.inspect().find(DrawerHUDView.self).opacity()
 
-            sut.isHUDHidden = false
-            sut.hudLayout = previous
-            sut.unregisterGlobal(id: "ReadoutPlugin")
-            #expect(shownOpacity == 1)
-            #expect(hiddenOpacity == 0)
-        }
+                sut.isHUDHidden = false
+                sut.hudLayout = previous
+                sut.unregisterGlobal(id: "ReadoutPlugin")
+                #expect(shownOpacity == 1)
+                #expect(hiddenOpacity == 0)
+            }
 
-        @Test("The HUD card shows each pinned plugin's readout")
-        func theCardShowsReadouts() throws {
-            let sut = DrawerHUDView(
-                readouts: [AnyDebugDrawerPlugin(ReadoutPlugin())],
-                origin: nil,
-                move: { _ in },
-                unpin: { _ in }
-            )
+            @Test("The HUD card shows each pinned plugin's readout")
+            func theCardShowsReadouts() throws {
+                let sut = DrawerHUDView(
+                    readouts: [AnyDebugDrawerPlugin(ReadoutPlugin())],
+                    origin: nil,
+                    move: { _ in },
+                    unpin: { _ in }
+                )
 
-            let inspected = try sut.inspect()
+                let inspected = try sut.inspect()
 
-            #expect(throws: Never.self) { try inspected.find(text: "42 FPS") }
-        }
+                #expect(throws: Never.self) { try inspected.find(text: "42 FPS") }
+            }
+        #endif
     }
 #endif

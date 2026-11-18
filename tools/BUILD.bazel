@@ -1,6 +1,7 @@
 # First-party Swift rule wrappers; see swift_rules.bzl.
 
 load(":python_test.bzl", "python_test")
+load(":visionos_test_runner.bzl", "visionos_test_runner")
 
 # tools/bazel's daily sweep of stale output bases (tools/sweep-output-bases).
 python_test(
@@ -21,6 +22,12 @@ python_test(
     data = [
         "//Sources/DebugDrawerColorVisionPlugin:shaders",
     ],
+)
+
+# Runs the visionOS test bundles (TESTED_PLATFORMS in scripts/modules.py) in a new simulator.
+visionos_test_runner(
+    name = "visionos_test_runner",
+    visibility = ["//visibility:public"],
 )
 
 # Debug builds (the default; `--config=release` builds opt). Modules that generate mocks define

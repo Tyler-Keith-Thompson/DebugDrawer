@@ -73,6 +73,7 @@ Every shell command gets a timeout. macOS has no `timeout`; use
 | `just filter <pattern>` | Tests whose name matches |
 | `just test-release` | `--config=release`: builds and runs only the `XPerformanceTests` targets |
 | `just release-check` | Example apps built optimized, and every public symbol present in release (`scripts/release_api.py`); a `just deploy` gate |
+| `just spm-visionos-test` | Core's tests (`TESTED_PLATFORMS`) through SwiftPM in the visionOS simulator, through a scheme holding only that test target; `just spm-test` runs it. Bazel runs them as `//Tests/DebugDrawerTests:DebugDrawerTests_visionOS` in a new simulator (`tools/visionos_test_runner.bzl`) |
 | `just spm-catalyst-example` | Build the iOS example as a Mac Catalyst app without launching it: every `Example/iOS` file, the example libraries and products their imports name; `just spm` runs it |
 | `just spm-test`, `just verify` | SwiftPM tests; both build systems |
 | `just modules` | Regenerate build files from `scripts/modules.py` |
@@ -134,7 +135,10 @@ the *default* sections below where they differ:
 - **Platforms.** A plugin works on every supported platform where its API exists; macOS and iOS
   are the platforms built today (`PLATFORMS` in `scripts/modules.py`). Core also builds for
   visionOS, tvOS and watchOS (`EXTRA_PLATFORMS`): a plugin ported to one joins its list, and
-  `just build` and `just build-spm` then build it for that platform's simulator. On tvOS a view is
+  `just build` and `just build-spm` then build it for that platform's simulator. Core's tests also
+  run on visionOS (`TESTED_PLATFORMS`): a test that can't run there (ViewInspector and
+  SnapshotTesting don't build for it, `APPLE_ONLY_PACKAGE_EXCLUDED_PLATFORMS`) sits under an `#if`
+  that says why. On tvOS a view is
   driven by focus: no pasteboard, keyboard shortcuts or drag, and Menu (`onExitCommand`) closes
   what is open. On watchOS the drawer is a full-screen list that navigates to each plugin's view
   (`DrawerWatchList`), so a plugin's body is a short column; there is no pasteboard, keyboard,

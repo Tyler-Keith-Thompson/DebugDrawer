@@ -2,7 +2,12 @@
     @testable import DebugDrawer
     import SwiftUI
     import Testing
-    import ViewInspector
+
+    // ViewInspector isn't linked on visionOS (APPLE_ONLY_PACKAGE_EXCLUDED_PLATFORMS in
+    // scripts/modules.py), so the tests that inspect views run everywhere else.
+    #if !os(visionOS)
+        import ViewInspector
+    #endif
 
     struct NoticePlugin: DebugDrawerPlugin {
         var title = "Notices"
@@ -111,44 +116,46 @@
             #expect(!DebugDrawer.shared.isOpen)
         }
 
-        @Test("The toast view shows the plugin's title, the latest message and the count")
-        func theToastViewShowsItsContent() throws {
-            let toast = DebugDrawerToast(pluginID: "NoticePlugin", message: "3 requests failed", count: 3)
-            let sut = DrawerToastView(toast: toast, plugin: AnyDebugDrawerPlugin(NoticePlugin()), open: {}, dismiss: {})
+        #if !os(visionOS)
+            @Test("The toast view shows the plugin's title, the latest message and the count")
+            func theToastViewShowsItsContent() throws {
+                let toast = DebugDrawerToast(pluginID: "NoticePlugin", message: "3 requests failed", count: 3)
+                let sut = DrawerToastView(toast: toast, plugin: AnyDebugDrawerPlugin(NoticePlugin()), open: {}, dismiss: {})
 
-            let inspected = try sut.inspect()
+                let inspected = try sut.inspect()
 
-            #expect(throws: Never.self) { try inspected.find(text: "Notices") }
-            #expect(throws: Never.self) { try inspected.find(text: "3 requests failed") }
-            #expect(throws: Never.self) { try inspected.find(text: "3") }
-        }
+                #expect(throws: Never.self) { try inspected.find(text: "Notices") }
+                #expect(throws: Never.self) { try inspected.find(text: "3 requests failed") }
+                #expect(throws: Never.self) { try inspected.find(text: "3") }
+            }
 
-        @Test("Tapping the toast opens it; the dismiss button dismisses it")
-        func theToastViewsButtonsCallBack() throws {
-            var opened = 0
-            var dismissed = 0
-            let toast = DebugDrawerToast(pluginID: "NoticePlugin", message: "failed", count: 1)
-            let sut = DrawerToastView(
-                toast: toast,
-                plugin: nil,
-                open: { opened += 1 },
-                dismiss: { dismissed += 1 }
-            )
+            @Test("Tapping the toast opens it; the dismiss button dismisses it")
+            func theToastViewsButtonsCallBack() throws {
+                var opened = 0
+                var dismissed = 0
+                let toast = DebugDrawerToast(pluginID: "NoticePlugin", message: "failed", count: 1)
+                let sut = DrawerToastView(
+                    toast: toast,
+                    plugin: nil,
+                    open: { opened += 1 },
+                    dismiss: { dismissed += 1 }
+                )
 
-            try sut.inspect().find(ViewType.Button.self) { try $0.accessibilityLabel().string() == "Dismiss" }.tap()
-            try sut.inspect().find(ViewType.Button.self) { try $0.accessibilityHint().string() == "Opens the debug drawer at this plugin" }.tap()
+                try sut.inspect().find(ViewType.Button.self) { try $0.accessibilityLabel().string() == "Dismiss" }.tap()
+                try sut.inspect().find(ViewType.Button.self) { try $0.accessibilityHint().string() == "Opens the debug drawer at this plugin" }.tap()
 
-            #expect(opened == 1)
-            #expect(dismissed == 1)
-        }
+                #expect(opened == 1)
+                #expect(dismissed == 1)
+            }
 
-        @Test("A section header shows its plugin's badge count")
-        func aHeaderShowsTheBadge() throws {
-            let sut = PluginHeaderLabel(plugin: AnyDebugDrawerPlugin(NoticePlugin()), isExpanded: false, isPinned: false, badge: 7)
+            @Test("A section header shows its plugin's badge count")
+            func aHeaderShowsTheBadge() throws {
+                let sut = PluginHeaderLabel(plugin: AnyDebugDrawerPlugin(NoticePlugin()), isExpanded: false, isPinned: false, badge: 7)
 
-            let actual = try sut.inspect().find(ViewType.Text.self) { try $0.accessibilityLabel().string() == "7 new" }
+                let actual = try sut.inspect().find(ViewType.Text.self) { try $0.accessibilityLabel().string() == "7 new" }
 
-            #expect(throws: Never.self) { try actual.string() }
-        }
+                #expect(throws: Never.self) { try actual.string() }
+            }
+        #endif
     }
 #endif

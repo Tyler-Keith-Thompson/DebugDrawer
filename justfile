@@ -120,6 +120,25 @@ spm-platform platform:
 [doc('Build the visionOS modules through SwiftPM for the visionOS simulator')]
 spm-visionos: (spm-platform "visionOS")
 
+# A platform's tested targets (TESTED_PLATFORMS in scripts/modules.py) each run through a scheme
+# that modules.py writes into .swiftpm/ holding just that test target, so xcodebuild builds only
+# what it tests, never the modules not ported there; DebugDrawer-Package would build them all,
+# with or without -only-testing.
+[doc('Run the test targets ported to a platform through SwiftPM in its simulator, e.g. just spm-platform-test visionOS "platform=visionOS Simulator,name=Apple Vision Pro"')]
+spm-platform-test platform destination:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    for scheme in $(python3 {{PROJECT_ROOT}}/scripts/modules.py platform-test-schemes {{platform}}); do
+        xcodebuild test -quiet -scheme "$scheme" -destination '{{destination}}' \
+            -derivedDataPath {{PROJECT_ROOT}}/.build/xcode-{{lowercase(platform)}}
+    done
+
+# The simulator `just spm-visionos-test` runs the visionOS tests in.
+VISIONOS_DESTINATION := env("VISIONOS_DESTINATION", "platform=visionOS Simulator,name=" + VISIONOS_DEVICE)
+
+[doc("Run the visionOS test targets (core's) through SwiftPM in the visionOS simulator")]
+spm-visionos-test: (spm-platform-test "visionOS" VISIONOS_DESTINATION)
+
 [doc('Build the tvOS modules through SwiftPM for the tvOS simulator')]
 spm-tvos: (spm-platform "tvOS")
 
@@ -143,9 +162,10 @@ spm-catalyst:
 spm-catalyst-example:
     python3 {{PROJECT_ROOT}}/scripts/catalyst_example.py build
 
-[doc('Run the tests via SwiftPM')]
+[doc('Run the tests via SwiftPM: on the Mac (arguments go to swift test), then the visionOS ones in its simulator')]
 spm-test *args="":
     {{SWIFT}} test {{args}}
+    just spm-visionos-test
 
 [doc('Verify both build systems agree — run before pushing')]
 verify: test spm-test
