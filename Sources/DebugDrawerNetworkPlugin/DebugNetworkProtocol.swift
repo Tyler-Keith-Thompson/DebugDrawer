@@ -8,7 +8,12 @@
 
         private var entryId: UUID?
         private var startTime: CFAbsoluteTime = 0
-        private var responseData = Data()
+        /// The response body the log keeps: its first bytes, up to the limit `installNetwork()`
+        /// set when the request started.
+        private var capture = NetworkBodyCapture(limit: NetworkBodyCapture.limit.withLock { $0 })
+        /// A conditioned request's whole body, which its delivery hands the client once it has
+        /// all arrived; unused otherwise, as the client gets each chunk as it comes.
+        private var deliveryBody = Data()
         private var httpResponse: HTTPURLResponse?
         private var dataTask: URLSessionDataTask?
         /// Times the request when a conditioning profile applies to it; `nil` leaves it alone.
@@ -97,9 +102,7 @@
         }
 
         private func startNetwork(_ request: URLRequest) {
-            let session = URLSession(configuration: .default, delegate: self, delegateQueue: nil)
-            dataTask = session.dataTask(with: request)
-            dataTask?.resume()
+            dataTask = NetworkForwardingSession.shared.start(request, for: self)
         }
 
         /// Conditions the request by `plan`: the latency first, then the failure the plan decided,
@@ -129,7 +132,7 @@
                     return
                 }
                 // What the log records as the body, as the network's would be.
-                responseData = answer.body
+                capture.append(answer.body)
                 delivery.deliver(response, body: answer.body)
             }
         }
@@ -157,7 +160,7 @@
             let completion = NetworkCompletion(
                 statusCode: httpResponse?.statusCode,
                 headers: httpResponse?.allHeaderFields as? [String: String],
-                body: httpResponse == nil ? nil : responseData,
+                body: httpResponse == nil ? nil : capture.body,
                 duration: CFAbsoluteTimeGetCurrent() - startTime,
                 error: error?.localizedDescription
             )
@@ -185,7 +188,8 @@
             entry.mockRuleName = answer.ruleName
             entry.statusCode = answer.status
             entry.responseHeaders = answer.headers
-            entry.responseBody = answer.body
+            capture.append(answer.body)
+            entry.response = capture.body
             entry.duration = CFAbsoluteTimeGetCurrent() - startTime
             entry.isComplete = true
             Task { @MainActor [entry] in
@@ -194,42 +198,39 @@
         }
     }
 
-    extension DebugNetworkProtocol: URLSessionDataDelegate {
-        func urlSession(
-            _: URLSession,
-            dataTask _: URLSessionDataTask,
-            didReceive response: URLResponse,
-            completionHandler: @escaping (URLSession.ResponseDisposition) -> Void
-        ) {
+    // The forwarding session's events for this protocol's request (NetworkForwardingSession).
+    extension DebugNetworkProtocol {
+        func forwardingDidReceive(_ response: URLResponse) {
             httpResponse = response as? HTTPURLResponse
             // A conditioned request's answer is read whole, then delivered at the profile's pace.
             if delivery == nil {
                 client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
             }
-            completionHandler(.allow)
         }
 
-        func urlSession(_: URLSession, dataTask _: URLSessionDataTask, didReceive data: Data) {
-            responseData.append(data)
+        func forwardingDidLoad(_ data: Data) {
+            capture.append(data)
             if delivery == nil {
                 client?.urlProtocol(self, didLoad: data)
+            } else {
+                deliveryBody.append(data)
             }
         }
 
-        func urlSession(_: URLSession, task _: URLSessionTask, didFinishCollecting metrics: URLSessionTaskMetrics) {
+        func forwardingDidCollect(_ metrics: URLSessionTaskMetrics) {
             guard let id = entryId, let timing = NetworkTimingMetrics(metrics) else { return }
             Task { @MainActor in
                 NetworkStore.shared.recordMetrics(id: id, metrics: timing)
             }
         }
 
-        func urlSession(_: URLSession, task _: URLSessionTask, didCompleteWithError error: Error?) {
+        func forwardingDidComplete(error: Error?) {
             if let delivery {
                 // The delivery tells the client, and completes the log record when it ends.
                 if let error {
                     delivery.fail(error as NSError)
                 } else if let httpResponse {
-                    delivery.deliver(httpResponse, body: responseData)
+                    delivery.deliver(httpResponse, body: deliveryBody)
                 } else {
                     delivery.fail(URLError(.badServerResponse) as NSError)
                 }
@@ -238,7 +239,7 @@
             let completion = NetworkCompletion(
                 statusCode: httpResponse?.statusCode,
                 headers: httpResponse?.allHeaderFields as? [String: String],
-                body: responseData,
+                body: capture.body,
                 duration: CFAbsoluteTimeGetCurrent() - startTime,
                 error: error?.localizedDescription
             )

@@ -11,6 +11,9 @@
     /// is sent again. A replay names its original, and a request that was resent says how often,
     /// each with a button that selects the other.
     ///
+    /// A response whose body the log cut short says how much of it the log keeps, and its body
+    /// stays masked until revealed when the redaction rules can't be read against it.
+    ///
     /// A GraphQL request names its operation. Ignore offers the request's host and its parent
     /// domains for the ignore list.
     ///
@@ -63,6 +66,12 @@
                         .debugDrawerValueStyle(.text)
                 }
                 NetworkReplayLinkRows(entry: entry, links: links, onShow: onShow)
+
+                if entry.isResponseBodyTruncated, let kept = entry.responseBody {
+                    DebugDrawerIssueRow("Response body truncated", severity: .warning) {
+                        Text("The log keeps the first \(NetworkEntry.sizeLabel(kept.count)) of \(entry.responseSizeLabel).")
+                    }
+                }
 
                 if let error = entry.error {
                     DebugDrawerIssueRow("Request failed", severity: .error) {
@@ -153,7 +162,8 @@
 
             if let body = entry.responseBody, let pretty = body.prettyBody {
                 collapsibleSection("Response Body") {
-                    codeBlock(pretty, redacted: redaction.redacting(json: body).prettyBody ?? pretty)
+                    // A truncated body the rules can't be read against is masked whole until revealed.
+                    codeBlock(pretty, redacted: entry.redactedResponseBody(redaction).map { $0.prettyBody ?? pretty } ?? DebugDrawerRedaction.mask)
                 }
             }
         }

@@ -16,4 +16,5 @@ PERFORMANCE_TEST_PACKAGES = [
     "Tests/DebugDrawerDesignOverlayPluginTests",
     "Tests/DebugDrawerColorVisionPluginTests",
     "Tests/DebugDrawerAppStateResetPluginTests",
+    "Tests/DebugDrawerNetworkPluginTests",
 ]

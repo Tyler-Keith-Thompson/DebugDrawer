@@ -172,7 +172,7 @@
             let requestHeaders = redaction.redacting(headers: entry.requestHeaders, cookies: requestCookies)
             let responseHeaders = redaction.redacting(headers: entry.responseHeaders ?? [:], cookies: responseCookies)
             let requestBody = entry.requestBody.map { redaction.redacting(json: $0) }
-            let responseBody = entry.responseBody.map { redaction.redacting(json: $0) }
+            let responseBody = entry.redactedResponseBody(redaction)
             let time = (entry.duration ?? 0) * 1000
 
             startedDateTime = HTTPArchive.dateStyle.format(entry.timestamp)
@@ -206,12 +206,12 @@
                 cookies: responseCookies.map { redaction.redacting($0, header: "Set-Cookie") },
                 headers: responseHeaders.harNameValues,
                 content: HTTPArchive.Content(
-                    size: entry.responseBody?.count ?? 0,
+                    size: entry.responseBodySize ?? 0,
                     mimeType: responseHeaders.value(named: "Content-Type") ?? "",
                     text: responseText ?? responseBody?.base64EncodedString(),
                     encoding: isBinary ? "base64" : nil
                 ),
-                bodySize: entry.responseBody?.count ?? (entry.isComplete ? 0 : -1)
+                bodySize: entry.responseBodySize ?? (entry.isComplete ? 0 : -1)
             )
             timings = HTTPArchive.Timings(entry.metrics, total: time)
             error = entry.error

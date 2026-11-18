@@ -210,6 +210,7 @@ PERFORMANCE_TESTS = [
     "DebugDrawerDesignOverlayPluginTests",
     "DebugDrawerColorVisionPluginTests",
     "DebugDrawerAppStateResetPluginTests",
+    "DebugDrawerNetworkPluginTests",
 ]
 
 # Performance tests run up to their one-minute limits each, so their targets get "medium" (300 s).

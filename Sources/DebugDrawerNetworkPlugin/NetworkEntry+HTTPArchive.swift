@@ -22,6 +22,7 @@
                 statusCode: entry.response.status > 0 ? entry.response.status : nil,
                 responseHeaders: entry.response.status > 0 ? entry.response.headers.headerFields : nil,
                 responseBody: entry.response.content.text.flatMap { Data(harText: $0, encoding: entry.response.content.encoding) },
+                responseBodySize: entry.response.content.size,
                 duration: entry.time >= 0 ? entry.time / 1000 : nil,
                 error: entry.error ?? (entry.response.status > 0 ? nil : "No response"),
                 isComplete: true

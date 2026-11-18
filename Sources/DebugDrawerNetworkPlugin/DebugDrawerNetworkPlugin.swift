@@ -89,7 +89,10 @@ public extension NetworkStore {
 
         /// The requests in `entries` to a host none of `ignored` matches that pass the status
         /// filter `status` and contain `text` (ignoring case) in the URL, the method, the GraphQL
-        /// operation name or the response body. Empty text matches every request.
+        /// operation name or the response body. Empty text matches every request. The body is
+        /// searched as it was pretty-printed when it arrived.
+        ///
+        /// - Complexity: O(*n*) in the text of `entries`; no body is parsed.
         nonisolated static func entries(
             _ entries: [NetworkEntry],
             matching status: StatusFilter,
@@ -110,7 +113,7 @@ public extension NetworkStore {
                     $0.url.lowercased().contains(query) ||
                         $0.method.lowercased().contains(query) ||
                         ($0.graphQLOperationName?.lowercased().contains(query) ?? false) ||
-                        ($0.prettyResponseBody?.lowercased().contains(query) ?? false)
+                        ($0.response?.searchText?.contains(query) ?? false)
                 }
             }
             return result
@@ -238,7 +241,7 @@ public extension NetworkStore {
             guard let idx = entries.firstIndex(where: { $0.id == id }) else { return }
             entries[idx].statusCode = completion.statusCode
             entries[idx].responseHeaders = completion.headers
-            entries[idx].responseBody = completion.body
+            entries[idx].response = completion.body
             entries[idx].duration = completion.duration
             entries[idx].error = completion.error
             entries[idx].isComplete = true
