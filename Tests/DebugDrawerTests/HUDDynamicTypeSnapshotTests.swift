@@ -20,7 +20,9 @@
     }
 
     // ImageRenderer draws the view without a window, at a fixed scale and width, so the
-    // reference doesn't depend on which simulator runs it.
+    // reference doesn't depend on which simulator runs it. The card holds no UIKit control, and
+    // its background is a material, which a hosted layer render leaves out, so ImageRenderer
+    // draws it rather than a hosted window as the other iOS snapshots are.
     @MainActor
     @Suite(.timeLimit(.minutes(1)))
     struct HUDDynamicTypeSnapshotTests {

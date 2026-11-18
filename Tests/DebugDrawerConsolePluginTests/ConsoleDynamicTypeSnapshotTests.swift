@@ -25,7 +25,7 @@
                 .background(Color(uiColor: .systemBackground))
                 .environment(\.dynamicTypeSize, .accessibility3)
             // ImageRenderer draws a UIViewRepresentable as a placeholder, so the view is hosted in a
-            // window that is never shown and drawn with drawHierarchy, at a fixed size and scale.
+            // window that is never shown and its layer rendered, at a fixed size and scale.
             let controller = UIHostingController(rootView: sut)
             let size = CGSize(width: 352, height: 272)
             let scene = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first

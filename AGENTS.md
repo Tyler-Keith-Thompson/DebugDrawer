@@ -178,7 +178,12 @@ iOS by SwiftPM.
   Dynamic Type sizes. `ImageRenderer` draws SwiftUI's own views; an AppKit-backed control (a text
   field, picker, switch, disclosure group or `NSViewRepresentable`) renders as a placeholder, so
   host that view in an `NSHostingView` in a window that is never shown, set its `appearance`, and
-  draw it into a bitmap at a fixed 2x scale. A snapshot is worth only what a person reads in it,
+  draw it into a bitmap at a fixed 2x scale. On iOS it draws every UIKit-backed control (text
+  field, picker, switch, segmented control) as a placeholder too, so the iOS Dynamic Type
+  snapshots host every view in a `UIHostingController` in a window that is never shown, with no
+  safe area, size it with `sizeThatFits`, lay it out with `layoutIfNeeded` and render its layer
+  at a fixed 2x scale. `drawHierarchy` draws nothing there: the SwiftPM test runner connects no
+  window scene. A snapshot is worth only what a person reads in it,
   so look at every recorded image before committing it. After a change to how a view looks,
   `just record-snapshots`, then review the changed images in `git diff`.
 - **Accessibility**: every control has an `accessibilityLabel`; an image that only decorates is
