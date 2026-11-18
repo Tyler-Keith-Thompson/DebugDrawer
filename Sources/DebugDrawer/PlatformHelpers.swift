@@ -44,24 +44,6 @@ public func debugDrawerCopyToClipboard(_ string: String) {
     #endif
 }
 
-/// Puts `image` on the general pasteboard, replacing what was there.
-///
-/// Unavailable on tvOS and watchOS, which have no pasteboard. In release builds it does nothing.
-///
-/// - Parameter image: The image to copy.
-@available(tvOS, unavailable)
-@available(watchOS, unavailable)
-public func debugDrawerCopyImageToClipboard(_ image: PlatformImage) {
-    #if DEBUG && os(macOS)
-        let pb = NSPasteboard.general
-        pb.clearContents()
-        pb.writeObjects([image])
-    #elseif DEBUG && (os(iOS) || os(visionOS))
-        // Under Mac Catalyst this puts the image on the Mac's general pasteboard.
-        UIPasteboard.general.image = image
-    #endif
-}
-
 #if DEBUG
     /// Whether the user turned on Reduce Motion in the system's accessibility settings, for code
     /// outside a view, which can't read `\.accessibilityReduceMotion`.
@@ -96,15 +78,11 @@ public func debugDrawerCopyImageToClipboard(_ image: PlatformImage) {
     /// The platform's image type: `NSImage` on the Mac, `UIImage` elsewhere.
     public typealias PlatformImage = NSImage
     /// The platform's color type: `NSColor` on the Mac, `UIColor` elsewhere.
-    public typealias PlatformColor = NSColor
-    /// The platform's font type: `NSFont` on the Mac, `UIFont` elsewhere.
-    public typealias PlatformFont = NSFont
+    typealias PlatformColor = NSColor
 #elseif os(iOS) || os(visionOS) || os(tvOS) || os(watchOS)
     // UIKit's types on Mac Catalyst too, whose views and pasteboard are UIKit's.
     /// The platform's image type: `UIImage` here, `NSImage` on the Mac.
     public typealias PlatformImage = UIImage
     /// The platform's color type: `UIColor` here, `NSColor` on the Mac.
-    public typealias PlatformColor = UIColor
-    /// The platform's font type: `UIFont` here, `NSFont` on the Mac.
-    public typealias PlatformFont = UIFont
+    typealias PlatformColor = UIColor
 #endif

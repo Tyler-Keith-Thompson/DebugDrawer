@@ -1,11 +1,9 @@
-/// The accessibility identifier on the drawer's overlay.
-///
-/// Auditors and other tools that walk the app's views skip the subtree that carries it, so
-/// they report on the app and not on the drawer.
-public let debugDrawerOverlayIdentifier = "com.debugdrawer.overlay"
-
 #if DEBUG
     import SwiftUI
+
+    /// The accessibility identifier on the drawer's overlay, which tells the drawer's views apart
+    /// from the app's.
+    let debugDrawerOverlayIdentifier = "com.debugdrawer.overlay"
 
     // MARK: - Central registry + state
 

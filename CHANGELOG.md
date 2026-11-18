@@ -45,11 +45,18 @@ the entry becomes the GitHub release's notes.
 - DD-53: the bug report's app-info.json carries the build details; `installAppInfo()` takes `buildMetadata:`.
 - `installNetwork`, `installConsole` and `installDeepLink` take new parameters with defaults, and
   `DebugDrawerReport.Kind` gains `movie`.
-- DD-189: `AsyncPluginView.reload()` is removed; it never re-ran the task.
 - DD-61: every public API compiles in release, where it does nothing: `DebugDrawer.shared`, the
-  plugins' `install*()` calls and types, their stores, `.trackRenders()`, `AsyncPluginView`,
-  `OnDemandPluginView`, `RedactedText` and the clipboard helpers no longer need `#if DEBUG`, and
+  plugins' `install*()` calls and types, their stores, `.trackRenders()`, `RedactedText` and
+  `debugDrawerCopyToClipboard(_:)` no longer need `#if DEBUG`, and
   `just deploy` builds the example apps optimized and checks every public symbol exists in release.
+
+### Removed
+
+- DD-64: core API no shipped plugin or example app used: `AsyncPluginView`, `OnDemandPluginView`,
+  `debugDrawerCopyImageToClipboard(_:)`, `PlatformColor`, `PlatformFont`, `debugDrawerViewTag` and
+  `debugDrawerOverlayIdentifier`.
+- DD-64: View Inspector's unreachable measure and inspect tool (`InspectorToolController`) and its
+  3D view hierarchy, which no control in the drawer opened.
 
 ### Fixed
 

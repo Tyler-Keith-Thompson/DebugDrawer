@@ -46,7 +46,6 @@ public extension DebugDrawer {
         @State private var hierarchy: ViewNode?
         @State private var isHierarchyExpanded = false
         @State private var searchText = ""
-        @State private var debugger3DRequest: ViewDebugger3DRequest?
 
         var body: some View {
             DebugDrawerSection("Overlays") {
@@ -142,27 +141,7 @@ public extension DebugDrawer {
                     }
                 }
             }
-            .sheet(item: $debugger3DRequest) { request in
-                ViewDebugger3DCombinedSheet(targetView: request.targetView)
-            }
         }
-
-        #if os(macOS)
-        private func open3DDebugger() {
-            guard let view = NSApp?.keyWindow?.contentView else { return }
-            debugger3DRequest = ViewDebugger3DRequest(targetView: view)
-        }
-        #elseif os(iOS)
-        private func open3DDebugger() {
-            guard let windowScene = UIApplication.shared.connectedScenes
-                .compactMap({ $0 as? UIWindowScene })
-                .first(where: { $0.activationState == .foregroundActive }),
-                let window = windowScene.windows.first(where: { $0.isKeyWindow }),
-                let rootView = window.rootViewController?.view
-            else { return }
-            debugger3DRequest = ViewDebugger3DRequest(targetView: rootView)
-        }
-        #endif
 
         private func snapshotHierarchy() {
             #if os(macOS)

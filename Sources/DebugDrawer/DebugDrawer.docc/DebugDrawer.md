@@ -28,8 +28,6 @@ and the API a host calls compiles to stand-ins that do nothing.
 - ``AnyDebugDrawerPlugin``
 - ``DebugDrawerToast``
 - ``HUDLayout``
-- ``debugDrawerOverlayIdentifier``
-- ``debugDrawerViewTag``
 - ``debugDrawerChromeStartLayerName``
 - ``debugDrawerChromeEndLayerName``
 
@@ -38,8 +36,6 @@ and the API a host calls compiles to stand-ins that do nothing.
 - <doc:WritingPlugins>
 - ``DebugDrawerPlugin``
 - ``DebugDrawerAction``
-- ``AsyncPluginView``
-- ``OnDemandPluginView``
 
 ### Building a Plugin's View
 
@@ -80,7 +76,4 @@ and the API a host calls compiles to stand-ins that do nothing.
 ### Platform Types
 
 - ``PlatformImage``
-- ``PlatformColor``
-- ``PlatformFont``
 - ``debugDrawerCopyToClipboard(_:)``
-- ``debugDrawerCopyImageToClipboard(_:)``

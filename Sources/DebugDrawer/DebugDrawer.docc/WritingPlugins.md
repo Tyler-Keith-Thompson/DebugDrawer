@@ -137,13 +137,6 @@ struct JobsPlugin: DebugDrawerPlugin {
 }
 ```
 
-### Slow work
-
-A body that reads a large file or scans a directory shouldn't block the main actor.
-``AsyncPluginView`` runs its task when it appears and shows a progress indicator until the result
-arrives; ``OnDemandPluginView`` waits for a button press first. Both exist in
-every build and draw nothing in release.
-
 ### A plugin's state
 
 A plugin is a value the drawer reads, not a view, so it holds no `@State`. Keep a plugin's

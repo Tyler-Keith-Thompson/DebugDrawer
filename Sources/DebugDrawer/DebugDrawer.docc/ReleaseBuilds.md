@@ -26,8 +26,8 @@ plugins call, as stand-ins, so the same code compiles in both configurations wit
 | ``DebugDrawer/DebugDrawer`` and its ``DebugDrawer/DebugDrawer/shared`` instance | Registering drops the plugin, toggling opens nothing, and every property keeps its starting value |
 | ``DebugDrawer/DebugDrawer/createReport(in:)`` | Throws ``DebugDrawerReport/WriteFailed`` |
 | ``AnyDebugDrawerPlugin``, ``HUDLayout``, ``DebugDrawerToast`` | Compile; the drawer holds none |
-| ``AsyncPluginView``, ``OnDemandPluginView``, ``RedactedText`` | Draw nothing and run nothing |
-| `debugDrawerCopyToClipboard(_:)`, `debugDrawerCopyImageToClipboard(_:)` | Do nothing |
+| ``RedactedText`` | Draws nothing |
+| `debugDrawerCopyToClipboard(_:)` | Does nothing |
 | The shipped plugins' `install*()` calls, their plugin types and their stores | Install nothing; the stores stay empty and swizzle or intercept nothing |
 
 So the calls that set the drawer up need no `#if DEBUG`:
