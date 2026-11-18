@@ -134,7 +134,7 @@ public extension DebugDrawer {
 
         private func snapshotHierarchy() {
             #if os(macOS)
-            guard let contentView = NSApp?.keyWindow?.contentView else { return }
+            guard let contentView = debugDrawerAppKeyWindow?.contentView else { return }
             hierarchy = ViewNode.build(from: contentView)
             isHierarchyExpanded = true
             #elseif os(iOS)

@@ -128,7 +128,7 @@
                 DrawerRule()
                 ForEach(plugins) { plugin in
                     let expanded = plugin.title != "User Defaults"
-                    DrawerPluginSection(plugin: plugin, isExpanded: expanded) {
+                    DrawerPluginSection(plugin: plugin, isExpanded: expanded, showAlone: {}, header: {
                         PluginSectionHeader(
                             plugin: plugin,
                             isExpanded: expanded,
@@ -136,6 +136,86 @@
                             badge: badges[plugin.id],
                             isMovable: true
                         ) {}
+                    })
+                }
+                DrawerFilterBar(
+                    field: { DrawerSearchField(query: .constant("")) },
+                    showsOnlyOwnCode: .constant(false),
+                    showsOnlyUnread: .constant(false)
+                )
+            }
+            .background(DrawerPalette.panel)
+        }
+    }
+
+    /// The panel with one plugin shown alone, as the drawer lays it out: the header with the back
+    /// button and the jump bar ending at the plugin, the plugin's detail view at full height, and
+    /// the filter bar at the foot.
+    struct DrawerFixtureDetailPanel: View {
+        private let plugin = AnyDebugDrawerPlugin(FixtureHangPlugin())
+
+        var body: some View {
+            VStack(spacing: 0) {
+                DrawerHeader(
+                    isReportInProgress: false,
+                    context: DrawerJumpBar.Context(appName: "Orders", version: "1.4.2", build: "88", device: "iPad", system: "iOS 27.2"),
+                    focus: plugin,
+                    createReport: {},
+                    close: {}
+                )
+                DrawerRule()
+                DrawerPluginDetail(plugin: plugin)
+                    .frame(maxHeight: .infinity, alignment: .top)
+                DrawerFilterBar(
+                    field: { DrawerSearchField(query: .constant("")) },
+                    showsOnlyOwnCode: .constant(false),
+                    showsOnlyUnread: .constant(false)
+                )
+            }
+            .background(DrawerPalette.panel)
+        }
+    }
+
+    /// The compact panel, as wide as an iPhone's window: the header block over a list of the
+    /// plugins, each header a row that shows its plugin alone, and the filter bar at the foot.
+    struct DrawerFixtureCompactPanel: View {
+        private let plugins: [AnyDebugDrawerPlugin] = [
+            AnyDebugDrawerPlugin(FixtureAppInfoPlugin()),
+            AnyDebugDrawerPlugin(FixturePermissionsPlugin()),
+            AnyDebugDrawerPlugin(FixturePerformancePlugin()),
+            AnyDebugDrawerPlugin(FixtureHangPlugin()),
+            AnyDebugDrawerPlugin(FixtureLibrariesPlugin()),
+            AnyDebugDrawerPlugin(FixtureCollapsedPlugin())
+        ]
+        private let badges = ["FixturePermissionsPlugin": 2]
+
+        var body: some View {
+            VStack(spacing: 0) {
+                DrawerHeader(
+                    isReportInProgress: false,
+                    context: DrawerJumpBar.Context(appName: "Orders", version: "1.4.2", build: "88", device: "iPhone", system: "iOS 27.2"),
+                    createReport: {},
+                    close: {}
+                )
+                DrawerNavigatorTabs(tabs: DrawerNavigatorTab.tabs(for: plugins, badges: badges), selection: .constant(.all))
+                    .padding(.vertical, 4)
+                DrawerRule()
+                // The list scrolls, as the drawer's does, so the header and the filter bar stay put
+                // at large text sizes.
+                ScrollView {
+                    VStack(spacing: 0) {
+                        ForEach(plugins) { plugin in
+                            DrawerPluginSection(plugin: plugin, isExpanded: false) {
+                                PluginSectionHeader(
+                                    plugin: plugin,
+                                    isExpanded: false,
+                                    isPinned: plugin.title == "App Info",
+                                    badge: badges[plugin.id],
+                                    isMovable: true,
+                                    opensAlone: true
+                                ) {}
+                            }
+                        }
                     }
                 }
                 DrawerFilterBar(

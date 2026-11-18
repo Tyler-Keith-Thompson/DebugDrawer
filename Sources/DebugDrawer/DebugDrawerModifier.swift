@@ -3,9 +3,11 @@
 
     // MARK: - Root modifier (attach once at app level)
 
+    // The modifier applies no animation to the app's content: each layer it adds animates itself
+    // (the HUD's fade, the toast's slide, the panel's transition in its own window), so a change
+    // to the drawer never animates a change of the app's.
     struct DebugDrawerModifier: ViewModifier {
         @ObservedObject var drawer = DebugDrawer.shared
-        @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
         func body(content: Content) -> some View {
             content
@@ -13,42 +15,60 @@
                 // (DrawerChromeBoundary).
                 .overlay { DrawerChromeBoundaryMarker(layerName: debugDrawerChromeStartLayerName) }
                 // Under the drawer, which takes no touches while closed, so the HUD keeps working.
-                .overlay {
-                    let readouts = drawer.hudPlugins
-                    if !readouts.isEmpty {
-                        DrawerHUDView(
-                            readouts: readouts,
-                            origin: drawer.hudLayout.origin,
-                            move: { drawer.moveHUD(to: $0) },
-                            unpin: { drawer.toggleHUD(forPlugin: $0) }
-                        )
-                        .opacity(drawer.isHUDHidden ? 0 : 1)
-                    }
-                }
+                .overlay { DrawerHUDLayer(drawer: drawer) }
                 .drawerPresentation(drawer: drawer)
-                .overlay(alignment: .topTrailing) {
-                    // A toast exists only while the drawer is closed; opening it is the toast's job.
-                    if !drawer.isOpen, let toast = drawer.toast {
-                        DrawerToastView(
-                            toast: toast,
-                            plugin: (drawer.localPlugins + drawer.globalPlugins).first { $0.id == toast.pluginID },
-                            open: { drawer.openToast() },
-                            dismiss: { drawer.dismissToast() }
-                        )
-                        .transition(.move(edge: .top).combined(with: .opacity))
-                    }
-                }
+                .overlay(alignment: .topTrailing) { DrawerToastLayer(drawer: drawer) }
                 .overlay { DrawerChromeBoundaryMarker(layerName: debugDrawerChromeEndLayerName) }
-                .animation(reduceMotion ? nil : .easeInOut(duration: 0.25), value: drawer.isOpen)
-                .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: drawer.toast)
+        }
+    }
+
+    /// The pinned plugins' HUD, if any are pinned, faded out while a capture hides it.
+    private struct DrawerHUDLayer: View {
+        @ObservedObject var drawer: DebugDrawer
+
+        var body: some View {
+            let readouts = drawer.hudPlugins
+            if !readouts.isEmpty {
+                DrawerHUDView(
+                    readouts: readouts,
+                    origin: drawer.hudLayout.origin,
+                    move: { drawer.moveHUD(to: $0) },
+                    unpin: { drawer.toggleHUD(forPlugin: $0) }
+                )
+                .opacity(drawer.isHUDHidden ? 0 : 1)
+            }
+        }
+    }
+
+    /// The toast, sliding in from the top, while the key window's drawer is closed: opening the
+    /// drawer is the toast's job.
+    private struct DrawerToastLayer: View {
+        @ObservedObject var drawer: DebugDrawer
+        @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+        var body: some View {
+            ZStack {
+                if !drawer.isOpen, let toast = drawer.toast {
+                    DrawerToastView(
+                        toast: toast,
+                        plugin: (drawer.localPlugins + drawer.globalPlugins).first { $0.id == toast.pluginID },
+                        open: { drawer.openToast() },
+                        dismiss: { drawer.dismissToast() }
+                    )
+                    .transition(.move(edge: .top).combined(with: .opacity))
+                }
+            }
+            .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: drawer.toast)
+            .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: drawer.isOpen)
         }
     }
 
     // MARK: - Presentation
 
     extension View {
-        /// Places the drawer: a panel in an overlay along the window's trailing edge, on visionOS
-        /// in an ornament beside the window, and on watchOS a full-screen list of the plugins.
+        /// Places the drawer: on the Mac and iOS in a window of its own, attached to the window
+        /// this view is in; on visionOS in an ornament beside the window; on tvOS in an overlay
+        /// along the window's trailing edge; and on watchOS a full-screen list of the plugins.
         @ViewBuilder
         fileprivate func drawerPresentation(drawer: DebugDrawer) -> some View {
             #if os(watchOS)
@@ -56,36 +76,38 @@
                 // list (DrawerWatchList). Its Close button closes the drawer, and a dismissal by the
                 // system closes it too (isOpenBinding).
                 fullScreenCover(isPresented: drawer.isOpenBinding) {
-                    DrawerWatchList(drawer: drawer)
+                    DrawerWatchList(drawer: drawer, presentation: drawer.detachedPresentation)
                         .accessibilityIdentifier(debugDrawerOverlayIdentifier)
                 }
+            #elseif os(macOS) || os(iOS)
+                // A window of the drawer's own (DrawerChildPanel, DrawerSceneWindow), so sheets and
+                // alerts the app presents stay under it. Mac Catalyst takes this branch: its scenes
+                // are UIKit's, and the drawer's window draws over the scene's others there too.
+                background { DrawerWindowAttacher(drawer: drawer) }
+            #elseif os(visionOS)
+                // An ornament, not a separate window: it needs no scene from the host (a window
+                // would need a WindowGroup the app declares and an openWindow call), it moves
+                // with the app's window and stays beside it instead of floating wherever the
+                // system puts a new window, and it covers none of the app, which an overlay on a
+                // spatial window would. It takes the window's height, so the plugin list scrolls
+                // as it does in the overlay.
+                modifier(DrawerOrnament(
+                    isOpen: drawer.detachedPresentation.isOpen,
+                    panel: DebugDrawerOverlay(drawer: drawer, presentation: drawer.detachedPresentation)
+                        .accessibilityIdentifier(debugDrawerOverlayIdentifier)
+                ))
             #else
-                drawerPanel(isOpen: drawer.isOpen) {
-                    DebugDrawerOverlay(drawer: drawer)
+                // tvOS keeps the overlay in the app's window: the focus engine moves within one
+                // window's views, so a window of the drawer's own would take focus from the app
+                // whenever it showed. So on tvOS a sheet or an alert the app presents still covers
+                // the drawer.
+                overlay(alignment: .trailing) {
+                    DebugDrawerOverlay(drawer: drawer, presentation: drawer.detachedPresentation)
                         .accessibilityIdentifier(debugDrawerOverlayIdentifier)
                         .allowsHitTesting(drawer.isOpen)
                 }
             #endif
         }
-
-        #if !os(watchOS)
-            /// The drawer's panel: an overlay along the window's trailing edge, or on visionOS an
-            /// ornament beside the window.
-            @ViewBuilder
-            private func drawerPanel(isOpen: Bool, @ViewBuilder panel: () -> some View) -> some View {
-                #if os(visionOS)
-                    // An ornament, not a separate window: it needs no scene from the host (a window
-                    // would need a WindowGroup the app declares and an openWindow call), it moves
-                    // with the app's window and stays beside it instead of floating wherever the
-                    // system puts a new window, and it covers none of the app, which an overlay on a
-                    // spatial window would. It takes the window's height, so the plugin list scrolls
-                    // as it does in the overlay.
-                    modifier(DrawerOrnament(isOpen: isOpen, panel: panel()))
-                #else
-                    overlay(alignment: .trailing, content: panel)
-                #endif
-            }
-        #endif
     }
 
     #if os(watchOS)

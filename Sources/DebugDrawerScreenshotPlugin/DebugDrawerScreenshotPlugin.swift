@@ -149,7 +149,8 @@ public extension DebugDrawer {
         #if os(macOS)
         private func performCapture(destination: Destination) async {
             do {
-                guard let window = NSApp?.keyWindow else { throw ScreenshotError.noWindow }
+                // The app's key window, not the drawer's panel when its search field has focus.
+                guard let window = debugDrawerAppKeyWindow else { throw ScreenshotError.noWindow }
                 guard let bitmap = WindowCapture.bitmap(of: window),
                       let png = bitmap.representation(using: .png, properties: [:])
                 else { throw ScreenshotError.encodingFailed }
@@ -185,11 +186,8 @@ public extension DebugDrawer {
         }
         #elseif os(iOS)
         private func performCapture(destination _: Destination) async {
-            guard let window = UIApplication.shared.connectedScenes
-                .compactMap({ $0 as? UIWindowScene })
-                .first(where: { $0.activationState == .foregroundActive })?
-                .windows.first(where: \.isKeyWindow)
-            else {
+            // The app's key window, not the drawer's when its search field has focus.
+            guard let window = debugDrawerAppKeyWindow else {
                 store.lastPath = "Error: \(ScreenshotError.noWindow.localizedDescription)"
                 store.isCapturing = false
                 return

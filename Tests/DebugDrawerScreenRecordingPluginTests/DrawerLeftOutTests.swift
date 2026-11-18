@@ -12,7 +12,7 @@
     @Suite(.serialized)
     struct DrawerLeftOutTests {
         @Test(
-            "With the drawer open, a recorded frame shows the app where the panel is, the right way up; the window as drawn shows the panel"
+            "With the drawer open, a recorded frame shows the app where the panel is, the right way up; the panel's own window is left out"
         )
         func drawerLeftOut() throws {
             DebugDrawer.shared.isOpen = true
@@ -61,14 +61,14 @@
             func isRed(_ rgb: [UInt8]) -> Bool { rgb[0] > 200 && rgb[1] < 120 && rgb[2] < 120 }
             func isGreen(_ rgb: [UInt8]) -> Bool { rgb[1] > 150 && rgb[0] < 120 && rgb[2] < 150 }
             let scale = CGFloat(actual.width) / 800
-            // The panel is 340 points wide at the trailing edge.
+            // The panel is 316 points wide at the trailing edge, in a window of its own.
             let underPanel = CGPoint(x: 700, y: 400)
             let besidePanel = CGPoint(x: 100, y: 400)
             let topUnderPanel = CGPoint(x: 700, y: 100)
             #expect(isRed(color(of: actual, at: underPanel, scale: scale)))
             #expect(isRed(color(of: actual, at: besidePanel, scale: scale)))
             #expect(isGreen(color(of: actual, at: topUnderPanel, scale: scale)))
-            #expect(!isRed(color(of: onScreen, at: underPanel, scale: 1)))
+            #expect(isRed(color(of: onScreen, at: underPanel, scale: 1)))
             #expect(isRed(color(of: onScreen, at: besidePanel, scale: 1)))
             #expect(!DrawerChromeLayers.layers(in: layer).isEmpty)
             #expect(DrawerChromeLayers.layers(in: layer).allSatisfy { !$0.isHidden })

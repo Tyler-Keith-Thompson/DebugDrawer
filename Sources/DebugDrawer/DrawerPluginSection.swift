@@ -17,30 +17,29 @@
         @ScaledMetric(relativeTo: .body) private var bottom = DrawerSpacing.rowPadding
         @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
-        init(plugin: AnyDebugDrawerPlugin, isExpanded: Bool, @ViewBuilder header: () -> Header) {
+        /// Shows the plugin alone, from a button at the header's trailing end; `nil` for no button.
+        let showAlone: (() -> Void)?
+
+        init(plugin: AnyDebugDrawerPlugin, isExpanded: Bool, showAlone: (() -> Void)? = nil, @ViewBuilder header: () -> Header) {
             self.plugin = plugin
             self.isExpanded = isExpanded
+            self.showAlone = showAlone
             self.header = header()
         }
 
         var body: some View {
             VStack(spacing: 0) {
-                // The accessory sits beside the header's button rather than in it, so an action
-                // in it is a control of its own and VoiceOver reads it apart from the heading.
-                // It goes under the header, where the title has the row's width to itself, at
-                // accessibility text sizes and whenever the title and the accessory are too wide
-                // to share the row.
-                if let accessory = plugin.headerAccessory {
-                    if dynamicTypeSize.isAccessibilitySize {
-                        headerRow(accessory, below: true)
-                    } else {
-                        ViewThatFits(in: .horizontal) {
-                            headerRow(accessory, below: false)
-                            headerRow(accessory, below: true)
+                HStack(alignment: .top, spacing: 0) {
+                    headerBlock
+                    if let showAlone {
+                        Button(action: showAlone) {
+                            DrawerIconButtonLabel(systemImage: "chevron.forward")
                         }
+                        .debugDrawerButtonStyle(.plain)
+                        .accessibilityLabel("Show \(plugin.title) alone")
+                        .help("Show \(plugin.title) alone")
+                        .padding(.trailing, inset / 2)
                     }
-                } else {
-                    header
                 }
                 if isExpanded {
                     // A stack of its own, so a body of several views is laid out as one rather
@@ -57,6 +56,26 @@
                     .transition(.opacity.combined(with: .move(edge: .top)))
                 }
                 DrawerRule()
+            }
+        }
+
+        /// The header and its accessory. The accessory sits beside the header's button rather than
+        /// in it, so an action in it is a control of its own and VoiceOver reads it apart from the
+        /// heading. It goes under the header, where the title has the row's width to itself, at
+        /// accessibility text sizes and whenever the title and the accessory are too wide to share
+        /// the row.
+        @ViewBuilder private var headerBlock: some View {
+            if let accessory = plugin.headerAccessory {
+                if dynamicTypeSize.isAccessibilitySize {
+                    headerRow(accessory, below: true)
+                } else {
+                    ViewThatFits(in: .horizontal) {
+                        headerRow(accessory, below: false)
+                        headerRow(accessory, below: true)
+                    }
+                }
+            } else {
+                header
             }
         }
 
@@ -101,6 +120,13 @@
                     .background(.ultraThickMaterial)
                     .clipShape(shape)
                     .shadow(color: .black.opacity(0.25), radius: 12, x: -4)
+            #elseif os(macOS)
+                // The panel fills a window of its own, which draws the shadow around it
+                // (DrawerChildPanel): one drawn here would be clipped at the window's edges.
+                content
+                    .background(DrawerPalette.panel)
+                    .clipShape(shape)
+                    .overlay { shape.strokeBorder(DrawerPalette.separator, lineWidth: 1 / displayScale) }
             #else
                 content
                     .background(DrawerPalette.panel)

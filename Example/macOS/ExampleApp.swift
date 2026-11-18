@@ -139,6 +139,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         setupMenuBar()
         createMainWindow()
+        ExamplePresentations.runAppModalAlertIfAsked()
     }
 
     /// The plugins installed with one call each, which compile in release too and do nothing there;
@@ -222,6 +223,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         DebugDrawer.shared.toggle()
     }
 
+    // AppKit enables a menu item during an app-modal session only when its target works when modal,
+    // so Ctrl+D opens the drawer above an app-modal alert too.
+    @objc var worksWhenModal: Bool {
+        true
+    }
+
     // Shows what a plugin's notice looks like: a badge on Network and a toast that opens it.
     @objc private func postSampleNotice() {
         let network = NetworkPlugin()
@@ -287,6 +294,9 @@ struct ExampleContentView: View {
                     }
                     .accessibilityElement(children: .contain)
                     .accessibilityLabel("Counter actions")
+
+                    // The drawer opens above each of these (Ctrl+D or the Debug menu while one is up).
+                    ExamplePresentationButtons()
 
                     Text("Counter: \(counter)")
                         .font(.title2.monospacedDigit())

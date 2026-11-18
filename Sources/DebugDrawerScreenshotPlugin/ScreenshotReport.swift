@@ -10,13 +10,10 @@ extension ScreenshotPlugin: DebugDrawerReportContributor {
     /// release builds it adds nothing.
     public func contribute(to report: inout DebugDrawerReport, redaction: DebugDrawerRedaction) {
         #if DEBUG && os(macOS)
-            Self.contribute(capturing: NSApp?.keyWindow, to: &report)
+            // The app's key window, not the drawer's panel when its search field has focus.
+            Self.contribute(capturing: debugDrawerAppKeyWindow, to: &report)
         #elseif DEBUG && os(iOS)
-            let window = UIApplication.shared.connectedScenes
-                .compactMap { $0 as? UIWindowScene }
-                .first { $0.activationState == .foregroundActive }?
-                .windows.first(where: \.isKeyWindow)
-            Self.contribute(capturing: window, to: &report)
+            Self.contribute(capturing: debugDrawerAppKeyWindow, to: &report)
         #endif
     }
 }

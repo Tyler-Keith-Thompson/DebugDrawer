@@ -14,6 +14,8 @@
     /// (Local, Pinned, then each category), where each row opens its plugin's view.
     struct DrawerWatchList: View {
         @ObservedObject var drawer: DebugDrawer
+        /// The drawer's state, through which a toast asks for its plugin.
+        @ObservedObject var presentation: DrawerPresentation
         /// The plugins opened from the list, by ID; a toast's plugin is pushed onto it.
         @State private var path: [String] = []
         /// Pins and order, loaded each time the drawer opens.
@@ -42,13 +44,13 @@
                 layout = DrawerLayout(from: .standard)
                 reveal()
             }
-            .onChange(of: drawer.revealRequest) { reveal() }
+            .onChange(of: presentation.revealRequest) { reveal() }
         }
 
         /// Opens the plugin a toast asked for.
         private func reveal() {
-            guard let id = drawer.revealRequest else { return }
-            drawer.revealRequest = nil
+            guard let id = presentation.revealRequest else { return }
+            presentation.revealRequest = nil
             path = [id]
         }
     }

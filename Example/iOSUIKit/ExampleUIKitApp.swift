@@ -34,6 +34,9 @@ final class ExampleUIKitSceneDelegate: UIResponder, UIWindowSceneDelegate {
         window.rootViewController = UIHostingController(rootView: ExampleUIKitContentView(continued: continued).debugDrawer())
         window.makeKeyAndVisible()
         self.window = window
+        // A UIKit app attaches the drawer to its scene itself; `.debugDrawer()` on the hosted root
+        // above also does, for its HUD and toasts, and a second attach of a scene does nothing.
+        DebugDrawer.shared.attach(to: windowScene)
         // Launched with -OpenDebugDrawer, the window opens with the drawer open.
         if ProcessInfo.processInfo.arguments.contains("-OpenDebugDrawer"), !DebugDrawer.shared.isOpen {
             DebugDrawer.shared.toggle()

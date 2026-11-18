@@ -11,6 +11,9 @@
         let badge: Int?
         /// Whether the header's context menu pins and moves it, as for a global plugin.
         let isMovable: Bool
+        /// Whether the button shows the plugin alone rather than expanding the section, as in the
+        /// compact panel's list.
+        var opensAlone = false
         let toggle: () -> Void
 
         var body: some View {
@@ -25,16 +28,21 @@
             #endif
             .accessibilityLabel(plugin.title)
             .accessibilityValue(state)
-            .accessibilityHint(isMovable ? "Toggles the section. Its actions pin it or move it." : "Toggles the section.")
+            .accessibilityHint(hint)
             .accessibilityAddTraits(.isHeader)
         }
 
         /// The label names the plugin only, so the pin and badge the label draws are read here.
         private var state: String {
-            let expansion = isExpanded ? "Expanded" : "Collapsed"
+            let expansion = opensAlone ? [] : [isExpanded ? "Expanded" : "Collapsed"]
             let pin = isPinned ? ["Pinned"] : []
             let count = badge.map { ["\($0) new"] } ?? []
-            return ([expansion] + pin + count).joined(separator: ", ")
+            return (expansion + pin + count).joined(separator: ", ")
+        }
+
+        private var hint: String {
+            let action = opensAlone ? "Shows the plugin." : "Toggles the section."
+            return isMovable ? "\(action) Its actions pin it or move it." : action
         }
     }
 #endif

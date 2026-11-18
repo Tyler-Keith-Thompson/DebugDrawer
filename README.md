@@ -72,6 +72,14 @@ get stand-ins that do nothing: `DebugDrawer.shared` drops the plugins registered
 opens, the plugins' `install*()` calls install nothing, and `.debugDrawer()` and
 `.debugLocalPlugin()` return the view unchanged.
 
+The drawer opens in a window of its own, above the app's sheets and alerts: on macOS a panel along
+the trailing edge of the window, on iOS a window above the scene's, at 316 points wide or, where
+the window is narrower than two of those (an iPhone in portrait), as wide as the window. Each
+window's drawer opens and closes on its own; `toggle()` and `isOpen` act on the key window's. A
+UIKit or AppKit app without `debugDrawer()` attaches it with `DebugDrawer.shared.attach(to:)`,
+passing each `UIWindowScene` or `NSWindow`. A section header's chevron, or the jump bar's menu, shows
+one plugin alone at the panel's full height, and the back button returns to the list.
+
 ### Building a plugin's view
 
 Core has the views the shipped plugins are built from, so a plugin of your own looks like them:
@@ -1626,8 +1634,8 @@ is closed, so they never open it or take a key from the app:
 | Keys | Does |
 |---|---|
 | Cmd-K | Focuses the search field |
-| Cmd-Option-Down / Cmd-Option-Up | Scrolls to the next or previous plugin's section and moves focus to its header |
-| Escape | Clears the search field if it holds text, otherwise closes the drawer |
+| Cmd-Option-Down / Cmd-Option-Up | Scrolls to the next or previous plugin's section and moves focus to its header; with one plugin shown alone, shows the next or previous one |
+| Escape | Clears the search field if it holds text, otherwise returns from a plugin shown alone to the list, otherwise closes the drawer |
 
 With keyboard navigation turned on (Full Keyboard Access on iOS, Keyboard navigation in macOS's
 settings), Tab reaches every section header, and Space expands or collapses the section.

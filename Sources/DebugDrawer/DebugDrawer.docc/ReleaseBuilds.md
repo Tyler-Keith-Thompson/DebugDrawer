@@ -16,6 +16,7 @@ plugins call, as stand-ins, so the same code compiles in both configurations wit
 | API | In release |
 |---|---|
 | `debugDrawer()` | Returns the view unchanged |
+| `DebugDrawer.shared.attach(to:)`, for a `UIWindowScene` or an `NSWindow` | Does nothing |
 | `debugLocalPlugin(_:)` | Returns the view unchanged; the plugin is never read |
 | ``DebugDrawerPlugin`` and its defaults | Compile; nothing reads a plugin |
 | ``DebugDrawerPlugin/setBadge(_:)``, ``DebugDrawerPlugin/clearBadge()``, ``DebugDrawerPlugin/postToast(_:)`` | Do nothing |

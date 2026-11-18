@@ -9,8 +9,13 @@
     /// running app, its name, its version and build in monospaced figures, then the device and
     /// system, which give way first when the line runs short ("● Orders › 1.4.2 (88) › iPad ·
     /// iOS 27.2"). It sits in a well with a hairline edge.
+    ///
+    /// While one plugin is shown alone, the path ends at it instead of the build and device
+    /// ("● Orders › Network"), as Xcode's ends at the file it shows.
     struct DrawerJumpBar: View {
         let context: Context
+        /// The plugin shown alone, or `nil` in the outline.
+        var focus: AnyDebugDrawerPlugin?
         @Environment(\.displayScale) private var displayScale
         @Environment(\.dynamicTypeSize) private var dynamicTypeSize
         @ScaledMetric(relativeTo: .body) private var height = DrawerSpacing.jumpBarHeight
@@ -32,17 +37,24 @@
                 Text(context.appName)
                     .foregroundStyle(DrawerPalette.text)
                     .layoutPriority(2)
-                if let release = context.release {
+                if let focus {
                     if !stacked { separator }
-                    Text(release)
-                        .monospaced()
+                    Label(focus.title, systemImage: focus.icon)
                         .foregroundStyle(DrawerPalette.text)
-                        .layoutPriority(1)
+                        .layoutPriority(3)
+                } else {
+                    if let release = context.release {
+                        if !stacked { separator }
+                        Text(release)
+                            .monospaced()
+                            .foregroundStyle(DrawerPalette.text)
+                            .layoutPriority(1)
+                    }
+                    if !stacked { separator }
+                    Text("\(context.device) · \(context.system)")
+                        .foregroundStyle(DrawerPalette.secondaryText)
+                        .truncationMode(.tail)
                 }
-                if !stacked { separator }
-                Text("\(context.device) · \(context.system)")
-                    .foregroundStyle(DrawerPalette.secondaryText)
-                    .truncationMode(.tail)
                 if !stacked { Spacer(minLength: 0) }
             }
             .debugDrawerFont(.secondary)
@@ -54,7 +66,7 @@
             .background(DrawerPalette.well, in: shape)
             .overlay { shape.strokeBorder(DrawerPalette.separator, lineWidth: 1 / displayScale) }
             .accessibilityElement(children: .ignore)
-            .accessibilityLabel(context.spoken)
+            .accessibilityLabel(focus.map { "\(context.appName), \($0.title)" } ?? context.spoken)
         }
 
         private var separator: some View {

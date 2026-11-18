@@ -16,7 +16,7 @@
               arguments: [ColorScheme.light, .dark])
         func panel(colorScheme: ColorScheme) throws {
             let sut = DrawerFixturePanel()
-                .frame(width: 340)
+                .frame(width: 316)
             let host = NSHostingView(rootView: sut)
             host.appearance = NSAppearance(named: colorScheme == .dark ? .darkAqua : .aqua)
             let window = NSWindow(contentRect: .zero, styleMask: .borderless, backing: .buffered, defer: true)

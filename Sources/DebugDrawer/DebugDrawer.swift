@@ -28,8 +28,32 @@
         /// The app's drawer, which `debugDrawer()` shows and every plugin registers with.
         public static let shared = DebugDrawer()
 
-        /// Whether the drawer is on screen. Set it, or call ``toggle()`` to animate the change.
-        @Published public var isOpen = false
+        /// Whether the key window's drawer is on screen. Set it, or call ``toggle()``.
+        ///
+        /// Each window has a drawer of its own, open or closed apart from the others; this is the
+        /// one in the key window (on iOS, the scene in front), or, with none attached yet, the
+        /// drawer the next window attached opens with.
+        @Published public var isOpen = false {
+            didSet {
+                guard !isSyncingOpenState, isOpen != keyPresentation.isOpen else { return }
+                keyPresentation.isOpen = isOpen
+            }
+        }
+
+        /// True while ``isOpen`` is being set from the key window's drawer, so the change isn't
+        /// passed back to it.
+        var isSyncingOpenState = false
+
+        /// Bring ``isOpen`` up to date when another window becomes key, and on iOS detach a scene's
+        /// drawer when the scene disconnects; added on the first attach.
+        var windowObservers: [any NSObjectProtocol] = []
+
+        /// The drawer of each window attached with `attach(to:)`, in the order they were attached.
+        var attachments: [DrawerAttachment] = []
+
+        /// The drawer of no window: the one tvOS, visionOS and watchOS draw in the app's own
+        /// window, and elsewhere the state the first window attached takes on.
+        let detachedPresentation = DrawerPresentation()
 
         /// The plugins registered with ``registerGlobal(_:)``, in the order they were registered.
         @Published public private(set) var globalPlugins: [AnyDebugDrawerPlugin] = []
@@ -99,53 +123,6 @@
             guard localTokens[id] == token else { return }
             localTokens.removeValue(forKey: id)
             localPlugins.removeAll { $0.id == id }
-        }
-
-        // MARK: - Visibility
-
-        /// Opens the drawer if it is closed and closes it if it is open, animated unless the system
-        /// reduces motion.
-        public func toggle() {
-            withAnimation(Self.motion(.easeInOut(duration: 0.25))) {
-                isOpen.toggle()
-            }
-        }
-
-        /// Hides the HUD, and the drawer unless `drawer` is false, runs `action` once that has
-        /// rendered, then shows them again. For screenshots and anything else that needs a clean view.
-        ///
-        /// - Parameters:
-        ///   - hidesDrawer: Whether to close the drawer too; it reopens afterwards if it was open.
-        ///   - action: The work to do while they are hidden.
-        public func performWhileHidden(drawer hidesDrawer: Bool = true, _ action: @escaping @MainActor () async -> Void) {
-            let reopens = hidesDrawer && isOpen
-            let hidesHUD = !hudLayout.pinned.isEmpty
-            guard reopens || hidesHUD else {
-                Task { await action() }
-                return
-            }
-
-            // The completion runs once the hiding has rendered. A fade is no motion, so the HUD's
-            // transaction animates even when the system reduces motion; the drawer's own modifier
-            // drops its slide then.
-            withAnimation(Self.motion(.easeInOut(duration: 0.15)) ?? .linear(duration: 0.1)) {
-                if reopens { self.isOpen = false }
-                self.isHUDHidden = true
-            } completion: { [weak self] in
-                Task { @MainActor [weak self] in
-                    await action()
-                    withAnimation(Self.motion(.easeInOut(duration: 0.25)) ?? .linear(duration: 0.1)) {
-                        if reopens { self?.isOpen = true }
-                        self?.isHUDHidden = false
-                    }
-                }
-            }
-        }
-
-        /// `animation`, or none when the user asked the system to reduce motion. The drawer is not a
-        /// view, so it reads the system setting rather than `\.accessibilityReduceMotion`.
-        private static func motion(_ animation: Animation) -> Animation? {
-            debugDrawerSystemReduceMotion ? nil : animation
         }
 
         /// Whether there are any plugins registered at all.
@@ -218,8 +195,11 @@
         /// The notice shown while the drawer is closed, if a plugin has raised one.
         @Published public private(set) var toast: DebugDrawerToast?
 
-        /// A plugin the overlay should expand and scroll to the next time it can.
-        @Published var revealRequest: String?
+        /// A plugin the key window's drawer should show the next time it can.
+        var revealRequest: String? {
+            get { keyPresentation.revealRequest }
+            set { keyPresentation.revealRequest = newValue }
+        }
 
         /// Shows `count` on the plugin's section header; zero or less clears it.
         ///

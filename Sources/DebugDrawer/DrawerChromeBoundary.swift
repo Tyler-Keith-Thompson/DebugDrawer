@@ -21,10 +21,11 @@ public let debugDrawerChromeEndLayerName = "com.debugdrawer.chrome.end"
     // layers above that view's, so in painter's order every layer between the two is the drawer's
     // and every layer outside them is the app's. A recorder that renders the window in process can
     // hide the layers between them for the length of one render, which no commit ever shows, and so
-    // record the app without the drawer while the drawer stays on screen. Rejected: hosting the
-    // drawer in a window of its own (plugins' views would lose the environment the app gives the
-    // views under .debugDrawer(), and every host's touches and focus would change), and naming the
-    // drawer's layers by SwiftUI's internal classes (undocumented, and they change between releases).
+    // record the app without the drawer while the drawer stays on screen. On the Mac and iOS the
+    // panel itself is in a window of its own (DrawerChildPanel, DrawerSceneWindow), which a
+    // capture of the app's window leaves out anyway; the HUD and the toast are still drawn in the
+    // app's window, between the markers. Rejected: naming the drawer's layers by SwiftUI's internal
+    // classes (undocumented, and they change between releases).
 
     /// An empty platform view with a named layer, which takes no touches and no space and is hidden
     /// from accessibility. Platforms with no recorder draw nothing.

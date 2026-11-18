@@ -32,7 +32,7 @@
 
         @Published public var animationSpeed: Double = 1.0 {
             didSet {
-                guard let window = NSApp?.keyWindow else { return }
+                guard let window = debugDrawerAppKeyWindow else { return }
                 window.contentView?.layer?.speed = animationSpeed == 1.0 ? 1.0 : Float(1.0 / animationSpeed)
             }
         }
@@ -67,7 +67,7 @@
                 // Delivered on the main queue (`queue: .main` above), so the view never leaves it.
                 let view = notification.object as? NSView
                 MainActor.assumeIsolated {
-                    guard let view, view.window == NSApp?.keyWindow,
+                    guard let view, view.window == debugDrawerAppKeyWindow,
                           let self, self.isBordersEnabled else { return }
                     self.applyBorders()
                 }
@@ -83,7 +83,7 @@
         }
 
         private func applyBorders() {
-            guard let window = NSApp?.keyWindow else { return }
+            guard let window = debugDrawerAppKeyWindow else { return }
             removeBorders()
             addBorders(to: window.contentView, depth: 0)
         }
@@ -157,11 +157,9 @@
 
         private init() {}
 
+        /// The app's key window, not the drawer's when its search field has focus.
         static var keyWindow: UIWindow? {
-            UIApplication.shared.connectedScenes
-                .compactMap { $0 as? UIWindowScene }
-                .first(where: { $0.activationState == .foregroundActive })?
-                .windows.first(where: { $0.isKeyWindow })
+            debugDrawerAppKeyWindow
         }
 
         private func applyBorders() {

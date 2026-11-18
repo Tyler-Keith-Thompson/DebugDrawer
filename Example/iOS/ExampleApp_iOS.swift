@@ -197,6 +197,10 @@ struct ExampleContentView_iOS: View {
     @AppStorage(ExampleTweaks.counterKey) private var counter = 0
     @State private var text = ""
     @State private var isShowingSheet = false
+    // Launched with -ShowSampleAlert, the screen opens with the alert up, so the drawer can be
+    // checked above it without a hand (with -OpenDebugDrawer).
+    @State private var isShowingAlert = ProcessInfo.processInfo.arguments.contains("-ShowSampleAlert")
+    @AccessibilityFocusState private var isAlertTriggerFocused: Bool
 
     var body: some View {
         NavigationStack {
@@ -231,6 +235,9 @@ struct ExampleContentView_iOS: View {
                         isShowingSheet = true
                         ExampleAnalytics.track("sheet_shown")
                     }
+                    // The drawer opens above an alert too, in a window above the alert's.
+                    Button("Show Alert") { isShowingAlert = true }
+                        .accessibilityFocused($isAlertTriggerFocused)
                     // Analytics lists each event as it is recorded. Recording does nothing in
                     // release, so neither does the button.
                     Button("Track Sample Event") { ExampleAnalytics.trackSample() }
@@ -311,6 +318,12 @@ struct ExampleContentView_iOS: View {
             .sheet(isPresented: $isShowingSheet) {
                 ExampleSheet_iOS()
             }
+            .alert("Sample Alert", isPresented: $isShowingAlert) {
+                // VoiceOver returns to the button that showed the alert.
+                Button("OK") { isAlertTriggerFocused = true }
+            } message: {
+                Text("An alert the app presents over its screen.")
+            }
             .toolbar {
                 // A device without a keyboard has no Ctrl+D, so the example opens the drawer from here;
                 // release builds have no drawer, so there it does nothing.
@@ -339,8 +352,8 @@ struct ExampleContentView_iOS: View {
     }
 }
 
-/// A presented sheet with a drawer of its own, as a host adds one to each sheet's root: opened
-/// over the sheet, the drawer's capture includes it.
+/// A presented sheet with a button for the drawer, which opens above it: the drawer is in a window
+/// of its own, above every presentation in the scene, so the sheet needs no drawer of its own.
 struct ExampleSheet_iOS: View {
     @Environment(\.dismiss) private var dismiss
 
@@ -362,6 +375,5 @@ struct ExampleSheet_iOS: View {
                     }
                 }
         }
-        .debugDrawer()
     }
 }

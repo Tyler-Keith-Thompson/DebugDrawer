@@ -78,14 +78,14 @@
         @Test("Opening the drawer and using the View Inspector plugin records no renders")
         func drawerIsNeverCounted() throws {
             let drawer = DebugDrawer.shared
-            let wasOpen = drawer.isOpen
             let flashesWereOn = RenderFlashSetting.shared.isOn
             drawer.installViewInspector()
-            drawer.isOpen = true
+            let presentation = DrawerPresentation()
+            presentation.isOpen = true
             // Every body evaluated below runs in this one main-actor turn, so no other test
             // records in between.
             let before = RenderTracker.shared.counts
-            let sut = Text("App").debugDrawer()
+            let sut = DebugDrawerOverlay(drawer: drawer, presentation: presentation)
 
             let app = try sut.inspect()
             let texts = app.findAll(ViewType.Text.self).compactMap { try? $0.string() }
@@ -95,7 +95,6 @@
             _ = try ViewInspectorPluginView().inspect().findAll(ViewType.Text.self)
             let actual = RenderTracker.shared.counts
             RenderFlashSetting.shared.isOn = flashesWereOn
-            drawer.isOpen = wasOpen
 
             #expect(texts.contains("View Inspector"))
             #expect(pluginTexts.contains("SwiftUI Renders"))

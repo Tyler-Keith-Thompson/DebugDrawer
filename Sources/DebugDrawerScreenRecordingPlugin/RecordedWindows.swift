@@ -1,5 +1,6 @@
 #if DEBUG
     import CoreGraphics
+    import DebugDrawer
     import QuartzCore
     #if os(macOS)
         import AppKit
@@ -9,8 +10,9 @@
 
     /// The windows a recording draws, each frame, with the drawer's layers hidden
     /// (`DrawerChromeLayers`): on iOS every window of the scene that was in front when recording
-    /// started, in window-level order, so sheets and alerts show; on macOS the content of the
-    /// window that was main.
+    /// started, in window-level order, so sheets and alerts show, but not the drawer's own window;
+    /// on macOS the content of the window that was main, which the drawer's panel, a window of its
+    /// own, is not part of.
     ///
     /// Drawn with `CALayer.render(in:)`, in process: no ReplayKit or ScreenCaptureKit, so no
     /// permission prompt, and the drawer can be left out while it stays on screen. The render is of
@@ -24,7 +26,7 @@
 
             /// The main window, or the key one, or `nil` when the app shows none.
             convenience init?() {
-                guard let window = NSApp?.mainWindow ?? NSApp?.keyWindow else { return nil }
+                guard let window = NSApp?.mainWindow ?? debugDrawerAppKeyWindow else { return nil }
                 self.init(window: window)
             }
 
@@ -73,10 +75,11 @@
                 self.scene = scene
             }
 
-            /// The scene's visible windows, lowest level first.
+            /// The scene's visible windows, lowest level first, without the drawer's own.
             var windows: [UIWindow] {
                 (scene?.windows ?? [])
                     .filter { !$0.isHidden && $0.alpha > 0 && $0.bounds.width > 0 && $0.bounds.height > 0 }
+                    .filter { !isDebugDrawerWindow($0) }
                     .enumerated()
                     .sorted { ($0.element.windowLevel.rawValue, $0.offset) < ($1.element.windowLevel.rawValue, $1.offset) }
                     .map(\.element)

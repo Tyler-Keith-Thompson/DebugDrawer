@@ -20,14 +20,14 @@
               ])
         func panel(style: UIUserInterfaceStyle, typeSize: DynamicTypeSize, name: String) throws {
             let sut = DrawerFixturePanel()
-                .frame(width: 340)
+                .frame(width: 316)
                 .environment(\.dynamicTypeSize, typeSize)
             let controller = UIHostingController(rootView: sut)
             // No safe area: the window's status bar inset would lay the view out shorter than it
             // measured, overlapping its rows.
             controller.safeAreaRegions = []
-            let fitted = controller.sizeThatFits(in: CGSize(width: 340, height: CGFloat.greatestFiniteMagnitude))
-            let size = CGSize(width: 340, height: fitted.height.rounded(.up))
+            let fitted = controller.sizeThatFits(in: CGSize(width: 316, height: CGFloat.greatestFiniteMagnitude))
+            let size = CGSize(width: 316, height: fitted.height.rounded(.up))
             let scene = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first
             let window = scene.map(UIWindow.init(windowScene:)) ?? UIWindow()
             window.frame = CGRect(origin: .zero, size: size)
