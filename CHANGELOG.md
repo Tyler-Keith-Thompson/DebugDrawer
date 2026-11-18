@@ -26,6 +26,7 @@ the entry becomes the GitHub release's notes.
 
 ### Fixed
 
+- DD-181: a Network request row whose method, status and badges (Mocked, Conditioned, Replay) leave its path less than about twenty characters' width puts the path on a line of its own across the row, with the duration beside the status, and the badges on a line of their own too when they don't fit beside the status, rather than wrapping the path a letter or two a line in an iPad's drawer.
 - DD-175: Notifications' Pending and Delivered lists no longer show every notification in full, which with dozens of them made the plugin thousands of points tall and buried the token, settings and composer: each notification is one line, its title and time, that opens to its subtitle, body, identifier, details and `userInfo`, and each list shows its newest five until Show All.
 - DD-219: Hang Detector reads a stack frame whose image name has spaces (`My App`) with that name, and a frame in an Objective-C class method (`+[NSException raise:format:]`) with that method as its symbol, rather than showing the whole line or the address as the symbol.
 - DD-169: Crash Reports reads a stack frame whose image name has spaces (`My App`) with that name, and a frame in an Objective-C class method (`+[NSException raise:format:]`) with that method as its symbol, rather than showing the whole line or the address as the symbol.

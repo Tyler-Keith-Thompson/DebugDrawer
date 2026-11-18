@@ -52,6 +52,50 @@
         }
 
         @Test(
+            "In a drawer as narrow as the iPad's, a mocked, conditioned request's long path takes a line of its own and wraps at whole segments",
+            arguments: [ColorScheme.light, .dark]
+        )
+        func badgedRowInNarrowDrawer(colorScheme: ColorScheme) throws {
+            let start = Date(timeIntervalSinceReferenceDate: 800_000_000)
+            let entries = [
+                NetworkEntry(
+                    timestamp: start, method: "GET",
+                    url: "https://api.example.com/v2/accounts/8f14e45f/orders/1729/line-items/42/fulfillment-status",
+                    host: "api.example.com", path: "/v2/accounts/8f14e45f/orders/1729/line-items/42/fulfillment-status",
+                    requestHeaders: [:], requestBody: nil, statusCode: 200, duration: 2.142, isComplete: true,
+                    mockRuleName: "Fulfillment",
+                    conditionEffect: NetworkConditionEffect(profileName: "3G", latency: .milliseconds(2000), bandwidth: nil, failure: nil)
+                ),
+                NetworkEntry(
+                    timestamp: start, method: "POST", url: "https://api.example.com/v2/accounts/8f14e45f/orders",
+                    host: "api.example.com", path: "/v2/accounts/8f14e45f/orders", requestHeaders: [:], requestBody: nil,
+                    statusCode: 201, duration: 0.31, isComplete: true, mockRuleName: "New order"
+                ),
+                NetworkEntry(
+                    timestamp: start, method: "GET", url: "https://api.example.com/v1/users",
+                    host: "api.example.com", path: "/v1/users", requestHeaders: [:], requestBody: nil,
+                    statusCode: 200, duration: 0.142, isComplete: true
+                )
+            ]
+            let sut = VStack(spacing: 0) {
+                ForEach(entries) { entry in
+                    NetworkRequestRow(entry: entry, redaction: .standard, isSelected: false, onSelect: {})
+                }
+            }
+            // 316 pt: the drawer's panel width on an iPad (DrawerPanelLayout.regularWidth).
+            let renderer = ImageRenderer(content: sut
+                .frame(width: 316, alignment: .leading)
+                .padding()
+                .background(.background)
+                .environment(\.colorScheme, colorScheme))
+            renderer.scale = 2
+
+            let actual = try #require(renderer.nsImage)
+
+            assertSnapshot(of: actual, as: .image(perceptualPrecision: 0.98), named: "\(colorScheme)")
+        }
+
+        @Test(
             "A selected request shows its URL, time, size and status, then its query, timing, headers and body collapsed",
             arguments: [ColorScheme.light, .dark]
         )

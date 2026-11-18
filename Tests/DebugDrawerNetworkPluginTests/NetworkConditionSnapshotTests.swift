@@ -99,7 +99,7 @@
         }
 
         @Test(
-            "A conditioned, mocked request shows Mocked and Conditioned on a line below its status and, selected, the profile and what it did",
+            "A conditioned, mocked request shows Mocked and Conditioned beside its status, its path below and, selected, the profile and its effect",
             arguments: [ColorScheme.light, .dark]
         )
         func conditionedRow(colorScheme: ColorScheme) throws {

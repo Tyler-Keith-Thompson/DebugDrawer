@@ -20,7 +20,7 @@
         private static let textFieldPrecision: Float = 0.99
 
         @Test(
-            "A replay a mock answered shows Replay and Mocked under its method, and its detail links to the original, above the actions",
+            "A mocked replay shows Replay and Mocked beside its status, its path below, and its detail links to the original, above the actions",
             arguments: [ColorScheme.light, .dark]
         )
         func replayRow(colorScheme: ColorScheme) throws {

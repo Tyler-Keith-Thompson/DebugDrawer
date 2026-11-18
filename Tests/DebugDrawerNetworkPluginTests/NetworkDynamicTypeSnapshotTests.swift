@@ -67,6 +67,48 @@
             assertSnapshot(of: actual, as: .image(perceptualPrecision: 0.98), named: "accessibility3")
         }
 
+        @Test("In the iPad's drawer at the default text size, a mocked, conditioned request's long path takes a line of its own")
+        func badgedRowInNarrowDrawer() throws {
+            let entry = NetworkEntry(
+                timestamp: Date(timeIntervalSinceReferenceDate: 800_000_000), method: "GET",
+                url: "https://api.example.com/v2/accounts/8f14e45f/orders/1729/line-items/42/fulfillment-status",
+                host: "api.example.com", path: "/v2/accounts/8f14e45f/orders/1729/line-items/42/fulfillment-status",
+                requestHeaders: [:], requestBody: nil, statusCode: 200, duration: 2.142, isComplete: true,
+                mockRuleName: "Fulfillment",
+                conditionEffect: NetworkConditionEffect(profileName: "3G", latency: .milliseconds(2000), bandwidth: nil, failure: nil)
+            )
+            let sut = NetworkRequestRow(entry: entry, redaction: .standard, isSelected: false, onSelect: {})
+            // 316 pt: the drawer's panel width on an iPad (DrawerPanelLayout.regularWidth).
+            let controller = UIHostingController(rootView: sut
+                .frame(width: 316, alignment: .leading)
+                // No height proposed, as the drawer's scroll view proposes none.
+                .fixedSize(horizontal: false, vertical: true)
+                .padding()
+                .background(.background)
+                .environment(\.dynamicTypeSize, .large))
+            // No safe area: the window's status bar inset would lay the view out shorter than it
+            // measured, overlapping its rows.
+            controller.safeAreaRegions = []
+            let measured = controller.sizeThatFits(in: CGSize(width: 348, height: 8000))
+            let scene = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first
+            let window = scene.map(UIWindow.init(windowScene:)) ?? UIWindow()
+            window.frame = CGRect(origin: .zero, size: measured)
+            window.rootViewController = controller
+            window.overrideUserInterfaceStyle = .light
+            window.isHidden = false
+            controller.view.frame = window.bounds
+            window.layoutIfNeeded()
+            let format = UIGraphicsImageRendererFormat()
+            format.scale = 2
+
+            let actual = UIGraphicsImageRenderer(size: measured, format: format).image { context in
+                controller.view.layer.render(in: context.cgContext)
+            }
+            window.isHidden = true
+
+            assertSnapshot(of: actual, as: .image(perceptualPrecision: 0.98), named: "large")
+        }
+
         @Test("A selected request stays readable at a large accessibility text size")
         func selectedRow() throws {
             let metrics = NetworkTimingMetrics(
