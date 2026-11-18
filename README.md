@@ -667,6 +667,28 @@ past comments and fragments; a batch shows its first two names and how many more
 parameter. An anonymous operation, a body that isn't JSON and one over 1 MB show no name. There is
 nothing to install beyond `installNetwork()`.
 
+### Location: a fixed coordinate or a route, without leaving your desk
+
+`installLocation()` swaps `CLLocationManager`'s location methods, so call it at startup, before
+the app starts location updates. With Spoof Location on and a coordinate typed, picked from the
+presets or played from a GPX route, a manager that calls `startUpdatingLocation` gets that
+location instead of real updates, then each new coordinate or route point as it changes;
+`requestLocation` and `location` answer with it too. A manager already updating when spoofing
+begins stops getting real updates, and turning spoofing off starts them again. The switch and the
+coordinate are kept across launches, so spoofing is in effect from the next launch's
+`installLocation()`. A coordinate out of range (latitude beyond ±90, longitude beyond ±180) isn't
+applied.
+
+Only `CLLocationManager`'s location updates are spoofed. These still report the real location,
+which on the iOS simulator is the one Xcode or `xcrun simctl location` sets:
+
+- `CLLocationUpdate.liveUpdates()` and `CLMonitor`: no public API reaches what they yield.
+- MapKit's user location (`showsUserLocation`, `UserAnnotation`, `MapUserLocationButton`).
+- Region monitoring, significant-change and visit updates, and heading.
+
+Authorization isn't simulated: `authorizationStatus` is the real one, and a spoofed location is
+delivered whether or not the app is authorized.
+
 ### Tweaks: the app's own debug settings
 
 The Tweaks plugin shows the settings the app declares: toggles, pickers over an enumeration or a

@@ -4,9 +4,9 @@ import SwiftUI
 // The macOS example has its own copy of this file: each app is its own module, and the examples
 // share no code.
 
-/// A location manager of the app's own, created as the app creates one, and the last location its
-/// delegate was given. With spoofing on, the Location plugin's coordinate or route reaches it.
-/// It asks for no permission and starts no updates, so it shows only what the plugin delivers.
+/// A location manager of the app's own, created and started as an app starts one, and the last
+/// location its delegate was given: the real one, or with spoofing on, the Location plugin's
+/// coordinate or route.
 @MainActor
 final class ExampleLocationModel: NSObject, ObservableObject, CLLocationManagerDelegate {
     @Published private(set) var latest: CLLocation?
@@ -16,6 +16,8 @@ final class ExampleLocationModel: NSObject, ObservableObject, CLLocationManagerD
     override init() {
         super.init()
         manager.delegate = self
+        manager.requestWhenInUseAuthorization()
+        manager.startUpdatingLocation()
     }
 
     nonisolated func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
@@ -40,7 +42,7 @@ struct ExampleLocationReadout: View {
         VStack(alignment: .leading, spacing: 4) {
             Text(model.latest.map { String(format: "%.5f, %.5f", $0.coordinate.latitude, $0.coordinate.longitude) } ?? "No location yet")
                 .font(.body.monospacedDigit())
-            Text(model.latest.map(Self.motion(of:)) ?? "Turn on Spoof Location in the drawer, or play a route.")
+            Text(model.latest.map(Self.motion(of:)) ?? "Allow location, or turn on Spoof Location in the drawer.")
                 .font(.subheadline.monospacedDigit())
                 .foregroundStyle(.secondary)
             Text(model.latest.map { "Update \(model.count) at \($0.timestamp.formatted(date: .omitted, time: .standard))" } ?? "No updates")
