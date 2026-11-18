@@ -83,7 +83,7 @@
                 // A window of the drawer's own (DrawerChildPanel, DrawerSceneWindow), so sheets and
                 // alerts the app presents stay under it. Mac Catalyst takes this branch: its scenes
                 // are UIKit's, and the drawer's window draws over the scene's others there too.
-                background { DrawerWindowAttacher(drawer: drawer) }
+                background { DrawerWindowReader { drawer.attach(to: $0) } }
             #elseif os(visionOS)
                 // An ornament, not a separate window: it needs no scene from the host (a window
                 // would need a WindowGroup the app declares and an openWindow call), it moves
@@ -145,29 +145,51 @@
     // MARK: - Local plugin modifier
 
     /// Attaches a local plugin to this view's lifecycle.
-    /// The plugin appears in the drawer when this view is on screen
-    /// and is removed when the view disappears — but only if no newer
-    /// view has already replaced the registration.
+    /// The plugin appears in the drawer of the window this view is in while the view is on
+    /// screen, and is removed when the view disappears — but only if no newer view in that window
+    /// has already replaced the registration.
     ///
     /// Re-registers automatically when the plugin's `contentIdentifier` changes,
     /// so this works regardless of where `.id()` is placed in the chain.
     struct LocalPluginModifier<P: DebugDrawerPlugin>: ViewModifier {
         let plugin: P
-        @State private var token: UUID?
+        @State private var registration = LocalPluginRegistration()
 
         func body(content: Content) -> some View {
             content
-                .onAppear {
-                    token = DebugDrawer.shared.registerLocal(plugin)
-                }
-                .onDisappear {
-                    if let token {
-                        DebugDrawer.shared.unregisterLocal(id: plugin.id, token: token)
-                    }
-                }
-                .onChange(of: plugin.contentIdentifier) { _, _ in
-                    token = DebugDrawer.shared.registerLocal(plugin)
-                }
+                #if os(macOS) || os(iOS)
+                    .background { DrawerWindowReader { registration.move(to: DebugDrawer.scope(of: $0)) } }
+                #endif
+                .onAppear { registration.register(plugin) }
+                .onDisappear { registration.unregister(id: plugin.id) }
+                .onChange(of: plugin.contentIdentifier) { _, _ in registration.register(plugin) }
+        }
+    }
+
+    /// A local plugin's registration from one view: its token while the view is on screen, and the
+    /// window the view is in, once known. A class, so learning the window redraws nothing.
+    @MainActor
+    private final class LocalPluginRegistration {
+        private var token: UUID?
+        /// The view's window (on iOS, scene); `nil` until the view joins one, and on the platforms
+        /// with one drawer, where the plugin is listed in it.
+        private var scope: ObjectIdentifier?
+
+        func register(_ plugin: some DebugDrawerPlugin) {
+            token = DebugDrawer.shared.registerLocal(plugin, scope: scope)
+        }
+
+        func unregister(id: String) {
+            guard let token else { return }
+            DebugDrawer.shared.unregisterLocal(id: id, token: token)
+            self.token = nil
+        }
+
+        /// The view joined the window `scope` identifies: its plugin moves to that window's drawer.
+        func move(to scope: ObjectIdentifier) {
+            self.scope = scope
+            guard let token else { return }
+            DebugDrawer.shared.moveLocal(token: token, to: scope)
         }
     }
 
@@ -190,9 +212,10 @@
             modifier(DebugDrawerModifier())
         }
 
-        /// Adds `plugin` to the drawer while this view is on screen.
+        /// Adds `plugin` to the drawer of the window this view is in while the view is on screen.
         ///
-        /// The plugin is registered when the view appears, registered again when its
+        /// Each window (on iOS, each scene) has a drawer of its own, which lists the global plugins
+        /// and the local plugins of its own views only. The plugin is registered when the view appears, registered again when its
         /// ``DebugDrawerPlugin/contentIdentifier`` changes, and removed when the view disappears,
         /// unless a newer view has registered a plugin with the same ID since. In release builds it
         /// returns the view unchanged.

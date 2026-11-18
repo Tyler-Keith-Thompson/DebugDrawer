@@ -79,7 +79,10 @@ opens, the plugins' `install*()` calls install nothing, and `.debugDrawer()` and
 The drawer opens in a window of its own, above the app's sheets and alerts: on macOS a panel along
 the trailing edge of the window, on iOS a window above the scene's, at 316 points wide or, where
 the window is narrower than two of those (an iPhone in portrait), as wide as the window. Each
-window's drawer opens and closes on its own; `toggle()` and `isOpen` act on the key window's. A
+window's drawer opens and closes on its own; `toggle()` and `isOpen` act on the key window's
+(on iPadOS, the scene with the key window, or else the foreground-active one), and `toggle(in:)`
+on the `NSWindow` or `UIWindowScene` it is given, attaching it first if it isn't yet. The plugin
+registry is shared, but each window's drawer lists only the local plugins of its own views. A
 UIKit or AppKit app without `debugDrawer()` attaches it with `DebugDrawer.shared.attach(to:)`,
 passing each `UIWindowScene` or `NSWindow`, and gets the same drawer with every global plugin (the
 HUD and the toasts are drawn by `debugDrawer()`, so such a window shows neither). A section header's chevron, or the jump bar's menu, shows

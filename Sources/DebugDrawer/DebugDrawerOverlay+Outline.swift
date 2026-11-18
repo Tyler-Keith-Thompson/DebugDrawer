@@ -50,7 +50,7 @@
         }
 
         var sections: [DrawerSection] {
-            layout.sections(local: drawer.localPlugins, global: drawer.globalPlugins)
+            layout.sections(local: localPlugins, global: drawer.globalPlugins)
         }
 
         /// The sections as the outline lists them: the selected tab's, and only plugins with

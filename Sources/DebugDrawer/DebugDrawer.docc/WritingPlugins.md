@@ -58,6 +58,8 @@ struct OrderDetailView: View {
 ```
 
 The modifier registers the plugin when the view appears and removes it when the view disappears.
+In an app with several windows (on iPadOS, scenes), the plugin is listed only in the drawer of the
+window its view is in.
 A plugin that carries data the view changes declares a
 ``DebugDrawerPlugin/contentIdentifier`` that changes with it, here the order's ID; the modifier
 registers the plugin again whenever it changes. When a new view registers a plugin with the same

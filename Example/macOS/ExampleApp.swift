@@ -52,6 +52,8 @@ struct FolderReportUploader: DebugDrawerReportUploader {
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var mainWindow: NSWindow?
     private var appKitWindow: ExampleAppKitWindowController?
+    /// The windows opened with Debug > New Window (or -NewWindow).
+    private let windows = ExampleWindows()
 
     static func main() {
         let app = NSApplication.shared
@@ -146,6 +148,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             ExampleAppKitWindowController.openDrawerIfAsked()
         } else {
             createMainWindow()
+            windows.openNewWindowIfAsked(behind: mainWindow)
         }
         ExamplePresentations.runAppModalAlertIfAsked()
         // Launched with -RunTestBench and action identifiers (or all), runs those test bench actions,
@@ -186,17 +189,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func createMainWindow() {
-        let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 900, height: 600),
-            styleMask: [.titled, .closable, .miniaturizable, .resizable],
-            backing: .buffered,
-            defer: false
-        )
-        window.title = "DebugDrawer Example"
-        window.contentViewController = NSHostingController(rootView: ExampleContentView())
-        window.setFrameAutosaveName("DebugDrawerExample")
-        window.makeKeyAndOrderFront(nil)
-        mainWindow = window
+        mainWindow = ExampleWindows.makeWindow(title: "DebugDrawer Example", autosaveName: "DebugDrawerExample")
     }
 
     private func setupMenuBar() {
@@ -226,6 +219,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
         notice.target = self
         debugMenu.addItem(withTitle: "Show AppKit Window", action: #selector(showAppKitWindow), keyEquivalent: "").target = self
+        debugMenu.addItem(withTitle: "New Window", action: #selector(ExampleWindows.newWindow), keyEquivalent: "n").target = windows
         debugMenuItem.submenu = debugMenu
         mainMenu.addItem(debugMenuItem)
 
@@ -261,6 +255,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 // MARK: - Example content
 
 struct ExampleContentView: View {
+    /// The window's title, which its local plugin shows in that window's drawer alone.
+    var windowName = "DebugDrawer Example"
     // Launched with -ShowTestBench, the window opens on the test bench.
     @State private var selectedItem: String? = ProcessInfo.processInfo.arguments.contains("-ShowTestBench") ? Self.testBench : nil
     private static let testBench = "Test Bench"
@@ -302,10 +298,14 @@ struct ExampleContentView: View {
         // The design comp over the app, beneath .debugDrawer(), so the drawer stays above it.
         .debugDesignOverlay()
         .debugGrid()
+        // Listed in this window's drawer only.
+        .debugLocalPlugin(ExampleWindowPlugin(windowName: windowName))
         .debugDrawer()
-        // Launched with -OpenDebugDrawer, the window opens with the drawer open, so it can be
-        // checked without a hand, like the iOS example.
+        // Launched with -OpenDebugDrawer, the key window opens with the drawer open, so it can be
+        // checked without a hand, like the iOS example. Only the main window's view asks, so with
+        // -NewWindow the drawer opens once, in whichever window is key.
         .onAppear {
+            guard windowName == "DebugDrawer Example" else { return }
             if ProcessInfo.processInfo.arguments.contains("-OpenDebugDrawer"), !DebugDrawer.shared.isOpen {
                 DebugDrawer.shared.toggle()
             }

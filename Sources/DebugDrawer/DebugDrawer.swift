@@ -58,15 +58,17 @@
         /// The plugins registered with ``registerGlobal(_:)``, in the order they were registered.
         @Published public private(set) var globalPlugins: [AnyDebugDrawerPlugin] = []
 
-        /// The plugins attached with `debugLocalPlugin(_:)` whose views are on screen, in the order
-        /// they first appeared.
+        /// The plugins attached with `debugLocalPlugin(_:)` whose views are on screen, in every
+        /// window, in the order they first appeared.
+        ///
+        /// Each window's drawer lists only the local plugins registered from views in that window,
+        /// and those registered with ``registerLocal(_:)``, which belong to no window.
         @Published public private(set) var localPlugins: [AnyDebugDrawerPlugin] = []
 
-        /// Tracks the token that owns each local plugin registration.
-        /// When a new view registers with the same plugin ID, it gets a new token.
-        /// The old view's onDisappear checks the token — if it doesn't match, the
-        /// unregister is a no-op (the new view already claimed it).
-        var localTokens: [String: UUID] = [:]
+        /// Every local plugin's registration: its token and the window whose views registered it.
+        var localRegistrations: [DrawerLocalRegistration] = [] {
+            didSet { localPlugins = localRegistrations.map(\.plugin) }
+        }
 
         private init() {}
 
@@ -91,24 +93,43 @@
 
         // MARK: - Local
 
-        /// Registers a plugin tied to a view, replacing any local plugin with the same ID.
+        /// Registers a plugin tied to a view, listed in every window's drawer, replacing any local
+        /// plugin with the same ID registered this way.
         ///
-        /// `debugLocalPlugin(_:)` calls this when its view appears; call it directly only to tie a
-        /// plugin to something other than a SwiftUI view.
+        /// `debugLocalPlugin(_:)` registers its plugin for the window its view is in; call this
+        /// directly only to tie a plugin to something other than a SwiftUI view.
         ///
         /// - Parameter plugin: The plugin to add.
         /// - Returns: The token that owns the registration; pass it to
         ///   ``unregisterLocal(id:token:)``. Only the latest registration's token removes the plugin.
         @discardableResult
         public func registerLocal<P: DebugDrawerPlugin>(_ plugin: P) -> UUID {
+            registerLocal(plugin, scope: nil)
+        }
+
+        /// Registers a plugin for the drawer of the window `scope` identifies (every window's when
+        /// `nil`), replacing a plugin with the same ID registered for that window.
+        ///
+        /// - Returns: The token that owns the registration.
+        func registerLocal(_ plugin: some DebugDrawerPlugin, scope: ObjectIdentifier?) -> UUID {
             let token = UUID()
-            localTokens[plugin.id] = token
-            if let idx = localPlugins.firstIndex(where: { $0.id == plugin.id }) {
-                localPlugins[idx] = AnyDebugDrawerPlugin(plugin)
-            } else {
-                localPlugins.append(AnyDebugDrawerPlugin(plugin))
-            }
+            let registration = DrawerLocalRegistration(token: token, plugin: AnyDebugDrawerPlugin(plugin), scope: scope)
+            localRegistrations = localRegistrations.placing(registration)
             return token
+        }
+
+        /// Moves the registration `token` owns to the drawer of the window `scope` identifies, as
+        /// its view learns which window it is in.
+        func moveLocal(token: UUID, to scope: ObjectIdentifier?) {
+            guard var registration = localRegistrations.first(where: { $0.token == token }), registration.scope != scope else { return }
+            registration.scope = scope
+            localRegistrations = localRegistrations.placing(registration)
+        }
+
+        /// The local plugins the drawer of the window `scope` identifies lists: those registered
+        /// from its views and from no window, each ID once.
+        func localPlugins(listedIn scope: ObjectIdentifier?) -> [AnyDebugDrawerPlugin] {
+            localRegistrations.plugins(listedIn: scope)
         }
 
         /// Removes a local plugin if `token` is its current registration's.
@@ -120,9 +141,7 @@
         ///   - id: The plugin's ``DebugDrawerPlugin/id``.
         ///   - token: What ``registerLocal(_:)`` returned.
         public func unregisterLocal(id: String, token: UUID) {
-            guard localTokens[id] == token else { return }
-            localTokens.removeValue(forKey: id)
-            localPlugins.removeAll { $0.id == id }
+            localRegistrations.removeAll { $0.token == token && $0.plugin.id == id }
         }
 
         /// Whether there are any plugins registered at all.

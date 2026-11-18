@@ -11,6 +11,7 @@ the entry becomes the GitHub release's notes.
 ### Added
 
 - DD-199: `NetworkEntry.requestBodySize`, `isRequestBodyTruncated` and `requestSizeLabel`: Network keeps each request body to `installNetwork(bodyLimit:)`, as it does each response body, marked truncated with its full size.
+- DD-5: `DebugDrawer.toggle(in:)` opens or closes the drawer in the `NSWindow` (macOS) or `UIWindowScene` (iOS) it is given, attaching it first if it isn't yet, whichever window is key; the macOS example opens a second window (Debug > New Window, or `-NewWindow` at launch).
 - DD-84: HTTP Cookies lists the cookies web views keep in `WKWebsiteDataStore.default()` beside `HTTPCookieStorage.shared`'s, where WebKit exists, each row marked URLSession or WKWebView, and deletes each from its own store.
 - DD-72: `DebugDrawer.unsafeInstallDiskIOWithInterposing()` and `DiskIOStore.unsafeInstallWithInterposing()`, with a new dynamic library product, `DebugDrawerDiskIOInterposer`: in an app that links it, Disk I/O also records Swift's `Data.write(to:)`, `Data(contentsOf:)` and `FileHandle.write(contentsOf:)` (each `read`, `write`, `pread` and `pwrite` on a regular file no swizzled method records), with their bytes and thread. It relies on dyld interposing, undocumented behaviour a new OS can change, so it is opt-in and debug-only; the README says how to link it and what it risks. `installDiskIO()` is unchanged.
 
@@ -21,6 +22,7 @@ the entry becomes the GitHub release's notes.
 
 ### Fixed
 
+- DD-5: with several windows or scenes, a local plugin is listed only in the drawer of the window whose views registered it, rather than in every window's drawer; the same plugin registered from two windows stays in each until its own view leaves. On iPadOS, `toggle()` acts on the scene holding the key window when two scenes are foreground-active, and on macOS, while the app isn't active, on its frontmost window rather than the last one attached.
 - DD-199: with Network installed, a request whose body is a stream reaches the server with every byte of it, rather than an empty body; a body past the body limit is sent from a temporary file, with its `Content-Length`.
 - DD-204: Network's Resend no longer sends only the kept part of a request body the log cut short: Resend is unavailable and says why, and Edit and Resend shows the body as cut, with its full size, and won't send until the body is edited or removed.
 - DD-200: on iOS, View Inspector swaps `UIWindow.sendEvent(_:)` once, in `installViewInspector()`, rather than when click indicators are first turned on.

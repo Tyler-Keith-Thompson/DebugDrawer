@@ -28,8 +28,9 @@
             /// `debugDrawer()` calls this for the window its view is in; call it yourself from an
             /// AppKit app, once the window exists. Attaching a window twice does nothing; a sheet
             /// attaches the window it is on. The drawer's open state belongs to the window:
-            /// ``isOpen`` and ``toggle()`` act on the key window's. The drawer detaches when the
-            /// window closes. In release builds it does nothing.
+            /// ``isOpen`` and ``toggle()`` act on the key window's, and ``toggle(in:)`` on the
+            /// window given. It lists the global plugins and the local plugins of the window's own
+            /// views. The drawer detaches when the window closes. In release builds it does nothing.
             ///
             /// - Parameter window: The app's window.
             public func attach(to window: NSWindow) {
@@ -37,10 +38,30 @@
                 pruneAttachments()
                 guard !attachments.contains(where: { $0.window === host }) else { return }
                 let presentation = adoptDetachedState()
+                presentation.scope = Self.scope(of: host)
                 let panel = DrawerChildPanel(host: host, drawer: self, presentation: presentation)
                 attachments.append(DrawerAttachment(presentation: presentation, window: host, panel: panel))
                 if presentation.isOpen { panel.drawerWillShow() }
                 presentationDidChange()
+            }
+
+            /// Opens the drawer in `window` if it is closed there and closes it if it is open,
+            /// whichever window is key; the other windows' drawers stay as they are.
+            ///
+            /// A window not attached yet is attached first, as ``attach(to:)`` does, so an AppKit
+            /// app can open the drawer in any of its windows with this call alone. A sheet's window
+            /// opens the drawer of the window the sheet is on. In release builds it does nothing.
+            ///
+            /// - Parameter window: The app's window.
+            public func toggle(in window: NSWindow) {
+                attach(to: window)
+                let scope = Self.scope(of: window)
+                attachments.first { $0.presentation.scope == scope }?.presentation.isOpen.toggle()
+            }
+
+            /// What identifies `window`'s drawer: the app's window behind it.
+            static func scope(of window: NSWindow) -> ObjectIdentifier {
+                ObjectIdentifier(appWindow(for: window))
             }
 
             /// The app's window behind `window`: the window a sheet is on, or the window a drawer
@@ -57,18 +78,39 @@
             /// `debugDrawer()` calls this for the scene its view is in; call it yourself from a
             /// UIKit app's scene delegate, once the scene has connected. Attaching a scene twice
             /// does nothing. The drawer's open state belongs to the scene: ``isOpen`` and
-            /// ``toggle()`` act on the scene in front. The drawer detaches when the scene
-            /// disconnects. In release builds it does nothing.
+            /// ``toggle()`` act on the scene in front, and ``toggle(in:)`` on the scene given. It
+            /// lists the global plugins and the local plugins of the scene's own views. The drawer
+            /// detaches when the scene disconnects. In release builds it does nothing.
             ///
             /// - Parameter scene: The app's window scene.
             public func attach(to scene: UIWindowScene) {
                 pruneAttachments()
                 guard !attachments.contains(where: { $0.scene === scene }) else { return }
                 let presentation = adoptDetachedState()
+                presentation.scope = Self.scope(of: scene)
                 let window = DrawerSceneWindow(scene: scene, drawer: self, presentation: presentation)
                 attachments.append(DrawerAttachment(presentation: presentation, scene: scene, window: window))
                 if presentation.isOpen { window.drawerWillShow() }
                 presentationDidChange()
+            }
+
+            /// Opens the drawer in `scene` if it is closed there and closes it if it is open,
+            /// whichever scene is in front; the other scenes' drawers stay as they are.
+            ///
+            /// A scene not attached yet is attached first, as ``attach(to:)`` does, so a UIKit app
+            /// can open the drawer in any of its scenes with this call alone. In release builds it
+            /// does nothing.
+            ///
+            /// - Parameter scene: The app's window scene.
+            public func toggle(in scene: UIWindowScene) {
+                attach(to: scene)
+                let scope = Self.scope(of: scene)
+                attachments.first { $0.presentation.scope == scope }?.presentation.isOpen.toggle()
+            }
+
+            /// What identifies `scene`'s drawer.
+            static func scope(of scene: UIWindowScene) -> ObjectIdentifier {
+                ObjectIdentifier(scene)
             }
 
             /// Hides and forgets the drawer of a scene that has disconnected.
@@ -95,8 +137,8 @@
         }
 
         #if os(macOS) || os(iOS)
-        /// Keeps ``isOpen`` the key window's as the key window changes, and on iOS forgets a
-        /// scene's drawer when the scene disconnects.
+        /// Keeps ``isOpen`` the key window's as the key window (on iOS, the scene in front)
+        /// changes, and on iOS forgets a scene's drawer when the scene disconnects.
         private func observeKeyWindowChanges() {
             guard windowObservers.isEmpty else { return }
             let center = NotificationCenter.default
@@ -105,9 +147,11 @@
                     MainActor.assumeIsolated { self?.presentationDidChange() }
                 })
             #elseif os(iOS)
-                windowObservers.append(center.addObserver(forName: UIScene.didActivateNotification, object: nil, queue: .main) { [weak self] _ in
-                    MainActor.assumeIsolated { self?.presentationDidChange() }
-                })
+                for name in [UIScene.didActivateNotification, UIWindow.didBecomeKeyNotification] {
+                    windowObservers.append(center.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
+                        MainActor.assumeIsolated { self?.presentationDidChange() }
+                    })
+                }
                 let disconnected = UIScene.didDisconnectNotification
                 windowObservers.append(center.addObserver(forName: disconnected, object: nil, queue: .main) { [weak self] notification in
                     guard let scene = notification.object as? UIScene else { return }
@@ -117,9 +161,13 @@
         }
         #endif
 
-        /// Forgets a window's drawer, as its window closes.
+        /// Forgets a window's drawer and the local plugins its views registered, as its window
+        /// closes.
         func detach(_ presentation: DrawerPresentation) {
             attachments.removeAll { $0.presentation === presentation }
+            if let scope = presentation.scope {
+                localRegistrations.removeAll { $0.scope == scope }
+            }
             presentationDidChange()
         }
 
@@ -137,30 +185,41 @@
             attachments.map(\.presentation) + [detachedPresentation]
         }
 
-        /// The drawer of the key window (on iOS, of the scene in front), or the last window's
-        /// attached when none is key, or the detached one when none is attached.
+        /// The drawer of the key window (the main window, or the frontmost while the app isn't
+        /// active; on iOS, of the scene with the key window, or else the foreground-active one), or
+        /// the last window's attached when none is, or the detached one when none is attached.
         var keyPresentation: DrawerPresentation {
-            let live = attachments.filter { attachment in
-                #if os(macOS)
-                    attachment.window != nil
-                #elseif os(iOS)
-                    attachment.scene != nil
-                #else
-                    true
-                #endif
-            }
             #if os(macOS)
+                let live = attachments.filter { $0.window != nil }
                 let app = NSApplication.shared
-                for candidate in [app.keyWindow, app.mainWindow].compactMap(\.self) {
-                    let window = Self.appWindow(for: candidate)
-                    if let attachment = live.first(where: { $0.window === window }) { return attachment.presentation }
-                }
+                // While the app isn't active it has no key or main window; its frontmost window
+                // is the one the user comes back to.
+                let front = ([app.keyWindow, app.mainWindow].compactMap(\.self) + app.orderedWindows).map(Self.scope(of:))
             #elseif os(iOS)
-                if let attachment = live.first(where: { $0.scene?.activationState == .foregroundActive }) {
-                    return attachment.presentation
-                }
+                let live = attachments.filter { $0.scene != nil }
+                let scenes = live.compactMap(\.scene)
+                // Two scenes side by side are both foreground-active; the one holding the app's key
+                // window is the one the user last touched.
+                let keyScenes = scenes.filter { $0.windows.contains(where: \.isKeyWindow) }
+                let activeScenes = scenes.filter { $0.activationState == .foregroundActive }
+                let front = (keyScenes + activeScenes).map(Self.scope(of:))
+            #else
+                let live = attachments
+                let front: [ObjectIdentifier] = []
             #endif
-            return live.last?.presentation ?? detachedPresentation
+            return Self.frontPresentation(of: live.map(\.presentation), front: front) ?? detachedPresentation
+        }
+
+        /// The drawer ``toggle()`` acts on: the first window in `front` that has one, or else the
+        /// last attached. The Mac and iOS share it, each naming its windows or scenes in front.
+        ///
+        /// - Parameters:
+        ///   - presentations: The attached windows' drawers, in the order they were attached.
+        ///   - front: The windows (scenes) the user is working in, most recent first.
+        /// - Returns: The drawer to act on, or `nil` when none is attached.
+        static func frontPresentation(of presentations: [DrawerPresentation], front: [ObjectIdentifier]) -> DrawerPresentation? {
+            let inFront = front.lazy.compactMap { scope in presentations.first { $0.scope == scope } }.first
+            return inFront ?? presentations.last
         }
 
         /// Brings ``isOpen`` up to date with the key window's drawer, and tells the views that
@@ -217,11 +276,21 @@
             ///
             /// - Parameter window: Ignored.
             func attach(to window: NSWindow) {}
+
+            /// Does nothing: release builds have no drawer to open.
+            ///
+            /// - Parameter window: Ignored.
+            func toggle(in window: NSWindow) {}
         #elseif os(iOS)
             /// Does nothing: release builds have no drawer.
             ///
             /// - Parameter scene: Ignored.
             func attach(to scene: UIWindowScene) {}
+
+            /// Does nothing: release builds have no drawer to open.
+            ///
+            /// - Parameter scene: Ignored.
+            func toggle(in scene: UIWindowScene) {}
         #endif
     }
 #endif

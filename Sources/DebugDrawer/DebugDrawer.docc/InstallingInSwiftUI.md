@@ -81,11 +81,37 @@ struct OrdersRootView: View {
 
 Each window has a drawer of its own, open or closed apart from the others;
 ``DebugDrawer/DebugDrawer/toggle()`` and ``DebugDrawer/DebugDrawer/isOpen`` act on the key
-window's.
+window's, as "Use the drawer with several windows" below describes.
 
 While the drawer is open, Cmd-K focuses its search field, Cmd-Option-Down and Cmd-Option-Up move
 between plugins, and Escape clears the search, then leaves a plugin shown alone, then closes the
 drawer. None of these exists while it is closed, so they never take a key from the app.
+
+### Use the drawer with several windows
+
+An app with several windows on the Mac, or several scenes on iPadOS, has one registry of plugins
+and one drawer per window. Each window's drawer opens and closes on its own, and lists the global
+plugins and the local plugins of the views in that window only: a local plugin attached with
+`debugLocalPlugin(_:)` in one window is not in another window's drawer.
+
+``DebugDrawer/DebugDrawer/toggle()`` acts on the key window's drawer on the Mac (while the app
+isn't active, the frontmost window's), and on iPadOS on the drawer of the scene holding the key
+window, or else the foreground-active scene. To open or close the drawer in a window of your
+choosing, pass it to `toggle(in:)`: an `NSWindow` on the Mac, a `UIWindowScene` on iOS. A window
+or scene not attached yet is attached first, so the call works on its own in an AppKit or UIKit
+app:
+
+```swift
+final class InvoiceWindowController: NSWindowController {
+    @objc func toggleDebugDrawer(_: Any?) {
+        guard let window else { return }
+        DebugDrawer.shared.toggle(in: window)
+    }
+}
+```
+
+On tvOS, visionOS and watchOS the drawer is drawn in the app's own window, so there is one drawer,
+which lists every local plugin.
 
 ### Find a plugin
 

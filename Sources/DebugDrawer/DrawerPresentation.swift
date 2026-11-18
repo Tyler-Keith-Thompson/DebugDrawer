@@ -6,7 +6,8 @@
     ///
     /// Each window (an `NSWindow` on the Mac, a `UIWindowScene` on iOS) has its own, so opening the
     /// drawer in one leaves the others as they were. ``DebugDrawer/isOpen`` and
-    /// ``DebugDrawer/toggle()`` act on the key window's; platforms that draw the drawer in the
+    /// ``DebugDrawer/toggle()`` act on the key window's, and it lists only the local plugins of
+    /// views in its own window; platforms that draw the drawer in the
     /// app's own window (tvOS, visionOS, watchOS) have one, the drawer's detached presentation.
     @MainActor
     final class DrawerPresentation: ObservableObject {
@@ -36,6 +37,10 @@
         /// Where the open panel is, in its window's coordinates, for the window's hit testing;
         /// `nil` while nothing is drawn.
         var panelFrame: CGRect?
+
+        /// The window (on iOS, the scene) this drawer is attached to, whose views' local plugins it
+        /// lists; `nil` for the detached drawer, which lists every local plugin.
+        var scope: ObjectIdentifier?
 
         /// The window the drawer is drawn in, told when to show and that the panel has gone.
         weak var host: (any DrawerPresentationHost)?

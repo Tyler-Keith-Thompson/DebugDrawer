@@ -168,7 +168,40 @@
 
     // Views render on the Mac; ViewInspector is linked on Apple platforms only.
     #if os(macOS)
+        import AppKit
         import ViewInspector
+
+        // InstallingInSwiftUI.md
+        final class InvoiceWindowController: NSWindowController {
+            @objc func toggleDebugDrawer(_: Any?) {
+                guard let window else { return }
+                DebugDrawer.shared.toggle(in: window)
+            }
+        }
+
+        @MainActor
+        @Suite("Documentation examples: windows")
+        struct DocumentationWindowExamplesTests {
+            @Test("Installing in SwiftUI: a window controller opens the drawer in its own window, attaching it first")
+            func toggleInWindow() throws {
+                // Borderless and far off screen: ordered in, so the drawer's panel can be, but never seen.
+                let window = NSWindow(
+                    contentRect: CGRect(x: -30000, y: -30000, width: 900, height: 600),
+                    styleMask: .borderless, backing: .buffered, defer: false
+                )
+                window.isReleasedWhenClosed = false
+                window.orderFront(nil)
+                defer { window.close() }
+                let sut = InvoiceWindowController(window: window)
+
+                sut.toggleDebugDrawer(nil)
+
+                // The drawer's panel is a child window of the window it opens in.
+                let actual = window.childWindows?.contains(where: \.isVisible) == true
+                DebugDrawer.shared.toggle(in: window)
+                #expect(actual)
+            }
+        }
 
         @MainActor
         @Suite("Documentation examples: views")

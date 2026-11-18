@@ -6,6 +6,13 @@
     extension DebugDrawer {
         /// Opens the key window's drawer if it is closed and closes it if it is open. The panel
         /// slides in and out unless the system reduces motion; nothing of the app's moves.
+        ///
+        /// Each window has a drawer of its own. On the Mac this acts on the key window's (while
+        /// the app isn't active, its frontmost window's); on iOS
+        /// and iPadOS on the drawer of the scene holding the key window, or else of the
+        /// foreground-active scene; the other windows' drawers stay as they are. With no window
+        /// attached, it opens the drawer the first window attached shows. To act on a window of
+        /// your choosing, call `toggle(in:)`.
         public func toggle() {
             keyPresentation.isOpen.toggle()
         }

@@ -214,7 +214,12 @@
         }
 
         var allPlugins: [AnyDebugDrawerPlugin] {
-            drawer.localPlugins + drawer.globalPlugins
+            localPlugins + drawer.globalPlugins
+        }
+
+        /// The local plugins of this window's views, and those registered from no window.
+        var localPlugins: [AnyDebugDrawerPlugin] {
+            drawer.localPlugins(listedIn: presentation.scope)
         }
 
         /// The plugin shown alone, while it is still registered; `nil` in the outline.
