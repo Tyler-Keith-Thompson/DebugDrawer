@@ -16,7 +16,7 @@ is a library of its own:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/Tyler-Keith-Thompson/DebugDrawer", from: "0.1.1"),
+    .package(url: "https://github.com/Tyler-Keith-Thompson/DebugDrawer", from: "0.1.2"),
 ],
 ```
 

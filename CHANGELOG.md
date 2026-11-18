@@ -8,6 +8,8 @@ the entry becomes the GitHub release's notes.
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-11-17
+
 ### Added
 
 - DD-30: Analytics plugin: the analytics events an app records, live, with search, detail and JSON export.
@@ -60,6 +62,24 @@ the entry becomes the GitHub release's notes.
   (`IOEvent.error`); totals (`DiskIOStore.totals`, `DiskIOTotals`) count every call since Clear;
   calls reach the main actor in batches; the drawer's own file work is left out, and a plugin marks
   its own with `DebugDrawerActivity.isDrawerWork`; disk space is read off the main thread.
+- DD-73: the drawer opens in a window of its own, above the app's sheets and alerts: a child panel
+  beside the window on macOS, an overlay window per scene on iOS. It is 316 points wide, or the
+  full width at compact widths. A plugin chosen from its header, the jump bar or search shows alone
+  at full height with a way back. `DebugDrawer.attach(to:)` attaches a window or scene the app
+  hosts itself, and `.debugDrawer()` attaches its own; `.debugDrawer()` no longer animates the
+  app's content.
+- DD-62: Network forwards every request through one shared session, no longer keeps intercepted
+  requests alive, and records at most `bodyLimit` bytes of each response body (1 MiB by default,
+  `installNetwork(bodyLimit:)`), with `NetworkEntry.responseBodySize` and
+  `isResponseBodyTruncated`.
+- DD-75: Performance shows a blocked main thread as dropped frames and a lower frame rate, reads the
+  real memory footprint and its lifetime peak, and Performance and Energy sample only while their
+  view or the HUD readout is on screen.
+- DD-78: UserDefaults lists the app's persistent domain, keys like `CountryCode` and
+  `NSFWFilterEnabled` included; registered, launch-argument and global keys show under Show Other
+  Domains, read-only with their source; an edited integer stays an integer and a real a real.
+- DD-83: the README and doc comments describe each plugin as it behaves, say which plugins build
+  on which platforms, and what each plugin needs from the app.
 
 ### Removed
 
@@ -79,6 +99,14 @@ the entry becomes the GitHub release's notes.
 - DD-182: the Network snapshot tests of hosted text fields no longer fail at random.
 - DD-187: the Deep Link Tester's userInfo rows fit an iPad's drawer at every text size.
 - DD-79: File Browser lists the app's own folders before they exist, says when they are empty, shows a refused delete and why, and keeps the folder shown and its items' identities across a refresh.
+- DD-67: Location's spoofed coordinate reaches a location manager the app started before spoofing
+  was turned on, holds after a relaunch, and turning spoofing off gives the app its real updates
+  back; its swizzles are installed only by `installLocation()`.
+- DD-66: on macOS, a line an app prints shows whole in the Console even when the pipe delivers it
+  in pieces, multi-byte characters included.
+- DD-192: on macOS, each printed line reaches the Console, and Xcode's console, as soon as it is
+  printed.
+- DD-69: a delete the keychain refuses shows "Keychain refused" with its reason.
 
 ## [0.1.1] - 2026-11-16
 
