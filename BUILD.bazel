@@ -17,6 +17,7 @@ SIMULATOR_TEST_PACKAGES = []
 APP_TARGETS = [
     "//Example:ExampleApp_macOS",
     "//Example:ExampleApp_iOS",
+    "//Example:ExampleApp_visionOS",
 ]
 
 # Test bundles are derived from the directory layout rather than listed: a directory under
