@@ -1,65 +1,74 @@
 #if DEBUG
     @testable import DebugDrawer
     @testable import DebugDrawerNetworkPlugin
-    import XCTest
+    import Foundation
+    import Testing
 
     @MainActor
-    final class NetworkPluginTests: XCTestCase {
-        func testNetworkEntryCreation() {
+    @Suite(.timeLimit(.minutes(1)))
+    struct NetworkPluginTests {
+        @Test("An entry keeps the method and host it was made with, and starts incomplete")
+        func networkEntryCreation() {
             let entry = NetworkEntry(
                 timestamp: Date(), method: "GET", url: "https://example.com/api",
                 host: "example.com", path: "/api",
                 requestHeaders: ["Accept": "application/json"],
                 requestBody: nil, isComplete: false
             )
-            XCTAssertEqual(entry.method, "GET")
-            XCTAssertEqual(entry.host, "example.com")
-            XCTAssertFalse(entry.isComplete)
+            #expect(entry.method == "GET")
+            #expect(entry.host == "example.com")
+            #expect(!entry.isComplete)
         }
 
-        func testResponseSizeLabel() {
+        @Test("The response size label is a dash with no body, then bytes, then kilobytes")
+        func responseSizeLabel() {
             var entry = NetworkEntry(
                 timestamp: Date(), method: "GET", url: "", host: "", path: "",
                 requestHeaders: [:], requestBody: nil, isComplete: true
             )
-            XCTAssertEqual(entry.responseSizeLabel, "—")
+            #expect(entry.responseSizeLabel == "—")
 
             entry.responseBody = Data(repeating: 0, count: 512)
-            XCTAssertEqual(entry.responseSizeLabel, "512 B")
+            #expect(entry.responseSizeLabel == "512 B")
 
             entry.responseBody = Data(repeating: 0, count: 2048)
-            XCTAssertEqual(entry.responseSizeLabel, "2 KB")
+            #expect(entry.responseSizeLabel == "2 KB")
         }
 
-        func testDurationLabel() {
+        @Test("The duration label is an ellipsis with no duration, milliseconds under a second, and seconds above")
+        func durationLabel() {
             var entry = NetworkEntry(
                 timestamp: Date(), method: "GET", url: "", host: "", path: "",
                 requestHeaders: [:], requestBody: nil, isComplete: true
             )
-            XCTAssertEqual(entry.durationLabel, "...")
+            #expect(entry.durationLabel == "...")
 
             entry.duration = 0.050
-            XCTAssertEqual(entry.durationLabel, "50ms")
+            #expect(entry.durationLabel == "50ms")
 
             entry.duration = 1.5
-            XCTAssertEqual(entry.durationLabel, "1.50s")
+            #expect(entry.durationLabel == "1.50s")
         }
 
-        func testNetworkStoreFilterStatus() {
-            let store = NetworkStore.shared
+        // A store of its own: clearing the shared one would drop the requests the interception
+        // suites are waiting to see logged.
+        @Test("A cleared store shows no entries, and its status filter starts at All")
+        func networkStoreFilterStatus() {
+            let store = NetworkStore(ignoreStorage: FakeNetworkIgnoreListStorage())
             store.clear()
-            XCTAssertEqual(store.filteredEntries.count, 0)
-            XCTAssertEqual(store.filterStatus, .all)
+            #expect(store.filteredEntries.isEmpty)
+            #expect(store.filterStatus == .all)
         }
 
-        func testPrettyPrintJSON() {
+        @Test("A JSON response body is pretty-printed with its keys")
+        func prettyPrintJSON() throws {
             var entry = NetworkEntry(
                 timestamp: Date(), method: "POST", url: "", host: "", path: "",
                 requestHeaders: [:], requestBody: nil, isComplete: true
             )
             entry.responseBody = Data("{\"key\":\"value\"}".utf8)
-            XCTAssertNotNil(entry.prettyResponseBody)
-            XCTAssertTrue(entry.prettyResponseBody!.contains("key"))
+            let pretty = try #require(entry.prettyResponseBody)
+            #expect(pretty.contains("key"))
         }
     }
 #endif

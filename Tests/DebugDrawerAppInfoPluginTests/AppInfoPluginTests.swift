@@ -1,26 +1,31 @@
 #if DEBUG
     @testable import DebugDrawer
     @testable import DebugDrawerAppInfoPlugin
-    import XCTest
+    import Foundation
+    import Testing
 
     @MainActor
-    final class AppInfoPluginTests: XCTestCase {
-        func testAppMetricsRefresh() {
+    @Suite(.timeLimit(.minutes(1)))
+    struct AppInfoPluginTests {
+        @Test("Refreshing the shared metrics gives a memory footprint and an uptime above zero")
+        func appMetricsRefresh() throws {
             let metrics = AppMetrics.shared
             metrics.refresh()
-            XCTAssertGreaterThan(metrics.footprintMB, 0)
-            XCTAssertGreaterThan(try XCTUnwrap(metrics.uptime), 0)
+            #expect(metrics.footprintMB > 0)
+            #expect(try #require(metrics.uptime) > 0)
         }
 
-        func testPluginConformance() {
+        @Test("The plugin is titled App Info, with the info.circle icon")
+        func pluginConformance() {
             let plugin = AppInfoPlugin()
-            XCTAssertEqual(plugin.title, "App Info")
-            XCTAssertEqual(plugin.icon, "info.circle")
+            #expect(plugin.title == "App Info")
+            #expect(plugin.icon == "info.circle")
         }
 
-        func testMachineHardwareName() {
+        @Test("The machine's hardware name is not empty")
+        func machineHardwareName() {
             let name = ProcessInfo.processInfo.machineHardwareName
-            XCTAssertFalse(name.isEmpty)
+            #expect(!name.isEmpty)
         }
     }
 #endif

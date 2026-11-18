@@ -1,11 +1,12 @@
 #if DEBUG
     @testable import DebugDrawerAppInfoPlugin
     import SwiftUI
+    import Testing
     import ViewInspector
-    import XCTest
 
     @MainActor
-    final class AppInfoProcessStartTests: XCTestCase {
+    @Suite(.timeLimit(.minutes(1)))
+    struct AppInfoProcessStartTests {
         /// A wall clock the test moves by hand.
         private final class FakeClock {
             var now: Date
@@ -18,7 +19,8 @@
             return try view.inspect().findAll(ViewType.Text.self).map { try $0.string() }
         }
 
-        func testUptimeCountsFromProcessStartNotFromWhenMetricsAreCreated() throws {
+        @Test("Uptime counts from the process's start, not from when the metrics were created")
+        func uptimeCountsFromProcessStartNotFromWhenMetricsAreCreated() throws {
             let start = ProcessStart(date: Date(timeIntervalSince1970: 1_000_000), isTraced: false)
             let clock = FakeClock(start.date.addingTimeInterval(5))
             let early = AppMetrics(processStart: start, now: { clock.now })
@@ -28,45 +30,49 @@
             let late = AppMetrics(processStart: start, now: { clock.now })
             early.refresh()
 
-            XCTAssertEqual(late.uptime, 600)
-            XCTAssertEqual(early.uptime, 600)
-            XCTAssertTrue(try texts(late).contains("10m 0s"))
-            XCTAssertTrue(try texts(late).contains(AppInfoFacts.launchFormatter.string(from: start.date)),
-                          "Launched should show the process start, whenever the metrics were created")
+            #expect(late.uptime == 600)
+            #expect(early.uptime == 600)
+            #expect(try texts(late).contains("10m 0s"))
+            #expect(try texts(late).contains(AppInfoFacts.launchFormatter.string(from: start.date)),
+                    "Launched should show the process start, whenever the metrics were created")
         }
 
-        func testProcessStartComesFromKinfoProc() throws {
-            let start = try XCTUnwrap(ProcessStart.current(), "kinfo_proc gave no start time")
+        @Test("The process start comes from kinfo_proc, shortly before this test, and the shared metrics use it")
+        func processStartComesFromKinfoProc() throws {
+            let start = try #require(ProcessStart.current(), "kinfo_proc gave no start time")
             // This test process started before this test ran, and not long before.
-            XCTAssertLessThan(start.date, Date())
-            XCTAssertGreaterThan(start.date, Date().addingTimeInterval(-3600))
-            XCTAssertGreaterThan(try XCTUnwrap(AppMetrics.shared.uptime), 0)
-            XCTAssertEqual(AppMetrics.shared.processStart?.date, start.date)
+            #expect(start.date < Date())
+            #expect(start.date > Date().addingTimeInterval(-3600))
+            #expect(try #require(AppMetrics.shared.uptime) > 0)
+            #expect(AppMetrics.shared.processStart?.date == start.date)
         }
 
-        func testDebuggerRowIsComputedNotHardcoded() throws {
+        @Test("The Debugger row says Attached or Not attached from the process, and there is no hardcoded Debug row")
+        func debuggerRowIsComputedNotHardcoded() throws {
             let attached = AppMetrics(processStart: .init(date: Date(), isTraced: true), now: Date.init)
             let detached = AppMetrics(processStart: .init(date: Date(), isTraced: false), now: Date.init)
-            XCTAssertTrue(try texts(attached).contains("Attached"))
-            XCTAssertTrue(try texts(detached).contains("Not attached"))
-            XCTAssertFalse(try texts(detached).contains("Debug"), "the hardcoded Debug: Yes row is gone")
+            #expect(try texts(attached).contains("Attached"))
+            #expect(try texts(detached).contains("Not attached"))
+            #expect(try !texts(detached).contains("Debug"), "the hardcoded Debug: Yes row is gone")
         }
 
-        func testWithoutProcessStartUptimeAndLaunchShowADash() throws {
+        @Test("Without a process start, Uptime and Launched are listed with no made-up value")
+        func withoutProcessStartUptimeAndLaunchShowADash() throws {
             let metrics = AppMetrics(processStart: nil, now: Date.init)
-            XCTAssertNil(metrics.uptime)
+            #expect(metrics.uptime == nil)
             let shown = try texts(metrics)
-            XCTAssertTrue(shown.contains("Uptime"))
-            XCTAssertTrue(shown.contains("Launched"))
-            XCTAssertFalse(shown.contains("0s"), "no made-up uptime: \(shown)")
+            #expect(shown.contains("Uptime"))
+            #expect(shown.contains("Launched"))
+            #expect(!shown.contains("0s"), "no made-up uptime: \(shown)")
         }
 
-        func testSandboxRowIsShownOnlyOnMacOS() throws {
+        @Test("The Sandbox row is shown on macOS only")
+        func sandboxRowIsShownOnlyOnMacOS() throws {
             let shown = try texts(AppMetrics(processStart: nil, now: Date.init))
             #if os(macOS)
-                XCTAssertTrue(shown.contains("Sandbox"))
+                #expect(shown.contains("Sandbox"))
             #else
-                XCTAssertFalse(shown.contains("Sandbox"))
+                #expect(!shown.contains("Sandbox"))
             #endif
         }
     }

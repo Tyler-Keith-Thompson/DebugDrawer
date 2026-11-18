@@ -1,61 +1,72 @@
 #if DEBUG
     @testable import DebugDrawer
     @testable import DebugDrawerConsolePlugin
-    import XCTest
+    import Foundation
+    import Testing
 
+    // The store tests clear the shared store and read it back without suspending, on the main
+    // actor, so no other suite's line lands between the two.
     @MainActor
-    final class ConsolePluginTests: XCTestCase {
-        func testLogLineCreation() {
+    @Suite(.timeLimit(.minutes(1)))
+    struct ConsolePluginTests {
+        @Test("A log line keeps the text, source and level it was made with")
+        func logLineCreation() {
             let line = LogLine(timestamp: Date(), text: "hello", source: .stdout, level: .info)
-            XCTAssertEqual(line.text, "hello")
-            XCTAssertEqual(line.source, .stdout)
-            XCTAssertEqual(line.level, .info)
+            #expect(line.text == "hello")
+            #expect(line.source == .stdout)
+            #expect(line.level == .info)
         }
 
-        func testLogLineLevelComparable() {
-            XCTAssertTrue(LogLine.Level.debug < LogLine.Level.info)
-            XCTAssertTrue(LogLine.Level.info < LogLine.Level.error)
-            XCTAssertTrue(LogLine.Level.error < LogLine.Level.fault)
+        @Test("Levels order debug, info, error, fault")
+        func logLineLevelComparable() {
+            #expect(LogLine.Level.debug < LogLine.Level.info)
+            #expect(LogLine.Level.info < LogLine.Level.error)
+            #expect(LogLine.Level.error < LogLine.Level.fault)
         }
 
-        func testLogLineLevelLabels() {
-            XCTAssertEqual(LogLine.Level.error.label, "ERR")
-            XCTAssertEqual(LogLine.Level.fault.label, "FLT")
-            XCTAssertEqual(LogLine.Level.debug.label, "DBG")
-            XCTAssertNil(LogLine.Level.info.label)
-            XCTAssertNil(LogLine.Level.notice.label)
+        @Test("Error, fault and debug have the short labels ERR, FLT and DBG; info and notice have none")
+        func logLineLevelLabels() {
+            #expect(LogLine.Level.error.label == "ERR")
+            #expect(LogLine.Level.fault.label == "FLT")
+            #expect(LogLine.Level.debug.label == "DBG")
+            #expect(LogLine.Level.info.label == nil)
+            #expect(LogLine.Level.notice.label == nil)
         }
 
-        func testConsoleLogStoreCapacity() {
+        @Test("Clearing the store leaves no lines")
+        func consoleLogStoreCapacity() {
             let store = ConsoleLogStore.shared
             store.clear()
-            XCTAssertEqual(store.lines.count, 0)
+            #expect(store.lines.isEmpty)
         }
 
-        func testConsoleLogStoreFilterLevel() {
+        @Test("A cleared store filtered to errors shows no lines")
+        func consoleLogStoreFilterLevel() {
             let store = ConsoleLogStore.shared
             store.clear()
             store.filterLevel = .error
+            defer { store.filterLevel = .debug }
             // filteredLines should only include error+ level
-            XCTAssertEqual(store.filteredLines.count, 0)
-            store.filterLevel = .debug // reset
+            #expect(store.filteredLines.isEmpty)
         }
 
-        func testConsolePluginConformsToProtocol() {
+        @Test("The plugin is titled Console, with the terminal icon and an id")
+        func consolePluginConformsToProtocol() {
             let plugin = ConsolePlugin()
-            XCTAssertEqual(plugin.title, "Console")
-            XCTAssertEqual(plugin.icon, "terminal")
-            XCTAssertFalse(plugin.id.isEmpty)
+            #expect(plugin.title == "Console")
+            #expect(plugin.icon == "terminal")
+            #expect(!plugin.id.isEmpty)
         }
 
-        func testConsolePluginRegistration() {
+        @Test("Registering the plugin globally lists it among the drawer's global plugins")
+        func consolePluginRegistration() {
             let drawer = DebugDrawer.shared
             for plugin in drawer.globalPlugins { drawer.unregisterGlobal(id: plugin.id) }
 
             // Register the plugin directly without installing stdout capture
             // (install() redirects stdout which breaks the test runner)
             drawer.registerGlobal(ConsolePlugin())
-            XCTAssertTrue(drawer.globalPlugins.contains(where: { $0.title == "Console" }))
+            #expect(drawer.globalPlugins.contains(where: { $0.title == "Console" }))
         }
     }
 #endif
