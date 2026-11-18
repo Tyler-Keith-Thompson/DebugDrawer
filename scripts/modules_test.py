@@ -1,7 +1,7 @@
 """Tests of scripts/modules.py's check that no two snapshot references of one test target share a
 base name, which `just modules` (and so `just record-snapshots`) runs over every test target:
 rules_xcodeproj copies a target's references into one flat bundle, where two such names collide;
-and of the tags it gives the generated test targets."""
+of the tags it gives the generated test targets; and of what SwiftPM skips."""
 
 import importlib.machinery
 import importlib.util
@@ -124,6 +124,43 @@ class PerformanceTestTagTests(unittest.TestCase):
         actual = modules.test_build_bazel(name, [])
 
         self.assertNotIn("exclusive", actual)
+
+
+class SwiftPMPerformanceSkipTests(unittest.TestCase):
+    """SwiftPM builds the performance targets in debug but runs none of them (DD-188): `swift test`
+    skips every test whose identifier starts with one's module name."""
+
+    def test_the_skip_pattern_matches_a_swift_testing_test_in_every_performance_target(self):
+        pattern = re.compile(modules.swift_test_performance_skip())
+
+        actual = [name for name in modules.PERFORMANCE_TESTS
+                  if not pattern.search(modules.performance_target(name) + ".LeakDetectorOverheadTests/overhead()")]
+
+        self.assertEqual([], actual)
+
+    def test_the_skip_pattern_matches_an_xctest_test_in_a_performance_target(self):
+        pattern = re.compile(modules.swift_test_performance_skip())
+        identifier = modules.performance_target(modules.PERFORMANCE_TESTS[0]) + ".SpeedTests/testSpeed"
+
+        actual = pattern.search(identifier)
+
+        self.assertIsNotNone(actual)
+
+    def test_the_skip_pattern_spares_the_target_a_performance_target_was_split_from(self):
+        pattern = re.compile(modules.swift_test_performance_skip())
+        identifier = modules.PERFORMANCE_TESTS[0] + ".StoreTests/recordsAnEvent()"
+
+        actual = pattern.search(identifier)
+
+        self.assertIsNone(actual)
+
+    def test_the_skip_pattern_spares_a_suite_named_like_a_performance_target_elsewhere(self):
+        pattern = re.compile(modules.swift_test_performance_skip())
+        identifier = "DebugDrawerTests." + modules.performance_target(modules.PERFORMANCE_TESTS[0]) + "/runs()"
+
+        actual = pattern.search(identifier)
+
+        self.assertIsNone(actual)
 
 
 if __name__ == "__main__":

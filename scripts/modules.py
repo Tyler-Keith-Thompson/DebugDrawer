@@ -246,7 +246,10 @@ TEST_SIZES = {name: "medium" for name in [
 # same dependencies, in the same Bazel package. `--config=release` builds and runs only those:
 # every other test target and test library is tagged RELEASE_EXCLUDED_TAG, which .bazelrc filters
 # out under release. Debug runs both. A `.timeLimit` that only guards a small input against a hang
-# does not make a test speed-reliant.
+# does not make a test speed-reliant. SwiftPM builds the performance targets in debug but runs
+# none of them: `just spm-test-mac` skips them with swift_test_performance_skip() and the
+# xcodebuild stages (`just test-ios`, `just spm-catalyst-test`) with `-skip-testing:` for each of
+# performance_targets(), since a debug build beside every other test can't meet their budgets.
 PERFORMANCE_TESTS = [
     "DebugDrawerHangDetectorPluginTests",
     "DebugDrawerLeakDetectorPluginTests",
@@ -306,6 +309,19 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 def performance_target(name):
     """The speed-reliant target split from test target `name`: FlowsTests -> FlowsPerformanceTests."""
     return name.removesuffix("Tests") + "PerformanceTests"
+
+
+def performance_targets():
+    """Every speed-reliant target, in PERFORMANCE_TESTS order."""
+    return [performance_target(name) for name in PERFORMANCE_TESTS]
+
+
+def swift_test_performance_skip():
+    """The `swift test --skip` pattern matching every test in a performance target and no other.
+    SwiftPM matches it against each test's identifier, which starts with the target's module name
+    and a dot (`Module.Suite/test()`, `Module.Class/test`), so it is anchored there: a suite named
+    like a performance target in another target still runs."""
+    return "^(" + "|".join(performance_targets()) + r")\."
 
 
 def check():
@@ -1116,6 +1132,12 @@ if __name__ == "__main__":
         print("\n".join(CATALYST_MODULES))
     # `just spm-platform-test` asks for the schemes to test on a platform, which
     # `modules.py platform-test-schemes visionOS` writes and names.
+    # `just spm-test-mac` and the xcodebuild test recipes ask what to skip: SwiftPM runs no
+    # performance target (PERFORMANCE_TESTS).
+    elif sys.argv[1:2] == ["swift-test-performance-skip"]:
+        print(swift_test_performance_skip())
+    elif sys.argv[1:2] == ["performance-targets"]:
+        print("\n".join(performance_targets()))
     elif sys.argv[1:2] == ["platform-test-schemes"]:
         for name in TESTED_PLATFORMS[sys.argv[2]]:
             write(os.path.join(ROOT, ".swiftpm", "xcode", "xcshareddata", "xcschemes", f"{name}.xcscheme"), test_scheme(name))

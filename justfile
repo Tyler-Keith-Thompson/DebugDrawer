@@ -34,12 +34,18 @@ record-snapshots:
 # macOS doesn't scale text with Dynamic Type, so the large-text snapshots (under #if os(iOS)) run
 # on an iOS simulator through xcodebuild. xcodebuild hands the test process only the variables
 # prefixed TEST_RUNNER_, which is how record-snapshots asks it to record. The renderer draws at a
-# fixed width and scale, so any simulator gives the same references.
+# fixed width and scale, so any simulator gives the same references. Like every SwiftPM run, it
+# builds the performance targets in debug and runs none of them (PERFORMANCE_TESTS in
+# scripts/modules.py); Bazel runs them, optimized under `just test-release`.
 IOS_DESTINATION := env("IOS_DESTINATION", "platform=iOS Simulator,name=iPad Pro 13-inch (M5)")
 
 [doc('Run the SwiftPM tests on an iOS simulator (the Dynamic Type snapshots)')]
 test-ios *env="":
-    env {{env}} xcodebuild test -quiet -scheme DebugDrawer-Package -destination '{{IOS_DESTINATION}}' -derivedDataPath {{PROJECT_ROOT}}/.build/xcode-ios
+    #!/usr/bin/env bash
+    set -euo pipefail
+    skips=$(python3 {{PROJECT_ROOT}}/scripts/modules.py performance-targets | sed 's/^/-skip-testing:/')
+    env {{env}} xcodebuild test -quiet -scheme DebugDrawer-Package -destination '{{IOS_DESTINATION}}' \
+        -derivedDataPath {{PROJECT_ROOT}}/.build/xcode-ios $skips
 
 [doc('SwiftLint and a11y-check over every first-party target (tools/lint.bzl)')]
 lint:
@@ -167,22 +173,26 @@ spm-catalyst-example:
 # (APPLE_ONLY_PACKAGE_EXCLUDED_PLATFORMS in scripts/modules.py), and so do tests that make a UIKit
 # window: xctest runs them without an NSApplication. The test process runs on the Mac, so it gets
 # a temporary home folder as spm-test-mac's does; xcodebuild hands it the variables prefixed
-# TEST_RUNNER_.
-[doc('Run every test target through SwiftPM for Mac Catalyst')]
+# TEST_RUNNER_. The performance targets are built but not run, as in every SwiftPM run.
+[doc('Run every test target but the performance ones through SwiftPM for Mac Catalyst')]
 spm-catalyst-test:
     #!/usr/bin/env bash
     set -euo pipefail
+    skips=$(python3 {{PROJECT_ROOT}}/scripts/modules.py performance-targets | sed 's/^/-skip-testing:/')
     home=$(mktemp -d)
     trap 'rm -rf "$home"' EXIT
     xcodebuild test -quiet -scheme DebugDrawer-Package -destination 'platform=macOS,variant=Mac Catalyst' \
-        -derivedDataPath {{PROJECT_ROOT}}/.build/xcode-catalyst-test TEST_RUNNER_CFFIXED_USER_HOME="$home"
+        -derivedDataPath {{PROJECT_ROOT}}/.build/xcode-catalyst-test TEST_RUNNER_CFFIXED_USER_HOME="$home" $skips
 
 # Plugins keep their files in Application Support and Caches under the home folder, which on macOS
 # Foundation reads from CFFIXED_USER_HOME (never HOME), so the test process and every exit test's
 # child get a temporary one, removed afterwards. SwiftPM keeps its own caches and configuration
 # under the home folder too, so the tests are built with the real one and only the run moves.
 # The arguments pass through as given (positional), so a quoted filter such as "A|B" stays one.
-[doc('Run the SwiftPM tests on the Mac, in a temporary home folder (arguments go to swift test)')]
+# The performance targets (PERFORMANCE_TESTS in scripts/modules.py) are built but skipped: their
+# wall-clock budgets hold only in the optimized build Bazel runs each alone (`just test-release`),
+# not in a debug build beside every other test. Further --skip arguments add to that one.
+[doc('Run the SwiftPM tests on the Mac but the performance ones, in a temporary home folder (arguments go to swift test)')]
 [positional-arguments]
 spm-test-mac *args="":
     #!/usr/bin/env bash
@@ -190,9 +200,10 @@ spm-test-mac *args="":
     {{SWIFT}} build --build-tests
     home=$(mktemp -d)
     trap 'rm -rf "$home"' EXIT
-    CFFIXED_USER_HOME="$home" {{SWIFT}} test --skip-build "$@"
+    skip=$(python3 {{PROJECT_ROOT}}/scripts/modules.py swift-test-performance-skip)
+    CFFIXED_USER_HOME="$home" {{SWIFT}} test --skip-build --skip "$skip" "$@"
 
-[doc('Run the tests via SwiftPM: on the Mac (arguments go to swift test), then the visionOS ones in its simulator and every one for Mac Catalyst')]
+[doc('Run the tests via SwiftPM but the performance ones: on the Mac (arguments go to swift test), then the visionOS ones in its simulator and the rest for Mac Catalyst')]
 [positional-arguments]
 spm-test *args="":
     just spm-test-mac "$@"
