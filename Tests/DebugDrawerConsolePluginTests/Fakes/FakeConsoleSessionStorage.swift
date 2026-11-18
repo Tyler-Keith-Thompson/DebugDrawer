@@ -4,26 +4,25 @@
     import os
 
     /// Sessions in memory. Setting `failsReading` makes every read throw, as a file gone
-    /// unreadable would; `holdsAppends` makes each append wait until the test calls
-    /// `releaseAppend()`, after announcing itself on `appendsStarted`.
+    /// unreadable would; setting `holdsAppends` makes each append from then on wait until the
+    /// test calls `releaseAppend()`, after announcing itself on `appendsStarted`.
     final class FakeConsoleSessionStorage: ConsoleSessionStorage {
         struct ReadFailed: Error {}
 
         private struct State {
             var sessions: [String: Data] = [:]
             var failsReading = false
+            var holdsAppends = false
         }
 
         private let state: OSAllocatedUnfairLock<State>
-        private let holdsAppends: Bool
         private let gate = DispatchSemaphore(value: 0)
         private let started: AsyncStream<Void>.Continuation
         /// Yields once as each append begins, before it waits on the gate.
         let appendsStarted: AsyncStream<Void>
 
-        init(sessions: [String: Data] = [:], holdsAppends: Bool = false) {
+        init(sessions: [String: Data] = [:]) {
             state = OSAllocatedUnfairLock(initialState: State(sessions: sessions))
-            self.holdsAppends = holdsAppends
             (appendsStarted, started) = AsyncStream.makeStream()
         }
 
@@ -34,6 +33,11 @@
         var failsReading: Bool {
             get { state.withLock(\.failsReading) }
             set { state.withLock { $0.failsReading = newValue } }
+        }
+
+        var holdsAppends: Bool {
+            get { state.withLock(\.holdsAppends) }
+            set { state.withLock { $0.holdsAppends = newValue } }
         }
 
         /// Lets one held append go on.

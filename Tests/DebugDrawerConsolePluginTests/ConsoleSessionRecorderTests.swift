@@ -90,7 +90,7 @@
             let files = try FileManager.default.contentsOfDirectory(atPath: directory.path(percentEncoded: false))
 
             #expect(actual == expected)
-            #expect(files.sorted() == expected.sorted())
+            #expect(files.sorted() == (expected + [sut.currentName]).sorted())
         }
 
         @Test("Once the current session's writes take the sessions past maxBytes, the oldest earlier session is deleted, and only it")
@@ -109,9 +109,15 @@
             let sizes = try storage.sessionFiles().reduce(into: [String: Int]()) { $0[$1.name] = $1.byteCount }
             let oldestBytes = try #require(sizes[oldest.currentName])
             let newerBytes = try #require(sizes[newer.currentName])
-            // Room for both sessions at launch, and for the next one's header and line, as large
-            // as either's, only once one goes.
-            let tight = ConsoleSessionPersistence(maxBytes: oldestBytes + newerBytes + 10, storage: storage)
+            // A launch alone in a directory of its own writes only its header.
+            let probeDirectory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+            defer { try? FileManager.default.removeItem(at: probeDirectory) }
+            let probeStorage = _ConsoleSessionStorage(directory: probeDirectory)
+            let probe = ConsoleSessionRecorder(ConsoleSessionPersistence(storage: probeStorage), started: Date(timeIntervalSince1970: 1_800_000_120))
+            let headerBytes = try #require(probeStorage.sessionFiles().first { $0.name == probe.currentName }?.byteCount)
+            // Room for both sessions and the next one's header at launch, and for its line too,
+            // as large as either session's, only once one goes.
+            let tight = ConsoleSessionPersistence(maxBytes: oldestBytes + newerBytes + headerBytes + 10, storage: storage)
 
             let sut = ConsoleSessionRecorder(tight, started: Date(timeIntervalSince1970: 1_800_000_120))
             let atLaunch = await sut.previousSessions().map(\.id)
@@ -142,8 +148,9 @@
             }
             let sizes = try storage.sessionFiles().map(\.byteCount)
             let largest = sizes.max() ?? 0
-            // Room for two of the three, so only the oldest goes.
-            let maxBytes = 2 * largest + 1
+            // Room for two of the three and the launch's header, smaller than a session, so only
+            // the oldest goes.
+            let maxBytes = 3 * largest - 1
             let expected = [names[2], names[1]]
 
             let sut = ConsoleSessionRecorder(
@@ -154,7 +161,7 @@
             let files = try FileManager.default.contentsOfDirectory(atPath: directory.path(percentEncoded: false))
 
             #expect(actual == expected)
-            #expect(files.sorted() == expected.sorted())
+            #expect(files.sorted() == (expected + [sut.currentName]).sorted())
         }
 
         @Test("A current session that alone would pass maxBytes keeps the lines that fit, within the limit, and is never deleted")
@@ -271,11 +278,13 @@
 
         @Test("While a write is slow, at most capacity lines wait, the earliest going first")
         func boundedWhileWriting() async throws {
-            let storage = FakeConsoleSessionStorage(holdsAppends: true)
+            let storage = FakeConsoleSessionStorage()
             let sut = ConsoleSessionRecorder(
                 ConsoleSessionPersistence(storage: storage),
                 started: Date(timeIntervalSince1970: 1_800_000_000), capacity: 3
             )
+            // Held from after the header, which the recorder writes before it returns.
+            storage.holdsAppends = true
             var started = storage.appendsStarted.makeAsyncIterator()
             sut.record(LogLine(timestamp: Date(timeIntervalSince1970: 1_800_000_000), text: "line 0", source: .oslog, level: .info))
             await started.next()

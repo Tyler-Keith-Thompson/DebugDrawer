@@ -52,7 +52,7 @@ public extension DebugDrawer {
             // Started before capture begins, so the first line is written too, and once a launch,
             // so a second install doesn't start a second session.
             if ConsoleLogStore.shared.recorder == nil {
-                let recorder = ConsoleSessionRecorder(sessions)
+                let recorder = ConsoleSessionRecorder(sessions, ingestFilter: ConsoleLogStore.shared.ingestFilter)
                 ConsoleLogStore.shared.persist(to: recorder)
                 Task { await ConsoleSessionsModel.shared.start(recorder) }
             }

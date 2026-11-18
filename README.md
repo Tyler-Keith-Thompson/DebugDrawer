@@ -474,7 +474,7 @@ show them; the unified log of the current process holds no earlier launch's line
 line is written as it is captured, as logged: log text has no keys for the redaction rules to
 match, so the Console shows, copies and keeps it unmasked. A launch's session is a file of JSON
 Lines in Application Support, in the app's folder under `DebugDrawer/ConsoleSessions`: a header
-with the start and the app's version, then one line per log line, with its time, level, source,
+with the start, the app's version and the process, written at install, then one line per log line, with its time, level, source,
 os_log subsystem and category (left out when empty) and text, appended as it comes, so a crash mid-write costs at most the line being written, which is
 skipped on reading. Writing happens on a queue of its own, in batches, never on the main actor. By
 default 5 earlier sessions are kept in at most 20 MB; both are set at install:
@@ -490,6 +490,14 @@ in `maxBytes`, which is checked again as the current session grows. The current 
 deleted; a line that would take it alone past `maxBytes` isn't written. `ConsoleSessionPersistence.off`
 writes nothing and deletes what earlier launches kept. To keep sessions somewhere else, pass a
 `storage` of your own, a `ConsoleSessionStorage` (append, list, read and delete).
+
+The console reads the app's os_log lines from its unified log every two seconds, so a crash or a
+kill can come before it has read the last ones. On macOS, where the app may read the system's log
+(`OSLogStore(scope: .system)`; an app outside the App Sandbox, run by an administrator, may), the
+next launch reads those lines from it and adds them to the end of the earlier session (a launch
+that starts before the system has taken in a crashed process's last lines misses them). Elsewhere,
+and on iOS, where a process reads only its own log, a session keeps what its launch read. A session
+that kept no line and missed none is deleted at the next launch.
 
 While an earlier session is kept, the console offers Captured and Previous. Previous shows the
 newest earlier session, read-only, with a menu of the others by start and size, the app version

@@ -71,15 +71,14 @@
                 _ = await earlier.previousSessions()
                 names.append(earlier.currentName)
             }
-            let sut = ConsoleSessionsModel(recorder: ConsoleSessionRecorder(
-                ConsoleSessionPersistence(storage: storage), started: Date(timeIntervalSince1970: 1_800_000_600)
-            ))
+            let current = ConsoleSessionRecorder(ConsoleSessionPersistence(storage: storage), started: Date(timeIntervalSince1970: 1_800_000_600))
+            let sut = ConsoleSessionsModel(recorder: current)
             await sut.reload()
 
             await sut.delete([names[0]])
 
             #expect(sut.sessions.map(\.id) == [names[1]])
-            #expect(storage.sessions.keys.sorted() == [names[1]])
+            #expect(storage.sessions.keys.sorted() == [names[1], current.currentName])
         }
 
         @Test("With no recorder started, nothing is listed")
