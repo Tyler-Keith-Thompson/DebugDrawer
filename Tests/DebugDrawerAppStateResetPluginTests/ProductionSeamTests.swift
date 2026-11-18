@@ -5,8 +5,10 @@
     import Testing
 
     // The real conformers, against stores the tests make for themselves: a defaults suite and a
-    // URL cache of their own, and the keychain's queries. The simulator's keychain is exercised
-    // below, on iOS, where a test process has a keychain of its own.
+    // URL cache of their own, and the keychain's queries. The keychain itself is exercised by
+    // KeychainSeamTests, in the iOS simulator inside //tools/test_host (`just test`), the one
+    // runner with a keychain: the Mac's refuse an unsigned test bundle (errSecMissingEntitlement),
+    // and the login keychain is the user's, which no test touches.
     @MainActor
     @Suite(.timeLimit(.minutes(1)))
     struct ProductionSeamTests {

@@ -1,5 +1,7 @@
 # First-party Swift rule wrappers; see swift_rules.bzl.
 
+load("@rules_apple//apple/testing/default_runner:ios_xctestrun_runner.bzl", "ios_xctestrun_runner")
+load("@rules_shell//shell:sh_binary.bzl", "sh_binary")
 load(":python_test.bzl", "python_test")
 load(":visionos_test_runner.bzl", "visionos_test_runner")
 
@@ -22,6 +24,23 @@ python_test(
     data = [
         "//Sources/DebugDrawerColorVisionPlugin:shaders",
     ],
+)
+
+# Runs the iOS test bundles (TESTED_PLATFORMS in scripts/modules.py), hosted by //tools/test_host,
+# through xcodebuild in a new simulator that is deleted afterwards. rules_apple's ordered runner,
+# since its default one (xctestrunner) fails a run that holds only Swift Testing tests.
+ios_xctestrun_runner(
+    name = "ios_test_runner",
+    create_simulator_action = ":create_simulator",
+    # Any device the newest runtime supports; the tests size their own views.
+    device_type = "iPhone 17",
+    reuse_simulator = False,
+    visibility = ["//visibility:public"],
+)
+
+sh_binary(
+    name = "create_simulator",
+    srcs = ["create_simulator.sh"],
 )
 
 # Runs the visionOS test bundles (TESTED_PLATFORMS in scripts/modules.py) in a new simulator.

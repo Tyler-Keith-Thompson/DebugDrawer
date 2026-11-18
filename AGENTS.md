@@ -139,7 +139,10 @@ the *default* sections below where they differ:
   `just build` and `just build-spm` then build it for that platform's simulator. Core's tests also
   run on visionOS (`TESTED_PLATFORMS`): a test that can't run there (ViewInspector and
   SnapshotTesting don't build for it, `APPLE_ONLY_PACKAGE_EXCLUDED_PLATFORMS`) sits under an `#if`
-  that says why. On tvOS a view is
+  that says why. The Keychain and App State Reset tests also run in the iOS simulator under
+  `just test`, hosted by `//tools/test_host`, whose entitlements give them the keychain no Mac
+  test runner has; a test of the real keychain sits under `#if os(iOS) &&
+  targetEnvironment(simulator)` and never touches the Mac's. On tvOS a view is
   driven by focus: no pasteboard, keyboard shortcuts or drag, and Menu (`onExitCommand`) closes
   what is open. On watchOS the drawer is a full-screen list that navigates to each plugin's view
   (`DrawerWatchList`), so a plugin's body is a short column; there is no pasteboard, keyboard,

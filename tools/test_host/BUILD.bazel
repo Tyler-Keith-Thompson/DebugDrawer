@@ -1,0 +1,28 @@
+load("@rules_apple//apple:ios.bzl", "ios_application")
+load("//tools:swift_rules.bzl", "swift_library")
+
+swift_library(
+    name = "TestHostLibrary",
+    testonly = True,
+    srcs = ["TestHost.swift"],
+    module_name = "TestHost",
+    target_compatible_with = ["@platforms//os:ios"],
+)
+
+# The app the iOS unit tests (TESTED_PLATFORMS in scripts/modules.py) run inside, so they have an
+# application identifier and so a keychain of their own, which a test with no host lacks.
+ios_application(
+    name = "test_host",
+    testonly = True,
+    bundle_id = "com.debugdrawer.testhost",
+    bundle_name = "TestHost",
+    entitlements = "TestHost.entitlements",
+    families = [
+        "iphone",
+        "ipad",
+    ],
+    infoplists = ["Info.plist"],
+    minimum_os_version = "17.0",
+    visibility = ["//visibility:public"],
+    deps = [":TestHostLibrary"],
+)

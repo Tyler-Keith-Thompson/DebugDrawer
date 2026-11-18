@@ -4,10 +4,9 @@
     import Security
     import Testing
 
-    // No test runner has a keychain: an unsigned macOS test bundle, SwiftPM's runners and the iOS
-    // simulator's xctest all get errSecMissingEntitlement from SecItem* (DD-180). So the real
-    // keychain's calls are pinned by the exact dictionaries `_Keychain` hands SecItem*, and the
-    // round trip through SecItemCopyMatching is run in the iOS example app.
+    // The exact dictionaries `_Keychain` hands SecItem*, pinned on every runner. The round trip
+    // through the real keychain is KeychainSeamTests, which only Bazel's iOS run, inside
+    // //tools/test_host, has a keychain for.
     @MainActor
     @Suite(.timeLimit(.minutes(1)))
     struct KeychainQueryTests {

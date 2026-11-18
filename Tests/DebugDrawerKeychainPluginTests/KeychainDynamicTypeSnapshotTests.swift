@@ -1,5 +1,7 @@
-// iOS scales text with Dynamic Type, so the large-text snapshots run on the iOS simulator.
-#if os(iOS) && !targetEnvironment(macCatalyst)
+// iOS scales text with Dynamic Type, so the large-text snapshots run on the iOS simulator, through
+// SwiftPM (`just test-ios`); Bazel's iOS run links no SnapshotTesting, since its relative #filePath
+// can't lead the simulator to the references (BAZEL_TESTED_PLATFORM_EXCLUDED_PACKAGES).
+#if os(iOS) && !targetEnvironment(macCatalyst) && canImport(SnapshotTesting)
     @testable import DebugDrawerKeychainPlugin
     import SnapshotTesting
     import SwiftUI

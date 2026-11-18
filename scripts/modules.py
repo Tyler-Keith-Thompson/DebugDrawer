@@ -134,13 +134,28 @@ EXTRA_PLATFORMS = {
     "watchOS": ("10.0", ["DebugDrawer", "DebugDrawerAnalyticsPlugin", "DebugDrawerDatabaseBrowserPlugin", "DebugDrawerLocalizationPlugin"]),
 }
 
-# Test targets that also run in the simulator of a platform in EXTRA_PLATFORMS, by platform, each
-# testing only modules listed for it. Bazel runs each as a `<Name>_<platform>` unit test (`just
-# test`), with //tools:<platform>_test_runner; SwiftPM runs each through a scheme of its own that
-# holds just that test target, so no unported module builds (`just spm-platform-test`, which `just
-# spm-test` runs). Tests that can't run there sit under an `#if` that says why.
+# Test targets that also run in the simulator of iOS or of a platform in EXTRA_PLATFORMS, by
+# platform, each testing only modules listed for it. Bazel runs each as a `<Name>_<platform>` unit
+# test (`just test`), with //tools:<platform>_test_runner, in a simulator made for the run; an iOS
+# one runs inside //tools/test_host. SwiftPM runs each visionOS one through a scheme of its own
+# that holds just that test target, so no unported module builds (`just spm-platform-test`, which
+# `just spm-test` runs), and every target on iOS (`just test-ios`). Tests that can't run there sit
+# under an `#if` that says why.
 TESTED_PLATFORMS = {
+    # The data protection keychain answers only a process with an application identifier, which
+    # the Mac's test runners lack (errSecMissingEntitlement), and the login keychain is the user's,
+    # which no test touches. So the real keychain is exercised in the iOS simulator, inside a test
+    # host whose entitlements give it a keychain of its own.
+    "iOS": ["DebugDrawerAppStateResetPluginTests", "DebugDrawerKeychainPluginTests"],
     "visionOS": ["DebugDrawerTests"],
+}
+
+# Apple-only packages Bazel leaves out of a TESTED_PLATFORMS run, by platform. On iOS the views are
+# tested on the Mac, and the Dynamic Type snapshots, which `just test-ios` runs, find their
+# references beside the test through SwiftPM's absolute #filePath, which Bazel's relative one
+# can't give them in the simulator; they sit under `#if canImport(SnapshotTesting)`.
+BAZEL_TESTED_PLATFORM_EXCLUDED_PACKAGES = {
+    "iOS": ["viewinspector", "swift-snapshot-testing"],
 }
 
 # Modules that also build for Mac Catalyst, the iOS SDK's UIKit running in a Mac window, where
@@ -343,13 +358,17 @@ def check():
             else:
                 assert d in names and d not in IOS_MODULES, f"benchmark {name} imports {d}, which isn't a module Package.swift declares"
     for platform, targets in TESTED_PLATFORMS.items():
-        assert platform in EXTRA_PLATFORMS, f"TESTED_PLATFORMS names {platform}, which EXTRA_PLATFORMS doesn't"
+        assert platform == "iOS" or platform in EXTRA_PLATFORMS, f"TESTED_PLATFORMS names {platform}, which EXTRA_PLATFORMS doesn't"
         for name in targets:
             assert name in tests, f"TESTED_PLATFORMS[{platform!r}] names unknown test target {name}"
-            assert not simulator_test(name), f"{name} runs in the iOS simulator, so it can't run on {platform}"
+            assert not simulator_test(name), f"{name} runs in the iOS simulator already, so it can't run on {platform}"
             for d in dict(TEST_TARGETS)[name]:
-                assert "/" in d or d in EXTRA_PLATFORMS[platform][1], \
+                assert "/" in d or platform == "iOS" or d in EXTRA_PLATFORMS[platform][1], \
                     f"{name} runs on {platform}, so its dependency {d} must be listed for it in EXTRA_PLATFORMS"
+    for platform, packages in BAZEL_TESTED_PLATFORM_EXCLUDED_PACKAGES.items():
+        assert platform in TESTED_PLATFORMS, f"BAZEL_TESTED_PLATFORM_EXCLUDED_PACKAGES names {platform}, which TESTED_PLATFORMS doesn't"
+        for package in packages:
+            assert package in APPLE_ONLY_PACKAGES, f"BAZEL_TESTED_PLATFORM_EXCLUDED_PACKAGES names {package}, which isn't Apple-only"
     for package, platforms in APPLE_ONLY_PACKAGE_EXCLUDED_PLATFORMS.items():
         assert package in APPLE_ONLY_PACKAGES, f"APPLE_ONLY_PACKAGE_EXCLUDED_PLATFORMS names {package}, which isn't Apple-only"
         for platform in platforms:
@@ -449,7 +468,8 @@ def bazel_deps(deps, platforms=()):
     branches = ""
     for platform in ["macOS", *platforms]:
         apple = "".join(f'            "{bazel_label(d)}",\n' for d in deps
-                        if apple_only(d) and platform not in APPLE_ONLY_PACKAGE_EXCLUDED_PLATFORMS.get(d.split("/")[0], []))
+                        if apple_only(d) and platform not in APPLE_ONLY_PACKAGE_EXCLUDED_PLATFORMS.get(d.split("/")[0], [])
+                        and d.split("/")[0] not in BAZEL_TESTED_PLATFORM_EXCLUDED_PACKAGES.get(platform, []))
         if apple:
             branches += f'        "@platforms//os:{platform.lower()}": [\n{apple}        ],\n'
     if branches:
@@ -825,22 +845,28 @@ def test_targets_bazel(name, deps, size, srcs, tags, test_tags=()):
 
 def tested_platforms(name):
     """The (platform, minimum) pairs of TESTED_PLATFORMS that run test target `name`."""
-    return [(platform, EXTRA_PLATFORMS[platform][0]) for platform, targets in TESTED_PLATFORMS.items() if name in targets]
+    return [(platform, IOS_MINIMUM if platform == "iOS" else EXTRA_PLATFORMS[platform][0])
+            for platform, targets in TESTED_PLATFORMS.items() if name in targets]
 
 
 def platform_test_bazel(name, platform, minimum, tags):
     """The unit test that runs test target `name`'s library in `platform`'s simulator."""
     tags_attr = f"    tags = {tags},\n".replace("'", '"') if tags else ""
+    # The test host gives an iOS run an application identifier, and with it a keychain.
+    host = ("# Hosted by //tools/test_host, whose entitlements give the tests a keychain.\n",
+            '    test_host = "//tools/test_host",\n') if platform == "iOS" else ("", "")
     return (
         f"\n# `bazel test` / `just test` on {platform}: the bundle, run in a new {platform} simulator by\n"
         f"# //tools:{platform.lower()}_test_runner (TESTED_PLATFORMS in scripts/modules.py). Booting one takes\n"
         "# much of a minute on its own.\n"
+        f"{host[0]}"
         f"{platform.lower()}_unit_test(\n"
         f'    name = "{name}_{platform}",\n'
         '    size = "medium",\n'
         f'    minimum_os_version = "{minimum}",\n'
         f'    runner = "//tools:{platform.lower()}_test_runner",\n'
         f"{tags_attr}"
+        f"{host[1]}"
         f'    deps = [":{name}Library"],\n'
         ")\n"
     )
@@ -894,13 +920,14 @@ def test_build_bazel(name, deps):
     if simulator_test(name):
         # Booting a simulator takes much of a minute on its own.
         return simulator_test_build_bazel(name, deps, TEST_SIZES.get(name, "medium"))
-    platform_loads = "".join(
-        f'load("@rules_apple//apple:{platform.lower()}.bzl", "{platform.lower()}_unit_test")\n' for platform, _ in sorted(tested_platforms(name))
+    # Sorted by file, as buildifier orders loads.
+    unit_test_loads = "".join(
+        f'load("@rules_apple//apple:{platform}.bzl", "{platform}_unit_test")\n'
+        for platform in sorted(["macos", *(platform.lower() for platform, _ in tested_platforms(name))])
     )
     header = (
         "# GENERATED by scripts/modules.py — edit the table there, then run `just modules`.\n\n"
-        'load("@rules_apple//apple:macos.bzl", "macos_unit_test")\n'
-        f"{platform_loads}"
+        f"{unit_test_loads}"
         'load("//tools:swift_rules.bzl", "swift_library", "swift_test")\n\n'
     )
     excluded_note = (

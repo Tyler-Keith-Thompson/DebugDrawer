@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- The identity Xcode gives a simulator build and rules_apple doesn't: without it the data
+         protection keychain refuses the process (errSecMissingEntitlement), so the keychain tests
+         would have no keychain. The simulator checks neither the team prefix nor a profile. -->
+    <key>application-identifier</key>
+    <string>FAKETEAMID.com.debugdrawer.testhost</string>
+    <key>keychain-access-groups</key>
+    <array>
+        <string>FAKETEAMID.com.debugdrawer.testhost</string>
+    </array>
+</dict>
+</plist>

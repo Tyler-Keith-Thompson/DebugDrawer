@@ -1,45 +1,55 @@
-#if DEBUG
+// The data protection keychain answers only a process with an application identifier. Of the
+// runners, only Bazel's iOS one has it, from //tools/test_host's entitlements (TESTED_PLATFORMS in
+// scripts/modules.py); SwiftPM's iOS run (`just test-ios`) has none and gets
+// errSecMissingEntitlement, and the Mac's runners are never asked, as the login keychain is the
+// user's.
+#if DEBUG && os(iOS) && targetEnvironment(simulator)
     import Foundation
     @testable import DebugDrawerAppStateResetPlugin
     import Security
     import Testing
 
-    /// The keychain probe the suite below is enabled by.
-    enum KeychainAccess {
-        /// Whether this process may write to the data protection keychain. It adds an item of its
-        /// own and deletes it again: on the Mac a read can answer where a write is refused, so only
-        /// `errSecMissingEntitlement` from a write means the keychain is out of reach.
-        static var answers: Bool {
-            let item: [String: Any] = [
-                kSecClass as String: kSecClassGenericPassword,
-                kSecAttrService as String: "com.debugdrawer.tests.appStateReset.probe.\(UUID().uuidString)",
-                kSecValueData as String: Data("probe".utf8),
-                kSecUseDataProtectionKeychain as String: true
-            ]
-            let status = SecItemAdd(item as CFDictionary, nil)
-            if status == errSecSuccess {
-                var query = item
-                query.removeValue(forKey: kSecValueData as String)
-                SecItemDelete(query as CFDictionary)
-            }
-            return status != errSecMissingEntitlement
-        }
-    }
+    /// Whether the tests run inside //tools/test_host, by its bundle identifier.
+    private let isInTestHost = Bundle.main.bundleIdentifier == "com.debugdrawer.testhost"
 
     /// The real keychain, through the plugin's own `_Keychain`. Each test touches only items it adds
-    /// under a service no other test uses, and deletes them when it ends.
-    ///
-    /// The data protection keychain answers only a process signed with an application identifier.
-    /// SwiftPM's runners (`just test-spm`, `just test-ios`) and Bazel's macOS `swift_test` have
-    /// none and get `errSecMissingEntitlement`, and so does an `ios_unit_test` hosted by the iOS
-    /// example app under `xcodebuild test`, though the same app launched on its own has a keychain.
-    /// Where it gets that refusal, the suite is skipped by name rather than passing on nothing.
+    /// under a service no other run uses, and deletes them when it ends.
     @MainActor
     @Suite(
         .timeLimit(.minutes(1)),
-        .enabled(if: KeychainAccess.answers, "The data protection keychain refuses a runner without an application identifier")
+        .enabled(if: isInTestHost, "Only //tools/test_host's entitlements give a test process a keychain")
     )
     struct KeychainSeamTests {
+        @Test("The real keychain lists a generic password added through SecItemAdd and deletes it, so the keychain then finds none")
+        func addListDelete() throws {
+            let service = "com.debugdrawer.tests.appStateReset.\(UUID().uuidString)"
+            let expectedAccount = "alice"
+            let match: [String: Any] = [
+                kSecClass as String: kSecClassGenericPassword,
+                kSecAttrService as String: service,
+                kSecUseDataProtectionKeychain as String: true
+            ]
+            defer { SecItemDelete(match as CFDictionary) }
+            let attributes = match.merging([
+                kSecAttrAccount as String: expectedAccount,
+                kSecValueData as String: Data("secret".utf8)
+            ]) { _, new in new }
+            let added = SecItemAdd(attributes as CFDictionary, nil)
+            try #require(added == errSecSuccess, "SecItemAdd returned \(added)")
+            let sut = _Keychain()
+
+            let listed = try sut.items().filter { $0.service == service }
+            let item = try #require(listed.first)
+            try sut.delete(item)
+            var result: CFTypeRef?
+            let actual = SecItemCopyMatching(match as CFDictionary, &result)
+
+            #expect(listed.count == 1)
+            #expect(item.itemClass == .genericPassword)
+            #expect(item.account == expectedAccount)
+            #expect(actual == errSecItemNotFound)
+        }
+
         @Test("The keychain lists the items the app added, by service and account, and deletes the one asked for alone")
         func listAndDeleteOne() throws {
             let service = "com.debugdrawer.tests.appStateReset.\(UUID().uuidString)"
