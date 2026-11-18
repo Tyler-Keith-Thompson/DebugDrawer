@@ -96,17 +96,18 @@
 
     #elseif os(iOS)
 
+    /// Touch indicators through a `UIWindow.sendEvent(_:)` swizzle that observes touches and never
+    /// consumes them. `installViewInspector()` installs it once; the swizzled method draws only
+    /// while ``ViewBorderController/isClickIndicatorEnabled`` is on.
     @MainActor
-    /// Touch indicator via UIWindow.sendEvent swizzle — never intercepts touches.
-    /// Matches DebugSwift's approach: observe touches, don't consume them.
-    final class ClickIndicatorMonitor {
-        static let shared = ClickIndicatorMonitor()
+    enum ClickIndicatorMonitor {
+        private static var isInstalled = false
 
-        private var swizzled = false
-
-        func start() {
-            guard !swizzled else { return }
-            swizzled = true
+        /// Swaps `UIWindow.sendEvent(_:)` for `dd_sendEvent(_:)`; later calls do nothing, so the
+        /// swap is never undone.
+        static func install() {
+            guard !isInstalled else { return }
+            isInstalled = true
 
             let original = #selector(UIWindow.sendEvent(_:))
             let swizzled = #selector(UIWindow.dd_sendEvent(_:))
@@ -115,18 +116,15 @@
             else { return }
             method_exchangeImplementations(originalMethod, swizzledMethod)
         }
-
-        func stop() {
-            // Swizzle is permanent — we check the enabled flag in the swizzled method
-        }
     }
 
     extension UIWindow {
+        // After the swap this selector names UIKit's sendEvent(_:), so the call forwards the event
+        // unchanged. The swizzle stays installed while indicators are off, so the flag decides
+        // whether anything is drawn.
         @objc func dd_sendEvent(_ event: UIEvent) {
-            // Call original
             dd_sendEvent(event)
 
-            // Only show indicators when enabled
             guard ViewBorderController.shared.isClickIndicatorEnabled else { return }
 
             guard let touches = event.allTouches else { return }

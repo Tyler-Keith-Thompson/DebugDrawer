@@ -147,10 +147,10 @@
         /// The grid's opacity, from 0 to 1.
         @Published public var gridOpacity: Double = 0.15
 
+        // installViewInspector() installed the touch swizzle, which reads this flag; setting it
+        // swizzles nothing.
         /// Whether each click or touch in the app shows a ripple where it landed.
-        @Published public var isClickIndicatorEnabled = false {
-            didSet { isClickIndicatorEnabled ? ClickIndicatorMonitor.shared.start() : ClickIndicatorMonitor.shared.stop() }
-        }
+        @Published public var isClickIndicatorEnabled = false
 
         /// How many times slower the key window's Core Animation runs: 1 is normal speed.
         @Published public var animationSpeed: Double = 1.0 {

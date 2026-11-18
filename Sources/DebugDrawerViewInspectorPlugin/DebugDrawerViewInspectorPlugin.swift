@@ -29,9 +29,16 @@ public struct ViewInspectorPlugin: DebugDrawerPlugin {
 
 public extension DebugDrawer {
     /// Registers the View Inspector plugin. Its switches act on the app's key window; the grid
-    /// shows only under `.debugGrid()`.
+    /// shows only under `.debugGrid()`. On iOS it also swaps `UIWindow.sendEvent(_:)` once, so
+    /// the click indicators switch can show touches; the swap forwards every event unchanged.
     func installViewInspector() {
         #if DEBUG
+            #if os(iOS)
+                // Mac Catalyst is os(iOS) here on purpose: its windows are UIWindows, which take
+                // touches and clicks through sendEvent(_:), so the iOS swizzle is the right path.
+                // macOS observes clicks with an NSEvent monitor that the switch starts and stops.
+                ClickIndicatorMonitor.install()
+            #endif
             registerGlobal(ViewInspectorPlugin())
         #endif
     }
