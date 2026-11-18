@@ -26,6 +26,7 @@ the entry becomes the GitHub release's notes.
 
 ### Fixed
 
+- DD-164: at accessibility text sizes the drawer's search results put their title and plugin name under the icon, across the row's whole width, wrapping only between words, rather than truncating or breaking a long word such as "Accessibility" mid-word; at other sizes a result keeps its one-line layout.
 - DD-159: on iOS a tap outside the compact panel (an iPhone in portrait, Slide Over) closes the drawer, as one outside a sheet does: the panel leaves a strip of the app above it, and a dimmed backdrop over what it leaves of the app takes the tap. Beside a regular panel (an iPad, an iPhone in landscape) taps still reach the app.
 - DD-90: Network bounds the bodies it keeps in total, not only each one, so 200 large requests no longer hold hundreds of megabytes; Console says how many older lines it dropped once it passes its capacity.
 - DD-85: the Deep Link Tester reports each opened URL honestly: handled or not handled by `openURL`, opened by the system, or an error saying why the system couldn't open it, where the Mac reported Opened whatever `NSWorkspace` did. On the Mac a scheme the app declares opens in the running copy rather than another installed one, and the presets no longer include `myapp://` or the private `App-prefs:` scheme.
