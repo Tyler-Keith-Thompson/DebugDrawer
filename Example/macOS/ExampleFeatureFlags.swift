@@ -1,5 +1,6 @@
 import DebugDrawer
 import DebugDrawerFeatureFlagsPlugin
+import DebugDrawerViewInspectorPlugin
 import SwiftUI
 
 // The iOS example has its own copy of this file: each app is its own module, and the examples
@@ -62,5 +63,8 @@ struct ExampleFeatureFlagsSummary: View {
         Text("Checkout: \(isNewCheckout ? "new" : "legacy"), \(color) button, free shipping over $\(threshold)")
             .font(.callout)
             .foregroundStyle(.secondary)
+            // Listed in the View Inspector's SwiftUI Renders: one render as it appears, and one
+            // more each time the Feature Flags plugin changes an override.
+            .trackRenders("ExampleFeatureFlagsSummary")
     }
 }

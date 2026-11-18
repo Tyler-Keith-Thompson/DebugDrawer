@@ -10,25 +10,24 @@
     @MainActor
     @Suite(.timeLimit(.minutes(1)))
     struct ViewInspectorDynamicTypeSnapshotTests {
-        @Test("The render counts stay readable at a large accessibility text size")
-        func renderCounts() throws {
-            let rendered = Date(timeIntervalSinceReferenceDate: 800_000_000)
+        @Test("The render counts stay readable at the default and an accessibility text size", arguments: [DynamicTypeSize.large, .accessibility3])
+        func renderCounts(size: DynamicTypeSize) throws {
             let entries = [
-                RenderTracker.Entry(id: "FeedView", count: 24, lastRender: rendered),
-                RenderTracker.Entry(id: "AvatarView", count: 7, lastRender: rendered),
-                RenderTracker.Entry(id: "SettingsView", count: 2, lastRender: rendered)
+                RenderTracker.Entry(id: "FeedView", count: 24),
+                RenderTracker.Entry(id: "AvatarView", count: 7),
+                RenderTracker.Entry(id: "SettingsView", count: 2)
             ]
-            let sut = RenderCountList(entries: entries)
-            let renderer = ImageRenderer(content: sut
+            let sut = RenderCountList(entries: entries) {}
+            let renderer = ImageRenderer(content: VStack(spacing: 0) { sut }
                 .frame(width: 320, alignment: .leading)
                 .padding()
                 .background(.background)
-                .environment(\.dynamicTypeSize, .accessibility3))
+                .environment(\.dynamicTypeSize, size))
             renderer.scale = 2
 
             let actual = try #require(renderer.uiImage)
 
-            assertSnapshot(of: actual, as: .image(perceptualPrecision: 0.98), named: "accessibility3")
+            assertSnapshot(of: actual, as: .image(perceptualPrecision: 0.98), named: size == .large ? "large" : "accessibility3")
         }
 
         @Test("A hierarchy row stays readable at a large accessibility text size")

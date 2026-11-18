@@ -14,23 +14,35 @@
     @MainActor
     @Suite(.timeLimit(.minutes(1)))
     struct ViewInspectorSnapshotTests {
-        @Test("The render counts list each view type with an OK, warning or error glyph by count", arguments: [ColorScheme.light, .dark])
+        @Test("The render counts list each tracked view with a glyph by count, under their total", arguments: [ColorScheme.light, .dark])
         func renderCounts(colorScheme: ColorScheme) throws {
-            let rendered = Date(timeIntervalSinceReferenceDate: 800_000_000)
             let entries = [
-                RenderTracker.Entry(id: "FeedView", count: 24, lastRender: rendered),
-                RenderTracker.Entry(id: "AvatarView", count: 7, lastRender: rendered),
-                RenderTracker.Entry(id: "SettingsView", count: 2, lastRender: rendered)
+                RenderTracker.Entry(id: "FeedView", count: 24),
+                RenderTracker.Entry(id: "AvatarView", count: 7),
+                RenderTracker.Entry(id: "SettingsView", count: 2)
             ]
-            let sut = RenderCountList(entries: entries)
-            let renderer = ImageRenderer(content: sut
-                .frame(width: 320, alignment: .leading)
+            let sut = RenderCountList(entries: entries) {}
+            // 316 pt: the drawer's narrowest panel. The Reset button is AppKit's, so the list is
+            // hosted rather than drawn by ImageRenderer.
+            let host = NSHostingView(rootView: VStack(spacing: 0) { sut }
+                .frame(width: 316, alignment: .leading)
                 .padding()
-                .background(.background)
-                .environment(\.colorScheme, colorScheme))
-            renderer.scale = 2
+                .background(.background))
+            host.appearance = NSAppearance(named: colorScheme == .dark ? .darkAqua : .aqua)
+            let window = NSWindow(contentRect: .zero, styleMask: .borderless, backing: .buffered, defer: true)
+            window.contentView = host
+            host.frame = CGRect(origin: .zero, size: host.fittingSize)
+            host.layoutSubtreeIfNeeded()
+            let bitmap = try #require(NSBitmapImageRep(
+                bitmapDataPlanes: nil, pixelsWide: Int(host.bounds.width) * 2, pixelsHigh: Int(host.bounds.height) * 2,
+                bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
+                colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0
+            ))
+            bitmap.size = host.bounds.size
+            host.cacheDisplay(in: host.bounds, to: bitmap)
 
-            let actual = try #require(renderer.nsImage)
+            let actual = NSImage(size: host.bounds.size)
+            actual.addRepresentation(bitmap)
 
             assertSnapshot(of: actual, as: .image(perceptualPrecision: 0.98), named: "\(colorScheme)")
         }

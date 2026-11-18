@@ -331,6 +331,9 @@ struct ExampleContentView_iOS: View {
                 }
             }
         }
+        // Listed in the View Inspector's SwiftUI Renders: the screen renders again when the counter
+        // changes, and not while the app sits idle.
+        .trackRenders("ExampleContentView")
     }
 }
 

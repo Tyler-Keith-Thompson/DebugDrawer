@@ -1,62 +1,37 @@
 #if DEBUG
-    @testable import DebugDrawer
     @testable import DebugDrawerViewInspectorPlugin
-    import XCTest
+    import Testing
 
     @MainActor
-    final class ViewInspectorPluginTests: XCTestCase {
-        func testViewBorderControllerDefaults() {
-            let controller = ViewBorderController.shared
-            XCTAssertFalse(controller.isBordersEnabled)
-            XCTAssertFalse(controller.isGridEnabled)
-            XCTAssertEqual(controller.gridSpacing, 8)
-            XCTAssertEqual(controller.animationSpeed, 1.0)
-            XCTAssertFalse(controller.isClickIndicatorEnabled)
+    @Suite
+    struct ViewInspectorPluginTests {
+        @Test("The overlays and click indicators start off, with an 8 pt grid and normal animation speed")
+        func viewBorderControllerDefaults() {
+            let sut = ViewBorderController.shared
+
+            #expect(!sut.isBordersEnabled)
+            #expect(!sut.isGridEnabled)
+            #expect(sut.gridSpacing == 8)
+            #expect(sut.animationSpeed == 1.0)
+            #expect(!sut.isClickIndicatorEnabled)
         }
 
-        func testGridColorCases() {
-            for color in ViewBorderController.GridColor.allCases {
-                _ = color.color // no crash
-            }
+        @Test("The plugin is titled View Inspector, with a dashed rectangle for its icon")
+        func pluginIdentity() {
+            let expectedTitle = "View Inspector"
+            let expectedIcon = "rectangle.dashed"
+
+            let actual = ViewInspectorPlugin()
+
+            #expect(actual.title == expectedTitle)
+            #expect(actual.icon == expectedIcon)
         }
 
-        func testRenderTrackerDefaults() {
-            let tracker = RenderTracker.shared
-            XCTAssertFalse(tracker.isEnabled)
-            XCTAssertTrue(tracker.showOverlays)
-            XCTAssertEqual(tracker.totalRenders, 0)
-        }
+        @Test("Flashing tracked views starts off")
+        func flashesStartOff() {
+            let actual = RenderFlashSetting.shared.isOn
 
-        func testRenderTrackerRecord() {
-            let tracker = RenderTracker.shared
-            tracker.reset()
-            tracker.isEnabled = true
-
-            tracker.recordRender("TestView")
-            tracker.recordRender("TestView")
-            tracker.recordRender("OtherView")
-
-            // Counts are in backing storage (pendingCounts), published values flush async
-            XCTAssertEqual(tracker.pendingCounts["TestView"], 2)
-            XCTAssertEqual(tracker.pendingCounts["OtherView"], 1)
-
-            tracker.reset()
-            tracker.isEnabled = false
-            XCTAssertEqual(tracker.pendingCounts.count, 0)
-        }
-
-        func testRenderTrackerDisabledSkips() {
-            let tracker = RenderTracker.shared
-            tracker.reset()
-            tracker.isEnabled = false
-            tracker.recordRender("ShouldSkip")
-            XCTAssertEqual(tracker.totalRenders, 0)
-        }
-
-        func testPluginConformance() {
-            let plugin = ViewInspectorPlugin()
-            XCTAssertEqual(plugin.title, "View Inspector")
-            XCTAssertEqual(plugin.icon, "rectangle.dashed")
+            #expect(!actual)
         }
     }
 #endif

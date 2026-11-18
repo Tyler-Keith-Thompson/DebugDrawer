@@ -45,6 +45,10 @@ the entry becomes the GitHub release's notes.
 - DD-53: the bug report's app-info.json carries the build details; `installAppInfo()` takes `buildMetadata:`.
 - `installNetwork`, `installConsole` and `installDeepLink` take new parameters with defaults, and
   `DebugDrawerReport.Kind` gains `movie`.
+- DD-70: View Inspector counts renders only for views an app tracks with `.trackRenders(_:)`: each
+  evaluation of the body that applies it, listed by name, busiest first. It no longer swizzles
+  `NSView` or `UIView` to guess at every view, and Flash Renders outlines a tracked view through a
+  SwiftUI overlay instead of adding views to the window.
 - DD-61: every public API compiles in release, where it does nothing: `DebugDrawer.shared`, the
   plugins' `install*()` calls and types, their stores, `.trackRenders()`, `RedactedText` and
   `debugDrawerCopyToClipboard(_:)` no longer need `#if DEBUG`, and
@@ -57,6 +61,9 @@ the entry becomes the GitHub release's notes.
   `debugDrawerOverlayIdentifier`.
 - DD-64: View Inspector's unreachable measure and inspect tool (`InspectorToolController`) and its
   3D view hierarchy, which no control in the drawer opened.
+- DD-70: View Inspector's `RenderTracker` (with `RenderTracker.Entry`, `isEnabled`,
+  `showOverlays`, `renderCounts`, `lastRenderTimes`, `recordRender(_:)`, `reset()`, `sortedEntries`
+  and `totalRenders`) and `RenderTrackingModifier`; `.trackRenders(_:)` is the API that stays.
 
 ### Fixed
 

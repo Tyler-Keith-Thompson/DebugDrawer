@@ -1506,6 +1506,36 @@ sandboxed shares Documents, Application Support, Caches and the temporary direct
 app, so there Files clears only Application Support's folder named after the app, and Caches only
 Caches' one. The plugin builds for macOS, iOS, Mac Catalyst, visionOS and tvOS.
 
+### View Inspector: which views keep re-rendering
+
+The View Inspector plugin counts how many times a view's body is evaluated, for the views the app
+names with `.trackRenders(_:)`. Apply it to the outermost view of the body to count, since it
+counts each time the body that applies it runs:
+
+```swift
+import DebugDrawerViewInspectorPlugin
+
+struct OrderRow: View {
+    let title: String
+    let total: String
+
+    var body: some View {
+        HStack {
+            Text(title)
+            Spacer()
+            Text(total)
+        }
+        .trackRenders("OrderRow")
+    }
+}
+```
+
+Its SwiftUI Renders section lists each name with its count, busiest first, and Reset starts them
+over. A row that renders again when nothing it shows has changed is reading state it doesn't need.
+Flash Renders outlines a tracked view each time its body runs, unless Reduce Motion is on. The
+drawer tracks none of its own views, so only the app's appear. In release builds
+`.trackRenders(_:)` returns the view unchanged.
+
 ### Opening the drawer
 
 The drawer doesn't decide how it opens. Call `DebugDrawer.shared.toggle()` from whatever trigger
@@ -1602,7 +1632,7 @@ ContentView()
 |---|---|
 | `DebugDrawer` | The drawer: its window, the plugin protocol and registry, the views plugins are built from, and release-build stand-ins |
 | `DebugDrawerConsolePlugin` | `os_log` entries (stdout and stderr on macOS) and an app logger's lines through `ConsoleLogSink`, with metadata: level filter, text or regular-expression search, subsystem and category mutes, time range, auto-follow, copy, lines kept across launches |
-| `DebugDrawerViewInspectorPlugin` | View borders by depth, alignment grid, click indicators, animation speed, SwiftUI render tracking, hierarchy snapshot |
+| `DebugDrawerViewInspectorPlugin` | View borders by depth, alignment grid, click indicators, animation speed, render counts of the views an app tracks with `.trackRenders(_:)`, hierarchy snapshot |
 | `DebugDrawerAccessibilityPlugin` | Runtime overrides of color scheme, Dynamic Type, layout direction, locale and the system accessibility settings SwiftUI exposes, each beside the system's value |
 | `DebugDrawerPerformancePlugin` | Live FPS and memory with sparkline graphs, CPU per thread, and a simulated memory warning |
 | `DebugDrawerEnergyPlugin` | Battery level and charging, CPU load and thermal state |

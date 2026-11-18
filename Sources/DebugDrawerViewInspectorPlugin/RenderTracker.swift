@@ -1,56 +1,78 @@
-#if !DEBUG
+#if DEBUG
     import Combine
     import Foundation
 
-    // The release stand-in for the debug tracker in SwiftUIRenderTracker.swift: the same members,
-    // so the host's code compiles unchanged, and nothing swizzled or counted behind them.
-
-    /// Release builds count no renders: this stand-in keeps the debug build's members.
+    /// How many times each view tracked with `.trackRenders(_:)` evaluated its body, by name.
+    ///
+    /// Bodies record into `counts`, which nothing observes: publishing from a body would invalidate
+    /// every view reading the tracker in the middle of a render, and a view that both records and
+    /// reads would render forever. `entries`, the published list, follows on the main queue's next
+    /// turn, once per turn however many bodies recorded in it.
     @MainActor
-    public final class RenderTracker: ObservableObject {
-        /// The stand-in tracker.
-        public static let shared = RenderTracker()
+    final class RenderTracker: ObservableObject {
+        /// The tracker `.trackRenders(_:)` records into and the plugin shows.
+        static let shared = RenderTracker()
 
-        /// Kept, never read: release builds track nothing.
-        @Published public var isEnabled = false
+        /// A tracked name and how many times its body was evaluated.
+        struct Entry: Identifiable, Equatable {
+            /// The name given to `.trackRenders(_:)`.
+            let id: String
+            /// How many body evaluations were recorded under the name.
+            let count: Int
+        }
 
-        /// Kept, never read.
-        @Published public var showOverlays = true
+        /// Every tracked name, busiest first, as of the last turn that recorded.
+        @Published private(set) var entries: [Entry] = []
 
-        /// Always empty.
-        @Published public private(set) var renderCounts: [String: Int] = [:]
+        /// Body evaluations by name, up to the moment; not observed.
+        private(set) var counts: [String: Int] = [:]
 
-        /// Always empty.
-        @Published public private(set) var lastRenderTimes: [String: Date] = [:]
+        private let recorded = PassthroughSubject<Void, Never>()
+        private var isPublishPending = false
+        private var publishing: AnyCancellable?
 
-        private init() {}
+        init() {
+            // The main queue's next turn: after the render pass that recorded, never during it.
+            publishing = recorded
+                .receive(on: DispatchQueue.main)
+                .sink { [weak self] in
+                    MainActor.assumeIsolated { self?.publish() }
+                }
+        }
 
-        /// Does nothing.
+        /// Counts one evaluation of the body tracked under `name`.
         ///
-        /// - Parameter id: Ignored.
-        public func recordRender(_ id: String) {}
-
-        /// Does nothing.
-        public func reset() {}
-
-        /// A view type's render count and when it last rendered.
-        public struct Entry: Identifiable, Equatable {
-            /// The view type's name.
-            public let id: String
-            /// How many times it rendered.
-            public let count: Int
-            /// When it last rendered.
-            public let lastRender: Date
+        /// - Parameter name: The name given to `.trackRenders(_:)`.
+        /// - Returns: The count under `name`, this evaluation included.
+        @discardableResult
+        func record(_ name: String) -> Int {
+            let count = counts[name, default: 0] + 1
+            counts[name] = count
+            if !isPublishPending {
+                isPublishPending = true
+                recorded.send()
+            }
+            return count
         }
 
-        /// Always empty.
-        public var sortedEntries: [Entry] {
-            []
+        /// Forgets every count.
+        func reset() {
+            counts = [:]
+            entries = []
         }
 
-        /// Always zero.
-        public var totalRenders: Int {
-            0
+        private func publish() {
+            isPublishPending = false
+            entries = Entry.busiestFirst(counts)
+        }
+    }
+
+    extension RenderTracker.Entry {
+        /// Counts as entries, most evaluations first, and names in order among equal counts.
+        static func busiestFirst(_ counts: [String: Int]) -> [Self] {
+            counts
+                .map { Self(id: $0.key, count: $0.value) }
+                .sorted { ($1.count, $0.id) < ($0.count, $1.id) }
         }
     }
 #endif

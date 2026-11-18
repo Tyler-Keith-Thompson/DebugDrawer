@@ -43,6 +43,7 @@ public extension DebugDrawer {
     struct ViewInspectorPluginView: View {
         @ObservedObject private var controller = ViewBorderController.shared
         @ObservedObject private var renderTracker = RenderTracker.shared
+        @ObservedObject private var flashSetting = RenderFlashSetting.shared
         @State private var hierarchy: ViewNode?
         @State private var isHierarchyExpanded = false
         @State private var searchText = ""
@@ -104,22 +105,10 @@ public extension DebugDrawer {
                 }
             }
 
+            // Counts only views the app tracks with .trackRenders(_:); the drawer tracks none of its own.
             DebugDrawerSection("SwiftUI Renders") {
-                DebugDrawerRow("Render Tracking", isOn: $renderTracker.isEnabled)
-
-                if renderTracker.isEnabled {
-                    DebugDrawerRow("Show Overlays", isOn: $renderTracker.showOverlays)
-
-                    if !renderTracker.renderCounts.isEmpty {
-                        DebugDrawerRow("\(renderTracker.renderCounts.count) views, \(renderTracker.totalRenders) renders") {
-                            Button("Reset") { renderTracker.reset() }
-                                .debugDrawerButtonStyle(.borderless)
-                                .accessibilityLabel("Reset render counts")
-                        }
-
-                        RenderCountList(entries: Array(renderTracker.sortedEntries.prefix(8)))
-                    }
-                }
+                DebugDrawerRow("Flash Renders", isOn: $flashSetting.isOn)
+                RenderCountList(entries: renderTracker.entries) { renderTracker.reset() }
             }
 
             DebugDrawerSection("View Hierarchy") {

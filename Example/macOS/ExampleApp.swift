@@ -353,6 +353,9 @@ struct ExampleContentView: View {
             .padding(40)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
+        // Listed in the View Inspector's SwiftUI Renders: the screen renders again when the counter
+        // or the selection changes, and not while the app sits idle.
+        .trackRenders("ExampleContentView")
         // Redraws the app's own strings when a Localization mode changes; beneath .debugDrawer(),
         // so the drawer keeps its place.
         .debugLocalization()
