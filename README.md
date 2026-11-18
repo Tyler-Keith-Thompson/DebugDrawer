@@ -81,7 +81,8 @@ the trailing edge of the window, on iOS a window above the scene's, at 316 point
 the window is narrower than two of those (an iPhone in portrait), as wide as the window. Each
 window's drawer opens and closes on its own; `toggle()` and `isOpen` act on the key window's. A
 UIKit or AppKit app without `debugDrawer()` attaches it with `DebugDrawer.shared.attach(to:)`,
-passing each `UIWindowScene` or `NSWindow`. A section header's chevron, or the jump bar's menu, shows
+passing each `UIWindowScene` or `NSWindow`, and gets the same drawer with every global plugin (the
+HUD and the toasts are drawn by `debugDrawer()`, so such a window shows neither). A section header's chevron, or the jump bar's menu, shows
 one plugin alone at the panel's full height, and the back button returns to the list.
 
 A local plugin is registered when its view appears and removed when it disappears, unless a newer

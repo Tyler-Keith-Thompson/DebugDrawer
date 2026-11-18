@@ -12,6 +12,10 @@ the entry becomes the GitHub release's notes.
 
 - DD-199: `NetworkEntry.requestBodySize`, `isRequestBodyTruncated` and `requestSizeLabel`: Network keeps each request body to `installNetwork(bodyLimit:)`, as it does each response body, marked truncated with its full size.
 
+### Changed
+
+- DD-4: the UIKit example (`Example/iOSUIKit`) has no SwiftUI root and installs every global plugin, and the macOS example opens an AppKit-only window (Debug > Show AppKit Window, or `-AppKitWindow` at launch), each attaching the drawer with `DebugDrawer.shared.attach(to:)`; the docs say a window with no SwiftUI view under `debugDrawer()` shows the drawer without the HUD and toasts.
+
 ### Fixed
 
 - DD-199: with Network installed, a request whose body is a stream reaches the server with every byte of it, rather than an empty body; a body past the body limit is sent from a temporary file, with its `Content-Length`.

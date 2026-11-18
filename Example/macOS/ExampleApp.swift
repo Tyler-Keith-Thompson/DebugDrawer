@@ -50,6 +50,7 @@ struct FolderReportUploader: DebugDrawerReportUploader {
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var mainWindow: NSWindow?
+    private var appKitWindow: ExampleAppKitWindowController?
 
     static func main() {
         let app = NSApplication.shared
@@ -138,7 +139,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         installShippedPlugins()
 
         setupMenuBar()
-        createMainWindow()
+        // Launched with -AppKitWindow, the app opens only its AppKit window: no SwiftUI root at all.
+        if ProcessInfo.processInfo.arguments.contains(ExampleAppKitWindowController.launchArgument) {
+            showAppKitWindow()
+            ExampleAppKitWindowController.openDrawerIfAsked()
+        } else {
+            createMainWindow()
+        }
         ExamplePresentations.runAppModalAlertIfAsked()
     }
 
@@ -213,10 +220,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             keyEquivalent: ""
         )
         notice.target = self
+        debugMenu.addItem(withTitle: "Show AppKit Window", action: #selector(showAppKitWindow), keyEquivalent: "").target = self
         debugMenuItem.submenu = debugMenu
         mainMenu.addItem(debugMenuItem)
 
         NSApp.mainMenu = mainMenu
+    }
+
+    /// Shows the window whose content is AppKit's alone, made the first time it is asked for.
+    @objc private func showAppKitWindow() {
+        if appKitWindow == nil { appKitWindow = ExampleAppKitWindowController() }
+        appKitWindow?.showWindow(nil)
     }
 
     @objc private func toggleDebugDrawer() {

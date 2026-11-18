@@ -38,13 +38,27 @@ An app whose windows aren't SwiftUI's attaches the drawer itself: to each `UIWin
 has connected, with `DebugDrawer.shared.attach(to: windowScene)`, or to each `NSWindow` with
 `DebugDrawer.shared.attach(to: window)`. Attaching twice does nothing, so a SwiftUI view under
 `debugDrawer()` in the same window is harmless. The drawer detaches when the scene disconnects or
-the window closes.
+the window closes. It is the same drawer `debugDrawer()` attaches, with every global plugin; the
+floating HUD and the toasts are drawn by `debugDrawer()` over its view, so a window with no
+SwiftUI view under it shows the drawer without them.
 
 ```swift
 func scene(_ scene: UIScene, willConnectTo _: UISceneSession, options _: UIScene.ConnectionOptions) {
     guard let windowScene = scene as? UIWindowScene else { return }
     // … the app's window …
     DebugDrawer.shared.attach(to: windowScene)
+}
+```
+
+On the Mac, attach a window once it exists, such as when its window controller shows it:
+
+```swift
+final class OrdersWindowController: NSWindowController {
+    override func showWindow(_ sender: Any?) {
+        super.showWindow(sender)
+        guard let window else { return }
+        DebugDrawer.shared.attach(to: window)
+    }
 }
 ```
 

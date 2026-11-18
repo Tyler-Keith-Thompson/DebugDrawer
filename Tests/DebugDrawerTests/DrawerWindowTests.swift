@@ -64,6 +64,46 @@
             #expect(recorder.updates.allSatisfy { !$0 })
         }
 
+        @Test("A debugDrawer() window and an AppKit window attached with attach(to:) get the same drawer: one panel view, one size")
+        func bothEntryPointsShareOnePresentation() throws {
+            let swiftUIWindow = NSWindow(
+                contentRect: CGRect(x: -30000, y: -30000, width: 900, height: 600),
+                styleMask: .borderless, backing: .buffered, defer: false
+            )
+            let appKitWindow = NSWindow(
+                contentRect: CGRect(x: -31000, y: -30000, width: 900, height: 600),
+                styleMask: .borderless, backing: .buffered, defer: false
+            )
+            let host = NSHostingView(rootView: Text("SwiftUI").debugDrawer())
+            swiftUIWindow.contentView = host
+            appKitWindow.contentView = NSTextField(labelWithString: "AppKit")
+            for window in [swiftUIWindow, appKitWindow] {
+                window.isReleasedWhenClosed = false
+                window.orderFront(nil)
+            }
+            defer { [swiftUIWindow, appKitWindow].forEach { $0.close() } }
+            host.layoutSubtreeIfNeeded()
+            DebugDrawer.shared.attach(to: appKitWindow)
+            let swiftUIDrawer = try #require(DebugDrawer.shared.attachments.first { $0.window === swiftUIWindow })
+            let appKitDrawer = try #require(DebugDrawer.shared.attachments.first { $0.window === appKitWindow })
+
+            swiftUIDrawer.presentation.isOpen = true
+            appKitDrawer.presentation.isOpen = true
+            defer {
+                swiftUIDrawer.presentation.isOpen = false
+                appKitDrawer.presentation.isOpen = false
+            }
+
+            let swiftUIContent = try #require(swiftUIDrawer.panel.contentView)
+            let appKitContent = try #require(appKitDrawer.panel.contentView)
+            #expect(type(of: swiftUIContent) == type(of: appKitContent))
+            #expect(swiftUIDrawer.panel.parent === swiftUIWindow)
+            #expect(appKitDrawer.panel.parent === appKitWindow)
+            #expect(swiftUIDrawer.panel.isVisible)
+            #expect(appKitDrawer.panel.isVisible)
+            #expect(swiftUIDrawer.panel.frame.size == appKitDrawer.panel.frame.size)
+        }
+
         @Test("Attaching a window twice keeps one drawer for it")
         func attachingTwiceKeepsOneDrawer() {
             let window = NSWindow(
