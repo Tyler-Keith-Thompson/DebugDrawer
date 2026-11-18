@@ -45,6 +45,8 @@ unchanged there.
   mask a sensitive value until the eye button beside it reveals it.
 - ``DebugDrawerIssueRow``: a severity glyph, a title and its status, a monospaced line and
   details, as in Xcode's issue navigator.
+- ``DebugDrawerEmptyState``: a symbol, a title and a line saying how something gets there, where
+  a plugin has nothing to list yet.
 - ``DebugDrawerGaugeRow``: a measure with a bar meter, as Xcode's debug gauges.
 - ``DebugDrawerStackFrameRow``: a frame of a stack trace, the app's own frames marked.
 - ``DebugDrawerTypeBadgeRow``: a loaded binary, with a letter badge for its kind, its path and

@@ -11,8 +11,8 @@ import UniformTypeIdentifiers
 /// entitlements name, and sample files to preview, written on request.
 enum ExampleFileBrowser {
     /// Launched with this argument, the app writes a JSON file, a binary and an XML property
-    /// list, a text file and a PNG into Documents/Samples, and a JSON file into its app group's
-    /// container, before it starts.
+    /// list, a text file and a PNG into Documents/Samples, a JSON file five folders below it, and
+    /// a JSON file into its app group's container, before it starts.
     static let launchArgument = "-SeedSampleFiles"
     /// The app group the example's entitlements name.
     static let appGroup = "group.com.debugdrawer.example"
@@ -42,6 +42,10 @@ enum ExampleFileBrowser {
         for (name, data) in files {
             try? data?.write(to: samples.appending(path: name))
         }
+        // Five folders down, to open one level at a time.
+        let deep = samples.appending(path: "Archive/2026/11/17/Backups", directoryHint: .isDirectory)
+        try? FileManager.default.createDirectory(at: deep, withIntermediateDirectories: true)
+        try? Data(#"{"backup":1,"items":42}"#.utf8).write(to: deep.appending(path: "backup.json"))
         if let group = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroup) {
             try? Data(#"{"sharedWith":"widget","items":3}"#.utf8).write(to: group.appending(path: "shared.json"))
         }

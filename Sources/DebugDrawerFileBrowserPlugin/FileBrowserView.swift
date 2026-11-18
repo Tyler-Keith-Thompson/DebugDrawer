@@ -9,14 +9,14 @@
         /// The total size of each folder counted, by its path.
         let folderSizes: [String: Int64]
         /// Why the last import, rename or delete failed.
-        var failure: String?
+        var failure: FileBrowserFailure?
         let actions: FileBrowserActions
 
         var body: some View {
             VStack(alignment: .leading, spacing: 0) {
                 switch screen {
-                case let .roots(roots):
-                    FileRootList(roots: roots, folderSizes: folderSizes) { actions.open(.directory($0, $0.url)) }
+                case let .roots(roots, isEmpty):
+                    FileRootList(roots: roots, isEmpty: isEmpty, folderSizes: folderSizes) { actions.open(.directory($0, $0.url)) }
                 case let .directory(listing):
                     // A view per folder, so the filter starts empty in each.
                     DirectoryView(listing: listing, folderSizes: folderSizes, actions: actions)
@@ -26,7 +26,9 @@
                         .id(detail.item.path)
                 }
                 if let failure {
-                    DebugDrawerIssueRow(failure, severity: .error)
+                    DebugDrawerIssueRow(failure.title, severity: .error) {
+                        Text(failure.reason)
+                    }
                 }
             }
         }

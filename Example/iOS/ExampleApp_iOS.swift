@@ -236,6 +236,8 @@ struct ExampleContentView_iOS: View {
                     Button("Track Sample Event") { ExampleAnalytics.trackSample() }
                     // Keychain lists both passwords, each in its access group, and the key.
                     Button("Add Sample Keychain Items") { ExampleKeychain.seed() }
+                    // File Browser lists them under Documents/Samples, one folder five levels down.
+                    Button("Create Sample Files") { ExampleFileBrowser.seed() }
                     // Crash Reports shows the crash on the next launch.
                     Button("Crash the App", role: .destructive) { ExampleCrash.crash() }
                     // Hangs reports the stall with its stack and a toast.

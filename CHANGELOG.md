@@ -37,6 +37,7 @@ the entry becomes the GitHub release's notes.
 - DD-56: a CI workflow, started by hand, runs the Bazel and SwiftPM tests on macOS and an iOS simulator.
 - DD-58: core's public API is documented, with a DocC catalog, and `just docs` fails on an undocumented symbol.
 - DD-59: this changelog; `just deploy` refuses a version it has no entry for, and an API break unless the bump is major or `allow-breaking` is given.
+- DD-79: `DebugDrawerEmptyState`, the drawer's empty state for a plugin with nothing to list yet.
 
 ### Changed
 
@@ -77,6 +78,7 @@ the entry becomes the GitHub release's notes.
 - DD-179: a row's icon sits beside its title when its accessory is a Toggle, Slider or Stepper.
 - DD-182: the Network snapshot tests of hosted text fields no longer fail at random.
 - DD-187: the Deep Link Tester's userInfo rows fit an iPad's drawer at every text size.
+- DD-79: File Browser lists the app's own folders before they exist, says when they are empty, shows a refused delete and why, and keeps the folder shown and its items' identities across a refresh.
 
 ## [0.1.1] - 2026-11-16
 

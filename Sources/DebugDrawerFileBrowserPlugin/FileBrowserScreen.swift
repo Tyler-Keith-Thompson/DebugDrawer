@@ -30,12 +30,18 @@
 
     /// What the browser shows.
     enum FileBrowserScreen: Hashable, Sendable {
-        /// The folders it starts from.
-        case roots(FileRoots)
+        /// The folders it starts from, and whether none the app can change holds anything.
+        case roots(FileRoots, isEmpty: Bool)
         /// A folder and what it holds.
         case directory(DirectoryListing)
         /// A file, its facts and its preview.
         case file(FileDetailState)
+    }
+
+    /// A change the file system refused: what failed ("Couldn't delete old.log") and why.
+    struct FileBrowserFailure: Hashable, Sendable {
+        let title: String
+        let reason: String
     }
 
     /// A read the browser waits on.

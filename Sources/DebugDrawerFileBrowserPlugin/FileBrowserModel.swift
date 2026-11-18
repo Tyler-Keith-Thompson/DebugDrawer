@@ -23,16 +23,17 @@
         /// The total size of each folder counted, by its path.
         @Published private(set) var folderSizes: [String: Int64] = [:]
         /// Why the last import, rename or delete failed, until another place is shown.
-        @Published private(set) var failure: String?
+        @Published private(set) var failure: FileBrowserFailure?
 
         let roots: FileRoots
         private static let logger = Logger(subsystem: "DebugDrawerFileBrowserPlugin", category: "FileBrowserModel")
         private let fileSystem: any FileSystem
 
-        init(roots: FileRoots, fileSystem: any FileSystem) {
+        /// A browser of `roots`, read from and changed through `fileSystem`.
+        init(roots: FileRoots, fileSystem: any FileSystem = LocalFileSystem()) {
             self.roots = roots
             self.fileSystem = fileSystem
-            screen = .roots(roots)
+            screen = .roots(roots, isEmpty: false)
         }
 
         /// Shows `place`, loading until `load(_:)` reads it.
@@ -40,7 +41,7 @@
             failure = nil
             request = LoadRequest(place: place, generation: request.generation + 1)
             screen = switch place {
-            case .roots: .roots(roots)
+            case .roots: .roots(roots, isEmpty: false)
             case let .directory(root, url): .directory(DirectoryListing(root: root, url: url, contents: .loading))
             case let .file(root, item): .file(FileDetailState(root: root, item: item, preview: .loading))
             }
@@ -63,6 +64,9 @@
             guard request == self.request else { return }
             switch request.place {
             case .roots:
+                let isEmpty = await rootsAreEmpty()
+                guard request == self.request, !Task.isCancelled else { return }
+                screen = .roots(roots, isEmpty: isEmpty)
                 await count(roots.available.map(\.url))
             case let .directory(root, url):
                 let contents = await contents(of: url)
@@ -109,7 +113,7 @@
             let name = name.trimmingCharacters(in: .whitespacesAndNewlines)
             guard let root = request.place.root, canChange(item, in: root), name != item.name else { return }
             guard Self.isFileName(name) else {
-                failure = "“\(name)” can't be a file name."
+                failure = FileBrowserFailure(title: "Couldn't rename \(item.name)", reason: "“\(name)” can't be a file name.")
                 return
             }
             let destination = item.url.deletingLastPathComponent()
@@ -152,6 +156,17 @@
             return Set(contents.items.map(\.name))
         }
 
+        /// Whether no root the app can change holds anything: the bundle never counts, and a
+        /// folder that doesn't exist yet or can't be read counts as empty.
+        private func rootsAreEmpty() async -> Bool {
+            for root in roots.available where !root.isReadOnly {
+                if let items = try? await fileSystem.contents(of: root.url), !items.isEmpty {
+                    return false
+                }
+            }
+            return true
+        }
+
         private func contents(of url: URL) async -> Loadable<DirectoryContents> {
             do {
                 return .loaded(DirectoryContents(directory: try await fileSystem.item(at: url), items: try await fileSystem.contents(of: url)))
@@ -192,7 +207,7 @@
 
         private func fail(_ action: String, _ error: any Error) {
             Self.logger.error("\(action, privacy: .private): \(error.localizedDescription, privacy: .private)")
-            failure = "\(action): \(error.localizedDescription)"
+            failure = FileBrowserFailure(title: action, reason: error.localizedDescription)
         }
 
         /// Whether `name` names a file: not empty, ".", "..", and with no slash or NUL.

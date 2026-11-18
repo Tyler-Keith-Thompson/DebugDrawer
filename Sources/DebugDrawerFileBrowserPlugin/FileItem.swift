@@ -10,8 +10,10 @@
         let modified: Date?
         let created: Date?
 
-        var id: URL {
-            url
+        /// Its path, so the same file keeps its identity from one listing to the next however
+        /// its URL was made.
+        var id: String {
+            path
         }
 
         var name: String {

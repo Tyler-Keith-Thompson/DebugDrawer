@@ -44,6 +44,7 @@ and the API a host calls compiles to stand-ins that do nothing.
 - ``DebugDrawerRow``
 - ``DebugDrawerKeyValueRow``
 - ``DebugDrawerIssueRow``
+- ``DebugDrawerEmptyState``
 - ``DebugDrawerGaugeRow``
 - ``DebugDrawerStackFrameRow``
 - ``DebugDrawerTypeBadgeRow``

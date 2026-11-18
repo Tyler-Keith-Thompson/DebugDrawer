@@ -96,7 +96,7 @@
 
             await sut.load(overtaken)
 
-            #expect(sut.screen == .roots(FileRoots(available: [root])))
+            #expect(sut.screen == .roots(FileRoots(available: [root]), isEmpty: false))
         }
 
         @Test("Deleting a file shows its folder without it; deleting the folder shown goes up")
@@ -160,7 +160,7 @@
             let sut = FileBrowserModel(roots: FileRoots(available: [root]), fileSystem: LocalFileSystem())
             let item = try await LocalFileSystem().item(at: file)
             sut.show(.directory(root, folder))
-            let expected = "“a/b” can't be a file name."
+            let expected = FileBrowserFailure(title: "Couldn't rename keep.txt", reason: "“a/b” can't be a file name.")
 
             await sut.rename(item, to: "a/b")
 
@@ -228,7 +228,7 @@
             let sut = FileBrowserModel(roots: FileRoots(available: [root]), fileSystem: fileSystem)
             let item = try await LocalFileSystem().item(at: file)
             sut.show(.directory(root, folder))
-            let expected = "Couldn't delete locked.txt: \(fileSystem.error.localizedDescription)"
+            let expected = FileBrowserFailure(title: "Couldn't delete locked.txt", reason: fileSystem.error.localizedDescription)
 
             await sut.delete(item)
 

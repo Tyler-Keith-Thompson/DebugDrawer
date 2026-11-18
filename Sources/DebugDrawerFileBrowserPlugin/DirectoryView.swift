@@ -66,10 +66,10 @@
         @ViewBuilder
         private func items(_ items: [FileItem]) -> some View {
             if items.isEmpty {
-                DebugDrawerSection {
-                    EmptyView()
-                } footer: {
-                    Text("The folder is empty.")
+                DebugDrawerEmptyState("Empty folder", systemImage: "folder") {
+                    if !listing.root.isReadOnly {
+                        Text("Files the app writes here, or you import, show here.")
+                    }
                 }
             } else {
                 let matching = items.filter { $0.matches(filter) }
