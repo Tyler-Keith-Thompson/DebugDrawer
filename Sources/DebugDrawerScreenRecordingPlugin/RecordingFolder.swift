@@ -1,5 +1,6 @@
 #if DEBUG
     import AVFoundation
+    import DebugDrawer
     import Foundation
 
     /// The folder the recordings are saved in, `Caches/DebugDrawer/Recordings` in production: the
@@ -7,7 +8,8 @@
     /// attach to a bug.
     ///
     /// Each movie is named for the moment it started (`Screen Recording 2026-11-16T10-46-40Z.mov`),
-    /// which is where the list reads its start time from.
+    /// which is where the list reads its start time from. Its file work is the drawer's own, which
+    /// Disk I/O leaves out.
     struct RecordingFolder: Sendable {
         /// The folder; created when the first recording starts.
         let directory: URL
@@ -22,11 +24,10 @@
         ///
         /// - Throws: `RecordingFailure.writeFailed` when the folder can't be created.
         func url(forRecordingStartedAt date: Date) throws(RecordingFailure) -> URL {
-            do {
-                try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-            } catch {
-                throw .writeFailed
+            let created = DebugDrawerActivity.$isDrawerWork.withValue(true) {
+                (try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)) != nil
             }
+            guard created else { throw .writeFailed }
             let base = "\(Self.namePrefix)\(Self.timestamp(of: date))"
             let candidates = [base] + (2 ... 100).map { "\(base) \($0)" }
             let free = candidates.lazy
@@ -41,7 +42,9 @@
         /// aren't recordings are left out.
         func recordings() async -> [Recording] {
             let keys: [URLResourceKey] = [.fileSizeKey, .creationDateKey]
-            let urls = (try? FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: keys)) ?? []
+            let urls = DebugDrawerActivity.$isDrawerWork.withValue(true) {
+                (try? FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: keys)) ?? []
+            }
             var recordings: [Recording] = []
             for url in urls where url.pathExtension == Self.fileExtension && url.lastPathComponent.hasPrefix(Self.namePrefix) {
                 let values = try? url.resourceValues(forKeys: Set(keys))
@@ -65,7 +68,9 @@
 
         /// Deletes `url`; one already gone is no error.
         func delete(_ url: URL) {
-            try? FileManager.default.removeItem(at: url)
+            DebugDrawerActivity.$isDrawerWork.withValue(true) {
+                try? FileManager.default.removeItem(at: url)
+            }
         }
 
         /// Deletes the oldest of `recordings` (newest first) past the first `capacity`.

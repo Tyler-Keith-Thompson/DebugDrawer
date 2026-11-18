@@ -1,53 +1,43 @@
 #if DEBUG
-    @testable import DebugDrawer
     @testable import DebugDrawerDiskIOPlugin
-    import XCTest
+    import Foundation
+    import Testing
 
     @MainActor
-    final class DiskIOPluginTests: XCTestCase {
-        func testIOEventCreation() {
-            let event = IOEvent(
-                timestamp: Date(), operation: .read, path: "/tmp/test.txt",
-                size: 1024, duration: 0.005, isMainThread: true
-            )
-            XCTAssertEqual(event.operation, .read)
-            XCTAssertEqual(event.size, 1024)
-            XCTAssertTrue(event.isMainThread)
+    @Suite
+    struct DiskIOPluginTests {
+        @Test("Each operation has a word for the filter and VoiceOver")
+        func operationNames() {
+            let operations: [IOEvent.Operation] = [.read, .write, .delete, .create, .list, .stat, .copy, .move]
+            let expected = ["Read", "Write", "Delete", "Create", "List", "Stat", "Copy", "Move"]
+
+            let actual = operations.map(\.name)
+
+            #expect(actual == expected)
         }
 
-        func testIOOperationNames() {
-            let names = [IOEvent.Operation.read, .write, .delete, .create, .list, .stat].map(\.name)
-            XCTAssertEqual(names, ["Read", "Write", "Delete", "Create", "List", "Stat"])
+        @Test("The plugin is titled Disk I/O, with the drive icon")
+        func plugin() {
+            let sut = DiskIOPlugin()
+
+            let actual = [sut.title, sut.icon]
+
+            #expect(actual == ["Disk I/O", "externaldrive"])
         }
 
-        func testDiskIOStoreFilter() {
-            let store = DiskIOStore.shared
-            store.clear()
-            XCTAssertEqual(store.filteredEvents.count, 0)
+        @Test("A store with nothing recorded lists nothing under any filter, and counts nothing")
+        func emptyStore() {
+            let sut = DiskIOStore(recorder: DiskIORecorder())
 
-            store.filterOp = .read
-            XCTAssertEqual(store.filteredEvents.count, 0)
+            sut.filterOp = .read
+            let filteredByOperation = sut.filteredEvents
+            sut.filterOp = nil
+            sut.mainThreadOnly = true
+            let filteredByThread = sut.filteredEvents
 
-            store.filterOp = nil
-            store.mainThreadOnly = true
-            XCTAssertEqual(store.filteredEvents.count, 0)
-            store.mainThreadOnly = false
-        }
-
-        func testDiskIOStoreStats() {
-            let store = DiskIOStore.shared
-            store.clear()
-            XCTAssertEqual(store.totalReads, 0)
-            XCTAssertEqual(store.totalWrites, 0)
-            XCTAssertEqual(store.totalBytesRead, 0)
-            XCTAssertEqual(store.totalBytesWritten, 0)
-            XCTAssertEqual(store.mainThreadOps, 0)
-        }
-
-        func testPluginConformance() {
-            let plugin = DiskIOPlugin()
-            XCTAssertEqual(plugin.title, "Disk I/O")
-            XCTAssertEqual(plugin.icon, "externaldrive")
+            #expect(filteredByOperation.isEmpty)
+            #expect(filteredByThread.isEmpty)
+            #expect(sut.totals == DiskIOTotals())
         }
     }
 #endif

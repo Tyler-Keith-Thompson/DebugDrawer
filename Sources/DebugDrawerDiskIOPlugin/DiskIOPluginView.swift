@@ -4,24 +4,21 @@
 
     struct DiskIOPluginView: View {
         @ObservedObject private var store = DiskIOStore.shared
+        /// The home volume, sampled off the main actor when the plugin appears and on Refresh;
+        /// `nil` until the first sample.
+        @State private var diskSpace: DiskSpace?
+        /// Bumped by Refresh, which samples the volume again.
+        @State private var diskSpaceRequest = 0
 
         var body: some View {
             VStack(alignment: .leading, spacing: 0) {
-                DebugDrawerSection("Totals") {
-                    DebugDrawerKeyValueRow("Reads", value: "\(store.totalReads)")
-                    DebugDrawerKeyValueRow("Writes", value: "\(store.totalWrites)")
-                    DebugDrawerKeyValueRow("Read", value: store.totalBytesRead.byteLabel)
-                    DebugDrawerKeyValueRow("Written", value: store.totalBytesWritten.byteLabel)
-                    if store.mainThreadOps > 0 {
-                        DebugDrawerIssueRow("Main thread", status: "\(store.mainThreadOps) calls", severity: .warning)
-                    }
-                }
+                DiskIOTotalsRows(totals: store.totals)
 
                 DebugDrawerSection("Calls") {
                     DebugDrawerRow("Operation") {
                         Picker("Operation", selection: $store.filterOp) {
                             Text("All").tag(IOEvent.Operation?.none)
-                            ForEach([IOEvent.Operation.read, .write, .delete, .list], id: \.rawValue) { operation in
+                            ForEach(IOEvent.Operation.filterable, id: \.rawValue) { operation in
                                 Text(operation.name).tag(IOEvent.Operation?.some(operation))
                             }
                         }
@@ -49,35 +46,50 @@
                     }
                 }
 
-                DiskSpaceRows(volume: DiskSpace.home)
+                DiskSpaceRows(volume: diskSpace)
 
                 DebugDrawerActionRow {
-                    EmptyView()
+                    Button("Refresh") { diskSpaceRequest += 1 }
+                        .accessibilityLabel("Refresh disk space")
                 } trailing: {
                     Button("Clear", role: .destructive) { store.clear() }
                         .debugDrawerButtonStyle(.destructive)
                         .accessibilityLabel("Clear recorded calls")
                 }
             }
+            .task(id: diskSpaceRequest) {
+                diskSpace = await DiskSpace.sample()
+            }
         }
     }
 
-    /// The home volume's size and free space, read when the plugin draws.
-    struct DiskSpace: Equatable {
-        let total: Int64
-        let free: Int64
+    extension IOEvent.Operation {
+        /// The operations the filter offers, in the order it lists them.
+        fileprivate static let filterable: [Self] = [.read, .write, .create, .delete, .list, .stat, .copy, .move]
+    }
 
-        /// The volume holding the home directory, or `nil` when the system won't say.
-        static var home: DiskSpace? {
-            guard let attributes = try? FileManager.default.attributesOfFileSystem(forPath: NSHomeDirectory()),
-                  let total = attributes[.systemSize] as? Int64,
-                  let free = attributes[.systemFreeSize] as? Int64,
-                  total > 0 else { return nil }
-            return DiskSpace(total: total, free: free)
+    /// The counts of every recorded call: reads and writes, the bytes of each, and a warning for
+    /// calls on the main thread and an error for calls that failed.
+    struct DiskIOTotalsRows: View {
+        let totals: DiskIOTotals
+
+        var body: some View {
+            DebugDrawerSection("Totals") {
+                DebugDrawerKeyValueRow("Reads", value: "\(totals.reads)")
+                DebugDrawerKeyValueRow("Writes", value: "\(totals.writes)")
+                DebugDrawerKeyValueRow("Read", value: totals.bytesRead.byteLabel)
+                DebugDrawerKeyValueRow("Written", value: totals.bytesWritten.byteLabel)
+                if totals.mainThreadCalls > 0 {
+                    DebugDrawerIssueRow("Main thread", status: totals.mainThreadCalls.callsLabel, severity: .warning)
+                }
+                if totals.failures > 0 {
+                    DebugDrawerIssueRow("Failed", status: totals.failures.callsLabel, severity: .error)
+                }
+            }
         }
     }
 
-    /// How full the volume is, as a gauge, and its free space.
+    /// How full the volume is, as a gauge, and its free space; nothing when `volume` is `nil`.
     struct DiskSpaceRows: View {
         let volume: DiskSpace?
 
@@ -97,15 +109,17 @@
         }
     }
 
-    /// One recorded I/O call: its operation, a warning when it ran on the main thread, the path's
-    /// last components, its size (or item count for a listing) and how long it took.
+    /// One recorded I/O call: its operation, a warning when it ran on the main thread, an error
+    /// when it failed, the path's last components (and a copy's or move's destination), its size
+    /// (or item count for a listing) and how long it took, then the error's description.
     struct IOEventRow: View {
         let event: IOEvent
         @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-        @ScaledMetric(relativeTo: .body) private var badgeWidth = 14
+        // Wide enough for the two-letter badges (Cp, Mv).
+        @ScaledMetric(relativeTo: .body) private var badgeWidth = 20
 
         var body: some View {
-            VStack(spacing: 0) {
+            VStack(alignment: .leading, spacing: 0) {
                 Group {
                     // At accessibility text sizes the path and the measurements have no room beside
                     // the badge, so each takes a line of its own.
@@ -113,19 +127,23 @@
                         VStack(alignment: .leading, spacing: 0) {
                             HStack(spacing: 6) {
                                 operationBadge
-                                mainThreadWarning
+                                glyphs
                             }
                             path
                             measurements
+                            failure
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
                     } else {
-                        HStack(spacing: 6) {
-                            operationBadge
-                            mainThreadWarning
-                            path
-                            Spacer()
-                            measurements
+                        VStack(alignment: .leading, spacing: 0) {
+                            HStack(spacing: 6) {
+                                operationBadge
+                                glyphs
+                                path
+                                Spacer()
+                                measurements
+                            }
+                            failure
                         }
                     }
                 }
@@ -141,20 +159,24 @@
                 .debugDrawerFont(.code)
                 .fontWeight(.bold)
                 .debugDrawerForegroundStyle(.secondary)
-                .frame(width: badgeWidth)
+                .frame(width: badgeWidth, alignment: .leading)
                 .accessibilityLabel(event.operation.name)
         }
 
-        @ViewBuilder private var mainThreadWarning: some View {
+        @ViewBuilder private var glyphs: some View {
             if event.isMainThread {
                 DebugDrawerIssueGlyph(.warning)
                     .accessibilityLabel("On the main thread")
             }
+            if event.error != nil {
+                DebugDrawerIssueGlyph(.error)
+                    .accessibilityLabel("Failed")
+            }
         }
 
-        // The last two components.
+        // The last two components, and a copy's or move's destination's name after an arrow.
         private var path: some View {
-            Text(event.shortPath)
+            Text(event.destination.map { "\(event.shortPath) → \(($0 as NSString).lastPathComponent)" } ?? event.shortPath)
                 .debugDrawerFont(.code)
                 .lineLimit(3)
                 .truncationMode(.head)
@@ -168,7 +190,7 @@
                     Text(event.size.byteLabel)
                         .debugDrawerForegroundStyle(.tertiary)
                 }
-                if event.operation == .list {
+                if event.operation == .list && event.error == nil {
                     Text("\(event.size) items")
                         .debugDrawerForegroundStyle(.tertiary)
                 }
@@ -176,6 +198,16 @@
                     .debugDrawerForegroundStyle(event.duration > 0.01 ? .primary : .tertiary)
             }
             .debugDrawerFont(.value)
+        }
+
+        @ViewBuilder private var failure: some View {
+            if let error = event.error {
+                Text(error.localizedDescription)
+                    .debugDrawerFont(.secondary)
+                    .debugDrawerForegroundStyle(.error)
+                    .lineLimit(3)
+                    .padding(.leading, dynamicTypeSize.isAccessibilitySize ? 0 : badgeWidth + 6)
+            }
         }
     }
 
@@ -191,6 +223,13 @@
             if duration < 0.001 { return "<1 ms" }
             if duration < 1 { return String(format: "%.0f ms", duration * 1000) }
             return String(format: "%.2f s", duration)
+        }
+    }
+
+    extension Int {
+        /// "1 call", "3 calls".
+        fileprivate var callsLabel: String {
+            self == 1 ? "1 call" : "\(self) calls"
         }
     }
 

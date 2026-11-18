@@ -1226,6 +1226,38 @@ a write from another process, such as an extension's, shows after Reload in the 
 Key, which also shows the system's keys. The bug report carries the standard defaults' keys as
 `user-defaults.json`.
 
+### Disk I/O: what the app reads and writes, and on which thread
+
+`DebugDrawer.shared.installDiskIO()` records the app's file calls as they happen: each call's
+operation, path, bytes, duration and thread, and the error of one that failed. Calls on the main
+thread carry a warning, and the totals (reads, writes, the bytes of each, main-thread calls and
+failures) count every call since Clear, not only the 500 the list keeps. Calls reach the drawer in
+batches, one per turn of the main queue, however many the app makes. The Disk section shows the
+home volume's size and free space, read when the plugin appears and on Refresh.
+
+What is recorded, through swizzled methods the install alone puts in place:
+
+- `FileManager`: `contents(atPath:)`, `createFile(atPath:contents:attributes:)`, `createDirectory`,
+  `removeItem`, `contentsOfDirectory`, `copyItem` and `moveItem` (each by path and by URL), and
+  `attributesOfItem(atPath:)`;
+- `NSData`: `write(toFile:)` and `write(to:)` (with `atomically:` or `options:`), and its
+  `contentsOfFile:` and `contentsOf:` initializers;
+- `FileHandle`: the Objective-C reads and writes on regular files: `readData(ofLength:)`,
+  `readDataToEndOfFile()`, `availableData`, `read(upToCount:)`, `readToEnd()` and `write(_:)`.
+
+What isn't, on current OSes, as none of it reaches a method the plugin can swizzle: Swift's
+`Data.write(to:)`, `Data(contentsOf:)` and `FileHandle.write(contentsOf:)`, `String`'s file
+methods, POSIX calls (`open`, `read`, `write`), SQLite, Core Data and `UserDefaults`. Nor is a
+`FileHandle` call that fails, a call that Foundation makes inside a recorded one, or the drawer's
+own file work: the File Browser's listings, bug reports, and the plugins' saved settings and
+sessions. A plugin of your own marks its file work the same way, so it stays out of the list:
+
+```swift
+let names = try DebugDrawerActivity.$isDrawerWork.withValue(true) {
+    try FileManager.default.contentsOfDirectory(atPath: folder)
+}
+```
+
 ### File Browser: what the app wrote to disk
 
 The File Browser plugin lists the app's own folders, so a developer can see what it wrote, how big
@@ -1659,7 +1691,7 @@ ContentView()
 | `DebugDrawerPerformancePlugin` | Live FPS and memory with sparkline graphs, CPU per thread, and a simulated memory warning |
 | `DebugDrawerEnergyPlugin` | Battery level and charging, CPU load and thermal state |
 | `DebugDrawerNetworkPlugin` | URLProtocol HTTP interception: method, URL, status, timing, headers, body, cURL export, mock responses by rule, slow and failing networks per host, replay and edit-and-resend, HAR export and import, WebSocket frames, requests kept across launches, ignored hosts, GraphQL operation names |
-| `DebugDrawerDiskIOPlugin` | FileManager reads, writes, deletes and listings, flagging main-thread I/O |
+| `DebugDrawerDiskIOPlugin` | FileManager, NSData and FileHandle file calls, flagging main-thread I/O and failures |
 | `DebugDrawerAppInfoPlugin` | Build (version, commit, branch, CI build), provisioning profile, entitlements, OS, memory, uptime, process, debugger, screen and reachability facts |
 | `DebugDrawerUserDefaultsPlugin` | Browse, search, add, edit, copy and delete UserDefaults keys of the standard defaults and app group suites, values of every property-list type edited at any depth, the list following the app's writes |
 | `DebugDrawerKeychainPlugin` | Generic and internet passwords, certificates and keys, each with every attribute the keychain returns (a key's or certificate's data is never read), filtered by access group and text; generic passwords added and edited, any item deleted; on the Mac, the data protection keychain |

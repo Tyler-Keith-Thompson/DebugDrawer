@@ -1,4 +1,5 @@
 #if DEBUG
+    import DebugDrawer
     import Foundation
 
     /// The directories whose contents the Files and Caches categories delete, and what inside
@@ -22,7 +23,8 @@
         /// (recordings and mockups), `DebugDrawer Crash Reports` and `DebugDrawer MetricKit Payloads`.
         static let debugDrawerPrefix = "DebugDrawer"
 
-        // Off the caller's actor, as is `delete`: a container's walk can take a while.
+        // Off the caller's actor, as is `delete`: a container's walk can take a while. Both are
+        // the drawer's own work, which Disk I/O leaves out.
 
         /// What a category would delete from `areas`: each area's entries, by name, descending
         /// only into folders that hold something kept, so the rest of such a folder is listed and
@@ -31,13 +33,15 @@
         /// - Parameter includingDebugDrawer: Whether DebugDrawer's own files go too.
         @concurrent
         func entries(in areas: [FileArea], includingDebugDrawer: Bool) async -> [FileEntry] {
-            areas.flatMap { area -> [FileEntry] in
-                guard let root = Self.realDirectoryPath(area.directory) else { return [] }
-                var kept = Set(kept.map(Self.path))
-                if !includingDebugDrawer {
-                    kept.formUnion(debugDrawerPaths(in: root))
+            DebugDrawerActivity.$isDrawerWork.withValue(true) {
+                areas.flatMap { area -> [FileEntry] in
+                    guard let root = Self.realDirectoryPath(area.directory) else { return [] }
+                    var kept = Set(kept.map(Self.path))
+                    if !includingDebugDrawer {
+                        kept.formUnion(debugDrawerPaths(in: root))
+                    }
+                    return Self.entries(in: root, named: area.name, keeping: kept)
                 }
-                return Self.entries(in: root, named: area.name, keeping: kept)
             }
         }
 
@@ -46,14 +50,16 @@
         /// - Returns: The entries that couldn't be deleted, with why.
         @concurrent
         func delete(_ entries: [FileEntry]) async -> [ResetFailure] {
-            entries.compactMap { entry in
-                do {
-                    try FileManager.default.removeItem(at: entry.url)
-                    return nil
-                } catch let error as CocoaError where error.code == .fileNoSuchFile {
-                    return nil
-                } catch {
-                    return .file(entry.displayPath, reason: error.localizedDescription)
+            DebugDrawerActivity.$isDrawerWork.withValue(true) {
+                entries.compactMap { entry in
+                    do {
+                        try FileManager.default.removeItem(at: entry.url)
+                        return nil
+                    } catch let error as CocoaError where error.code == .fileNoSuchFile {
+                        return nil
+                    } catch {
+                        return .file(entry.displayPath, reason: error.localizedDescription)
+                    }
                 }
             }
         }

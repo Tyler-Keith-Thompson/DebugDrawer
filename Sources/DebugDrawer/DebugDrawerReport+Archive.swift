@@ -27,6 +27,14 @@ extension DebugDrawerReport {
         /// - Returns: The zip's URL.
         /// - Throws: `WriteFailed` when a file can't be written or the folder can't be zipped.
         func writeArchive(summary: ReportSummary, in directory: URL) throws(WriteFailed) -> URL {
+            // The drawer's own work, which Disk I/O leaves out; through a Result, as binding a
+            // task-local value doesn't keep the error's type.
+            try DebugDrawerActivity.$isDrawerWork.withValue(true) {
+                Result { () throws(WriteFailed) in try writeArchiveFiles(summary: summary, in: directory) }
+            }.get()
+        }
+
+        private func writeArchiveFiles(summary: ReportSummary, in directory: URL) throws(WriteFailed) -> URL {
             let fileManager = FileManager.default
             let staging = fileManager.temporaryDirectory
                 .appendingPathComponent("DebugDrawerReport-\(UUID().uuidString)", isDirectory: true)

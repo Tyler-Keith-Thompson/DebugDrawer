@@ -3,7 +3,7 @@
 load("//tools:docc.bzl", "docc_archive")
 load("//tools:swift_rules.bzl", "swift_library")
 
-# Tracks FileManager reads, writes, deletes and listings, flagging main-thread I/O.
+# Tracks FileManager, NSData and FileHandle file calls, flagging main-thread I/O and failures.
 swift_library(
     name = "DebugDrawerDiskIOPlugin",
     srcs = glob(["**/*.swift"]),

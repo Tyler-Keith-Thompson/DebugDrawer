@@ -210,5 +210,19 @@
             #expect(actual == expectedTitles)
             #expect(AnyDebugDrawerPlugin(CachePlugin()).actions.isEmpty)
         }
+
+        @Test("Disk I/O: the drawer's own file work")
+        func drawerOwnFileWork() throws {
+            let folder = FileManager.default.temporaryDirectory.appending(path: "READMEDrawerWork-\(UUID().uuidString)").path
+            try FileManager.default.createDirectory(atPath: folder, withIntermediateDirectories: true)
+            defer { try? FileManager.default.removeItem(atPath: folder) }
+
+            let names = try DebugDrawerActivity.$isDrawerWork.withValue(true) {
+                try FileManager.default.contentsOfDirectory(atPath: folder)
+            }
+
+            #expect(names.isEmpty)
+            #expect(!DebugDrawerActivity.isDrawerWork)
+        }
     }
 #endif

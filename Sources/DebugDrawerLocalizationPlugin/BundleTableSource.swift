@@ -1,4 +1,5 @@
 #if DEBUG
+    import DebugDrawer
     import Foundation
 
     /// The app's localized bundles, read from their `.lproj` folders: the bundle at the root of
@@ -29,7 +30,11 @@
         /// The items in `folder` with the extension, sorted by name.
         private static func children(of folder: URL?, withExtension pathExtension: String) -> [URL] {
             guard let folder else { return [] }
-            return ((try? FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)) ?? [])
+            // The drawer's own work, which Disk I/O leaves out, as `read`'s listing is.
+            let children = DebugDrawerActivity.$isDrawerWork.withValue(true) {
+                (try? FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)) ?? []
+            }
+            return children
                 .filter { $0.pathExtension == pathExtension }
                 .sorted { $0.lastPathComponent < $1.lastPathComponent }
         }
@@ -37,7 +42,9 @@
         /// The bundle's tables, in every `.lproj` folder of its resources.
         static func read(_ bundle: Bundle, isMain: Bool) -> LocalizedBundle {
             let resources = bundle.resourceURL ?? bundle.bundleURL
-            let folders = (try? FileManager.default.contentsOfDirectory(at: resources, includingPropertiesForKeys: nil)) ?? []
+            let folders = DebugDrawerActivity.$isDrawerWork.withValue(true) {
+                (try? FileManager.default.contentsOfDirectory(at: resources, includingPropertiesForKeys: nil)) ?? []
+            }
             var tables: [String: [LocalizationTable]] = [:]
             for folder in folders where folder.pathExtension == "lproj" {
                 let localized = LocalizationTableFiles.tables(in: folder)

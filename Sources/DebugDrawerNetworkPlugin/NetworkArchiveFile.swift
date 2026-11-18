@@ -36,12 +36,15 @@
             // A file rather than data, so the name keeps its `.har`: the type is one the system
             // derives from the extension, which a share sheet might not map back to it. Written
             // when the share sheet asks for it, so nothing is encoded until then.
+            // The drawer's own work, which Disk I/O leaves out.
             FileRepresentation(exportedContentType: .httpArchive) { file in
-                let folder = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
-                try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-                let url = folder.appending(path: file.fileName, directoryHint: .notDirectory)
-                try file.data.write(to: url)
-                return SentTransferredFile(url)
+                try DebugDrawerActivity.$isDrawerWork.withValue(true) {
+                    let folder = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+                    try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+                    let url = folder.appending(path: file.fileName, directoryHint: .notDirectory)
+                    try file.data.write(to: url)
+                    return SentTransferredFile(url)
+                }
             }
         }
     }

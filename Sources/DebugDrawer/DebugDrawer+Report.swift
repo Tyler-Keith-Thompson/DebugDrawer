@@ -21,7 +21,10 @@
         /// - Returns: The zip's URL.
         /// - Throws: ``DebugDrawerReport/WriteFailed`` when a file can't be written or zipped.
         func createReport(in directory: URL = FileManager.default.temporaryDirectory) throws(DebugDrawerReport.WriteFailed) -> URL {
-            let report = DebugDrawerReport(contributionsOf: reportContributors, redaction: redaction)
+            // A plugin's contribution may read its files: the drawer's own work, like the writing.
+            let report = DebugDrawerActivity.$isDrawerWork.withValue(true) {
+                DebugDrawerReport(contributionsOf: reportContributors, redaction: redaction)
+            }
             return try report.writeArchive(summary: .current(at: Date()), in: directory)
         }
     }

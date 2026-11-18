@@ -1,4 +1,5 @@
 #if DEBUG
+    import DebugDrawer
     import Foundation
 
     /// Where the conditioning profiles are kept between launches.
@@ -19,14 +20,20 @@
             directory.appending(path: "conditions.json")
         }
 
+        // Both are the drawer's own work, which Disk I/O leaves out.
+
         func readProfiles() throws -> Data? {
-            guard FileManager.default.fileExists(atPath: file.path(percentEncoded: false)) else { return nil }
-            return try Data(contentsOf: file)
+            try DebugDrawerActivity.$isDrawerWork.withValue(true) {
+                guard FileManager.default.fileExists(atPath: file.path(percentEncoded: false)) else { return nil }
+                return try Data(contentsOf: file)
+            }
         }
 
         func writeProfiles(_ data: Data) throws {
-            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-            try data.write(to: file, options: .atomic)
+            try DebugDrawerActivity.$isDrawerWork.withValue(true) {
+                try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+                try data.write(to: file, options: .atomic)
+            }
         }
     }
 #endif

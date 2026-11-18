@@ -1,12 +1,14 @@
 #if DEBUG
     import Combine
+    import DebugDrawer
     import Foundation
 
     /// The payloads kept in a directory, one JSON file each, the newest ``limit`` kept, so the
     /// history survives relaunches.
     ///
     /// The directory is the seam tests replace (a temporary one), as Crash Reports' store does.
-    /// Main-actor isolated, like the drawer that shows and edits it.
+    /// Main-actor isolated, like the drawer that shows and edits it. Its file work is the
+    /// drawer's own, which Disk I/O leaves out.
     @MainActor
     final class MetricKitPayloadStore: ObservableObject {
         /// How many payloads are kept; one more deletes the one whose period ended first. Fifty is
@@ -28,8 +30,10 @@
         init(directory: URL, onUnseenCountChange: @escaping @MainActor (Int) -> Void = { _ in }) {
             self.directory = directory
             self.onUnseenCountChange = onUnseenCountChange
-            try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-            payloads = Self.load(from: directory)
+            payloads = DebugDrawerActivity.$isDrawerWork.withValue(true) {
+                try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+                return Self.load(from: directory)
+            }
         }
 
         /// How many payloads the developer hasn't opened.
@@ -59,7 +63,7 @@
                 save(payload)
             }
             for dropped in sorted.dropFirst(Self.limit) {
-                try? FileManager.default.removeItem(at: file(for: dropped.id))
+                removeFile(for: dropped.id)
             }
             update(kept)
             return added.filter { keptIDs.contains($0.id) }
@@ -85,14 +89,14 @@
 
         /// Deletes the payload with `id`.
         func delete(_ id: MetricKitPayload.ID) {
-            try? FileManager.default.removeItem(at: file(for: id))
+            removeFile(for: id)
             update(payloads.filter { $0.id != id })
         }
 
         /// Deletes every payload.
         func deleteAll() {
             for payload in payloads {
-                try? FileManager.default.removeItem(at: file(for: payload.id))
+                removeFile(for: payload.id)
             }
             update([])
         }
@@ -105,7 +109,15 @@
         private func save(_ payload: MetricKitPayload) {
             // A payload of data, dates, a string and a Boolean always encodes.
             if let data = try? JSONEncoder().encode(payload) {
-                try? data.write(to: file(for: payload.id), options: .atomic)
+                DebugDrawerActivity.$isDrawerWork.withValue(true) {
+                    try? data.write(to: file(for: payload.id), options: .atomic)
+                }
+            }
+        }
+
+        private func removeFile(for id: MetricKitPayload.ID) {
+            DebugDrawerActivity.$isDrawerWork.withValue(true) {
+                try? FileManager.default.removeItem(at: file(for: id))
             }
         }
 

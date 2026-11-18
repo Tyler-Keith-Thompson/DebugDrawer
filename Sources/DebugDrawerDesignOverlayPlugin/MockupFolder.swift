@@ -1,9 +1,10 @@
 #if DEBUG
+    import DebugDrawer
     import Foundation
 
     /// The mockup and its settings in a folder, `Caches/DebugDrawer/DesignOverlay` in production:
     /// the system may clear it when the device runs short of space, which suits a comp that can be
-    /// picked again.
+    /// picked again. Its file work is the drawer's own, which Disk I/O leaves out.
     struct MockupFolder: MockupStorage {
         /// The folder; created when the first mockup or settings are saved.
         let directory: URL
@@ -24,31 +25,33 @@
         }
 
         func loadMockup() -> Data? {
-            try? Data(contentsOf: mockupURL)
+            DebugDrawerActivity.$isDrawerWork.withValue(true) { try? Data(contentsOf: mockupURL) }
         }
 
         func saveMockup(_ data: Data) throws(MockupFailure) {
-            do {
-                try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-                try data.write(to: mockupURL, options: .atomic)
-            } catch {
-                throw .notSaved
+            let saved = DebugDrawerActivity.$isDrawerWork.withValue(true) {
+                (try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)) != nil
+                    && (try? data.write(to: mockupURL, options: .atomic)) != nil
             }
+            guard saved else { throw .notSaved }
         }
 
         func removeMockup() {
-            try? FileManager.default.removeItem(at: mockupURL)
+            DebugDrawerActivity.$isDrawerWork.withValue(true) { try? FileManager.default.removeItem(at: mockupURL) }
         }
 
         func loadSettings() -> DesignOverlaySettings? {
-            guard let data = try? Data(contentsOf: settingsURL) else { return nil }
+            let data = DebugDrawerActivity.$isDrawerWork.withValue(true) { try? Data(contentsOf: settingsURL) }
+            guard let data else { return nil }
             return try? JSONDecoder().decode(DesignOverlaySettings.self, from: data)
         }
 
         func saveSettings(_ settings: DesignOverlaySettings) {
             guard let data = try? JSONEncoder().encode(settings) else { return }
-            try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-            try? data.write(to: settingsURL, options: .atomic)
+            DebugDrawerActivity.$isDrawerWork.withValue(true) {
+                try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+                try? data.write(to: settingsURL, options: .atomic)
+            }
         }
     }
 #endif

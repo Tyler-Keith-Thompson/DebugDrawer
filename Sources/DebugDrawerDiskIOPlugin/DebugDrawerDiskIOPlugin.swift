@@ -1,47 +1,31 @@
 import Combine
 import DebugDrawer
 import Foundation
-import ObjectiveC
 import SwiftUI
-
-// MARK: - I/O event model
-
-public struct IOEvent: Identifiable {
-    public let id = UUID()
-    public let timestamp: Date
-    public let operation: Operation
-    public let path: String
-    public let size: Int64
-    public let duration: TimeInterval
-    public let isMainThread: Bool
-
-    public enum Operation: String {
-        case read = "R"
-        case write = "W"
-        case delete = "D"
-        case create = "C"
-        case list = "L"
-        case stat = "S"
-
-        /// The operation in a word ("Read"), for the filter and VoiceOver.
-        var name: String {
-            switch self {
-            case .read: "Read"
-            case .write: "Write"
-            case .delete: "Delete"
-            case .create: "Create"
-            case .list: "List"
-            case .stat: "Stat"
-            }
-        }
-    }
-}
 
 // MARK: - Plugin
 
 // The public API compiles in every configuration; the implementation under `#if DEBUG` below does
 // not, so release builds get an empty view and an installer that swizzles and registers nothing.
 
+/// The app's file calls as they happen: reads, writes, creates, deletes, listings, stats, copies
+/// and moves, each with its path, size, duration, thread and error, and running totals of them.
+///
+/// `installDiskIO()` swizzles these, and records each call the app makes through them:
+///
+/// - `FileManager`: `contents(atPath:)`, `createFile(atPath:contents:attributes:)`,
+///   `createDirectory` (path and URL), `removeItem`, `contentsOfDirectory`, `copyItem` and
+///   `moveItem` (each by path and by URL), and `attributesOfItem(atPath:)`;
+/// - `NSData`: `write(toFile:)` and `write(to:)` (with `atomically:` or `options:`), and its
+///   `contentsOfFile:` and `contentsOf:` initializers;
+/// - `FileHandle`: the Objective-C reads and writes (`readData(ofLength:)`, `readDataToEndOfFile()`,
+///   `availableData`, `read(upToCount:)`, `readToEnd()`, `write(_:)`) on regular files.
+///
+/// On current OSes these never reach a swizzled method, so they aren't recorded: Swift's
+/// `Data.write(to:)`, `Data(contentsOf:)` and `FileHandle.write(contentsOf:)`, `String`'s file
+/// methods, POSIX calls (`open`, `read`, `write`), SQLite, Core Data and `UserDefaults`. Nor is a
+/// `FileHandle` call that fails, or the drawer's own file work, which runs with
+/// `DebugDrawerActivity.isDrawerWork` bound to `true`.
 public struct DiskIOPlugin: DebugDrawerPlugin {
     public var title = "Disk I/O"
     public var category = "Storage"
@@ -61,6 +45,7 @@ public struct DiskIOPlugin: DebugDrawerPlugin {
 // MARK: - Convenience installer
 
 public extension DebugDrawer {
+    /// Swizzles the file methods ``DiskIOPlugin`` lists and registers the plugin.
     func installDiskIO() {
         #if DEBUG
             DiskIOStore.shared.install()
@@ -72,38 +57,45 @@ public extension DebugDrawer {
 #if DEBUG
     // MARK: - I/O monitor store
 
+    /// The recorded calls, newest first, and the totals of every call since the last clear.
     @MainActor
     public final class DiskIOStore: ObservableObject {
-        public static let shared = DiskIOStore()
+        public static let shared = DiskIOStore(recorder: .shared)
 
+        /// The newest calls, at most ``capacity``, newest first.
         @Published public private(set) var events: [IOEvent] = []
+        /// Every call since the last clear, including the ones ``events`` no longer keeps.
+        @Published public private(set) var totals = DiskIOTotals()
         @Published public var filterOp: IOEvent.Operation?
         @Published public var mainThreadOnly = false
 
-        public var capacity = 500
+        /// How many calls ``events`` keeps.
+        public var capacity = 500 {
+            didSet { recorder.setLimit(capacity) }
+        }
+
         private var installed = false
-        private let lineSubject = PassthroughSubject<IOEvent, Never>()
+        private let recorder: DiskIORecorder
         private var cancellable: AnyCancellable?
 
-        /// Stats
         public var totalReads: Int {
-            events.filter { $0.operation == .read }.count
+            totals.reads
         }
 
         public var totalWrites: Int {
-            events.filter { $0.operation == .write }.count
+            totals.writes
         }
 
         public var totalBytesRead: Int64 {
-            events.filter { $0.operation == .read }.reduce(0) { $0 + $1.size }
+            totals.bytesRead
         }
 
         public var totalBytesWritten: Int64 {
-            events.filter { $0.operation == .write }.reduce(0) { $0 + $1.size }
+            totals.bytesWritten
         }
 
         public var mainThreadOps: Int {
-            events.filter(\.isMainThread).count
+            totals.mainThreadCalls
         }
 
         public var filteredEvents: [IOEvent] {
@@ -113,17 +105,12 @@ public extension DebugDrawer {
             return result
         }
 
-        private init() {
-            cancellable = lineSubject
-                .collect(.byTime(DispatchQueue.main, .milliseconds(200)))
-                .receive(on: DispatchQueue.main)
-                .sink { [weak self] batch in
-                    guard let self, !batch.isEmpty else { return }
-                    self.events.insert(contentsOf: batch, at: 0)
-                    if self.events.count > self.capacity {
-                        self.events.removeLast(self.events.count - self.capacity)
-                    }
-                }
+        /// A store showing what `recorder` records.
+        init(recorder: DiskIORecorder) {
+            self.recorder = recorder
+            cancellable = recorder.batches.sink { [weak self] batch in
+                self?.receive(batch)
+            }
         }
 
         public func install() {
@@ -132,12 +119,19 @@ public extension DebugDrawer {
             DiskIOSwizzler.install()
         }
 
-        func record(_ event: IOEvent) {
-            lineSubject.send(event)
-        }
-
         public func clear() {
             events.removeAll()
+            totals = DiskIOTotals()
+        }
+
+        private func receive(_ batch: DiskIOBatch) {
+            totals += batch.totals
+            guard !batch.events.isEmpty else { return }
+            // Built whole and assigned once: `@Published` has no in-place mutation, so inserting
+            // and trimming in place would copy the list twice.
+            var newest = Array(batch.events.reversed().prefix(capacity))
+            newest.append(contentsOf: events.prefix(max(capacity - newest.count, 0)))
+            events = newest
         }
     }
 #else
@@ -151,6 +145,8 @@ public extension DebugDrawer {
 
         /// Always empty.
         @Published public private(set) var events: [IOEvent] = []
+        /// Always zero.
+        @Published public private(set) var totals = DiskIOTotals()
         /// Kept, never applied.
         @Published public var filterOp: IOEvent.Operation?
         /// Kept, never applied.
@@ -196,124 +192,5 @@ public extension DebugDrawer {
 
         /// Does nothing.
         public func clear() {}
-    }
-#endif
-
-#if DEBUG
-    // MARK: - FileManager swizzling
-
-    enum DiskIOSwizzler {
-        static func install() {
-            // Swizzle contentsOfFile (read)
-            swizzle(
-                cls: FileManager.self,
-                original: #selector(FileManager.contents(atPath:)),
-                swizzled: #selector(FileManager.dd_contents(atPath:))
-            )
-
-            // Swizzle createFile (write)
-            swizzle(
-                cls: FileManager.self,
-                original: #selector(FileManager.createFile(atPath:contents:attributes:)),
-                swizzled: #selector(FileManager.dd_createFile(atPath:contents:attributes:))
-            )
-
-            // Swizzle removeItem (delete)
-            swizzle(
-                cls: FileManager.self,
-                original: #selector(FileManager.removeItem(atPath:)),
-                swizzled: #selector(FileManager.dd_removeItem(atPath:))
-            )
-
-            // Swizzle contentsOfDirectory (list)
-            swizzle(
-                cls: FileManager.self,
-                original: #selector(FileManager.contentsOfDirectory(atPath:)),
-                swizzled: #selector(FileManager.dd_contentsOfDirectory(atPath:))
-            )
-
-            // Swizzle attributesOfItem (stat)
-            swizzle(
-                cls: FileManager.self,
-                original: #selector(FileManager.attributesOfItem(atPath:)),
-                swizzled: #selector(FileManager.dd_attributesOfItem(atPath:))
-            )
-        }
-
-        private static func swizzle(cls: AnyClass, original: Selector, swizzled: Selector) {
-            guard let originalMethod = class_getInstanceMethod(cls, original),
-                  let swizzledMethod = class_getInstanceMethod(cls, swizzled)
-            else { return }
-            method_exchangeImplementations(originalMethod, swizzledMethod)
-        }
-    }
-
-    // MARK: - Swizzled FileManager methods
-
-    extension FileManager {
-        @objc func dd_contents(atPath path: String) -> Data? {
-            let start = CFAbsoluteTimeGetCurrent()
-            let result = dd_contents(atPath: path) // calls original
-            let duration = CFAbsoluteTimeGetCurrent() - start
-            let size = Int64(result?.count ?? 0)
-
-            let event = IOEvent(
-                timestamp: Date(), operation: .read, path: path,
-                size: size, duration: duration, isMainThread: Thread.isMainThread
-            )
-            Task { @MainActor in DiskIOStore.shared.record(event) }
-            return result
-        }
-
-        @objc func dd_createFile(atPath path: String, contents data: Data?, attributes: [FileAttributeKey: Any]?) -> Bool {
-            let start = CFAbsoluteTimeGetCurrent()
-            let result = dd_createFile(atPath: path, contents: data, attributes: attributes)
-            let duration = CFAbsoluteTimeGetCurrent() - start
-
-            let event = IOEvent(
-                timestamp: Date(), operation: .write, path: path,
-                size: Int64(data?.count ?? 0), duration: duration, isMainThread: Thread.isMainThread
-            )
-            Task { @MainActor in DiskIOStore.shared.record(event) }
-            return result
-        }
-
-        @objc func dd_removeItem(atPath path: String) throws {
-            let start = CFAbsoluteTimeGetCurrent()
-            try dd_removeItem(atPath: path)
-            let duration = CFAbsoluteTimeGetCurrent() - start
-
-            let event = IOEvent(
-                timestamp: Date(), operation: .delete, path: path,
-                size: 0, duration: duration, isMainThread: Thread.isMainThread
-            )
-            Task { @MainActor in DiskIOStore.shared.record(event) }
-        }
-
-        @objc func dd_contentsOfDirectory(atPath path: String) throws -> [String] {
-            let start = CFAbsoluteTimeGetCurrent()
-            let result = try dd_contentsOfDirectory(atPath: path)
-            let duration = CFAbsoluteTimeGetCurrent() - start
-
-            let event = IOEvent(
-                timestamp: Date(), operation: .list, path: path,
-                size: Int64(result.count), duration: duration, isMainThread: Thread.isMainThread
-            )
-            Task { @MainActor in DiskIOStore.shared.record(event) }
-            return result
-        }
-
-        @objc func dd_attributesOfItem(atPath path: String) throws -> [FileAttributeKey: Any] {
-            let start = CFAbsoluteTimeGetCurrent()
-            let result = try dd_attributesOfItem(atPath: path)
-            let duration = CFAbsoluteTimeGetCurrent() - start
-
-            let event = IOEvent(
-                timestamp: Date(), operation: .stat, path: path,
-                size: (result[.size] as? Int64) ?? 0, duration: duration, isMainThread: Thread.isMainThread
-            )
-            Task { @MainActor in DiskIOStore.shared.record(event) }
-            return result
-        }
     }
 #endif

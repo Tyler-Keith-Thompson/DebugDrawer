@@ -1,5 +1,6 @@
 #if DEBUG
     import Combine
+    import DebugDrawer
     import Foundation
 
     /// The crash reports kept in a directory: the crash file the handlers left, read on the next
@@ -7,7 +8,8 @@
     ///
     /// The directory is the seam tests replace (a temporary one): the signal handler can only
     /// write a file, so a protocol over storage would still need a real path beside it.
-    /// Main-actor isolated, like the drawer that shows and edits it.
+    /// Main-actor isolated, like the drawer that shows and edits it. Its file work is the
+    /// drawer's own, which Disk I/O leaves out.
     @MainActor
     final class CrashReportStore: ObservableObject {
         /// How many reports are kept; adding one more deletes the oldest.
@@ -28,8 +30,10 @@
         init(directory: URL, onUnseenCountChange: @escaping @MainActor (Int) -> Void = { _ in }) {
             self.directory = directory
             self.onUnseenCountChange = onUnseenCountChange
-            try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-            reports = Self.load(from: directory)
+            reports = DebugDrawerActivity.$isDrawerWork.withValue(true) {
+                try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+                return Self.load(from: directory)
+            }
         }
 
         /// The file the crash handlers write.
@@ -49,9 +53,13 @@
         @discardableResult
         func collectCrashFile(id: UUID = UUID()) -> CrashReport? {
             let file = crashFile
-            guard let data = FileManager.default.contents(atPath: file.path(percentEncoded: false)) else { return nil }
-            let modified = (try? file.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate
-            try? FileManager.default.removeItem(at: file)
+            let found: (data: Data, modified: Date?)? = DebugDrawerActivity.$isDrawerWork.withValue(true) {
+                guard let data = FileManager.default.contents(atPath: file.path(percentEncoded: false)) else { return nil }
+                let modified = (try? file.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate
+                try? FileManager.default.removeItem(at: file)
+                return (data, modified)
+            }
+            guard let (data, modified) = found else { return nil }
             // A file cut off inside a character isn't UTF-8; Latin-1 reads any bytes, so its
             // ASCII lines (the keys and the frames) still parse.
             let text = String(bytes: data, encoding: .utf8) ?? String(bytes: data, encoding: .isoLatin1) ?? ""
@@ -75,7 +83,7 @@
             save(report)
             let sorted = (reports.filter { $0.id != report.id } + [report]).sorted(by: CrashReport.isNewer)
             for dropped in sorted.dropFirst(Self.limit) {
-                try? FileManager.default.removeItem(at: file(for: dropped.id))
+                removeFile(for: dropped.id)
             }
             update(Array(sorted.prefix(Self.limit)))
         }
@@ -100,14 +108,14 @@
 
         /// Deletes the report with `id`.
         func delete(_ id: CrashReport.ID) {
-            try? FileManager.default.removeItem(at: file(for: id))
+            removeFile(for: id)
             update(reports.filter { $0.id != id })
         }
 
         /// Deletes every report.
         func deleteAll() {
             for report in reports {
-                try? FileManager.default.removeItem(at: file(for: report.id))
+                removeFile(for: report.id)
             }
             update([])
         }
@@ -120,7 +128,15 @@
         private func save(_ report: CrashReport) {
             // A report of strings, a date and a Boolean always encodes.
             if let data = try? JSONEncoder().encode(report) {
-                try? data.write(to: file(for: report.id), options: .atomic)
+                DebugDrawerActivity.$isDrawerWork.withValue(true) {
+                    try? data.write(to: file(for: report.id), options: .atomic)
+                }
+            }
+        }
+
+        private func removeFile(for id: CrashReport.ID) {
+            DebugDrawerActivity.$isDrawerWork.withValue(true) {
+                try? FileManager.default.removeItem(at: file(for: id))
             }
         }
 

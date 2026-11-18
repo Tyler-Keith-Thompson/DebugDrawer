@@ -1,4 +1,5 @@
 #if DEBUG
+    import DebugDrawer
     import Foundation
     import os
 
@@ -46,7 +47,8 @@
                 if let copy = copies[path] {
                     return copy
                 }
-                let copy = write(URL(fileURLWithPath: path), index: copies.count)
+                // The drawer's own work, which Disk I/O leaves out.
+                let copy = DebugDrawerActivity.$isDrawerWork.withValue(true) { write(URL(fileURLWithPath: path), index: copies.count) }
                 copies[path] = copy
                 return copy
             }

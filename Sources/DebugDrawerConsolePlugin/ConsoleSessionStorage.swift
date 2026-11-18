@@ -1,3 +1,4 @@
+import DebugDrawer
 import Foundation
 
 /// Where the Console plugin keeps the log lines of each launch, so the next launch can show
@@ -57,17 +58,41 @@ public struct ConsoleSessionFile: Hashable, Sendable {
 
         let directory: URL
 
+        // Every call is the drawer's own work, which Disk I/O leaves out.
+
         func sessionFiles() throws -> [ConsoleSessionFile] {
-            guard FileManager.default.fileExists(atPath: directory.path(percentEncoded: false)) else { return [] }
-            let files = try FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: [.fileSizeKey, .isRegularFileKey])
-            return files.compactMap { file in
-                let values = try? file.resourceValues(forKeys: [.fileSizeKey, .isRegularFileKey])
-                guard values?.isRegularFile == true, file.pathExtension == "jsonl" else { return nil }
-                return ConsoleSessionFile(name: file.lastPathComponent, byteCount: values?.fileSize ?? 0)
+            try DebugDrawerActivity.$isDrawerWork.withValue(true) {
+                guard FileManager.default.fileExists(atPath: directory.path(percentEncoded: false)) else { return [] }
+                let files = try FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: [.fileSizeKey, .isRegularFileKey])
+                return files.compactMap { file in
+                    let values = try? file.resourceValues(forKeys: [.fileSizeKey, .isRegularFileKey])
+                    guard values?.isRegularFile == true, file.pathExtension == "jsonl" else { return nil }
+                    return ConsoleSessionFile(name: file.lastPathComponent, byteCount: values?.fileSize ?? 0)
+                }
             }
         }
 
         func append(_ data: Data, toSessionNamed name: String) throws {
+            try DebugDrawerActivity.$isDrawerWork.withValue(true) { try appendFile(data, toSessionNamed: name) }
+        }
+
+        func contents(ofSessionNamed name: String) throws -> Data {
+            try DebugDrawerActivity.$isDrawerWork.withValue(true) {
+                try Data(contentsOf: directory.appending(path: name, directoryHint: .notDirectory))
+            }
+        }
+
+        func deleteSession(named name: String) throws {
+            try DebugDrawerActivity.$isDrawerWork.withValue(true) {
+                do {
+                    try FileManager.default.removeItem(at: directory.appending(path: name, directoryHint: .notDirectory))
+                } catch let error as CocoaError where error.code == .fileNoSuchFile {
+                    return
+                }
+            }
+        }
+
+        private func appendFile(_ data: Data, toSessionNamed name: String) throws {
             let file = directory.appending(path: name, directoryHint: .notDirectory)
             // Created on each append that finds it gone, so a session deleted while the app runs
             // (Reset App State, say) starts again rather than failing every write after.
@@ -84,18 +109,6 @@ public struct ConsoleSessionFile: Hashable, Sendable {
             defer { try? handle.close() }
             try handle.seekToEnd()
             try handle.write(contentsOf: data)
-        }
-
-        func contents(ofSessionNamed name: String) throws -> Data {
-            try Data(contentsOf: directory.appending(path: name, directoryHint: .notDirectory))
-        }
-
-        func deleteSession(named name: String) throws {
-            do {
-                try FileManager.default.removeItem(at: directory.appending(path: name, directoryHint: .notDirectory))
-            } catch let error as CocoaError where error.code == .fileNoSuchFile {
-                return
-            }
         }
     }
 #endif

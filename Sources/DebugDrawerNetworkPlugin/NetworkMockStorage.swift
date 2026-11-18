@@ -1,4 +1,5 @@
 #if DEBUG
+    import DebugDrawer
     import Foundation
 
     /// Where the mock rules and their body files are kept between launches.
@@ -38,29 +39,41 @@
             directory.appending(path: "Bodies", directoryHint: .isDirectory)
         }
 
+        // Every call is the drawer's own work, which Disk I/O leaves out.
+
         func readRules() throws -> Data? {
-            guard FileManager.default.fileExists(atPath: rulesFile.path(percentEncoded: false)) else { return nil }
-            return try Data(contentsOf: rulesFile)
+            try DebugDrawerActivity.$isDrawerWork.withValue(true) {
+                guard FileManager.default.fileExists(atPath: rulesFile.path(percentEncoded: false)) else { return nil }
+                return try Data(contentsOf: rulesFile)
+            }
         }
 
         func writeRules(_ data: Data) throws {
-            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-            try data.write(to: rulesFile, options: .atomic)
+            try DebugDrawerActivity.$isDrawerWork.withValue(true) {
+                try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+                try data.write(to: rulesFile, options: .atomic)
+            }
         }
 
         func addBody(_ data: Data, fileExtension: String?) throws -> String {
-            try FileManager.default.createDirectory(at: bodies, withIntermediateDirectories: true)
-            let name = UUID().uuidString + (fileExtension.map { $0.isEmpty ? "" : "." + $0 } ?? "")
-            try data.write(to: bodies.appending(path: name), options: .atomic)
-            return name
+            try DebugDrawerActivity.$isDrawerWork.withValue(true) {
+                try FileManager.default.createDirectory(at: bodies, withIntermediateDirectories: true)
+                let name = UUID().uuidString + (fileExtension.map { $0.isEmpty ? "" : "." + $0 } ?? "")
+                try data.write(to: bodies.appending(path: name), options: .atomic)
+                return name
+            }
         }
 
         func body(named name: String) -> Data? {
-            try? Data(contentsOf: bodies.appending(path: name))
+            DebugDrawerActivity.$isDrawerWork.withValue(true) {
+                try? Data(contentsOf: bodies.appending(path: name))
+            }
         }
 
         func removeBody(named name: String) {
-            try? FileManager.default.removeItem(at: bodies.appending(path: name))
+            DebugDrawerActivity.$isDrawerWork.withValue(true) {
+                try? FileManager.default.removeItem(at: bodies.appending(path: name))
+            }
         }
     }
 #endif

@@ -1,14 +1,20 @@
 #if DEBUG
+    import DebugDrawer
     import Foundation
 
     /// Reads the tables of one `.lproj` folder: `.strings` files (text in the strings format,
     /// UTF-8 or UTF-16, or a binary or XML property list, as Xcode compiles them and a String
-    /// Catalog becomes) and `.stringsdict` files.
+    /// Catalog becomes) and `.stringsdict` files. Reading them is the drawer's own work, which
+    /// Disk I/O leaves out.
     enum LocalizationTableFiles {
         /// The folder's tables, sorted by name. A `.strings` and a `.stringsdict` of the same name
         /// are one table, the stringsdict winning for a key in both, as Foundation's lookup does.
         /// A file that isn't a dictionary of strings is skipped.
         static func tables(in folder: URL) -> [LocalizationTable] {
+            DebugDrawerActivity.$isDrawerWork.withValue(true) { readTables(in: folder) }
+        }
+
+        private static func readTables(in folder: URL) -> [LocalizationTable] {
             let files = (try? FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)) ?? []
             var entries: [String: [String: LocalizationEntry]] = [:]
             for file in files.sorted(by: { $0.lastPathComponent < $1.lastPathComponent }) {

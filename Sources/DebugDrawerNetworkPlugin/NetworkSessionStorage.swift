@@ -1,3 +1,4 @@
+import DebugDrawer
 import Foundation
 
 /// Where the Network plugin keeps the requests of each launch, so the next launch can show
@@ -57,44 +58,54 @@ public struct NetworkSessionFile: Hashable, Sendable {
 
         let directory: URL
 
+        // Every call is the drawer's own work, which Disk I/O leaves out.
+
         func sessionFiles() throws -> [NetworkSessionFile] {
-            guard FileManager.default.fileExists(atPath: directory.path(percentEncoded: false)) else { return [] }
-            let files = try FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: [.fileSizeKey, .isRegularFileKey])
-            return files.compactMap { file in
-                let values = try? file.resourceValues(forKeys: [.fileSizeKey, .isRegularFileKey])
-                guard values?.isRegularFile == true, file.pathExtension == "jsonl" else { return nil }
-                return NetworkSessionFile(name: file.lastPathComponent, byteCount: values?.fileSize ?? 0)
+            try DebugDrawerActivity.$isDrawerWork.withValue(true) {
+                guard FileManager.default.fileExists(atPath: directory.path(percentEncoded: false)) else { return [] }
+                let files = try FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: [.fileSizeKey, .isRegularFileKey])
+                return files.compactMap { file in
+                    let values = try? file.resourceValues(forKeys: [.fileSizeKey, .isRegularFileKey])
+                    guard values?.isRegularFile == true, file.pathExtension == "jsonl" else { return nil }
+                    return NetworkSessionFile(name: file.lastPathComponent, byteCount: values?.fileSize ?? 0)
+                }
             }
         }
 
         func append(_ data: Data, toSessionNamed name: String) throws {
-            let file = directory.appending(path: name, directoryHint: .notDirectory)
-            // Created on each append that finds it gone, so a session deleted while the app runs
-            // (Reset App State, say) starts again rather than failing every write after.
-            if !FileManager.default.fileExists(atPath: file.path(percentEncoded: false)) {
-                try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-                guard FileManager.default.createFile(atPath: file.path(percentEncoded: false), contents: nil) else {
-                    throw CocoaError(.fileWriteUnknown)
+            try DebugDrawerActivity.$isDrawerWork.withValue(true) {
+                let file = directory.appending(path: name, directoryHint: .notDirectory)
+                // Created on each append that finds it gone, so a session deleted while the app runs
+                // (Reset App State, say) starts again rather than failing every write after.
+                if !FileManager.default.fileExists(atPath: file.path(percentEncoded: false)) {
+                    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+                    guard FileManager.default.createFile(atPath: file.path(percentEncoded: false), contents: nil) else {
+                        throw CocoaError(.fileWriteUnknown)
+                    }
                 }
+                // Written straight to the file, not through a buffer of the process's own, so what
+                // was appended survives the app crashing; nothing is synced to the disk, as only the
+                // system going down would lose it.
+                let handle = try FileHandle(forWritingTo: file)
+                defer { try? handle.close() }
+                try handle.seekToEnd()
+                try handle.write(contentsOf: data)
             }
-            // Written straight to the file, not through a buffer of the process's own, so what
-            // was appended survives the app crashing; nothing is synced to the disk, as only the
-            // system going down would lose it.
-            let handle = try FileHandle(forWritingTo: file)
-            defer { try? handle.close() }
-            try handle.seekToEnd()
-            try handle.write(contentsOf: data)
         }
 
         func contents(ofSessionNamed name: String) throws -> Data {
-            try Data(contentsOf: directory.appending(path: name, directoryHint: .notDirectory))
+            try DebugDrawerActivity.$isDrawerWork.withValue(true) {
+                try Data(contentsOf: directory.appending(path: name, directoryHint: .notDirectory))
+            }
         }
 
         func deleteSession(named name: String) throws {
-            do {
-                try FileManager.default.removeItem(at: directory.appending(path: name, directoryHint: .notDirectory))
-            } catch let error as CocoaError where error.code == .fileNoSuchFile {
-                return
+            try DebugDrawerActivity.$isDrawerWork.withValue(true) {
+                do {
+                    try FileManager.default.removeItem(at: directory.appending(path: name, directoryHint: .notDirectory))
+                } catch let error as CocoaError where error.code == .fileNoSuchFile {
+                    return
+                }
             }
         }
     }

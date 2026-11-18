@@ -53,6 +53,12 @@ the entry becomes the GitHub release's notes.
   plugins' `install*()` calls and types, their stores, `.trackRenders()`, `RedactedText` and
   `debugDrawerCopyToClipboard(_:)` no longer need `#if DEBUG`, and
   `just deploy` builds the example apps optimized and checks every public symbol exists in release.
+- DD-72: Disk I/O records `FileManager`'s URL methods, copies, moves and folder creation, `NSData`'s
+  file reads and writes and `FileHandle`'s Objective-C reads and writes, as well as creates
+  (`IOEvent.Operation.create`, and the new `copy` and `move`) and failed calls with their error
+  (`IOEvent.error`); totals (`DiskIOStore.totals`, `DiskIOTotals`) count every call since Clear;
+  calls reach the main actor in batches; the drawer's own file work is left out, and a plugin marks
+  its own with `DebugDrawerActivity.isDrawerWork`; disk space is read off the main thread.
 
 ### Removed
 

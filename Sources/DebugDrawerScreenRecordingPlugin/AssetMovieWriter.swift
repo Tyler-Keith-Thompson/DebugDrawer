@@ -2,6 +2,7 @@
     import AVFoundation
     import CoreGraphics
     import CoreVideo
+    import DebugDrawer
     import os
 
     /// Writes frames as H.264 in a QuickTime movie with AVAssetWriter.
@@ -72,7 +73,8 @@
             self.session = nil
             guard let lastTime = session.lastTime else {
                 session.writer.cancelWriting()
-                try? FileManager.default.removeItem(at: url)
+                // The drawer's own work, which Disk I/O leaves out, as below.
+                DebugDrawerActivity.$isDrawerWork.withValue(true) { try? FileManager.default.removeItem(at: url) }
                 throw hasFailed ? .writeFailed : .noFrames
             }
             // The last frame stays on screen for one frame's length rather than none.
@@ -136,7 +138,7 @@
         private func startSession(with frame: RecordedFrame) -> Session? {
             let (width, height) = Self.movieSize(of: frame.image)
             guard width >= 2, height >= 2 else { return nil }
-            try? FileManager.default.removeItem(at: url)
+            DebugDrawerActivity.$isDrawerWork.withValue(true) { try? FileManager.default.removeItem(at: url) }
             guard let writer = try? AVAssetWriter(outputURL: url, fileType: .mov) else { return nil }
             let input = AVAssetWriterInput(mediaType: .video, outputSettings: [
                 AVVideoCodecKey: AVVideoCodecType.h264,

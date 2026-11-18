@@ -1,4 +1,5 @@
 #if DEBUG
+    import DebugDrawer
     import Foundation
 
     /// Finds the app's SQLite stores: every file under Application Support, Documents, the app
@@ -33,15 +34,18 @@
         }
 
         /// Every store under the roots, each listed once, under the first root it was found in.
+        /// The search is the drawer's own work, which Disk I/O leaves out.
         ///
         /// - Complexity: O(*n*) in the number of files under the roots, reading the first 100
         ///   bytes of each whose extension fits.
         func stores() -> [DatabaseStore] {
-            var seen: Set<String> = []
-            return roots.flatMap { root in
-                candidates(under: root.url)
-                    .filter { seen.insert($0.resolvingSymlinksInPath().path(percentEncoded: false)).inserted }
-                    .compactMap { store(at: $0, location: root.location) }
+            DebugDrawerActivity.$isDrawerWork.withValue(true) {
+                var seen: Set<String> = []
+                return roots.flatMap { root in
+                    candidates(under: root.url)
+                        .filter { seen.insert($0.resolvingSymlinksInPath().path(percentEncoded: false)).inserted }
+                        .compactMap { store(at: $0, location: root.location) }
+                }
             }
         }
 
