@@ -3,9 +3,10 @@
     import DebugDrawer
     import Foundation
 
-    /// The folder the recordings are saved in, `Caches/DebugDrawer/Recordings` in production: the
-    /// system may clear it when the device runs short of space, which suits movies made only to
-    /// attach to a bug.
+    /// The folder the recordings are saved in, `Caches/DebugDrawer/Recordings` in production
+    /// (`Caches/<bundle identifier>/DebugDrawer/Recordings` in a Mac app outside the App Sandbox):
+    /// the system may clear it when the device runs short of space, which suits movies made only
+    /// to attach to a bug.
     ///
     /// Each movie is named for the moment it started (`Screen Recording 2026-11-16T10-46-40Z.mov`),
     /// which is where the list reads its start time from. Its file work is the drawer's own, which
@@ -14,10 +15,46 @@
         /// The folder; created when the first recording starts.
         let directory: URL
 
-        /// `Caches/DebugDrawer/Recordings` in the app's container.
+        /// The running app's folder: `Caches/DebugDrawer/Recordings` in its container, or in a Mac
+        /// app outside the App Sandbox `Caches/<bundle identifier>/DebugDrawer/Recordings`.
         static let standard = RecordingFolder(
-            directory: URL.cachesDirectory.appending(path: "DebugDrawer/Recordings", directoryHint: .isDirectory)
+            directory: directory(
+                cachesDirectory: .cachesDirectory,
+                isSandboxed: isAppSandboxed,
+                bundleIdentifier: Bundle.main.bundleIdentifier ?? ProcessInfo.processInfo.processName
+            )
         )
+
+        /// Where an app keeps its recordings.
+        ///
+        /// A sandboxed app's Caches is its own, so the folder is `DebugDrawer/Recordings` in it. A Mac
+        /// app outside the sandbox shares Caches with every other such app, so the folder goes in
+        /// the app's own `<bundle identifier>` folder there, which App State Reset clears and no
+        /// other app reads.
+        ///
+        /// - Parameters:
+        ///   - cachesDirectory: The app's Caches directory.
+        ///   - isSandboxed: Whether that directory is the app's own.
+        ///   - bundleIdentifier: The app's bundle identifier.
+        /// - Returns: The folder.
+        static func directory(cachesDirectory: URL, isSandboxed: Bool, bundleIdentifier: String) -> URL {
+            let caches = isSandboxed ? cachesDirectory : cachesDirectory.appending(path: bundleIdentifier, directoryHint: .isDirectory)
+            return caches.appending(path: "DebugDrawer/Recordings", directoryHint: .isDirectory)
+        }
+
+        // The same test as App State Reset's AppContainer.isSandboxed, duplicated on purpose:
+        // plugins are vertical modules with no shared helper target, and the two must agree for
+        // App State Reset to clear this folder.
+        /// Whether the app's directories are its own: always on iOS, tvOS and visionOS; on the Mac
+        /// and in Mac Catalyst only in the App Sandbox, which names the container in the
+        /// environment.
+        static var isAppSandboxed: Bool {
+            #if os(macOS) || targetEnvironment(macCatalyst)
+                ProcessInfo.processInfo.environment["APP_SANDBOX_CONTAINER_ID"] != nil
+            #else
+                true
+            #endif
+        }
 
         /// Where a recording started at `date` is written: named for the time, with ` 2`, ` 3` and
         /// so on added when one of that second is already there. Creates the folder.

@@ -15,8 +15,9 @@ import Foundation
 /// ```
 ///
 /// The mockup is picked in the drawer: from Photos or Files on iOS, from a file or the pasteboard
-/// on macOS. It is kept in `Caches/DebugDrawer/DesignOverlay`, so it is there again on the next
-/// launch, until Clear. Touches and clicks pass through the mockup to the app, except in Move
+/// on macOS. It is kept in `Caches/DebugDrawer/DesignOverlay` (in a Mac app outside the App
+/// Sandbox, `Caches/<bundle identifier>/DebugDrawer/DesignOverlay`), so it is there again on the
+/// next launch, until Clear. Touches and clicks pass through the mockup to the app, except in Move
 /// mode, where a drag moves it.
 ///
 /// The type exists in every build, so the calls compile unchanged in release, where they do

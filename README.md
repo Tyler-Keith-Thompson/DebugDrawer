@@ -1465,7 +1465,8 @@ to start and stop it with the drawer closed. On iOS and Mac Catalyst, Show touch
 where each finger is, in the movie only; it is off until turned on, and remembered.
 
 Movies are H.264, at the window's size up to 1920 pixels on the longer side, and are saved in
-`Caches/DebugDrawer/Recordings`, the newest five (or `capacity`) kept. Each is listed with when it
+`Caches/DebugDrawer/Recordings` (in a Mac app outside the App Sandbox,
+`Caches/<bundle identifier>/DebugDrawer/Recordings`), the newest five (or `capacity`) kept. Each is listed with when it
 started, its length and size, and can be shared or deleted. The newest is marked In Bug Report and
 goes into the bug report's Screen Recording folder; any other can be added. The movie shows what the
 app's layers hold when each frame is drawn, so an animation Core Animation runs on its own shows at
@@ -1499,7 +1500,8 @@ struct ShopApp: App {
 release, so neither needs `#if DEBUG`. The mockup is picked in the drawer: from Photos or Files on
 iOS and Mac Catalyst, from a file or the pasteboard (an image, or an image file copied in the
 Finder) on macOS. Photos runs out of the app's process, so nothing asks for a permission. The
-mockup is kept in `Caches/DebugDrawer/DesignOverlay` with its settings, so it is there again on the
+mockup is kept in `Caches/DebugDrawer/DesignOverlay` (in a Mac app outside the App Sandbox,
+`Caches/<bundle identifier>/DebugDrawer/DesignOverlay`) with its settings, so it is there again on the
 next launch, until Clear. `DesignOverlay.install(mockup:)` takes an image's data instead, for a
 comp the app bundles or generates, shown for that launch without replacing the saved one.
 
@@ -1648,7 +1650,8 @@ Links are deleted as links, never followed out of the container. App groups the 
 are found on their own. DebugDrawer's own state stays unless Include DebugDrawer's own settings is
 on: the UserDefaults keys starting `com.debugdrawer.` (the drawer's layout, HUD pins and plugin
 settings) and the files named `DebugDrawer…` in each directory and in its folder named after the
-app (recordings and mockups in `Caches/DebugDrawer`, crash reports and MetricKit payloads).
+app (recordings and mockups in `Caches/DebugDrawer`, or `Caches/<bundle identifier>/DebugDrawer` in a
+Mac app outside the App Sandbox, crash reports and MetricKit payloads).
 
 On iOS, tvOS and visionOS each app has a keychain of its own, and a query sees only the access
 groups its entitlements name. On the Mac and in Mac Catalyst the plugin asks the data protection

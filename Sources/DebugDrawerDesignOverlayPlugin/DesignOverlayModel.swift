@@ -13,7 +13,7 @@
     @MainActor
     final class DesignOverlayModel: ObservableObject {
         /// The model `DesignOverlay.install(mockup:)` installs and `debugDesignOverlay()` draws, over
-        /// `Caches/DebugDrawer/DesignOverlay`. Empty until installed.
+        /// `MockupFolder.standard`. Empty until installed.
         static let shared = DesignOverlayModel(storage: MockupFolder.standard)
 
         /// The mockup drawn, or `nil` before one is picked.

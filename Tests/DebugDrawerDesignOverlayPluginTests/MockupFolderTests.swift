@@ -6,9 +6,35 @@
 
     @Suite
     struct MockupFolderTests {
-        @Test("The standard folder is Caches/DebugDrawer/DesignOverlay")
+        @Test("Outside the App Sandbox the folder is Caches/<bundle identifier>/DebugDrawer/DesignOverlay")
+        func unsandboxed() {
+            let caches = URL(filePath: "/Users/someone/Library/Caches", directoryHint: .isDirectory)
+            let expected = "/Users/someone/Library/Caches/com.example.shop/DebugDrawer/DesignOverlay"
+
+            let actual = MockupFolder.directory(cachesDirectory: caches, isSandboxed: false, bundleIdentifier: "com.example.shop")
+
+            #expect(actual.path == expected)
+        }
+
+        @Test("In a sandboxed app, as on iOS, the folder is Caches/DebugDrawer/DesignOverlay")
+        func sandboxed() {
+            let caches = URL(filePath: "/containers/shop/Library/Caches", directoryHint: .isDirectory)
+            let expected = "/containers/shop/Library/Caches/DebugDrawer/DesignOverlay"
+
+            let actual = MockupFolder.directory(cachesDirectory: caches, isSandboxed: true, bundleIdentifier: "com.example.shop")
+
+            #expect(actual.path == expected)
+        }
+
+        @Test("The standard folder is in the app's own Caches folder on a Mac outside the sandbox, and in Caches/DebugDrawer on iOS")
         func standard() {
-            let expected = URL.cachesDirectory.appending(path: "DebugDrawer/DesignOverlay").standardizedFileURL.path
+            #if os(macOS) || targetEnvironment(macCatalyst)
+                // The test runner isn't sandboxed.
+                let bundleIdentifier = Bundle.main.bundleIdentifier ?? ProcessInfo.processInfo.processName
+                let expected = URL.cachesDirectory.appending(path: "\(bundleIdentifier)/DebugDrawer/DesignOverlay").standardizedFileURL.path
+            #else
+                let expected = URL.cachesDirectory.appending(path: "DebugDrawer/DesignOverlay").standardizedFileURL.path
+            #endif
 
             let actual = MockupFolder.standard.directory.standardizedFileURL.path
 

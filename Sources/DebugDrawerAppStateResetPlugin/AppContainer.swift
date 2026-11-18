@@ -20,7 +20,7 @@
         let appFolderName: String
 
         /// The prefix of what DebugDrawer keeps in an area or its app folder: `Caches/DebugDrawer`
-        /// (recordings and mockups), `DebugDrawer Crash Reports` and `DebugDrawer MetricKit Payloads`.
+        /// (recordings and mockups; in the app's folder outside the sandbox), `DebugDrawer Crash Reports` and `DebugDrawer MetricKit Payloads`.
         static let debugDrawerPrefix = "DebugDrawer"
 
         // Off the caller's actor, as is `delete`: a container's walk can take a while. Both are

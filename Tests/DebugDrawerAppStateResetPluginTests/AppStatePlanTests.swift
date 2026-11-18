@@ -133,6 +133,36 @@
             #expect(included.caches.map(\.displayPath) == ["Caches/DebugDrawer", "Caches/thumbs", "group.com.example/Library/Caches/g.cache"])
         }
 
+        @Test("Outside the sandbox, Caches lists Caches/<bundle identifier>/DebugDrawer with its recordings only when DebugDrawer is included")
+        func unsandboxedCaches() async throws {
+            let root = FileManager.default.temporaryDirectory.appending(path: "AppStateReset-\(UUID().uuidString)")
+            defer { try? FileManager.default.removeItem(at: root) }
+            let ownCaches = root.appending(path: "Caches/com.example.app")
+            for (path, contents) in ["DebugDrawer/Recordings/a.mov": "movie", "thumbs/1.png": "png"] {
+                let url = ownCaches.appending(path: path)
+                try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+                try Data(contents.utf8).write(to: url)
+            }
+            try Data("other".utf8).write(to: root.appending(path: "Caches/other.cache"))
+            // As AppContainer.current lays out a Mac app outside the sandbox.
+            let sut = AppContainer(
+                files: [],
+                caches: [FileArea(name: "Caches/com.example.app", directory: ownCaches)],
+                kept: [],
+                appFolderName: "com.example.app"
+            )
+            let expectedKept = ["Caches/com.example.app/thumbs"]
+            let expectedIncluded = ["Caches/com.example.app/DebugDrawer", "Caches/com.example.app/thumbs"]
+            let expectedRecordingsBytes: Int64 = 5
+
+            let kept = await sut.entries(in: sut.caches, includingDebugDrawer: false)
+            let included = await sut.entries(in: sut.caches, includingDebugDrawer: true)
+
+            #expect(kept.map(\.displayPath) == expectedKept)
+            #expect(included.map(\.displayPath) == expectedIncluded)
+            #expect(included.first?.byteCount == expectedRecordingsBytes)
+        }
+
         @Test("An area that is missing, or is itself a link, lists nothing; an empty one reads Empty")
         func missingAndLinkedAreas() async throws {
             let root = FileManager.default.temporaryDirectory.appending(path: "AppStateReset-\(UUID().uuidString)")

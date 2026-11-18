@@ -16,6 +16,7 @@ the entry becomes the GitHub release's notes.
 
 - DD-199: with Network installed, a request whose body is a stream reaches the server with every byte of it, rather than an empty body; a body past the body limit is sent from a temporary file, with its `Content-Length`.
 - DD-200: on iOS, View Inspector swaps `UIWindow.sendEvent(_:)` once, in `installViewInspector()`, rather than when click indicators are first turned on.
+- DD-201: in a Mac or Mac Catalyst app outside the App Sandbox, Screen Recording and Design Overlay save to `Caches/<bundle identifier>/DebugDrawer`, which App State Reset clears and no other app shares, rather than the shared `Caches/DebugDrawer`; files already in the shared folder are left there.
 
 ## [0.1.2] - 2026-11-17
 
