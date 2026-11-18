@@ -113,7 +113,7 @@
             AnyDebugDrawerPlugin(FixtureLibrariesPlugin()),
             AnyDebugDrawerPlugin(FixtureCollapsedPlugin())
         ]
-        private let badges = ["FixturePermissionsPlugin": 2]
+        private let badges = ["DebugDrawerTests.FixturePermissionsPlugin": 2]
 
         var body: some View {
             VStack(spacing: 0) {
@@ -187,7 +187,7 @@
             AnyDebugDrawerPlugin(FixtureLibrariesPlugin()),
             AnyDebugDrawerPlugin(FixtureCollapsedPlugin())
         ]
-        private let badges = ["FixturePermissionsPlugin": 2]
+        private let badges = ["DebugDrawerTests.FixturePermissionsPlugin": 2]
 
         var body: some View {
             VStack(spacing: 0) {

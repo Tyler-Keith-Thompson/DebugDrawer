@@ -8,6 +8,11 @@ import SwiftUI
 /// value edited in place whatever its type, and keys added and deleted. Installed by
 /// ``UserDefaultsBrowser/install(suites:)``.
 public struct UserDefaultsPlugin: DebugDrawerPlugin {
+    /// The plugin's identity in the drawer, which its saved state, HUD pin and badges are kept under.
+    public var id: String {
+        "UserDefaultsPlugin"
+    }
+
     public var title = "UserDefaults"
     public var category = "Storage"
     public var icon = "cylinder.split.1x2"

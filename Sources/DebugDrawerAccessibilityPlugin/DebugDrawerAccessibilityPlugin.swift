@@ -9,6 +9,11 @@ import SwiftUI
 /// Overrides of the color scheme, Dynamic Type, layout direction, locale and the system
 /// accessibility settings SwiftUI reads, for the views under `.debugAccessibilityOverrides()`.
 public struct AccessibilityPlugin: DebugDrawerPlugin {
+    /// The plugin's identity in the drawer, which its saved state, HUD pin and badges are kept under.
+    public var id: String {
+        "AccessibilityPlugin"
+    }
+
     public var title = "Accessibility"
     public var category = "Interface"
     public var icon = "accessibility"

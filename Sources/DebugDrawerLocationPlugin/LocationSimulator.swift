@@ -1,5 +1,6 @@
 #if DEBUG
     import CoreLocation
+    import DebugDrawer
     import Foundation
     import os
 
@@ -42,9 +43,10 @@
         }
 
         /// - Parameters:
-        ///   - defaults: Where the switch and the fixed coordinate are kept.
+        ///   - defaults: Where the switch and the fixed coordinate are kept: the drawer's own suite,
+        ///     apart from the app's defaults.
         ///   - service: Core Location's own behavior, for the calls the simulator lets through.
-        init(defaults: UserDefaults = .standard, service: some LocationService = CoreLocationService()) {
+        init(defaults: UserDefaults = .debugDrawer, service: some LocationService = CoreLocationService()) {
             self.defaults = defaults
             self.service = service
         }

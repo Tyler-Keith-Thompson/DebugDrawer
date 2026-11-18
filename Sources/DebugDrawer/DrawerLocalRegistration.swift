@@ -6,7 +6,10 @@
     struct DrawerLocalRegistration {
         /// What ``DebugDrawer/registerLocal(_:)`` returned; only it removes the registration.
         let token: UUID
-        var plugin: AnyDebugDrawerPlugin
+        /// The plugin's latest value, which ``plugin`` reads its views from.
+        let content: LocalPluginContent
+        /// The plugin as the drawer lists it, following ``content``.
+        let plugin: AnyDebugDrawerPlugin
         /// The window (on iOS, the scene) whose views registered the plugin, which alone lists it;
         /// `nil` lists it in every window's drawer.
         ///
@@ -14,6 +17,15 @@
         /// gone can't be mistaken for one from no window; the drawer forgets a window's
         /// registrations as the window detaches, before its identifier can be reused.
         var scope: ObjectIdentifier?
+
+        /// The registration `token` owns of `plugin`, for the drawer of the window `scope`
+        /// identifies.
+        @MainActor init(token: UUID, plugin: AnyDebugDrawerPlugin, scope: ObjectIdentifier?) {
+            self.token = token
+            content = LocalPluginContent(plugin)
+            self.plugin = AnyDebugDrawerPlugin(following: content)
+            self.scope = scope
+        }
 
         /// Whether the drawer of the window `scope` identifies lists this plugin: every drawer lists
         /// a plugin registered from no window, and the detached drawer (`scope` is `nil`) lists

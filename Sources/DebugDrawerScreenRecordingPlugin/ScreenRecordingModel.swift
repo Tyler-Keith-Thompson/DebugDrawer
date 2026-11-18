@@ -1,5 +1,6 @@
 #if DEBUG
     import Combine
+    import DebugDrawer
     import Foundation
 
     /// The recorder and its saved recordings, on the main actor, for the drawer, the HUD and the
@@ -40,14 +41,15 @@
         ///   - frameSource: What draws the frames.
         ///   - makeWriter: A writer for a new movie at a URL.
         ///   - now: The wall clock, read when a recording starts.
-        ///   - defaults: Where Show Touches is remembered.
+        ///   - defaults: Where Show Touches is remembered: the drawer's own suite, apart from the
+        ///     app's defaults.
         init(
             folder: RecordingFolder,
             capacity: Int,
             frameSource: any RecordingFrameSource,
             makeWriter: @escaping @MainActor (URL) -> any MovieWriter,
             now: @escaping @MainActor () -> Date = Date.init,
-            defaults: UserDefaults = .standard
+            defaults: UserDefaults = .debugDrawer
         ) {
             self.folder = folder
             self.capacity = capacity

@@ -9,6 +9,11 @@ import SwiftUI
 /// How long the app took to launch: from the process's start to `installLaunchTime()`
 /// (pre-main), from there to the first frame, and the total.
 public struct LaunchTimePlugin: DebugDrawerPlugin {
+    /// The plugin's identity in the drawer, which its saved state, HUD pin and badges are kept under.
+    public var id: String {
+        "LaunchTimePlugin"
+    }
+
     public var title = "Launch Time"
     public var category = "Performance"
     public var icon = "timer"

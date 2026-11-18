@@ -10,6 +10,11 @@ import SwiftUI
 /// keep in `WKWebsiteDataStore.default()`, each marked with its store. They are searched by name or
 /// domain, each expanded to its attributes and deletable, or all the filter shows.
 public struct CookiesPlugin: DebugDrawerPlugin {
+    /// The plugin's identity in the drawer, which its saved state, HUD pin and badges are kept under.
+    public var id: String {
+        "CookiesPlugin"
+    }
+
     public var title = "HTTP Cookies"
     public var category = "Logs & Network"
     public var icon = "doc.plaintext"

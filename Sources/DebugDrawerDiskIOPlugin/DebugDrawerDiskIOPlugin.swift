@@ -31,6 +31,11 @@ import SwiftUI
 /// dynamic library, records those too: each `read`, `write`, `pread` and `pwrite` on a regular
 /// file that no swizzled method records, through dyld interposing.
 public struct DiskIOPlugin: DebugDrawerPlugin {
+    /// The plugin's identity in the drawer, which its saved state, HUD pin and badges are kept under.
+    public var id: String {
+        "DiskIOPlugin"
+    }
+
     public var title = "Disk I/O"
     public var category = "Storage"
     public var icon = "externaldrive"

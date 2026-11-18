@@ -46,7 +46,7 @@
             let sut = DebugDrawer.shared
             sut.registerGlobal(TestPlugin(title: "A"))
 
-            sut.unregisterGlobal(id: "TestPlugin")
+            sut.unregisterGlobal(id: "DebugDrawerTests.TestPlugin")
 
             #expect(sut.globalPlugins.isEmpty)
         }
@@ -57,7 +57,7 @@
             let token = sut.registerLocal(TestPlugin(title: "Local"))
             #expect(sut.localPlugins.count == 1)
 
-            sut.unregisterLocal(id: "TestPlugin", token: token)
+            sut.unregisterLocal(id: "DebugDrawerTests.TestPlugin", token: token)
 
             #expect(sut.localPlugins.isEmpty)
         }
@@ -68,10 +68,10 @@
             let oldToken = sut.registerLocal(TestPlugin(title: "Local"))
             let newToken = sut.registerLocal(TestPlugin(title: "Updated"))
 
-            sut.unregisterLocal(id: "TestPlugin", token: oldToken)
+            sut.unregisterLocal(id: "DebugDrawerTests.TestPlugin", token: oldToken)
             #expect(sut.localPlugins.count == 1)
 
-            sut.unregisterLocal(id: "TestPlugin", token: newToken)
+            sut.unregisterLocal(id: "DebugDrawerTests.TestPlugin", token: newToken)
             #expect(sut.localPlugins.isEmpty)
         }
 

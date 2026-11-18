@@ -71,10 +71,6 @@ struct ExampleWindowPlugin: DebugDrawerPlugin {
         "macwindow"
     }
 
-    var contentIdentifier: String {
-        windowName
-    }
-
     var body: some View {
         DebugDrawerKeyValueRow("Window", value: windowName)
     }

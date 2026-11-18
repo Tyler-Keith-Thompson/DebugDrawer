@@ -12,6 +12,11 @@ import SwiftUI
 /// tapped universal link, Handoff or a Spotlight result. Installed by
 /// ``DebugDrawer/DebugDrawer/installDeepLink(presets:continueUserActivity:openURL:)``.
 public struct DeepLinkPlugin: DebugDrawerPlugin {
+    /// The plugin's identity in the drawer, which its saved state, HUD pin and badges are kept under.
+    public var id: String {
+        "DeepLinkPlugin"
+    }
+
     public var title = "Deep Link Tester"
     public var category = "App"
     public var icon = "link"

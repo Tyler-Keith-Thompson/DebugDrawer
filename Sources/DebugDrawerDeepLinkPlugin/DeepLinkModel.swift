@@ -1,5 +1,6 @@
 #if DEBUG
     import Combine
+    import DebugDrawer
     import Foundation
 
     /// The plugin's state: the URLs opened and the activities continued, each kept in the
@@ -30,13 +31,14 @@
         ///   - openURL: Where opened URLs go, in place of the system, when given; it returns
         ///     whether it handled the URL.
         ///   - system: Opens URLs when there's no `openURL`.
-        ///   - defaults: Where the history is kept.
+        ///   - defaults: Where the history is kept: the drawer's own suite, apart from the app's
+        ///     defaults.
         init(
             presets: [DeepLinkPreset] = [],
             delivery: any UserActivityDelivering,
             openURL: (@MainActor (URL) -> Bool)? = nil,
             system: any SystemURLOpening = _SystemURLOpening(),
-            defaults: UserDefaults = .standard
+            defaults: UserDefaults = .debugDrawer
         ) {
             self.presets = presets
             self.delivery = delivery

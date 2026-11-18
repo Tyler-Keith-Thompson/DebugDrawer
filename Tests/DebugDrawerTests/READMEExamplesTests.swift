@@ -167,7 +167,7 @@
             let uploads = UploadsPlugin()
             uploads.setBadge(2)
             uploads.postToast("Upload of report.pdf failed")
-            let badge = DebugDrawer.shared.badges["UploadsPlugin"]
+            let badge = DebugDrawer.shared.badges["DebugDrawerTests.UploadsPlugin"]
             let toast = DebugDrawer.shared.toast
             uploads.clearBadge()
 
@@ -175,9 +175,9 @@
             DebugDrawer.shared.dismissToast()
             DebugDrawer.shared.isOpen = wasOpen
             #expect(badge == 2)
-            #expect(toast?.pluginID == "UploadsPlugin")
+            #expect(toast?.pluginID == "DebugDrawerTests.UploadsPlugin")
             #expect(toast?.message == "Upload of report.pdf failed")
-            #expect(DebugDrawer.shared.badges["UploadsPlugin"] == nil)
+            #expect(DebugDrawer.shared.badges["DebugDrawerTests.UploadsPlugin"] == nil)
         }
 
         @Test("Redacting sensitive values")

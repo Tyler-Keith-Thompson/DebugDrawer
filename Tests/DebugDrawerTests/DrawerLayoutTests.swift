@@ -67,8 +67,8 @@
             var sut = DrawerLayout()
             let expected = ["Pinned: Keychain, Network", "Logs: Console"]
 
-            sut.togglePin("LayoutKeychain")
-            sut.togglePin("LayoutNetwork")
+            sut.togglePin("DebugDrawerTests.LayoutKeychain")
+            sut.togglePin("DebugDrawerTests.LayoutNetwork")
 
             let actual = sut.sections(for: plugins)
                 .map { "\($0.title): " + $0.plugins.map(\.title).joined(separator: ", ") }
@@ -79,8 +79,8 @@
         func pinningTwiceUnpins() {
             var sut = DrawerLayout()
 
-            sut.togglePin("LayoutConsole")
-            sut.togglePin("LayoutConsole")
+            sut.togglePin("DebugDrawerTests.LayoutConsole")
+            sut.togglePin("DebugDrawerTests.LayoutConsole")
 
             #expect(sut.pinned.isEmpty)
         }
@@ -95,7 +95,7 @@
             var sut = DrawerLayout()
             let expected = ["Network", "Console"]
 
-            sut.move("LayoutConsole", by: 1, among: plugins)
+            sut.move("DebugDrawerTests.LayoutConsole", by: 1, among: plugins)
 
             let actual = sut.sections(for: plugins).first?.plugins.map(\.title)
             #expect(actual == expected)
@@ -107,8 +107,8 @@
             var sut = DrawerLayout()
             let expected = DrawerLayout()
 
-            sut.move("LayoutConsole", by: -1, among: plugins)
-            sut.move("LayoutNetwork", by: 1, among: plugins)
+            sut.move("DebugDrawerTests.LayoutConsole", by: -1, among: plugins)
+            sut.move("DebugDrawerTests.LayoutNetwork", by: 1, among: plugins)
 
             #expect(sut == expected)
         }
@@ -117,11 +117,11 @@
         func movingAPinnedPluginReordersThePins() {
             let plugins = [AnyDebugDrawerPlugin(LayoutConsole()), AnyDebugDrawerPlugin(LayoutKeychain())]
             var sut = DrawerLayout()
-            sut.togglePin("LayoutConsole")
-            sut.togglePin("LayoutKeychain")
-            let expected = ["LayoutKeychain", "LayoutConsole"]
+            sut.togglePin("DebugDrawerTests.LayoutConsole")
+            sut.togglePin("DebugDrawerTests.LayoutKeychain")
+            let expected = ["DebugDrawerTests.LayoutKeychain", "DebugDrawerTests.LayoutConsole"]
 
-            sut.move("LayoutKeychain", by: -1, among: plugins)
+            sut.move("DebugDrawerTests.LayoutKeychain", by: -1, among: plugins)
 
             #expect(sut.pinned == expected)
         }
@@ -137,9 +137,9 @@
                 AnyDebugDrawerPlugin(LayoutKeychain())
             ]
             var expected = DrawerLayout()
-            expected.togglePin("LayoutKeychain")
-            expected.move("LayoutNetwork", by: -1, among: plugins)
-            expected.lastUsed = "LayoutNetwork"
+            expected.togglePin("DebugDrawerTests.LayoutKeychain")
+            expected.move("DebugDrawerTests.LayoutNetwork", by: -1, among: plugins)
+            expected.lastUsed = "DebugDrawerTests.LayoutNetwork"
 
             expected.save(to: defaults)
             let actual = DrawerLayout(from: try #require(UserDefaults(suiteName: suite)))
@@ -167,7 +167,7 @@
         func staleIDsAreSkipped() {
             var sut = DrawerLayout()
             sut.togglePin("RemovedPlugin")
-            sut.order = ["RemovedPlugin", "LayoutConsole"]
+            sut.order = ["RemovedPlugin", "DebugDrawerTests.LayoutConsole"]
             let expected = [["Console"]]
 
             let actual = sut.sections(for: [AnyDebugDrawerPlugin(LayoutConsole())]).map { $0.plugins.map(\.title) }
@@ -187,7 +187,7 @@
             let local = [AnyDebugDrawerPlugin(LayoutUncategorized()), AnyDebugDrawerPlugin(LayoutKeychain())]
             let global = [AnyDebugDrawerPlugin(LayoutConsole()), AnyDebugDrawerPlugin(LayoutNetwork())]
             var sut = DrawerLayout()
-            sut.togglePin("LayoutNetwork")
+            sut.togglePin("DebugDrawerTests.LayoutNetwork")
             let expected = ["local Local: Custom, Keychain", "pinned Pinned: Network", "category:Logs Logs: Console"]
 
             let actual = sut.sections(local: local, global: global)
@@ -232,7 +232,7 @@
                 var body: some View { EmptyView() }
             }
             var sut = DrawerLayout()
-            sut.togglePin("LayoutConsole")
+            sut.togglePin("DebugDrawerTests.LayoutConsole")
             let local = [AnyDebugDrawerPlugin(LayoutKeychain())]
             let global = [AnyDebugDrawerPlugin(LayoutConsole()), AnyDebugDrawerPlugin(LocalCategory()), AnyDebugDrawerPlugin(PinnedCategory())]
             let expected = ["local", "pinned", "category:Local", "category:Pinned"]

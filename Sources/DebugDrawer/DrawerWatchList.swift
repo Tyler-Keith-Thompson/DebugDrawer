@@ -41,9 +41,11 @@
                 }
             }
             .onAppear {
-                layout = DrawerLayout(from: .standard)
+                layout = DrawerLayout(from: drawer.defaults)
                 reveal()
             }
+            // A plugin registered later may have moved its saved pin and order to its ID.
+            .onChange(of: (drawer.localPlugins + drawer.globalPlugins).map(\.id)) { layout = DrawerLayout(from: drawer.defaults) }
             .onChange(of: presentation.revealRequest) { reveal() }
         }
 

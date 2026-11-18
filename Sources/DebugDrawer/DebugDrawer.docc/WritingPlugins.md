@@ -38,10 +38,6 @@ struct OrderPlugin: DebugDrawerPlugin {
     var title = "Order"
     var icon = "shippingbox"
 
-    var contentIdentifier: String {
-        orderID
-    }
-
     var body: some View {
         DebugDrawerKeyValueRow("Order ID", value: orderID)
     }
@@ -60,17 +56,22 @@ struct OrderDetailView: View {
 The modifier registers the plugin when the view appears and removes it when the view disappears.
 In an app with several windows (on iPadOS, scenes), the plugin is listed only in the drawer of the
 window its view is in.
-A plugin that carries data the view changes declares a
-``DebugDrawerPlugin/contentIdentifier`` that changes with it, here the order's ID; the modifier
-registers the plugin again whenever it changes. When a new view registers a plugin with the same
-ID before the old one disappears, the old view's disappearance leaves the new registration in
-place.
+While the view is on screen, the drawer shows the plugin's latest value: when `orderID` changes,
+the view hands the modifier a new `OrderPlugin`, and the plugin's section shows the new order.
+When a new view registers a plugin with the same ID before the old one disappears, the old view's
+disappearance leaves the new registration in place.
 
 ### Identity
 
-``DebugDrawerPlugin/id`` defaults to the type's name, which is what the drawer saves a plugin's
-collapsed state, pin and order under. Declare an `id` of your own only to register several
-instances of one type side by side.
+``DebugDrawerPlugin/id`` defaults to the type's fully qualified name (`Orders.OrderPlugin` for an
+`OrderPlugin` in the `Orders` module), which is what the drawer saves a plugin's collapsed state,
+pin and order under, so plugins of one name in two modules are told apart. Declare an `id` of
+your own only to register several instances of one type side by side. The drawer holds one global
+plugin per ID: registering a plugin of another type under an ID already registered leaves the
+first in place and logs an error naming both types.
+
+The drawer keeps what it saves in a `UserDefaults` suite of its own, named after the app's bundle
+identifier with `.debugdrawer` appended, so none of it shows among the app's standard defaults.
 
 ### Search actions
 

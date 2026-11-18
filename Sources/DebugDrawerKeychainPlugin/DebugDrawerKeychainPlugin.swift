@@ -9,6 +9,11 @@ import SwiftUI
 /// can be added and edited, and any item deleted. A password's value is read only when its
 /// detail opens, and a certificate's or key's data never.
 public struct KeychainPlugin: DebugDrawerPlugin {
+    /// The plugin's identity in the drawer, which its saved state, HUD pin and badges are kept under.
+    public var id: String {
+        "KeychainPlugin"
+    }
+
     public var title = "Keychain"
     public var category = "Storage"
     public var icon = "key"

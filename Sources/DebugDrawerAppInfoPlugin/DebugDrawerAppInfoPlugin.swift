@@ -9,6 +9,11 @@ import SwiftUI
 /// The App Info plugin: the build (version, commit, branch, CI build), the process, the device,
 /// the provisioning profile and the entitlements.
 public struct AppInfoPlugin: DebugDrawerPlugin {
+    /// The plugin's identity in the drawer, which its saved state, HUD pin and badges are kept under.
+    public var id: String {
+        "AppInfoPlugin"
+    }
+
     public var title = "App Info"
     public var category = "App"
     public var icon = "info.circle"

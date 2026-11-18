@@ -144,13 +144,19 @@
 
     // MARK: - Local plugin modifier
 
+    // SwiftUI evaluates the modifier's body again only when the modifier's plugin differs from the last one
+    // (or can't be compared), so each evaluation counts a revision, and `onChange` hands the latest
+    // plugin over once the update is done: publishing from the body itself would change the
+    // drawer's state during a view update. Rejected: the plugin's `contentIdentifier` (an author
+    // forgetting it shows a stale value), requiring `Equatable` plugins (a source break), and a
+    // preference read by `debugDrawer()` (it stops at sheets and other windows, and misses apps
+    // that attach the drawer with `attach(to:)`).
     /// Attaches a local plugin to this view's lifecycle.
     /// The plugin appears in the drawer of the window this view is in while the view is on
     /// screen, and is removed when the view disappears — but only if no newer view in that window
     /// has already replaced the registration.
     ///
-    /// Re-registers automatically when the plugin's `contentIdentifier` changes,
-    /// so this works regardless of where `.id()` is placed in the chain.
+    /// Each time SwiftUI updates the modifier with a new plugin value, the drawer shows that value.
     struct LocalPluginModifier<P: DebugDrawerPlugin>: ViewModifier {
         let plugin: P
         @State private var registration = LocalPluginRegistration()
@@ -162,7 +168,7 @@
                 #endif
                 .onAppear { registration.register(plugin) }
                 .onDisappear { registration.unregister(id: plugin.id) }
-                .onChange(of: plugin.contentIdentifier) { _, _ in registration.register(plugin) }
+                .onChange(of: registration.nextRevision()) { registration.update(plugin) }
         }
     }
 
@@ -174,9 +180,25 @@
         /// The view's window (on iOS, scene); `nil` until the view joins one, and on the platforms
         /// with one drawer, where the plugin is listed in it.
         private var scope: ObjectIdentifier?
+        /// How many times the view has described its plugin; each new count hands the plugin to the
+        /// drawer again.
+        private var revision = 0
 
         func register(_ plugin: some DebugDrawerPlugin) {
             token = DebugDrawer.shared.registerLocal(plugin, scope: scope)
+        }
+
+        /// Counts one more description of the plugin, from the modifier's body.
+        func nextRevision() -> Int {
+            revision += 1
+            return revision
+        }
+
+        /// Shows `plugin`, the view's latest, in place of the one registered; nothing while the
+        /// view is off screen.
+        func update(_ plugin: some DebugDrawerPlugin) {
+            guard let token else { return }
+            DebugDrawer.shared.updateLocal(plugin, token: token)
         }
 
         func unregister(id: String) {
@@ -215,10 +237,11 @@
         /// Adds `plugin` to the drawer of the window this view is in while the view is on screen.
         ///
         /// Each window (on iOS, each scene) has a drawer of its own, which lists the global plugins
-        /// and the local plugins of its own views only. The plugin is registered when the view appears, registered again when its
-        /// ``DebugDrawerPlugin/contentIdentifier`` changes, and removed when the view disappears,
-        /// unless a newer view has registered a plugin with the same ID since. In release builds it
-        /// returns the view unchanged.
+        /// and the local plugins of its own views only. The plugin is registered when the view
+        /// appears and removed when the view disappears, unless a newer view has registered a plugin
+        /// with the same ID since. While the view is on screen the drawer shows the plugin's latest
+        /// value: when the view updates with a new one (`UserPlugin(user: user)` after `user`
+        /// changes), the plugin's section shows it. In release builds it returns the view unchanged.
         ///
         /// - Parameter plugin: The plugin to show.
         /// - Returns: The view, unchanged in how it looks.

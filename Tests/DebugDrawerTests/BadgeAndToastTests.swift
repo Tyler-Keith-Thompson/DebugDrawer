@@ -40,11 +40,11 @@
             let sut = NoticePlugin()
 
             sut.setBadge(3)
-            let shown = DebugDrawer.shared.badges["NoticePlugin"]
+            let shown = DebugDrawer.shared.badges["DebugDrawerTests.NoticePlugin"]
             sut.clearBadge()
 
             #expect(shown == 3)
-            #expect(DebugDrawer.shared.badges["NoticePlugin"] == nil)
+            #expect(DebugDrawer.shared.badges["DebugDrawerTests.NoticePlugin"] == nil)
         }
 
         @Test("A badge of zero or less clears it")
@@ -60,7 +60,7 @@
         @Test("A burst of 100 posts from one plugin in one run-loop turn shows a single toast that counts them")
         func aBurstShowsOneToast() {
             let sut = NoticePlugin()
-            let expected = DebugDrawerToast(pluginID: "NoticePlugin", message: "Request 100 failed", count: 100)
+            let expected = DebugDrawerToast(pluginID: "DebugDrawerTests.NoticePlugin", message: "Request 100 failed", count: 100)
 
             for request in 1 ... 100 {
                 sut.postToast("Request \(request) failed")
@@ -73,7 +73,7 @@
         func anotherPluginReplacesTheToast() {
             NoticePlugin().postToast("first")
             NoticePlugin().postToast("second")
-            let expected = DebugDrawerToast(pluginID: "OtherNoticePlugin", message: "other", count: 1)
+            let expected = DebugDrawerToast(pluginID: "DebugDrawerTests.OtherNoticePlugin", message: "other", count: 1)
 
             OtherNoticePlugin().postToast("other")
 
@@ -102,7 +102,7 @@
             sut.openToast()
 
             #expect(sut.isOpen)
-            #expect(sut.revealRequest == "NoticePlugin")
+            #expect(sut.revealRequest == "DebugDrawerTests.NoticePlugin")
             #expect(sut.toast == nil)
         }
 
@@ -119,7 +119,7 @@
         #if !os(visionOS)
             @Test("The toast view shows the plugin's title, the latest message and the count")
             func theToastViewShowsItsContent() throws {
-                let toast = DebugDrawerToast(pluginID: "NoticePlugin", message: "3 requests failed", count: 3)
+                let toast = DebugDrawerToast(pluginID: "DebugDrawerTests.NoticePlugin", message: "3 requests failed", count: 3)
                 let sut = DrawerToastView(toast: toast, plugin: AnyDebugDrawerPlugin(NoticePlugin()), open: {}, dismiss: {})
 
                 let inspected = try sut.inspect()
@@ -133,7 +133,7 @@
             func theToastViewsButtonsCallBack() throws {
                 var opened = 0
                 var dismissed = 0
-                let toast = DebugDrawerToast(pluginID: "NoticePlugin", message: "failed", count: 1)
+                let toast = DebugDrawerToast(pluginID: "DebugDrawerTests.NoticePlugin", message: "failed", count: 1)
                 let sut = DrawerToastView(
                     toast: toast,
                     plugin: nil,

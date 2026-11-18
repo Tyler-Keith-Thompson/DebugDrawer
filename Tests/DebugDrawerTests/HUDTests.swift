@@ -93,13 +93,13 @@
             sut.registerGlobal(ReadoutPlugin())
             sut.registerGlobal(ReadoutPlugin(id: "SecondReadout", title: "Second"))
             sut.registerGlobal(PlainPlugin())
-            sut.hudLayout.pinned = ["SecondReadout", "PlainPlugin", "Unregistered", "ReadoutPlugin"]
+            sut.hudLayout.pinned = ["SecondReadout", "DebugDrawerTests.PlainPlugin", "Unregistered", "ReadoutPlugin"]
             let expected = ["SecondReadout", "ReadoutPlugin"]
 
             let actual = sut.hudPlugins.map(\.id)
 
             sut.hudLayout = previous
-            for id in ["ReadoutPlugin", "SecondReadout", "PlainPlugin"] {
+            for id in ["ReadoutPlugin", "SecondReadout", "DebugDrawerTests.PlainPlugin"] {
                 sut.unregisterGlobal(id: id)
             }
             #expect(actual == expected)
@@ -117,7 +117,7 @@
             sut.moveHUD(to: expected)
 
             #expect(sut.hudLayout.origin == expected)
-            #expect(HUDLayout(from: .standard).origin == expected)
+            #expect(HUDLayout(from: sut.defaults).origin == expected)
         }
 
         @Test("Running an action while hidden hides the HUD during it, even with the drawer kept")

@@ -6,6 +6,11 @@ import SwiftUI
 // intercepts and registers nothing.
 
 public struct NetworkPlugin: DebugDrawerPlugin {
+    /// The plugin's identity in the drawer, which its saved state, HUD pin and badges are kept under.
+    public var id: String {
+        "NetworkPlugin"
+    }
+
     public var title = "Network"
     public var category = "Logs & Network"
     public var icon = "network"

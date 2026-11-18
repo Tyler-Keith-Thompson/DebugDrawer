@@ -23,8 +23,10 @@ import SwiftUI
 /// - **Global**: registered once with `DebugDrawer.shared.registerGlobal(_:)`, always present.
 /// - **Local**: attached to a view with `debugLocalPlugin(_:)`, present only while that view is.
 ///
-/// ``id`` defaults to the type's name. The drawer saves whether each plugin's section is
-/// collapsed in `UserDefaults`, under its ``id``.
+/// ``id`` defaults to the type's fully qualified name (`MyApp.CachePlugin`), so two modules'
+/// plugins of one name are told apart. The drawer saves whether each plugin's section is
+/// collapsed, and where it is pinned, under its ``id``, in a `UserDefaults` suite of its own
+/// rather than the app's.
 ///
 /// The protocol exists in every build so conformances compile everywhere. In release builds
 /// `debugLocalPlugin(_:)` and `debugDrawer()` return the view unchanged, and nothing reads the
@@ -38,7 +40,12 @@ public protocol DebugDrawerPlugin: Identifiable {
     associatedtype HeaderAccessory: View = EmptyView
 
     /// Identifies the plugin in the drawer: registration, saved state and search. Defaults to the
-    /// type's name; declare one to register several instances of one type.
+    /// type's fully qualified name (`String(reflecting:)`, such as `MyApp.CachePlugin`; a
+    /// `private` or function-local type is named as if it were declared in its module); declare
+    /// one to register several instances of one type.
+    ///
+    /// The drawer holds one global plugin per ID: registering a plugin of another type under an
+    /// ID already registered leaves the first in place and logs an error.
     var id: String { get }
 
     /// Display title shown in the section header.
@@ -50,10 +57,9 @@ public protocol DebugDrawerPlugin: Identifiable {
     /// The view content rendered inside the section, built on the main actor like `View.body`.
     @ViewBuilder @MainActor var body: Body { get }
 
-    /// A value that changes when the plugin's content should be re-registered.
-    /// The local plugin modifier watches this to detect changes.
-    /// Defaults to `id` (static). Override for plugins with dynamic data
-    /// (e.g., a file path that changes as the user navigates).
+    /// Unused: `debugLocalPlugin(_:)` shows the plugin's latest value each time its view
+    /// updates, so nothing needs to say when the content changed. Defaults to ``id``.
+    @available(*, deprecated, message: "Unused: debugLocalPlugin(_:) shows the plugin's latest value as its view updates")
     var contentIdentifier: String { get }
 
     /// The group the plugin is listed under in the drawer. Defaults to `General`, listed last.
@@ -86,12 +92,13 @@ public protocol DebugDrawerPlugin: Identifiable {
 }
 
 public extension DebugDrawerPlugin {
-    /// Stable identifier derived from the concrete type name.
+    /// The type's fully qualified name, such as `MyApp.CachePlugin`.
     var id: String {
-        String(describing: type(of: self))
+        qualifiedName(of: type(of: self))
     }
 
-    /// Defaults to `id` — override when the plugin carries dynamic state.
+    /// ``id``: nothing reads it.
+    @available(*, deprecated, message: "Unused: debugLocalPlugin(_:) shows the plugin's latest value as its view updates")
     var contentIdentifier: String {
         id
     }
@@ -124,6 +131,14 @@ public extension DebugDrawerPlugin where HeaderAccessory == EmptyView {
 /// The category of a plugin that names none.
 let defaultPluginCategory = "General"
 
+// `String(reflecting:)` writes such a context as `(unknown context at $1029a4c80).`, an address
+// that moves between launches, which would lose the plugin's saved state at every launch.
+/// `type`'s fully qualified name (`MyApp.Screen.CachePlugin`) without the contexts Swift can't
+/// name: a `private` type or one declared in a function is `MyApp.CachePlugin`.
+func qualifiedName(of type: Any.Type) -> String {
+    String(reflecting: type).replacing(#/\(unknown context at \$[0-9a-fA-F]+\)\./#, with: "")
+}
+
 // MARK: - Type-erased wrapper
 
 /// A plugin of any type, as the drawer holds it: its properties read once, and its views
@@ -139,10 +154,18 @@ public struct AnyDebugDrawerPlugin: Identifiable {
     public let category: String
     /// The plugin's ``DebugDrawerPlugin/actions``.
     public let actions: [DebugDrawerAction]
-    private let _body: @MainActor () -> AnyView
-    private let _hud: (@MainActor () -> AnyView)?
-    private let _headerAccessory: (@MainActor () -> AnyView)?
-    private let _contribute: (@MainActor (inout DebugDrawerReport, DebugDrawerRedaction) -> Void)?
+    /// The plugin's type, fully qualified: two registrations of one ID from different types
+    /// collide.
+    let typeName: String
+    /// The type's unqualified name, when the plugin takes the default ``DebugDrawerPlugin/id``:
+    /// a name the drawer's saved state may still be keyed by, which it moves to ``id``.
+    let unqualifiedTypeID: String?
+    // Internal rather than private: a local plugin's wrapper builds them to read its latest value
+    // (LocalPluginContent).
+    let makeBody: @MainActor () -> AnyView
+    let makeHUD: (@MainActor () -> AnyView)?
+    let makeHeaderAccessory: (@MainActor () -> AnyView)?
+    let contributeToReport: (@MainActor (inout DebugDrawerReport, DebugDrawerRedaction) -> Void)?
 
     /// Wraps `plugin`, reading its properties now and keeping it to build its views later.
     ///
@@ -153,63 +176,71 @@ public struct AnyDebugDrawerPlugin: Identifiable {
         icon = plugin.icon
         category = plugin.category
         actions = plugin.actions
-        _body = { AnyView(plugin.body) }
+        typeName = String(reflecting: P.self)
+        unqualifiedTypeID = plugin.id == qualifiedName(of: P.self) ? String(describing: P.self) : nil
+        makeBody = { AnyView(plugin.body) }
         if plugin.hud == nil {
-            _hud = nil
+            makeHUD = nil
         } else {
-            _hud = { AnyView(plugin.hud) }
+            makeHUD = { AnyView(plugin.hud) }
         }
         if P.HeaderAccessory.self == EmptyView.self {
-            _headerAccessory = nil
+            makeHeaderAccessory = nil
         } else {
-            _headerAccessory = { AnyView(plugin.headerAccessory) }
+            makeHeaderAccessory = { AnyView(plugin.headerAccessory) }
         }
         if let contributor = plugin as? any DebugDrawerReportContributor {
-            _contribute = { contributor.contribute(to: &$0, redaction: $1) }
+            contributeToReport = { contributor.contribute(to: &$0, redaction: $1) }
         } else {
-            _contribute = nil
+            contributeToReport = nil
         }
     }
 
     /// Whether the plugin adopts ``DebugDrawerReportContributor``, and so adds files to the
     /// bug report.
     public var contributesToReport: Bool {
-        _contribute != nil
+        contributeToReport != nil
     }
 
     /// Adds the plugin's files to `report`; a plugin that doesn't adopt
     /// ``DebugDrawerReportContributor`` adds nothing.
     @MainActor public func contribute(to report: inout DebugDrawerReport, redaction: DebugDrawerRedaction) {
-        _contribute?(&report, redaction)
+        contributeToReport?(&report, redaction)
     }
 
     /// The plugin's ``DebugDrawerPlugin/body``, built now.
     @MainActor public var body: AnyView {
-        _body()
+        makeBody()
     }
 
     /// Whether the plugin offers a HUD readout.
     public var hasHUD: Bool {
-        _hud != nil
+        makeHUD != nil
     }
 
     /// The plugin's HUD readout, if it offers one.
     @MainActor public var hud: AnyView? {
-        _hud?()
+        makeHUD?()
     }
 
     /// The plugin's header accessory, if it declares one.
     @MainActor public var headerAccessory: AnyView? {
-        _headerAccessory?()
+        makeHeaderAccessory?()
     }
 
     /// Whether the plugin declares a header accessory, without building it.
     var hasHeaderAccessory: Bool {
-        _headerAccessory != nil
+        makeHeaderAccessory != nil
     }
 
     /// The `UserDefaults` key that records whether the user collapsed this plugin's section.
     var collapsedStateKey: String {
+        Self.collapsedStateKey(forID: id)
+    }
+
+    /// The `UserDefaults` key that records whether the user collapsed the section of the plugin
+    /// with ID `id`.
+    static func collapsedStateKey(forID id: String) -> String {
         "com.debugdrawer.collapsed." + id
     }
 }

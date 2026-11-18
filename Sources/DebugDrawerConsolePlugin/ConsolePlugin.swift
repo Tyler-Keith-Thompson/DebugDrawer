@@ -5,6 +5,11 @@ import SwiftUI
 // not, so release builds get an empty view and an installer that captures and registers nothing.
 
 public struct ConsolePlugin: DebugDrawerPlugin {
+    /// The plugin's identity in the drawer, which its saved state, HUD pin and badges are kept under.
+    public var id: String {
+        "ConsolePlugin"
+    }
+
     public var title = "Console"
     public var category = "Logs & Network"
     public var icon = "terminal"

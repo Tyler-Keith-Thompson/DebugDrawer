@@ -7,6 +7,11 @@ import SwiftUI
 /// The host's own debug settings: the tweaks and actions `installTweaks(storage:_:)` was
 /// given, in their sections.
 public struct TweaksPlugin: DebugDrawerPlugin {
+    /// The plugin's identity in the drawer, which its saved state, HUD pin and badges are kept under.
+    public var id: String {
+        "TweaksPlugin"
+    }
+
     public var title = "Tweaks"
     public var category = "App"
     public var icon = "slider.horizontal.3"

@@ -55,7 +55,7 @@
             drawer.isOpen = false
             drawer.registerGlobal(SnapshotFramesPlugin())
             drawer.hudLayout = HUDLayout()
-            drawer.hudLayout.pinned = ["SnapshotFramesPlugin"]
+            drawer.hudLayout.pinned = ["DebugDrawerTests.SnapshotFramesPlugin"]
             let app = VStack(spacing: 12) {
                 Text("Orders").font(.title)
                 Button("Refresh") {}
@@ -85,7 +85,7 @@
             actual.addRepresentation(bitmap)
 
             drawer.hudLayout = previous
-            drawer.unregisterGlobal(id: "SnapshotFramesPlugin")
+            drawer.unregisterGlobal(id: "DebugDrawerTests.SnapshotFramesPlugin")
             drawer.isOpen = wasOpen
             assertSnapshot(of: actual, as: .image(perceptualPrecision: 0.98), named: "\(colorScheme)")
         }

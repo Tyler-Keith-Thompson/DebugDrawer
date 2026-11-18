@@ -232,7 +232,8 @@
             drawer.unregisterLocal(id: ReportHeadersPlugin().id, token: headersToken)
             drawer.unregisterGlobal(id: ReportNotesPlugin().id)
             drawer.unregisterGlobal(id: ReportSilentPlugin().id)
-            #expect(actual.filter { $0.hasPrefix("Report") } == ["ReportNotesPlugin", "ReportHeadersPlugin"])
+            let expected = ["DebugDrawerTests.ReportNotesPlugin", "DebugDrawerTests.ReportHeadersPlugin"]
+            #expect(actual.filter { $0.hasPrefix("DebugDrawerTests.Report") } == expected)
         }
     }
 

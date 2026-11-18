@@ -11,6 +11,11 @@ import SwiftUI
 /// The battery, the power source, the thermal state and this process's CPU load, from
 /// ``EnergyMonitor``.
 public struct EnergyPlugin: DebugDrawerPlugin {
+    /// The plugin's identity in the drawer, which its saved state, HUD pin and badges are kept under.
+    public var id: String {
+        "EnergyPlugin"
+    }
+
     public var title = "Energy"
     public var category = "Performance"
     public var icon = "bolt.fill"

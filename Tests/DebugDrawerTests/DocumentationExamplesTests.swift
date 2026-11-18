@@ -39,10 +39,6 @@
         var title = "Order"
         var icon = "shippingbox"
 
-        var contentIdentifier: String {
-            orderID
-        }
-
         var body: some View {
             DebugDrawerKeyValueRow("Order ID", value: orderID)
         }
@@ -156,30 +152,29 @@
             #expect(actual.contains(expectedTitle))
         }
 
-        @Test("Writing plugins: a local plugin's ID is its type's name and its content follows the order")
+        @Test("Writing plugins: a local plugin's ID is its type's fully qualified name")
         func localPlugin() {
             let sut = OrderPlugin(orderID: "42")
-            let expectedID = "OrderPlugin"
-            let expectedContentIdentifier = "42"
+            let expectedID = "DebugDrawerTests.OrderPlugin"
 
             let actual = AnyDebugDrawerPlugin(sut)
 
             #expect(actual.id == expectedID)
-            #expect(sut.contentIdentifier == expectedContentIdentifier)
         }
 
         @Test("Writing plugins: a stale local registration's token leaves the newer one in place")
         func localPluginTokens() {
+            let id = "DebugDrawerTests.OrderPlugin"
             let stale = DebugDrawer.shared.registerLocal(OrderPlugin(orderID: "1"))
             let current = DebugDrawer.shared.registerLocal(OrderPlugin(orderID: "2"))
 
-            DebugDrawer.shared.unregisterLocal(id: "OrderPlugin", token: stale)
+            DebugDrawer.shared.unregisterLocal(id: id, token: stale)
 
             let actual = DebugDrawer.shared.localPlugins.map(\.id)
             // Leave the shared drawer as the other suites expect it, within this one main-actor turn.
-            DebugDrawer.shared.unregisterLocal(id: "OrderPlugin", token: current)
-            #expect(actual.filter { $0 == "OrderPlugin" }.count == 1)
-            #expect(!DebugDrawer.shared.localPlugins.contains { $0.id == "OrderPlugin" })
+            DebugDrawer.shared.unregisterLocal(id: id, token: current)
+            #expect(actual.filter { $0 == id }.count == 1)
+            #expect(!DebugDrawer.shared.localPlugins.contains { $0.id == id })
         }
 
         @Test("Writing plugins: a plugin declares its category, header accessory and HUD readout")

@@ -45,7 +45,7 @@
             .onChange(of: scrolledID) {
                 guard let scrolledID, scrolledID != layout.lastUsed else { return }
                 layout.lastUsed = scrolledID
-                layout.save(to: .standard)
+                layout.save(to: drawer.defaults)
             }
         }
 
@@ -112,10 +112,10 @@
                 let key = plugin.collapsedStateKey
                 if collapsedSections.contains(plugin.id) {
                     collapsedSections.remove(plugin.id)
-                    UserDefaults.standard.removeObject(forKey: key)
+                    drawer.defaults.removeObject(forKey: key)
                 } else {
                     collapsedSections.insert(plugin.id)
-                    UserDefaults.standard.set(true, forKey: key)
+                    drawer.defaults.set(true, forKey: key)
                 }
             }
         }

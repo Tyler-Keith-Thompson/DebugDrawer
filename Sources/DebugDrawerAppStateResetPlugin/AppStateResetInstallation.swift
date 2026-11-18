@@ -21,7 +21,8 @@
                 container: .current(appGroups: groups, directories: directories, appFolderName: bundleID),
                 cookies: _CookieStore(),
                 responseCache: URLCache.shared,
-                cleanup: cleanup
+                cleanup: cleanup,
+                debugDrawerDomain: UserDefaults.debugDrawerSuiteName
             )
             let model = AppStateResetModel(appState: appState, process: _AppProcess())
             let plugin = AppStateResetPlugin(model: model)

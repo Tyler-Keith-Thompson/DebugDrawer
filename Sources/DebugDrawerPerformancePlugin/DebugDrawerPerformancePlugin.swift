@@ -9,6 +9,11 @@ import SwiftUI
 /// The frame rate, dropped frames, memory footprint with its peak and CPU use per thread, as
 /// they change.
 public struct PerformancePlugin: DebugDrawerPlugin {
+    /// The plugin's identity in the drawer, which its saved state, HUD pin and badges are kept under.
+    public var id: String {
+        "PerformancePlugin"
+    }
+
     public var title = "Performance"
     public var category = "Performance"
     public var icon = "gauge.with.dots.needle.33percent"

@@ -1,4 +1,5 @@
 #if DEBUG
+    import os
     import SwiftUI
 
     /// The accessibility identifier on the drawer's overlay, which tells the drawer's views apart
@@ -27,6 +28,10 @@
     public final class DebugDrawer: ObservableObject {
         /// The app's drawer, which `debugDrawer()` shows and every plugin registers with.
         public static let shared = DebugDrawer()
+
+        /// Where the drawer reports registrations it can't honor, such as two plugin types under
+        /// one ID.
+        static let logger = Logger(subsystem: "DebugDrawer", category: "DebugDrawer")
 
         /// Whether the key window's drawer is on screen. Set it, or call ``toggle()``.
         ///
@@ -70,13 +75,14 @@
             didSet { localPlugins = localRegistrations.map(\.plugin) }
         }
 
-        /// Where the drawer saves what it keeps across launches: the HUD's layout and which
-        /// plugins' notices are silenced.
+        /// Where the drawer saves what it keeps across launches: the HUD's layout, which plugins'
+        /// notices are silenced, and each window's collapsed sections, pins and order.
         let defaults: UserDefaults
 
-        /// Makes a drawer that saves to `defaults`; the app's is ``shared``, saving to `.standard`.
+        /// Makes a drawer that saves to `defaults`; the app's is ``shared``, saving to the drawer's
+        /// own suite (`UserDefaults.debugDrawer`) so none of it shows among the app's defaults.
         /// Tests pass a suite of their own so nothing they save reaches another test or the app.
-        init(defaults: UserDefaults = .standard) {
+        init(defaults: UserDefaults = .debugDrawer) {
             self.defaults = defaults
             hudLayout = HUDLayout(from: defaults)
             noticesMutedPlugins = Set(defaults.stringArray(forKey: Self.noticesMutedDefaultsKey) ?? [])
@@ -86,12 +92,26 @@
 
         /// Registers a plugin that stays in the drawer for the app's lifetime.
         ///
-        /// A plugin whose ``DebugDrawerPlugin/id`` is already registered as global is ignored.
+        /// A plugin whose ``DebugDrawerPlugin/id`` is already registered as global is ignored; when
+        /// the plugin registered under that ID is of another type, the drawer also logs an error
+        /// naming both types, since one of them needs an ``DebugDrawerPlugin/id`` of its own.
         ///
         /// - Parameter plugin: The plugin to add.
         public func registerGlobal<P: DebugDrawerPlugin>(_ plugin: P) {
-            guard !globalPlugins.contains(where: { $0.id == plugin.id }) else { return }
-            globalPlugins.append(AnyDebugDrawerPlugin(plugin))
+            let wrapped = AnyDebugDrawerPlugin(plugin)
+            switch DrawerRegistrationOutcome(of: wrapped, among: globalPlugins) {
+            case .added:
+                adoptSavedState(of: wrapped)
+                globalPlugins.append(wrapped)
+            case .alreadyRegistered:
+                break
+            case let .collision(registered):
+                Self.logger.error("""
+                A global plugin of type \(wrapped.typeName, privacy: .public) wasn't registered: \
+                \(registered.typeName, privacy: .public) is registered under its id \(wrapped.id, privacy: .public). \
+                Give one of them an id of its own.
+                """)
+            }
         }
 
         /// Removes the global plugin with this ID; does nothing if there is none.
@@ -123,9 +143,39 @@
         /// - Returns: The token that owns the registration.
         func registerLocal(_ plugin: some DebugDrawerPlugin, scope: ObjectIdentifier?) -> UUID {
             let token = UUID()
-            let registration = DrawerLocalRegistration(token: token, plugin: AnyDebugDrawerPlugin(plugin), scope: scope)
-            localRegistrations = localRegistrations.placing(registration)
+            place(DrawerLocalRegistration(token: token, plugin: AnyDebugDrawerPlugin(plugin), scope: scope))
             return token
+        }
+
+        /// Shows `plugin` as the latest value of the registration `token` owns: its views follow it
+        /// at once, and the drawer lists it anew only when its ID, title, icon, category or
+        /// actions changed. Does nothing once `token` no longer owns a registration.
+        func updateLocal(_ plugin: some DebugDrawerPlugin, token: UUID) {
+            guard let registration = localRegistrations.first(where: { $0.token == token }) else { return }
+            let latest = AnyDebugDrawerPlugin(plugin)
+            if latest.isListed(like: registration.content.plugin) {
+                registration.content.plugin = latest
+            } else {
+                place(DrawerLocalRegistration(token: token, plugin: latest, scope: registration.scope))
+            }
+        }
+
+        /// Puts `registration` in the list, replacing the one with its token, or else the one of the
+        /// same ID in the same window, and logs an error when that one is of another type.
+        private func place(_ registration: DrawerLocalRegistration) {
+            let plugin = registration.plugin
+            let replaced = localRegistrations.first { $0.token != registration.token && $0.plugin.id == plugin.id && $0.scope == registration.scope }
+            if let replaced, replaced.plugin.typeName != plugin.typeName {
+                Self.logger.error("""
+                A local plugin of type \(plugin.typeName, privacy: .public) replaced one of type \
+                \(replaced.plugin.typeName, privacy: .public) registered under the same id \(plugin.id, privacy: .public). \
+                Give one of them an id of its own.
+                """)
+            }
+            if !localRegistrations.contains(where: { $0.token == registration.token || $0.plugin.id == plugin.id }) {
+                adoptSavedState(of: plugin)
+            }
+            localRegistrations = localRegistrations.placing(registration)
         }
 
         /// Moves the registration `token` owns to the drawer of the window `scope` identifies, as

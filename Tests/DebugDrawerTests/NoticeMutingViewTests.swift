@@ -33,7 +33,7 @@
 
             try sut.inspect().find(button: "Silence Notices").tap()
 
-            #expect(drawer.isNoticesMuted(forPlugin: "ChattyPlugin"))
+            #expect(drawer.isNoticesMuted(forPlugin: "DebugDrawerTests.ChattyPlugin"))
         }
 
         @Test("A silenced local plugin's section header menu offers Allow Notices, not Silence Notices, which allows them again")
@@ -43,7 +43,7 @@
             defer { suite.removePersistentDomain(forName: name) }
             let drawer = DebugDrawer(defaults: suite)
             drawer.registerGlobal(ChattyPlugin())
-            drawer.setNoticesMuted(true, forPlugin: "ChattyPlugin")
+            drawer.setNoticesMuted(true, forPlugin: "DebugDrawerTests.ChattyPlugin")
             let presentation = DrawerPresentation()
             presentation.isOpen = true
             let overlay = DebugDrawerOverlay(drawer: drawer, presentation: presentation)
@@ -53,7 +53,7 @@
             try sut.inspect().find(button: "Allow Notices").tap()
 
             #expect(silence.isEmpty)
-            #expect(!drawer.isNoticesMuted(forPlugin: "ChattyPlugin"))
+            #expect(!drawer.isNoticesMuted(forPlugin: "DebugDrawerTests.ChattyPlugin"))
         }
 
         @Test("A silenced plugin's section header shows a crossed-out bell and reads Notices silenced")

@@ -16,16 +16,20 @@
         let cookies: any CookieStore
         let responseCache: any ResponseCache
         let cleanup: AppStateReset.Cleanup?
+        /// The suite DebugDrawer keeps its own state in (`UserDefaults.debugDrawer`), cleared only
+        /// when the reset includes DebugDrawer's own settings; `nil` for none.
+        var debugDrawerDomain: String?
 
-        /// The prefix of DebugDrawer's own UserDefaults keys: its layout, its HUD pins, collapsed
-        /// plugins and each plugin's settings.
+        /// The prefix of the DebugDrawer keys kept in the app's own domain, such as Tweaks' values
+        /// and Feature Flags' overrides.
         static let debugDrawerKeyPrefix = "com.debugdrawer."
 
         /// What a reset would delete now.
         ///
-        /// - Parameter includingDebugDrawer: Whether DebugDrawer's own keys and files go too.
+        /// - Parameter includingDebugDrawer: Whether DebugDrawer's own keys, suite and files go too.
         func plan(includingDebugDrawer: Bool) async -> ResetPlan {
-            let defaults = domains.map { name in
+            let drawerDomains = includingDebugDrawer ? debugDrawerDomain.map { [$0] } ?? [] : []
+            let defaults = (domains + drawerDomains).map { name in
                 DefaultsDomain(
                     name: name,
                     keys: preferences.keys(inDomain: name).filter { includingDebugDrawer || !$0.hasPrefix(Self.debugDrawerKeyPrefix) }

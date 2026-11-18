@@ -27,6 +27,11 @@ import UniformTypeIdentifiers
 /// Authorization isn't simulated: `authorizationStatus` is the real one, and a spoofed location
 /// is delivered whether or not the app is authorized.
 public struct LocationPlugin: DebugDrawerPlugin {
+    /// The plugin's identity in the drawer, which its saved state, HUD pin and badges are kept under.
+    public var id: String {
+        "LocationPlugin"
+    }
+
     public var title = "Location Simulator"
     public var category = "App"
     public var icon = "location.circle"

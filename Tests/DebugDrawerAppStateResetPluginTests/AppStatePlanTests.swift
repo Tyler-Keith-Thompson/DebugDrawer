@@ -30,6 +30,23 @@
             #expect(included.defaults == expectedIncluded)
         }
 
+        @Test("DebugDrawer's own defaults suite is listed only when DebugDrawer's settings are included")
+        func debugDrawerSuite() async throws {
+            let seeded = try SeededAppState()
+            defer { seeded.remove() }
+            let suite = "com.example.app.debugdrawer"
+            seeded.preferences.domains[suite] = ["com.debugdrawer.collapsed.MyApp.CachePlugin", "com.debugdrawer.hud"]
+            var sut = seeded.appState
+            sut.debugDrawerDomain = suite
+            let expectedIncluded = DefaultsDomain(name: suite, keys: ["com.debugdrawer.collapsed.MyApp.CachePlugin", "com.debugdrawer.hud"])
+
+            let kept = await sut.plan(includingDebugDrawer: false)
+            let included = await sut.plan(includingDebugDrawer: true)
+
+            #expect(!kept.defaults.contains { $0.name == suite })
+            #expect(included.defaults.last == expectedIncluded)
+        }
+
         @Test("A domain with nothing to remove is left out, and one key reads in the singular")
         func defaultsSingular() async throws {
             let seeded = try SeededAppState()

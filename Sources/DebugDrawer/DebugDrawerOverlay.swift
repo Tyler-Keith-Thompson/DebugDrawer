@@ -55,6 +55,7 @@
                     }
                 }
                 .onAppear { loadCollapsedState() }
+                .onChange(of: allPlugins.map(\.id)) { oldIDs, _ in loadSavedState(addedSince: oldIDs) }
             #elseif os(macOS)
                 // The panel fills a window of its own, which AppKit sizes and places
                 // (DrawerChildPanel); it fades, since a slide would be clipped at the window's edge.
@@ -67,6 +68,7 @@
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .onAppear { loadCollapsedState() }
+                .onChange(of: allPlugins.map(\.id)) { oldIDs, _ in loadSavedState(addedSince: oldIDs) }
                 // `initial`: the window may first draw the panel after the drawer has opened (its
                 // window was hidden until then), when there is no change left to see.
                 .onChange(of: presentation.isOpen, initial: true) { _, isOpen in follow(isOpen: isOpen) }
@@ -86,6 +88,7 @@
                     if presentation.layout != layout { presentation.layout = layout }
                 }
                 .onAppear { loadCollapsedState() }
+                .onChange(of: allPlugins.map(\.id)) { oldIDs, _ in loadSavedState(addedSince: oldIDs) }
                 // `initial`: the window may first draw the panel after the drawer has opened (its
                 // window was hidden until then), when there is no change left to see.
                 .onChange(of: presentation.isOpen, initial: true) { _, isOpen in follow(isOpen: isOpen) }
@@ -249,12 +252,23 @@
         }
 
         func loadCollapsedState() {
-            for plugin in allPlugins where UserDefaults.standard.bool(forKey: plugin.collapsedStateKey) {
+            for plugin in allPlugins where drawer.defaults.bool(forKey: plugin.collapsedStateKey) {
                 collapsedSections.insert(plugin.id)
             }
-            layout = DrawerLayout(from: .standard)
+            layout = DrawerLayout(from: drawer.defaults)
             // The list isn't on screen yet; it opens at this plugin.
             scrolledID = layout.lastUsed
+        }
+
+        /// Reads the saved state of the plugins registered since the list last changed, as
+        /// `loadCollapsedState()` read the first ones': whether each is collapsed, and the layout,
+        /// which may have moved state saved under an older ID to theirs (`adoptSavedState(of:)`).
+        func loadSavedState(addedSince oldIDs: [String]) {
+            let known = Set(oldIDs)
+            for plugin in allPlugins where !known.contains(plugin.id) && drawer.defaults.bool(forKey: plugin.collapsedStateKey) {
+                collapsedSections.insert(plugin.id)
+            }
+            layout = DrawerLayout(from: drawer.defaults)
         }
 
         /// Changes the layout and saves it.
@@ -262,7 +276,7 @@
             withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.2)) {
                 change(&layout)
             }
-            layout.save(to: .standard)
+            layout.save(to: drawer.defaults)
         }
 
         // MARK: - Navigation

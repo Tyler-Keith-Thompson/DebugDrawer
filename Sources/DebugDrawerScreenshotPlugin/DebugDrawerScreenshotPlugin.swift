@@ -9,6 +9,11 @@ import SwiftUI
 /// Captures the app's key window: on macOS to a PNG on the Desktop or to the clipboard, on iOS to
 /// the clipboard.
 public struct ScreenshotPlugin: DebugDrawerPlugin {
+    /// The plugin's identity in the drawer, which its saved state, HUD pin and badges are kept under.
+    public var id: String {
+        "ScreenshotPlugin"
+    }
+
     public var title = "Screenshot"
     public var category = "Interface"
     public var icon = "camera"

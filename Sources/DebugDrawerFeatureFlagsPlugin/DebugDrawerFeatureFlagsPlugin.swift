@@ -8,6 +8,11 @@ import SwiftUI
 /// `installFeatureFlags(provider:storage:)` was given: each flag's live value, a local
 /// override, search, an overridden-only filter and Reset All.
 public struct FeatureFlagsPlugin: DebugDrawerPlugin {
+    /// The plugin's identity in the drawer, which its saved state, HUD pin and badges are kept under.
+    public var id: String {
+        "FeatureFlagsPlugin"
+    }
+
     public var title = "Feature Flags"
     public var category = "App"
     public var icon = "flag"

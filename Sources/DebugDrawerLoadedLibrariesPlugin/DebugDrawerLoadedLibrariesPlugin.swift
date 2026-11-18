@@ -10,6 +10,11 @@ import SwiftUI
 /// Every image loaded into the process, grouped as App, Third-Party and System, each with its
 /// path, UUID, load address and, for a framework, its version.
 public struct LoadedLibrariesPlugin: DebugDrawerPlugin {
+    /// The plugin's identity in the drawer, which its saved state, HUD pin and badges are kept under.
+    public var id: String {
+        "LoadedLibrariesPlugin"
+    }
+
     public var title = "Loaded Libraries"
     public var category = "App"
     public var icon = "books.vertical"

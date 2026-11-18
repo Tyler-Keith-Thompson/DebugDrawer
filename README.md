@@ -89,9 +89,13 @@ HUD and the toasts are drawn by `debugDrawer()`, so such a window shows neither)
 one plugin alone at the panel's full height, and the back button returns to the list.
 
 A local plugin is registered when its view appears and removed when it disappears, unless a newer
-view has registered a plugin with the same `id` since. A plugin that shows data of its own (an
-order's ID, a folder's path) declares a `contentIdentifier` that changes with it, and
-`.debugLocalPlugin()` registers the plugin again each time it changes; it defaults to `id`. A plugin
+view has registered a plugin with the same `id` since. While the view is on screen the drawer shows
+the plugin's latest value: `.debugLocalPlugin(UserPlugin(user: user))` shows the new user once
+`user` changes. A plugin's `id` defaults to its type's fully qualified name (`MyApp.CachePlugin`),
+so two modules' `CachePlugin`s both appear; registering a global plugin of another type under an
+`id` already registered keeps the first and logs an error. The drawer saves its state (collapsed
+sections, pins, the HUD, and plugin settings such as Deep Link's history) in a defaults suite of
+its own, `<bundle identifier>.debugdrawer`, never among the app's standard defaults. A plugin
 that needs a clean view of the app, as a screenshot does, runs its work in
 `DebugDrawer.shared.performWhileHidden(drawer:_:)`: it hides the HUD, and every open drawer unless
 `drawer` is false, runs the work once that has drawn, then shows them again.
@@ -1736,8 +1740,9 @@ be written, an item the keychain refuses), the app keeps running and the results
 
 Links are deleted as links, never followed out of the container. App groups the entitlements name
 are found on their own. DebugDrawer's own state stays unless Include DebugDrawer's own settings is
-on: the UserDefaults keys starting `com.debugdrawer.` (the drawer's layout, HUD pins and plugin
-settings) and the files named `DebugDrawer…` in each directory and in its folder named after the
+on: the drawer's own defaults suite (`<bundle identifier>.debugdrawer`: its layout, HUD pins and
+plugin settings), the keys starting `com.debugdrawer.` in the app's domain (Tweaks' values and
+Feature Flags' overrides) and the files named `DebugDrawer…` in each directory and in its folder named after the
 app (recordings and mockups in `Caches/DebugDrawer`, or `Caches/<bundle identifier>/DebugDrawer` in a
 Mac app outside the App Sandbox, crash reports and MetricKit payloads).
 
