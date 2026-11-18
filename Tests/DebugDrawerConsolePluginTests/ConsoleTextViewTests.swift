@@ -81,6 +81,80 @@
             #expect(afterTrim.split(separator: "\n").map { $0.split(separator: " ", maxSplits: 1)[1] } == ["line 2", "line 3"])
         }
 
+        @Test("Past the store's 2,000-line capacity, each batch still reaches the text: the newest line shows and the oldest are gone")
+        func pastCapacityKeepsUpdating() async throws {
+            func textView(in view: NSView) -> NSTextView? {
+                view as? NSTextView ?? view.subviews.lazy.compactMap(textView(in:)).first
+            }
+            let store = ConsoleLogStore(muteStorage: FakeConsoleMuteStorage())
+            let host = NSHostingView(rootView: ConsoleTextView(lines: [], isFollowing: .constant(false)).frame(width: 316, height: 120))
+            let window = NSWindow(contentRect: CGRect(x: 0, y: 0, width: 316, height: 120), styleMask: .borderless, backing: .buffered, defer: true)
+            window.contentView = host
+            var shown: [[Substring]] = []
+
+            // Five batches of 500: the fifth arrives at capacity, so the store drops as many as
+            // it adds and its count stays 2,000.
+            for batch in 0 ..< 5 {
+                let texts = (0 ..< 500).map { "line \(batch * 500 + $0)" }
+                for text in texts {
+                    store.ingest(LogLine(timestamp: Date(timeIntervalSince1970: 1_800_000_000), text: text, source: .stdout, level: .info))
+                }
+                for await _ in store.$lines.first(where: { $0.last?.text == texts.last }).values {}
+                host.rootView = ConsoleTextView(lines: store.shownLines, isFollowing: .constant(false)).frame(width: 316, height: 120)
+                host.layoutSubtreeIfNeeded()
+                shown.append(try #require(textView(in: host)).string.split(separator: "\n").map { $0.split(separator: " ", maxSplits: 1)[1] })
+            }
+            let expectedAtCapacity = (0 ..< 2000).map { "line \($0)"[...] }
+            let expected = (500 ..< 2500).map { "line \($0)"[...] }
+
+            #expect(shown[3] == expectedAtCapacity)
+            #expect(shown[4] == expected)
+        }
+
+        @Test("Switching the level from Errors to All, then searching, draws exactly the lines the store lists")
+        func levelAndSearchChangesDrawTheFilteredLines() async throws {
+            func textView(in view: NSView) -> NSTextView? {
+                view as? NSTextView ?? view.subviews.lazy.compactMap(textView(in:)).first
+            }
+            // Each row's text: after its time, and after the error glyph's attachment character
+            // on an error line.
+            func texts(in string: String) -> [String] {
+                string.split(separator: "\n").map { row in
+                    let text = row.split(separator: " ", maxSplits: 1)[1]
+                    return String(text.hasPrefix("\u{FFFC} ") ? text.dropFirst(2) : text)
+                }
+            }
+            let store = ConsoleLogStore(muteStorage: FakeConsoleMuteStorage())
+            let logged: [(String, LogLine.Level)] = [
+                ("feed loaded", .info), ("feed failed", .error), ("cart shown", .debug), ("cart failed", .error), ("feed retried", .notice)
+            ]
+            for (text, level) in logged {
+                store.ingest(LogLine(timestamp: Date(timeIntervalSince1970: 1_800_000_000), text: text, source: .oslog, level: level))
+            }
+            for await _ in store.$lines.first(where: { $0.count == logged.count }).values {}
+            store.filterLevel = .error
+            let host = NSHostingView(
+                rootView: ConsoleTextView(lines: store.shownLines, isFollowing: .constant(false)).frame(width: 316, height: 120)
+            )
+            let window = NSWindow(contentRect: CGRect(x: 0, y: 0, width: 316, height: 120), styleMask: .borderless, backing: .buffered, defer: true)
+            window.contentView = host
+            host.layoutSubtreeIfNeeded()
+            let errors = try #require(textView(in: host)).string
+
+            store.filterLevel = .debug
+            host.rootView = ConsoleTextView(lines: store.shownLines, isFollowing: .constant(false)).frame(width: 316, height: 120)
+            host.layoutSubtreeIfNeeded()
+            let all = try #require(textView(in: host)).string
+            store.searchText = "feed"
+            host.rootView = ConsoleTextView(lines: store.shownLines, isFollowing: .constant(false)).frame(width: 316, height: 120)
+            host.layoutSubtreeIfNeeded()
+            let searched = try #require(textView(in: host)).string
+
+            #expect(texts(in: errors) == ["feed failed", "cart failed"])
+            #expect(texts(in: all) == logged.map(\.0))
+            #expect(texts(in: searched) == ["feed loaded", "feed failed", "feed retried"])
+        }
+
         @Test("A line's context menu offers Mute Subsystem, Mute Category and Show Since This Line, and runs the one picked")
         func contextMenu() throws {
             func textView(in view: NSView) -> NSTextView? {

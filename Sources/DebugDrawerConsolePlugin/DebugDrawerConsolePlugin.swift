@@ -280,22 +280,35 @@ import SwiftUI
             capturePipes.append(pipe)
             let originalFd = dup(fd)
             dup2(pipe.fileHandleForWriting.fileDescriptor, fd)
+            // A read ends wherever the pipe cut the stream, inside a line or a character, so the
+            // stream's bytes go through one assembler that keeps what follows the last newline.
+            // The handler's calls come one at a time, but it is a Sendable closure; the lock is
+            // never contended. `OSAllocatedUnfairLock` rather than `Mutex`, which needs iOS 18;
+            // switch once iOS 18 is the minimum.
+            let assembler = OSAllocatedUnfairLock(initialState: ConsoleLineAssembler())
 
             pipe.fileHandleForReading.readabilityHandler = { [weak self] handle in
                 let data = handle.availableData
-                guard !data.isEmpty else { return }
-                // Forward to original destination.
-                if originalFd >= 0 {
-                    data.withUnsafeBytes { buf in
-                        if let ptr = buf.baseAddress {
-                            _ = write(originalFd, ptr, data.count)
+                let texts: [String]
+                if data.isEmpty {
+                    // The end of the stream: its last line shows even without a newline.
+                    handle.readabilityHandler = nil
+                    texts = assembler.withLock { $0.flush() }.map { [$0] } ?? []
+                } else {
+                    // Forward to original destination.
+                    if originalFd >= 0 {
+                        data.withUnsafeBytes { buf in
+                            if let ptr = buf.baseAddress {
+                                _ = write(originalFd, ptr, data.count)
+                            }
                         }
                     }
+                    texts = assembler.withLock { $0.lines(in: data) }
                 }
-                guard let text = String(data: data, encoding: .utf8) else { return }
-                let logLines = text.components(separatedBy: "\n")
+                let logLines = texts
                     .filter { !$0.isEmpty }
                     .map { LogLine(timestamp: Date(), text: $0, source: source, level: source == .stderr ? .error : .info) }
+                guard !logLines.isEmpty else { return }
 
                 Task { @MainActor [weak self] in
                     guard let self else { return }
