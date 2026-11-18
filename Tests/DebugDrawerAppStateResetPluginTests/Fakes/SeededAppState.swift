@@ -27,6 +27,10 @@
 
         /// The temporary directory that holds the container, and `Outside`.
         let root: URL
+        // Resolved once: resolving costs a file-system lookup per path component, and the tests ask
+        // for many relative paths per seeded state.
+        /// `root`'s path with its links resolved, the form the file walks report paths in.
+        let resolvedRoot: String
         let preferences: FakePreferenceStore
         let keychain: FakeKeychain
         let cookies: FakeCookieStore
@@ -65,6 +69,7 @@
             try FileManager.default.createSymbolicLink(
                 at: root.appending(path: "Application Support/link-out"), withDestinationURL: root.appending(path: "Outside")
             )
+            resolvedRoot = root.resolvingSymlinksInPath().path(percentEncoded: false)
             let group = root.appending(path: "group")
             let container = AppContainer(
                 files: [
@@ -113,8 +118,7 @@
 
         /// Every file, folder and link under `root`, by its path from it, links not followed.
         func paths() -> Set<String> {
-            let base = root.resolvingSymlinksInPath().path(percentEncoded: false)
-            let enumerator = FileManager.default.enumerator(atPath: base)
+            let enumerator = FileManager.default.enumerator(atPath: resolvedRoot)
             var paths: Set<String> = []
             while let path = enumerator?.nextObject() as? String {
                 paths.insert(path)
@@ -124,9 +128,8 @@
 
         /// `entry`'s path from `root`.
         func relativePath(of entry: FileEntry) -> String {
-            let base = root.resolvingSymlinksInPath().path(percentEncoded: false)
             let path = entry.url.path(percentEncoded: false)
-            return String(path.dropFirst(base.count).drop { $0 == "/" })
+            return String(path.dropFirst(resolvedRoot.count).drop { $0 == "/" })
         }
 
         /// Deletes the temporary directory.

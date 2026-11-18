@@ -105,39 +105,41 @@
             #expect(seeded.preferences.domains[SeededAppState.appDomain] == [])
         }
 
-        @Test("Whatever is selected, the reset deletes exactly what the plan lists: every subset of categories, with and without DebugDrawer's own")
-        func deletesExactlyThePlan() async throws {
-            // Every input there is (2^7 selections, twice), rather than a random sample of them.
+        // Every input there is (2^7 selections, twice), rather than a random sample of them. Each is a
+        // test case of its own, so the suite's time limit applies to each one rather than to all
+        // 256 together, which a loaded simulator took past a minute.
+        @Test(
+            "Whatever is selected, the reset deletes exactly what the plan lists: every subset of categories, with and without DebugDrawer's own",
+            arguments: [false, true], 0 ..< (1 << ResetCategory.allCases.count)
+        )
+        func deletesExactlyThePlan(includesDebugDrawer: Bool, mask: Int) async throws {
             let categories = ResetCategory.allCases
-            for includesDebugDrawer in [false, true] {
-                for mask in 0 ..< (1 << categories.count) {
-                    let selection = Set(categories.indices.filter { mask & (1 << $0) != 0 }.map { categories[$0] })
-                    let seeded = try SeededAppState()
-                    defer { seeded.remove() }
-                    let plan = await seeded.appState.plan(includingDebugDrawer: includesDebugDrawer)
-                    let before = seeded.paths()
-                    let listedEntries = (selection.contains(.files) ? plan.files : []) + (selection.contains(.caches) ? plan.caches : [])
-                    let listedPaths = before.filter { path in
-                        listedEntries.contains { path == seeded.relativePath(of: $0) || path.hasPrefix(seeded.relativePath(of: $0) + "/") }
-                    }
-                    let listedKeys = selection.contains(.userDefaults)
-                        ? Set(plan.defaults.flatMap { domain in domain.keys.map { "\(domain.name)/\($0)" } })
-                        : []
-                    let listedItems = selection.contains(.keychain) ? plan.keychain : .items([])
-                    let listedCookies = selection.contains(.cookies) ? Set(plan.cookies) : []
-
-                    _ = await seeded.appState.reset(selection, of: plan)
-                    let deletedPaths = before.subtracting(seeded.paths())
-                    let deletedKeys = Set(seeded.preferences.removed.flatMap { domain, keys in keys.map { "\(domain)/\($0)" } })
-
-                    #expect(deletedPaths == listedPaths, "\(selection), DebugDrawer \(includesDebugDrawer)")
-                    #expect(deletedKeys == listedKeys, "\(selection)")
-                    #expect(KeychainInventory.items(seeded.keychain.deleted) == listedItems, "\(selection)")
-                    #expect(Set(seeded.cookies.deleted) == listedCookies, "\(selection)")
-                    #expect(seeded.responseCache.removals == (selection.contains(.urlCache) ? 1 : 0), "\(selection)")
-                    #expect(seeded.cleanupCounter.runs == (selection.contains(.appCleanup) ? 1 : 0), "\(selection)")
-                }
+            let selection = Set(categories.indices.filter { mask & (1 << $0) != 0 }.map { categories[$0] })
+            let seeded = try SeededAppState()
+            defer { seeded.remove() }
+            let plan = await seeded.appState.plan(includingDebugDrawer: includesDebugDrawer)
+            let before = seeded.paths()
+            let listedEntries = (selection.contains(.files) ? plan.files : []) + (selection.contains(.caches) ? plan.caches : [])
+            let listedEntryPaths = listedEntries.map(seeded.relativePath(of:))
+            let listedPaths = before.filter { path in
+                listedEntryPaths.contains { path == $0 || path.hasPrefix($0 + "/") }
             }
+            let listedKeys = selection.contains(.userDefaults)
+                ? Set(plan.defaults.flatMap { domain in domain.keys.map { "\(domain.name)/\($0)" } })
+                : []
+            let listedItems = selection.contains(.keychain) ? plan.keychain : .items([])
+            let listedCookies = selection.contains(.cookies) ? Set(plan.cookies) : []
+
+            _ = await seeded.appState.reset(selection, of: plan)
+            let deletedPaths = before.subtracting(seeded.paths())
+            let deletedKeys = Set(seeded.preferences.removed.flatMap { domain, keys in keys.map { "\(domain)/\($0)" } })
+
+            #expect(deletedPaths == listedPaths, "\(selection), DebugDrawer \(includesDebugDrawer)")
+            #expect(deletedKeys == listedKeys, "\(selection)")
+            #expect(KeychainInventory.items(seeded.keychain.deleted) == listedItems, "\(selection)")
+            #expect(Set(seeded.cookies.deleted) == listedCookies, "\(selection)")
+            #expect(seeded.responseCache.removals == (selection.contains(.urlCache) ? 1 : 0), "\(selection)")
+            #expect(seeded.cleanupCounter.runs == (selection.contains(.appCleanup) ? 1 : 0), "\(selection)")
         }
 
         @Test("A keychain that can't be read fails the category with its status and deletes nothing")
