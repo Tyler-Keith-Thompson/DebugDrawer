@@ -49,6 +49,7 @@ let products: [Product] = [
     .library(name: "DebugDrawerDesignOverlayPlugin", targets: ["DebugDrawerDesignOverlayPlugin"]),
     .library(name: "DebugDrawerColorVisionPlugin", targets: ["DebugDrawerColorVisionPlugin"]),
     .library(name: "DebugDrawerAppStateResetPlugin", targets: ["DebugDrawerAppStateResetPlugin"]),
+    .library(name: "DebugDrawerDiskIOInterposer", type: .dynamic, targets: ["DebugDrawerDiskIOInterposer"]),
 ]
 
 let dependencies: [Package.Dependency] = [
@@ -97,6 +98,9 @@ let targets: [Target] = [
     .target(name: "DebugDrawerColorVisionPlugin", dependencies: ["DebugDrawer"], exclude: ["BUILD.bazel", "Shaders"]),
     .target(name: "DebugDrawerAppStateResetPlugin", dependencies: ["DebugDrawer"], exclude: bazelFiles),
 
+    // Dynamic libraries: C, each a `.dynamic` product of its own (DYNAMIC_LIBRARIES in scripts/modules.py).
+    .target(name: "DebugDrawerDiskIOInterposer", exclude: bazelFiles),
+
     // Shared fixtures (data only) for every test target.
     .target(name: "DebugDrawerTestSupport", path: "Tests/DebugDrawerTestSupport", exclude: bazelFiles),
 
@@ -111,7 +115,7 @@ let targets: [Target] = [
     .testTarget(name: "DebugDrawerKeychainPluginTests", dependencies: ["DebugDrawerKeychainPlugin", "DebugDrawer", .product(name: "ViewInspector", package: "viewinspector", condition: .when(platforms: applePlatforms)), .product(name: "SnapshotTesting", package: "swift-snapshot-testing", condition: .when(platforms: applePlatforms)), .product(name: "IssueReportingTestSupport", package: "xctest-dynamic-overlay", condition: .when(platforms: applePlatforms))], exclude: ["BUILD.bazel", "__Snapshots__"]),
     .testTarget(name: "DebugDrawerScreenshotPluginTests", dependencies: ["DebugDrawerScreenshotPlugin", "DebugDrawer", .product(name: "SnapshotTesting", package: "swift-snapshot-testing", condition: .when(platforms: applePlatforms)), .product(name: "IssueReportingTestSupport", package: "xctest-dynamic-overlay", condition: .when(platforms: applePlatforms))], exclude: ["BUILD.bazel", "__Snapshots__"]),
     .testTarget(name: "DebugDrawerFileBrowserPluginTests", dependencies: ["DebugDrawerFileBrowserPlugin", "DebugDrawer", .product(name: "ViewInspector", package: "viewinspector", condition: .when(platforms: applePlatforms)), .product(name: "SnapshotTesting", package: "swift-snapshot-testing", condition: .when(platforms: applePlatforms)), .product(name: "IssueReportingTestSupport", package: "xctest-dynamic-overlay", condition: .when(platforms: applePlatforms))], exclude: ["BUILD.bazel", "__Snapshots__"]),
-    .testTarget(name: "DebugDrawerDiskIOPluginTests", dependencies: ["DebugDrawerDiskIOPlugin", "DebugDrawer", .product(name: "ViewInspector", package: "viewinspector", condition: .when(platforms: applePlatforms)), .product(name: "SnapshotTesting", package: "swift-snapshot-testing", condition: .when(platforms: applePlatforms)), .product(name: "IssueReportingTestSupport", package: "xctest-dynamic-overlay", condition: .when(platforms: applePlatforms))], exclude: ["BUILD.bazel", "__Snapshots__"]),
+    .testTarget(name: "DebugDrawerDiskIOPluginTests", dependencies: ["DebugDrawerDiskIOPlugin", "DebugDrawer", "DebugDrawerDiskIOInterposer", .product(name: "ViewInspector", package: "viewinspector", condition: .when(platforms: applePlatforms)), .product(name: "SnapshotTesting", package: "swift-snapshot-testing", condition: .when(platforms: applePlatforms)), .product(name: "IssueReportingTestSupport", package: "xctest-dynamic-overlay", condition: .when(platforms: applePlatforms))], exclude: ["BUILD.bazel", "__Snapshots__"]),
     .testTarget(name: "DebugDrawerEnergyPluginTests", dependencies: ["DebugDrawerEnergyPlugin", "DebugDrawer", .product(name: "ViewInspector", package: "viewinspector", condition: .when(platforms: applePlatforms)), .product(name: "SnapshotTesting", package: "swift-snapshot-testing", condition: .when(platforms: applePlatforms)), .product(name: "IssueReportingTestSupport", package: "xctest-dynamic-overlay", condition: .when(platforms: applePlatforms))], exclude: ["BUILD.bazel", "__Snapshots__"]),
     .testTarget(name: "DebugDrawerLaunchTimePluginTests", dependencies: ["DebugDrawerLaunchTimePlugin", "DebugDrawer", .product(name: "ViewInspector", package: "viewinspector", condition: .when(platforms: applePlatforms)), .product(name: "SnapshotTesting", package: "swift-snapshot-testing", condition: .when(platforms: applePlatforms)), .product(name: "IssueReportingTestSupport", package: "xctest-dynamic-overlay", condition: .when(platforms: applePlatforms))], exclude: ["BUILD.bazel", "__Snapshots__"]),
     .testTarget(name: "DebugDrawerLoadedLibrariesPluginTests", dependencies: ["DebugDrawerLoadedLibrariesPlugin", "DebugDrawer", .product(name: "ViewInspector", package: "viewinspector", condition: .when(platforms: applePlatforms)), .product(name: "SnapshotTesting", package: "swift-snapshot-testing", condition: .when(platforms: applePlatforms)), .product(name: "IssueReportingTestSupport", package: "xctest-dynamic-overlay", condition: .when(platforms: applePlatforms))], exclude: ["BUILD.bazel", "__Snapshots__"]),

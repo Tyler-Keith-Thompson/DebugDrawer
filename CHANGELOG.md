@@ -12,6 +12,7 @@ the entry becomes the GitHub release's notes.
 
 - DD-199: `NetworkEntry.requestBodySize`, `isRequestBodyTruncated` and `requestSizeLabel`: Network keeps each request body to `installNetwork(bodyLimit:)`, as it does each response body, marked truncated with its full size.
 - DD-84: HTTP Cookies lists the cookies web views keep in `WKWebsiteDataStore.default()` beside `HTTPCookieStorage.shared`'s, where WebKit exists, each row marked URLSession or WKWebView, and deletes each from its own store.
+- DD-72: `DebugDrawer.unsafeInstallDiskIOWithInterposing()` and `DiskIOStore.unsafeInstallWithInterposing()`, with a new dynamic library product, `DebugDrawerDiskIOInterposer`: in an app that links it, Disk I/O also records Swift's `Data.write(to:)`, `Data(contentsOf:)` and `FileHandle.write(contentsOf:)` (each `read`, `write`, `pread` and `pwrite` on a regular file no swizzled method records), with their bytes and thread. It relies on dyld interposing, undocumented behaviour a new OS can change, so it is opt-in and debug-only; the README says how to link it and what it risks. `installDiskIO()` is unchanged.
 
 ### Changed
 

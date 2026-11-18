@@ -153,7 +153,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// a function of its own to keep launch short enough to read.
     private func installShippedPlugins() {
         ExampleConsole.install()
-        DebugDrawer.shared.installDiskIO()
+        // Links DebugDrawerDiskIOInterposer (Example/BUILD.bazel): Swift's Data and FileHandle calls too.
+        DebugDrawer.shared.unsafeInstallDiskIOWithInterposing()
         DebugDrawer.shared.installViewInspector()
         DebugDrawer.shared.installAccessibility()
         DebugDrawer.shared.installPerformance()

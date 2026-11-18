@@ -143,7 +143,9 @@ struct DebugDrawerExampleiOSApp: App {
     /// a function of its own to keep launch short enough to read.
     private func installShippedPlugins() {
         ExampleConsole.install()
-        DebugDrawer.shared.installDiskIO()
+        // The app links DebugDrawerDiskIOInterposer (Example/BUILD.bazel), so Disk I/O records Swift's
+        // Data and FileHandle calls too; built without it, this does what installDiskIO() does.
+        DebugDrawer.shared.unsafeInstallDiskIOWithInterposing()
         DebugDrawer.shared.installViewInspector()
         DebugDrawer.shared.installAccessibility()
         DebugDrawer.shared.installPerformance()

@@ -1,4 +1,4 @@
-load("@rules_apple//apple:ios.bzl", "ios_application")
+load("@rules_apple//apple:ios.bzl", "ios_application", "ios_framework")
 load("@rules_apple//apple:macos.bzl", "macos_application")
 load("@rules_apple//apple:tvos.bzl", "tvos_application")
 load("@rules_apple//apple:visionos.bzl", "visionos_application")
@@ -49,7 +49,9 @@ swift_library(
     name = "ExampleAppLib_macOS",
     srcs = glob(["macOS/*.swift"]),
     module_name = "ExampleApp_macOS",
-    deps = _SHARED_DEPS,
+    # The interposer's dylib, which macos_application copies into Contents/Frameworks, so
+    # unsafeInstallDiskIOWithInterposing() records Swift's Data and FileHandle calls too.
+    deps = _SHARED_DEPS + ["//Sources/DebugDrawerDiskIOInterposer"],
 )
 
 macos_application(
@@ -85,8 +87,22 @@ ios_application(
     resources = glob(["iOS/Resources/**"]),
     minimum_os_version = "17.0",
     entitlements = "iOS/ExampleApp_iOS.entitlements",
+    frameworks = [":DebugDrawerDiskIOInterposer_iOS"],
     deps = [":ExampleAppLib_iOS"],
     visibility = ["//visibility:public"],
+)
+
+# The interposer as a dynamic framework the app embeds and links at launch, so
+# unsafeInstallDiskIOWithInterposing() records Swift's Data and FileHandle calls too. ios_application
+# doesn't embed a cc_import's dylib, as macos_application does, so iOS wraps the sources itself.
+ios_framework(
+    name = "DebugDrawerDiskIOInterposer_iOS",
+    bundle_id = "com.debugdrawer.example.ios.interposer",
+    bundle_name = "DebugDrawerDiskIOInterposer",
+    families = ["iphone", "ipad"],
+    infoplists = ["iOS/Interposer-Info.plist"],
+    minimum_os_version = "17.0",
+    deps = ["//Sources/DebugDrawerDiskIOInterposer:DebugDrawerDiskIOInterposerSources"],
 )
 
 # ── iOS, UIKit ───────────────────────────────────────────────────────

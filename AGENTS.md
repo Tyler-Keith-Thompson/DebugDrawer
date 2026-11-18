@@ -44,6 +44,10 @@ the umbrella module and `swift/Package.swift` from it. Never edit the generated 
   sources must be listed in `PERFORMANCE_TESTS`, and the reverse.
 - Add an executable: a row in `EXECUTABLES` (name, description, dependencies). It holds only
   `@main`; its code lives in a module, where tests reach it.
+- Add a dynamic library (C code that must be an image of its own, loaded at launch, such as
+  `DebugDrawerDiskIOInterposer`'s dyld interposing tuples): a row in `DYNAMIC_LIBRARIES`. It is a
+  `.dynamic` product in SwiftPM and a dylib in Bazel; only test targets and apps link it, and a
+  module that uses it finds its functions with `dlsym`.
 - Add an external package: a row in `PACKAGES`, its `swiftpkg_<identity>` repository in
   `MODULE.bazel`'s `use_repo`, then `just modules` and `just resolve`.
 - A package whose main module takes the project's name (`import DebugDrawer` is the library

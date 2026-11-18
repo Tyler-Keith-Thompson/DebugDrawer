@@ -2,9 +2,9 @@
 """The module graph, written once.
 
 Package.swift, swift/Package.swift, every Sources/*/BUILD.bazel and Tests/*/BUILD.bazel, the
-umbrella module, tools/performance_tests.bzl, tools/executables.bzl and Benchmarks/Package.swift
-are generated from the tables below, so SwiftPM and Bazel cannot drift. Run `just modules` after
-editing them. `//:package_swift_test` fails when Package.swift disagrees with the Bazel graph.
+umbrella module, tools/performance_tests.bzl, tools/executables.bzl, tools/dynamic_libraries.bzl
+and Benchmarks/Package.swift are generated from the tables below, so SwiftPM and Bazel cannot
+drift. Run `just modules` after editing them. `//:package_swift_test` fails when Package.swift disagrees with the Bazel graph.
 
 Modules are named after the concept they hold, with a `Module` suffix only where the module
 would otherwise share a name with its main type (`GreetingModule` would hold `Greeting`). No
@@ -133,6 +133,17 @@ CATALYST_MODULES = ["DebugDrawer", "DebugDrawerAnalyticsPlugin", "DebugDrawerDat
 # as well as the API that exists in every build.
 DOCUMENTED_MODULES = ["DebugDrawer"]
 
+# Dynamic libraries: (name, description). Each is C sources under Sources/<name> (headers in
+# include/) with no dependencies, shipped as a `.dynamic` library product in Package.swift and as
+# a dylib in Bazel: a cc_import named after it, which a test or a macOS app links at launch, over a
+# cc_binary, with the sources also a cc_library an app can wrap in a framework of its own. For
+# code that must be its own image, loaded at launch, such as dyld interposing tuples, which dyld
+# applies only there. Sources compile with DEBUG in debug builds only, so a release build can
+# leave them empty. They are left out of the umbrella and the docs.
+DYNAMIC_LIBRARIES = [
+    ("DebugDrawerDiskIOInterposer", "The Disk I/O plugin's opt-in interposer: dyld interposing tuples for read, write, pread and pwrite, inert until unsafeInstallDiskIOWithInterposing() starts them."),
+]
+
 # Executables: (name, description, dependencies). Each is an `.executableTarget` and product in
 # Package.swift and a swift_binary in Bazel (`bazel run //Sources/<name>`). Keep them thin: the
 # code lives in MODULES, where tests can reach it. They are left out of the umbrella and the docs.
@@ -153,7 +164,7 @@ TEST_TARGETS = [
     ("DebugDrawerKeychainPluginTests", ["DebugDrawerKeychainPlugin", "DebugDrawer", "viewinspector/ViewInspector", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
     ("DebugDrawerScreenshotPluginTests", ["DebugDrawerScreenshotPlugin", "DebugDrawer", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
     ("DebugDrawerFileBrowserPluginTests", ["DebugDrawerFileBrowserPlugin", "DebugDrawer", "viewinspector/ViewInspector", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
-    ("DebugDrawerDiskIOPluginTests", ["DebugDrawerDiskIOPlugin", "DebugDrawer", "viewinspector/ViewInspector", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
+    ("DebugDrawerDiskIOPluginTests", ["DebugDrawerDiskIOPlugin", "DebugDrawer", "DebugDrawerDiskIOInterposer", "viewinspector/ViewInspector", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
     ("DebugDrawerEnergyPluginTests", ["DebugDrawerEnergyPlugin", "DebugDrawer", "viewinspector/ViewInspector", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
     ("DebugDrawerLaunchTimePluginTests", ["DebugDrawerLaunchTimePlugin", "DebugDrawer", "viewinspector/ViewInspector", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
     ("DebugDrawerLoadedLibrariesPluginTests", ["DebugDrawerLoadedLibrariesPlugin", "DebugDrawer", "viewinspector/ViewInspector", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
@@ -260,6 +271,13 @@ def check():
                 assert d in names, f"{name} depends on unknown {d}"
     executables = [e[0] for e in EXECUTABLES]
     assert not set(executables) & set(names + [PROJECT]), "an executable shares a module's name"
+    dynamic = [d[0] for d in DYNAMIC_LIBRARIES]
+    assert len(dynamic) == len(set(dynamic)), "duplicate dynamic library"
+    assert not set(dynamic) & set(names + executables + [PROJECT]), "a dynamic library shares a module's name"
+    for name, deps in [(m[0], m[3]) for m in MODULES] + [(e[0], e[2]) for e in EXECUTABLES]:
+        # A module that linked one would put its own copy into every image that links the module,
+        # and a module needn't: it finds a library's functions with dlsym when the app links it.
+        assert not set(deps) & set(dynamic), f"{name} depends on a dynamic library; only a test target may"
     tests = [t[0] for t in TEST_TARGETS]
     assert len(tests) == len(set(tests)), "duplicate test target"
     for name, deps in TEST_TARGETS:
@@ -269,7 +287,7 @@ def check():
             if "/" in d:
                 assert d.split("/")[0] in packages, f"{name} depends on unknown package {d}"
             else:
-                assert d in names + [PROJECT, TEST_SUPPORT], f"{name} depends on unknown {d}"
+                assert d in names + dynamic + [PROJECT, TEST_SUPPORT], f"{name} depends on unknown {d}"
     for name in PERFORMANCE_TESTS:
         assert name in tests, f"PERFORMANCE_TESTS names unknown test target {name}"
         assert not simulator_test(name), f"{name} runs in the simulator, which PERFORMANCE_TESTS doesn't support"
@@ -430,6 +448,7 @@ def package_swift():
         lines.append(f'    .library(name: "{PROJECT}", targets: ["{PROJECT}"]),')
     lines += [f'    .library(name: "{m[0]}", targets: ["{m[0]}"]),' for m in package_modules()]
     lines += [f'    .executable(name: "{e[0]}", targets: ["{e[0]}"]),' for e in EXECUTABLES]
+    lines += [f'    .library(name: "{d[0]}", type: .dynamic, targets: ["{d[0]}"]),' for d in DYNAMIC_LIBRARIES]
     lines += ["]", "", "let dependencies: [Package.Dependency] = ["]
     lines += [f'    .package(url: "{url}", {requirement(version)}),' for _, url, version in package_dependencies()]
     lines += ["]", "", "let targets: [Target] = ["]
@@ -450,6 +469,10 @@ def package_swift():
     for name, _, deps in EXECUTABLES:
         dl = ", ".join(spm_dep(d) for d in deps)
         lines.append(f'    .executableTarget(name: "{name}", dependencies: [{dl}]{exclude_arg(f"Sources/{name}")}),')
+    if DYNAMIC_LIBRARIES:
+        lines += ["", "    // Dynamic libraries: C, each a `.dynamic` product of its own (DYNAMIC_LIBRARIES in scripts/modules.py)."]
+    for name, _ in DYNAMIC_LIBRARIES:
+        lines.append(f'    .target(name: "{name}"{exclude_arg(f"Sources/{name}")}),')
     all_deps = ", ".join(f'"{m[0]}"' for m in package_modules())
     support_deps = ", ".join(spm_dep(d) for d in TEST_SUPPORT_DEPENDENCIES)
     support_deps_arg = f"dependencies: [{support_deps}], " if TEST_SUPPORT_DEPENDENCIES else ""
@@ -618,6 +641,44 @@ def executable_build_bazel(name, description, deps):
     )
 
 
+def dynamic_library_build_bazel(name, description):
+    return (
+        "# GENERATED by scripts/modules.py — edit DYNAMIC_LIBRARIES there, then run `just modules`.\n\n"
+        'load("@rules_cc//cc:cc_binary.bzl", "cc_binary")\n'
+        'load("@rules_cc//cc:cc_import.bzl", "cc_import")\n'
+        'load("@rules_cc//cc:cc_library.bzl", "cc_library")\n\n'
+        f"# {description}\n"
+        "# A dynamic library (DYNAMIC_LIBRARIES in scripts/modules.py): its C sources, compiled with DEBUG\n"
+        "# in debug builds only.\n"
+        "cc_library(\n"
+        f'    name = "{name}Sources",\n'
+        '    srcs = glob(["*.c"]),\n'
+        '    hdrs = glob(["include/*.h"]),\n'
+        '    includes = ["include"],\n'
+        '    local_defines = select({"//tools:debug": ["DEBUG=1"], "//conditions:default": []}),\n'
+        "    # Nothing references the library's symbols by name, so the linker would otherwise drop them.\n"
+        "    alwayslink = True,\n"
+        "    # Visible so an app can wrap them in a framework of its own (Example/BUILD.bazel does for iOS).\n"
+        '    visibility = ["//visibility:public"],\n'
+        ")\n\n"
+        "# The dylib itself, found at launch through the @rpath of whatever links it.\n"
+        "cc_binary(\n"
+        f'    name = "lib{name}.dylib",\n'
+        "    linkshared = True,\n"
+        f'    linkopts = ["-Wl,-install_name,@rpath/lib{name}.dylib"],\n'
+        f'    deps = [":{name}Sources"],\n'
+        ")\n\n"
+        "# What a test or a macOS app depends on to link the dylib at launch; macos_application copies it\n"
+        "# into Contents/Frameworks.\n"
+        "cc_import(\n"
+        f'    name = "{name}",\n'
+        '    hdrs = glob(["include/*.h"]),\n'
+        f'    shared_library = ":lib{name}.dylib",\n'
+        '    visibility = ["//visibility:public"],\n'
+        ")\n"
+    )
+
+
 def test_support_build_bazel():
     deps_attr = bazel_deps(TEST_SUPPORT_DEPENDENCIES)
     return (
@@ -778,6 +839,16 @@ def executables_bzl():
     )
 
 
+def dynamic_libraries_bzl():
+    packages = "".join(f'    "Sources/{d[0]}",\n' for d in DYNAMIC_LIBRARIES)
+    return (
+        '"""GENERATED by scripts/modules.py (DYNAMIC_LIBRARIES) — edit the table there, then run `just modules`."""\n\n'
+        "# The source packages that hold a C dynamic library rather than a Swift module: the root\n"
+        "# BUILD.bazel leaves them out of the docs.\n"
+        f"DYNAMIC_LIBRARY_PACKAGES = [\n{packages}]\n"
+    )
+
+
 def benchmark_dep(d):
     """A benchmark target's dependency: a product of one of PACKAGES, or else a library module."""
     if "/" in d:
@@ -849,6 +920,9 @@ def main():
     for name, description, deps in EXECUTABLES:
         d = os.path.join(ROOT, "Sources", name)
         write(os.path.join(d, "BUILD.bazel"), executable_build_bazel(name, description, deps))
+    for name, description in DYNAMIC_LIBRARIES:
+        write(os.path.join(ROOT, "Sources", name, "BUILD.bazel"), dynamic_library_build_bazel(name, description))
+    write(os.path.join(ROOT, "tools", "dynamic_libraries.bzl"), dynamic_libraries_bzl())
     write(os.path.join(ROOT, "Tests", TEST_SUPPORT, "BUILD.bazel"), test_support_build_bazel())
     write(os.path.join(ROOT, "tools", "executables.bzl"), executables_bzl())
     write(os.path.join(ROOT, "tools", "performance_tests.bzl"), performance_tests_bzl())

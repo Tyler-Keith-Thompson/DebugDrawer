@@ -7,11 +7,13 @@
     import Foundation
     import Testing
 
-    // Pins what the README and the plugin's documentation say isn't captured: should an OS route
-    // one of these through a swizzled method, this fails, and the documentation changes with it.
+    // Pins what the README and the plugin's documentation say `installDiskIO()` doesn't capture:
+    // should an OS route one of these through a swizzled method, this fails, and the documentation
+    // changes with it. Under Bazel the test executable links DebugDrawerDiskIOInterposer, so this
+    // also pins that its hooks record nothing until `unsafeInstallWithInterposing()` starts them.
     @Suite(.timeLimit(.minutes(1)))
     struct DiskIOUnrecordedSpellingsExitTests {
-        @Test("Swift's FileHandle.write(contentsOf:), Data.write(to:) and Data(contentsOf:) reach no swizzled method")
+        @Test("Without the interposing install, Swift's FileHandle.write(contentsOf:), Data.write(to:) and Data(contentsOf:) aren't recorded")
         func swiftSpellingsUnrecorded() async {
             await #expect(processExitsWith: .success) {
                 // The marker is written after the others, on the same thread, so once it is listed

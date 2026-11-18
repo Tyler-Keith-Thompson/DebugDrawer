@@ -2,6 +2,7 @@
 
 load("@rules_xcodeproj//xcodeproj:defs.bzl", "xcodeproj", "xcschemes")
 load("//tools:docc.bzl", "docc_site")
+load("//tools:dynamic_libraries.bzl", "DYNAMIC_LIBRARY_PACKAGES")
 load("//tools:executables.bzl", "EXECUTABLE_PACKAGES")
 load("//tools:performance_tests.bzl", "PERFORMANCE_TEST_PACKAGES")
 load("//tools:swiftpm.bzl", "swiftpm_manifest_test")
@@ -100,7 +101,7 @@ docc_site(
     archives = [
         "//" + package + ":" + package.removeprefix("Sources/") + "Documentation"
         for package in sorted(subpackages(include = ["Sources/*"]))
-        if package not in EXECUTABLE_PACKAGES and package not in IOS_PACKAGES
+        if package not in EXECUTABLE_PACKAGES and package not in IOS_PACKAGES and package not in DYNAMIC_LIBRARY_PACKAGES
     ],
     landing_page_name = "DebugDrawer",
     tags = ["manual"],

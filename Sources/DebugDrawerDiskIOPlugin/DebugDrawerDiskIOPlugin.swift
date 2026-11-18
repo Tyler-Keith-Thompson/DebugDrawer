@@ -21,11 +21,15 @@ import SwiftUI
 /// - `FileHandle`: the Objective-C reads and writes (`readData(ofLength:)`, `readDataToEndOfFile()`,
 ///   `availableData`, `read(upToCount:)`, `readToEnd()`, `write(_:)`) on regular files.
 ///
-/// On current OSes these never reach a swizzled method, so they aren't recorded: Swift's
-/// `Data.write(to:)`, `Data(contentsOf:)` and `FileHandle.write(contentsOf:)`, `String`'s file
-/// methods, POSIX calls (`open`, `read`, `write`), SQLite, Core Data and `UserDefaults`. Nor is a
-/// `FileHandle` call that fails, or the drawer's own file work, which runs with
+/// On current OSes these never reach a swizzled method, so `installDiskIO()` doesn't record them:
+/// Swift's `Data.write(to:)`, `Data(contentsOf:)` and `FileHandle.write(contentsOf:)`, `String`'s
+/// file methods, POSIX calls (`open`, `read`, `write`), SQLite, Core Data and `UserDefaults`. Nor
+/// is a `FileHandle` call that fails, or the drawer's own file work, which runs with
 /// `DebugDrawerActivity.isDrawerWork` bound to `true`.
+///
+/// `unsafeInstallDiskIOWithInterposing()`, in an app that links the `DebugDrawerDiskIOInterposer`
+/// dynamic library, records those too: each `read`, `write`, `pread` and `pwrite` on a regular
+/// file that no swizzled method records, through dyld interposing.
 public struct DiskIOPlugin: DebugDrawerPlugin {
     public var title = "Disk I/O"
     public var category = "Storage"
@@ -49,6 +53,21 @@ public extension DebugDrawer {
     func installDiskIO() {
         #if DEBUG
             DiskIOStore.shared.install()
+            registerGlobal(DiskIOPlugin())
+        #endif
+    }
+
+    /// Does what ``installDiskIO()`` does, and also records Swift's `Data.write(to:)`,
+    /// `Data(contentsOf:)` and `FileHandle.write(contentsOf:)`, through dyld interposing.
+    ///
+    /// Unsafe: interposing is undocumented dyld behaviour that a new OS can change or drop, and
+    /// it runs the plugin's code inside every `read`, `write`, `pread` and `pwrite` the process
+    /// makes. It needs the app to link the `DebugDrawerDiskIOInterposer` dynamic library, which
+    /// dyld must load at launch. Without it, and before iOS 18, where swizzling already sees those
+    /// calls, this does what ``installDiskIO()`` does.
+    func unsafeInstallDiskIOWithInterposing() {
+        #if DEBUG
+            DiskIOStore.shared.unsafeInstallWithInterposing()
             registerGlobal(DiskIOPlugin())
         #endif
     }
@@ -130,6 +149,20 @@ public extension DebugDrawer {
             DiskIOSwizzler.install()
         }
 
+        /// Does what ``install()`` does, then turns on the DebugDrawerDiskIOInterposer library's
+        /// hooks, so Swift's `Data.write(to:)`, `Data(contentsOf:)` and
+        /// `FileHandle.write(contentsOf:)` are recorded too.
+        ///
+        /// Unsafe: the library relies on dyld interposing, undocumented behaviour that a new OS can
+        /// change or drop. It records each `read`, `write`, `pread` and `pwrite` on a regular file
+        /// that no swizzled method records. Where the app doesn't link the library, or where
+        /// swizzling already sees those calls (before iOS 18), it does what ``install()`` does.
+        /// `unsafeInstallDiskIOWithInterposing()` calls it; a second call does nothing.
+        public func unsafeInstallWithInterposing() {
+            install()
+            DiskIOInterposer.start()
+        }
+
         /// Forgets the recorded calls and starts the totals over.
         public func clear() {
             events.removeAll()
@@ -201,6 +234,9 @@ public extension DebugDrawer {
 
         /// Does nothing: release builds swizzle nothing.
         public func install() {}
+
+        /// Does nothing: release builds swizzle and interpose nothing.
+        public func unsafeInstallWithInterposing() {}
 
         /// Does nothing.
         public func clear() {}

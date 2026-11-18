@@ -1344,9 +1344,9 @@ What is recorded, through swizzled methods the install alone puts in place:
 - `FileHandle`: the Objective-C reads and writes on regular files: `readData(ofLength:)`,
   `readDataToEndOfFile()`, `availableData`, `read(upToCount:)`, `readToEnd()` and `write(_:)`.
 
-What isn't, on current OSes, as none of it reaches a method the plugin can swizzle: Swift's
-`Data.write(to:)`, `Data(contentsOf:)` and `FileHandle.write(contentsOf:)`, `String`'s file
-methods, POSIX calls (`open`, `read`, `write`), SQLite, Core Data and `UserDefaults`. Nor is a
+What `installDiskIO()` doesn't record, on current OSes, as none of it reaches a method the plugin
+can swizzle (the unsafe install below records the first four): Swift's `Data.write(to:)`,
+`Data(contentsOf:)` and `FileHandle.write(contentsOf:)`, `String`'s file methods, POSIX calls (`open`, `read`, `write`), SQLite, Core Data and `UserDefaults`. Nor is a
 `FileHandle` call that fails, a call that Foundation makes inside a recorded one, or the drawer's
 own file work: the File Browser's listings, bug reports, and the plugins' saved settings and
 sessions. A plugin of your own marks its file work the same way, so it stays out of the list:
@@ -1356,6 +1356,43 @@ let names = try DebugDrawerActivity.$isDrawerWork.withValue(true) {
     try FileManager.default.contentsOfDirectory(atPath: folder)
 }
 ```
+
+#### Recording Swift's Data and FileHandle calls: an unsafe install
+
+`DebugDrawer.shared.unsafeInstallDiskIOWithInterposing()` does what `installDiskIO()` does, and
+also records Swift's `Data.write(to:)`, `Data(contentsOf:)` and `FileHandle.write(contentsOf:)`,
+and `String`'s file methods: each `read`, `write`, `pread` and `pwrite` on a regular file that no
+swizzled method records, with its path, bytes, duration, thread and error. A read that reaches
+the end of a file, or a write of no bytes, moves nothing and isn't listed; a call to a pipe, a
+socket or a terminal isn't the disk and isn't either. The drawer's own work stays out, as it does
+for the swizzled calls.
+
+It needs the app to link one more product, the `DebugDrawerDiskIOInterposer` dynamic library,
+which holds dyld interposing tuples for those four functions:
+
+```swift
+.target(name: "MyApp", dependencies: [
+    .product(name: "DebugDrawerDiskIOPlugin", package: "DebugDrawer"),
+    .product(name: "DebugDrawerDiskIOInterposer", package: "DebugDrawer"),
+])
+```
+
+In Xcode, add `DebugDrawerDiskIOInterposer` to the app target's Frameworks, Libraries, and
+Embedded Content, embedded. The plugin never links it: the install looks it up at runtime, so an
+app that doesn't link it, or a build where dyld didn't load it at launch (a library opened with
+`dlopen`, a plugin bundle, a test bundle SwiftPM loads), records what `installDiskIO()` records
+and logs why. Before iOS 18 Foundation's Swift calls reach the `NSData` and `FileHandle` methods
+the plugin swizzles, so there the install leaves interposing off. The library's functions pass
+every call straight to the system until the install turns them on, and a release build's library
+holds nothing.
+
+What makes it unsafe: dyld interposing is undocumented behaviour, which a new OS can change or
+drop without notice; an App Store build may be rejected for linking a library that uses it, so
+link it into debug builds only (a separate debug target, or a scheme that leaves it out of
+release); and once on, the plugin's code runs inside every `read` and `write` the process makes,
+on every thread, so a crash or a deadlock there takes the app with it. dyld applies interposing
+only to a process it trusts: a debug build signed for development is one, a hardened one may not
+be.
 
 ### File Browser: what the app wrote to disk
 
@@ -1829,6 +1866,7 @@ ContentView()
 | `DebugDrawerEnergyPlugin` | Battery level and charging, power source, CPU load and thermal state, sampled while its view shows or between `EnergyMonitor.shared.start()` and `stop()` |
 | `DebugDrawerNetworkPlugin` | URLProtocol HTTP interception: method, URL, status, timing, headers, body, cURL export, mock responses by rule, slow and failing networks per host, replay and edit-and-resend, HAR export and import, WebSocket frames, requests kept across launches, ignored hosts, GraphQL operation names |
 | `DebugDrawerDiskIOPlugin` | FileManager, NSData and FileHandle file calls, flagging main-thread I/O and failures |
+| `DebugDrawerDiskIOInterposer` | A dynamic library, linked only to opt in: dyld interposing tuples for `read`, `write`, `pread` and `pwrite`, which `unsafeInstallDiskIOWithInterposing()` turns on so Disk I/O records Swift's `Data` and `FileHandle` calls |
 | `DebugDrawerAppInfoPlugin` | Build (version, commit, branch, CI build), provisioning profile, entitlements, OS, memory, uptime, process, debugger, screen and reachability facts |
 | `DebugDrawerUserDefaultsPlugin` | Browse, search, add, edit, copy and delete UserDefaults keys of the standard defaults and app group suites, values of every property-list type edited at any depth, the list following the app's writes |
 | `DebugDrawerKeychainPlugin` | Generic and internet passwords, certificates and keys, each with every attribute the keychain returns (a key's or certificate's data is never read), filtered by access group and text; generic passwords added and edited, any item deleted; on the Mac, the data protection keychain |

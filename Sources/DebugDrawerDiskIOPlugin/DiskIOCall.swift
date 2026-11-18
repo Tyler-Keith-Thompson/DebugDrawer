@@ -28,6 +28,14 @@
             return DiskIOCall(start: CFAbsoluteTimeGetCurrent(), isMainThread: Thread.isMainThread)
         }
 
+        /// Whether a call the interposer saw on this thread belongs in the record: it isn't the
+        /// drawer's own work, nor made inside a swizzled call being recorded, whose event covers it.
+        static var isRecordable: Bool {
+            guard !DebugDrawerActivity.isDrawerWork else { return false }
+            guard let callInProgress else { return true }
+            return pthread_getspecific(callInProgress) == nil
+        }
+
         /// Ends the call, recording it unless `operation` is `nil`.
         ///
         /// An Objective-C exception the original raises unwinds past `end`, and the thread then
