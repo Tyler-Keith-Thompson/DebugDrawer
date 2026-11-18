@@ -2,8 +2,9 @@
     /// One line of a report's stack read into its parts, as Xcode's debug navigator shows a frame:
     /// its index, the image it's in, and its symbol.
     ///
-    /// The lines are `backtrace_symbols(3)`'s ("1   Example   0x0000000100004a1c
-    /// $s7Example5crashyyF + 48"), or MetricKit's, which have no symbol ("1 Example 0x100004000 +
+    /// The lines are `backtrace_symbols(3)`'s, the image padded to a column ("1   Example
+    /// 0x0000000100004a1c $s7Example5crashyyF + 48"; the symbol is the image's name when `dladdr`
+    /// finds no symbol, and `0x0` when it finds no image either), or MetricKit's, which have no symbol ("1 Example 0x100004000 +
     /// 16384"). The Hangs plugin reads the same lines with a type of its own: the plugins are
     /// vertical, and a dozen lines cost less than a shared module.
     struct StackFrame: Equatable {
@@ -14,22 +15,30 @@
 
         /// The parts of `line`; a line that isn't in either form is its own symbol, at
         /// `position`, in an unknown image.
+        ///
+        /// - Complexity: O(*n*), where *n* is the length of `line`.
         init(line: String, position: Int) {
-            let parts = line.split(separator: " ", maxSplits: 3, omittingEmptySubsequences: true)
-            guard parts.count >= 3, let index = Int(parts[0]), parts[2].hasPrefix("0x") else {
+            // The image is everything between the index and the first address, so a padded
+            // column or an image whose name has spaces ("My App") reads whole; the symbol is
+            // everything after the address, so an Objective-C method's spaces stay in it.
+            guard let match = line.wholeMatch(of: #/\s*(\d+)\s+(.+?)\s+(0x[[:xdigit:]]+)(?:\s+(.*?))?\s*/#),
+                  let index = Int(match.1) else {
                 self.init(index: position, image: "???", symbol: line)
                 return
             }
-            let rest = parts.count > 3 ? parts[3].trimmingPrefix(while: \.isWhitespace) : ""
-            let symbol = if rest.isEmpty || rest.hasPrefix("+") {
+            let address = match.3
+            let rest = match.4 ?? ""
+            // A class method ("+[NSException raise:format:]") starts with a plus too, so only a
+            // bare "+ <offset>" is MetricKit's.
+            let symbol = if rest.isEmpty || rest.wholeMatch(of: #/\+\s*\d+/#) != nil {
                 // MetricKit's line: the address and its offset into the image are all it has.
-                rest.isEmpty ? String(parts[2]) : "\(parts[2]) \(rest)"
+                rest.isEmpty ? String(address) : "\(address) \(rest)"
             } else if let offset = rest.range(of: " + ", options: .backwards) {
                 String(rest[..<offset.lowerBound])
             } else {
                 String(rest)
             }
-            self.init(index: index, image: String(parts[1]), symbol: symbol)
+            self.init(index: index, image: String(match.2), symbol: symbol)
         }
 
         init(index: Int, image: String, symbol: String) {

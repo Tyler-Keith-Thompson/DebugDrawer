@@ -26,6 +26,7 @@ the entry becomes the GitHub release's notes.
 
 ### Fixed
 
+- DD-169: Crash Reports reads a stack frame whose image name has spaces (`My App`) with that name, and a frame in an Objective-C class method (`+[NSException raise:format:]`) with that method as its symbol, rather than showing the whole line or the address as the symbol.
 - DD-164: at accessibility text sizes the drawer's search results put their title and plugin name under the icon, across the row's whole width, wrapping only between words, rather than truncating or breaking a long word such as "Accessibility" mid-word; at other sizes a result keeps its one-line layout.
 - DD-159: on iOS a tap outside the compact panel (an iPhone in portrait, Slide Over) closes the drawer, as one outside a sheet does: the panel leaves a strip of the app above it, and a dimmed backdrop over what it leaves of the app takes the tap. Beside a regular panel (an iPad, an iPhone in landscape) taps still reach the app.
 - DD-90: Network bounds the bodies it keeps in total, not only each one, so 200 large requests no longer hold hundreds of megabytes; Console says how many older lines it dropped once it passes its capacity.

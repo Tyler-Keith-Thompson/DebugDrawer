@@ -155,6 +155,24 @@
             #expect(actual == expected)
         }
 
+        @Test("A report's text, which Copy Report copies, keeps each frame's line as backtrace_symbols_fd wrote it, padding and offset included")
+        func textKeepsUnparsedFrames() {
+            let frames = [
+                "0   libsystem_kernel.dylib              0x00000001802a1a6c __pthread_kill + 8",
+                "1   CoreFoundation                      0x00000001804b8c40 -[NSObject(NSObject) doesNotRecognizeSelector:] + 136",
+                "2   Example                             0x0000000104a1c3d8 $s7Example11ContentViewV5crashyyF + 52"
+            ]
+            let sut = CrashReport(
+                id: UUID(), date: Date(timeIntervalSince1970: 0), title: "SIGABRT", reason: nil, appVersion: nil,
+                frames: frames, source: .captured, isSeen: true
+            )
+            let expected = "SIGABRT\nDate: 1970-01-01T00:00:00Z\nSource: Captured\n\n" + frames.joined(separator: "\n") + "\n"
+
+            let actual = sut.text()
+
+            #expect(actual == expected)
+        }
+
         @Test("A report without frames, reason or version says no stack trace was recorded")
         func textWithoutFrames() {
             let sut = CrashReport(
