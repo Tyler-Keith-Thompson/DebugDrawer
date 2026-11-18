@@ -61,7 +61,7 @@ struct ExampleMainScreen: View {
                 ExampleWebSocketDemo()
                     .frame(maxWidth: 480)
                 // The Deep Link Tester's universal links and activities, as the app receives them.
-                ExampleContinuedActivityRow()
+                ExampleDeepLinkRow()
                     .frame(maxWidth: 480)
 
             }

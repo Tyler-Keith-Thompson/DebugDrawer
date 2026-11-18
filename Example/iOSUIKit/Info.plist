@@ -22,5 +22,17 @@
         <key>UIApplicationSupportsMultipleScenes</key>
         <false/>
     </dict>
+    <!-- The app's own scheme: the Deep Link Tester lists it as a preset, and the app routes its URLs. -->
+    <key>CFBundleURLTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleURLName</key>
+            <string>DebugDrawer UIKit Example</string>
+            <key>CFBundleURLSchemes</key>
+            <array>
+                <string>debugdrawer-example-uikit</string>
+            </array>
+        </dict>
+    </array>
 </dict>
 </plist>

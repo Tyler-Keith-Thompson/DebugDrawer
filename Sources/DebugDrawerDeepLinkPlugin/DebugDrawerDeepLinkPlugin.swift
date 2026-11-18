@@ -7,9 +7,10 @@ import SwiftUI
 // The public API compiles in every configuration; the implementation under `#if DEBUG` below does
 // not, so release builds get an empty view and an installer that registers nothing.
 
-/// Opens URLs as the system opens a tapped link, and continues universal links and activities
-/// of the app's own type in the app, as the system does for a tapped universal link, Handoff
-/// or a Spotlight result. Installed by ``DebugDrawer/DebugDrawer/installDeepLink(continueUserActivity:)``.
+/// Opens URLs in the app's own handler or as the system opens a tapped link, and continues
+/// universal links and activities of the app's own type in the app, as the system does for a
+/// tapped universal link, Handoff or a Spotlight result. Installed by
+/// ``DebugDrawer/DebugDrawer/installDeepLink(presets:continueUserActivity:openURL:)``.
 public struct DeepLinkPlugin: DebugDrawerPlugin {
     public var title = "Deep Link Tester"
     public var category = "App"
@@ -18,17 +19,19 @@ public struct DeepLinkPlugin: DebugDrawerPlugin {
     #if DEBUG
         let model: DeepLinkModel
 
-        /// The plugin with no handler: a continued activity goes to the app's scene or app delegate.
+        /// The plugin with no handlers: it lists ``DeepLinkPreset/bundleURLSchemes``, opens URLs
+        /// through the system, and continues an activity in the app's scene or app delegate.
         @MainActor
         public init() {
-            self.init(model: DeepLinkModel(delivery: _UserActivityDelivering(handler: nil)))
+            self.init(model: DeepLinkModel(presets: DeepLinkPreset.bundleURLSchemes, delivery: _UserActivityDelivering(handler: nil)))
         }
 
         init(model: DeepLinkModel) {
             self.model = model
         }
     #else
-        /// The plugin with no handler: a continued activity goes to the app's scene or app delegate.
+        /// The plugin with no handlers: it lists ``DeepLinkPreset/bundleURLSchemes``, opens URLs
+        /// through the system, and continues an activity in the app's scene or app delegate.
         @MainActor
         public init() {}
     #endif
@@ -48,6 +51,13 @@ public extension DebugDrawer {
     /// Adds the Deep Link Tester, which opens URLs and continues universal links and activities
     /// in the app.
     ///
+    /// An opened URL goes to `openURL` when given, rather than to the system: the handler routes
+    /// the URL as the app's own `onOpenURL` or `application(_:open:)` does and returns whether it
+    /// handled it, and the plugin shows which. Without one, the system opens the URL in whichever
+    /// app takes its scheme, as it does a tapped link, so a universal link opens the browser; on
+    /// the Mac a scheme the app declares opens in this copy of the app. The plugin shows when the
+    /// system couldn't open it, and why.
+    ///
     /// A continued activity goes to `continueUserActivity` when given. A SwiftUI app passes
     /// one, since `onContinueUserActivity` has no public entry point: the handler routes the
     /// activity as the app's own continuation code does. Without one, the activity goes to the
@@ -55,17 +65,42 @@ public extension DebugDrawer {
     /// delegate's `application(_:continue:restorationHandler:)`; with neither, the plugin
     /// says so.
     ///
-    /// Calling it again replaces the plugin and its handler.
+    /// Calling it again replaces the plugin and its handlers.
     ///
-    /// - Parameter continueUserActivity: Receives each activity the plugin continues, on the
-    ///   main actor: a universal link as `NSUserActivityTypeBrowsingWeb` with its
-    ///   `webpageURL`, or an activity of the app's own type with its `userInfo`.
-    func installDeepLink(continueUserActivity: (@MainActor (NSUserActivity) -> Void)? = nil) {
+    /// - Parameters:
+    ///   - presets: The URLs listed under Presets; by default one for each URL scheme the app's
+    ///     Info.plist declares (``DeepLinkPreset/bundleURLSchemes``), and none when it declares
+    ///     none.
+    ///   - continueUserActivity: Receives each activity the plugin continues, on the main actor:
+    ///     a universal link as `NSUserActivityTypeBrowsingWeb` with its `webpageURL`, or an
+    ///     activity of the app's own type with its `userInfo`.
+    ///   - openURL: Receives each URL the plugin opens, on the main actor, in place of the
+    ///     system, and returns whether the app handled it.
+    func installDeepLink(
+        presets: [DeepLinkPreset] = DeepLinkPreset.bundleURLSchemes,
+        continueUserActivity: (@MainActor (NSUserActivity) -> Void)? = nil,
+        openURL: (@MainActor (URL) -> Bool)? = nil
+    ) {
         #if DEBUG
-            let plugin = DeepLinkPlugin(model: DeepLinkModel(delivery: _UserActivityDelivering(handler: continueUserActivity)))
+            let model = DeepLinkModel(
+                presets: presets, delivery: _UserActivityDelivering(handler: continueUserActivity), openURL: openURL
+            )
+            let plugin = DeepLinkPlugin(model: model)
             unregisterGlobal(id: plugin.id)
             registerGlobal(plugin)
         #endif
+    }
+
+    /// Adds the Deep Link Tester with the app's own URL schemes as presets and no `openURL`.
+    ///
+    /// Calls resolve to ``installDeepLink(presets:continueUserActivity:openURL:)``, which takes
+    /// the same arguments.
+    ///
+    /// - Parameter continueUserActivity: Receives each activity the plugin continues.
+    @available(*, deprecated, message: "Use installDeepLink(presets:continueUserActivity:openURL:)")
+    @_disfavoredOverload
+    func installDeepLink(continueUserActivity: (@MainActor (NSUserActivity) -> Void)? = nil) {
+        installDeepLink(presets: DeepLinkPreset.bundleURLSchemes, continueUserActivity: continueUserActivity, openURL: nil)
     }
 }
 
@@ -74,14 +109,6 @@ public extension DebugDrawer {
 
     /// Reads the model and keeps the typed URL; `DeepLinkForm` draws them.
     struct DeepLinkPluginView: View {
-        static let presets: [DeepLinkForm.Preset] = [
-            .init(label: "HTTPS", url: "https://example.com/path"),
-            .init(label: "Custom Scheme", url: "myapp://deeplink/screen"),
-            .init(label: "Settings (iOS)", url: "App-prefs:root=General"),
-            .init(label: "Mail", url: "mailto:test@example.com"),
-            .init(label: "Tel", url: "tel:+1234567890")
-        ]
-
         @ObservedObject var model: DeepLinkModel
         @State private var urlText = ""
 
@@ -89,10 +116,10 @@ public extension DebugDrawer {
             DeepLinkForm(
                 urlText: $urlText,
                 outcome: model.outcome,
-                presets: Self.presets,
+                presets: model.presets,
                 history: model.history,
                 activities: model.activities,
-                onOpen: { model.open($0) },
+                onOpen: { url in Task { await model.open(url) } },
                 onContinue: { model.continue($0) },
                 onClear: { model.clearHistory() }
             )

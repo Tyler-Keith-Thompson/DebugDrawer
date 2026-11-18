@@ -24,10 +24,10 @@
             arguments: [ColorScheme.light, .dark]
         )
         func empty(colorScheme: ColorScheme) throws {
-            let presets: [DeepLinkForm.Preset] = [
-                .init(label: "HTTPS", url: "https://example.com/path"),
-                .init(label: "Custom Scheme", url: "myapp://deeplink/screen"),
-                .init(label: "Mail", url: "mailto:test@example.com")
+            let presets: [DeepLinkPreset] = [
+                try DeepLinkPreset("HTTPS", url: #require(URL(string: "https://example.com/path"))),
+                try DeepLinkPreset("Custom Scheme", url: #require(URL(string: "myapp://deeplink/screen"))),
+                try DeepLinkPreset("Mail", url: #require(URL(string: "mailto:test@example.com")))
             ]
             let sut = DeepLinkForm(urlText: .constant(""), presets: presets, onOpen: { _ in }, onContinue: { _ in }, onClear: {})
 
@@ -61,9 +61,9 @@
             arguments: [ColorScheme.light, .dark]
         )
         func afterOpening(colorScheme: ColorScheme) throws {
-            let presets: [DeepLinkForm.Preset] = [
-                .init(label: "HTTPS", url: "https://example.com/path"),
-                .init(label: "Custom Scheme", url: "myapp://deeplink/screen")
+            let presets: [DeepLinkPreset] = [
+                try DeepLinkPreset("HTTPS", url: #require(URL(string: "https://example.com/path"))),
+                try DeepLinkPreset("Custom Scheme", url: #require(URL(string: "myapp://deeplink/screen")))
             ]
             let sut = DeepLinkForm(
                 urlText: .constant("myapp://orders/42"),
@@ -105,9 +105,9 @@
             arguments: [ColorScheme.light, .dark]
         )
         func universalLink(colorScheme: ColorScheme) throws {
-            let presets: [DeepLinkForm.Preset] = [
-                .init(label: "HTTPS", url: "https://example.com/path"),
-                .init(label: "Custom Scheme", url: "myapp://deeplink/screen")
+            let presets: [DeepLinkPreset] = [
+                try DeepLinkPreset("HTTPS", url: #require(URL(string: "https://example.com/path"))),
+                try DeepLinkPreset("Custom Scheme", url: #require(URL(string: "myapp://deeplink/screen")))
             ]
             let activities = [
                 DeepLinkActivity(activityType: NSUserActivityTypeBrowsingWeb, webpageURL: URL(string: "https://example.com/orders/42"), userInfo: []),

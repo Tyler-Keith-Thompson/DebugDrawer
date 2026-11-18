@@ -1,7 +1,7 @@
 import DebugDrawer
 import UIKit
 
-/// The UIKit example's screen: the activity the scene continued last, a bar button that toggles
+/// The UIKit example's screen: the URL or activity the scene took last, a bar button that toggles
 /// the drawer and one that shows the test bench.
 final class ExampleUIKitViewController: UIViewController {
     private let continued = UILabel()
@@ -23,7 +23,7 @@ final class ExampleUIKitViewController: UIViewController {
         )
 
         let heading = UILabel()
-        heading.text = "Last Continued Activity"
+        heading.text = "Last Deep Link"
         heading.font = .preferredFont(forTextStyle: .headline)
         heading.adjustsFontForContentSizeCategory = true
 
@@ -44,7 +44,7 @@ final class ExampleUIKitViewController: UIViewController {
         activity.axis = .vertical
         activity.spacing = 2
         activity.isAccessibilityElement = true
-        activity.accessibilityLabel = "Last Continued Activity"
+        activity.accessibilityLabel = "Last Deep Link"
         activity.accessibilityValue = continued.text
 
         let stack = UIStackView(arrangedSubviews: [detail, activity])
@@ -69,6 +69,13 @@ final class ExampleUIKitViewController: UIViewController {
         let detail = activity.webpageURL?.absoluteString ?? "\(activity.activityType) {\(userInfo)}"
         loadViewIfNeeded()
         continued.text = "scene(_:continue:): \(detail)"
+        continued.superview?.accessibilityValue = continued.text
+    }
+
+    /// Shows a URL the scene took and what handed it over: "openURL: debugdrawer-example-uikit://orders/42".
+    func showOpened(_ url: URL, via route: String) {
+        loadViewIfNeeded()
+        continued.text = "\(route): \(url.absoluteString)"
         continued.superview?.accessibilityValue = continued.text
     }
 }

@@ -7,7 +7,7 @@
     import Foundation
     import Testing
 
-    /// The app's router: `onContinueUserActivity` hands it the activities the system continues.
+    /// The app's router: `onOpenURL` and `onContinueUserActivity` hand it the links the system opens.
     @MainActor
     final class Router {
         private(set) var path: [String] = []
@@ -17,16 +17,26 @@
                 path.append(url.path)
             }
         }
+
+        func open(_ url: URL) -> Bool {
+            guard url.scheme == "myapp" else { return false }
+            path.append(url.path)
+            return true
+        }
     }
 
     @MainActor
     @Suite("README examples")
     struct READMEExamplesTests {
-        @Test("Deep links: universal links and user activities")
-        func deepLinks() {
+        @Test("Deep links: URLs, universal links and user activities")
+        func deepLinks() throws {
             let router = Router()
 
-            DebugDrawer.shared.installDeepLink(continueUserActivity: router.handle)
+            DebugDrawer.shared.installDeepLink(
+                presets: DeepLinkPreset.bundleURLSchemes + [DeepLinkPreset("Order 42", url: URL(string: "myapp://orders/42")!)],
+                continueUserActivity: router.handle,
+                openURL: router.open
+            )
 
             // Leave the shared drawer as the other suites expect it, within this one main-actor turn.
             let installed = DebugDrawer.shared.globalPlugins.contains { $0.id == "DeepLinkPlugin" }
@@ -34,8 +44,13 @@
             let activity = NSUserActivity(activityType: NSUserActivityTypeBrowsingWeb)
             activity.webpageURL = URL(string: "https://example.com/orders/42")
             router.handle(activity)
+            let opened = try router.open(#require(URL(string: "myapp://orders/7")))
+            let declined = try router.open(#require(URL(string: "other://orders/8")))
             #expect(installed)
-            #expect(router.path == ["/orders/42"])
+            #expect(opened)
+            #expect(!declined)
+            // In myapp://orders/7, orders is the host.
+            #expect(router.path == ["/orders/42", "/7"])
         }
     }
 #endif

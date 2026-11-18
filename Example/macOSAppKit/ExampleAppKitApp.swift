@@ -6,8 +6,10 @@ import ExampleTestBench
 // An AppKit app with no SwiftUI root: an app delegate, a menu bar and a window controller whose
 // content is AppKit views, with no `.debugDrawer()` anywhere. The window attaches the drawer with
 // `attach(to:)`, and the drawer shows every global plugin. The Debug menu toggles the drawer and
-// holds the test bench. The Deep Link Tester is installed with no handler, so an activity it sends
-// goes to application(_:continue:restorationHandler:), as a Handoff or a Spotlight result does.
+// holds the test bench. The Deep Link Tester is installed with no continueUserActivity handler, so
+// an activity it sends goes to application(_:continue:restorationHandler:), as a Handoff or a
+// Spotlight result does. A URL it opens goes to the window's own routing, which
+// application(_:open:) uses for a URL the system opens.
 
 @main
 @MainActor
@@ -22,7 +24,7 @@ final class ExampleAppKitAppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationDidFinishLaunching(_: Notification) {
-        ExamplePlugins.install()
+        ExamplePlugins.install(openURL: { [windowController] url in windowController.route(url, via: "openURL") })
         NSApp.mainMenu = mainMenu()
         windowController.showWindow(nil)
         // Launched with -OpenDebugDrawer, the window opens with the drawer open.
@@ -39,6 +41,12 @@ final class ExampleAppKitAppDelegate: NSObject, NSApplicationDelegate {
     ) -> Bool {
         windowController.showContinued(userActivity)
         return true
+    }
+
+    func application(_: NSApplication, open urls: [URL]) {
+        for url in urls {
+            windowController.route(url, via: "application(_:open:)")
+        }
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_: NSApplication) -> Bool {
@@ -105,12 +113,21 @@ final class ExampleAppKitAppWindowController: NSWindowController {
 
     func showContinued(_ activity: NSUserActivity) {
         let detail = activity.webpageURL?.absoluteString ?? activity.activityType
-        screen.show(label: "Last Continued Activity", value: "application(_:continue:): \(detail)")
+        screen.show(label: "Last Deep Link", value: "application(_:continue:): \(detail)")
+    }
+
+    /// Takes `url` when it is of the app's own scheme, which Info.plist declares, and says
+    /// whether it did.
+    @discardableResult
+    func route(_ url: URL, via route: String) -> Bool {
+        guard url.scheme?.lowercased() == "debugdrawer-example-appkit" else { return false }
+        screen.show(label: "Last Deep Link", value: "\(route): \(url.absoluteString)")
+        return true
     }
 }
 
 /// The window's content: what the app is, how to open the drawer and the test bench, and what the
-/// last action or continued activity did.
+/// last action or deep link did.
 final class ExampleAppKitAppViewController: NSViewController {
     private let heading = NSTextField(labelWithString: "Last Test Bench Action")
     private let detail = NSTextField(wrappingLabelWithString: "None yet: choose one from Debug › Test Bench.")

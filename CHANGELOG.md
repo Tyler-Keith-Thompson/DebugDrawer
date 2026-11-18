@@ -10,6 +10,7 @@ the entry becomes the GitHub release's notes.
 
 ### Added
 
+- DD-85: `installDeepLink(presets:continueUserActivity:openURL:)` and `DeepLinkPreset`: an app passes the Deep Link Tester its own presets and an `openURL` handler, which receives each URL the plugin opens in place of the system and returns whether it handled it. Presets default to `DeepLinkPreset.bundleURLSchemes`, one per scheme the app's Info.plist declares, with an empty state saying how to add some when there are none. `installDeepLink(continueUserActivity:)` remains, deprecated, and forwards to it.
 - DD-199: `NetworkEntry.requestBodySize`, `isRequestBodyTruncated` and `requestSizeLabel`: Network keeps each request body to `installNetwork(bodyLimit:)`, as it does each response body, marked truncated with its full size.
 - DD-5: `DebugDrawer.toggle(in:)` opens or closes the drawer in the `NSWindow` (macOS) or `UIWindowScene` (iOS) it is given, attaching it first if it isn't yet, whichever window is key; the macOS example opens a second window (Debug > New Window, or `-NewWindow` at launch).
 - DD-84: HTTP Cookies lists the cookies web views keep in `WKWebsiteDataStore.default()` beside `HTTPCookieStorage.shared`'s, where WebKit exists, each row marked URLSession or WKWebView, and deletes each from its own store.
@@ -17,11 +18,13 @@ the entry becomes the GitHub release's notes.
 
 ### Changed
 
+- DD-85: each example app declares a URL scheme of its own (`debugdrawer-example`, `-ios`, `-uikit`, `-appkit`), which the Deep Link Tester lists as its preset, and routes the URLs the tester opens through `openURL`, showing the last one in its window.
 - DD-4: the UIKit example (`Example/iOSUIKit`) has no SwiftUI root and installs every global plugin, and the macOS example opens an AppKit-only window (Debug > Show AppKit Window, or `-AppKitWindow` at launch), each attaching the drawer with `DebugDrawer.shared.attach(to:)`; the docs say a window with no SwiftUI view under `debugDrawer()` shows the drawer without the HUD and toasts.
 - DD-60: every example app has a Test Bench, actions grouped by plugin that give each one data (requests that succeed, fail with 404 and never resolve, a WebSocket, a line at every log level, main-thread file I/O, defaults, keychain and cookie writes, a leak, a hang and a crash), run at launch with `-RunTestBench <ids>|all`; an AppKit-only Mac example joins the UIKit one (`just run appkit`, `just run uikit`).
 
 ### Fixed
 
+- DD-85: the Deep Link Tester reports each opened URL honestly: handled or not handled by `openURL`, opened by the system, or an error saying why the system couldn't open it, where the Mac reported Opened whatever `NSWorkspace` did. On the Mac a scheme the app declares opens in the running copy rather than another installed one, and the presets no longer include `myapp://` or the private `App-prefs:` scheme.
 - DD-5: with several windows or scenes, a local plugin is listed only in the drawer of the window whose views registered it, rather than in every window's drawer; the same plugin registered from two windows stays in each until its own view leaves. On iPadOS, `toggle()` acts on the scene holding the key window when two scenes are foreground-active, and on macOS, while the app isn't active, on its frontmost window rather than the last one attached.
 - DD-199: with Network installed, a request whose body is a stream reaches the server with every byte of it, rather than an empty body; a body past the body limit is sent from a temporary file, with its `Content-Length`.
 - DD-204: Network's Resend no longer sends only the kept part of a request body the log cut short: Resend is unavailable and says why, and Edit and Resend shows the body as cut, with its full size, and won't send until the body is edited or removed.

@@ -377,7 +377,7 @@ These need only their install call:
   touch lands, slows animations up to ten times, and lists the key window's view hierarchy with
   each view's class and accessibility label. Its render counts follow below (View Inspector).
 
-### Deep links: universal links and user activities
+### Deep links: URLs, universal links and user activities
 
 Opening an https URL goes to the browser, so a universal link, a Handoff or a Spotlight result
 can't be tested by opening a URL. The Deep Link Tester continues one in the app instead, as the
@@ -386,14 +386,17 @@ system does: an https URL in the field is sent as an `NSUserActivity` of type
 app's own type with a userInfo of strings, numbers and Booleans. Sent activities are listed apart
 from the URLs opened, and a tap puts one back in the form.
 
-A SwiftUI app's `onContinueUserActivity` has no public entry point, so a SwiftUI app passes the
-plugin the code that handles an activity:
+Pass the code that routes the app's own URLs as `openURL`, and an opened URL goes to it rather
+than to the system, so it never reaches the browser or another installed copy of the app. It
+returns whether it handled the URL, and the plugin shows which. A SwiftUI app's
+`onContinueUserActivity` has no public entry point either, so a SwiftUI app also passes the code
+that handles an activity:
 
 ```swift
 import DebugDrawerDeepLinkPlugin
 import Foundation
 
-/// The app's router: `onContinueUserActivity` hands it the activities the system continues.
+/// The app's router: `onOpenURL` and `onContinueUserActivity` hand it the links the system opens.
 @MainActor
 final class Router {
     private(set) var path: [String] = []
@@ -403,15 +406,31 @@ final class Router {
             path.append(url.path)
         }
     }
+
+    func open(_ url: URL) -> Bool {
+        guard url.scheme == "myapp" else { return false }
+        path.append(url.path)
+        return true
+    }
 }
 
 let router = Router()
 
-DebugDrawer.shared.installDeepLink(continueUserActivity: router.handle)
+DebugDrawer.shared.installDeepLink(
+    presets: DeepLinkPreset.bundleURLSchemes + [DeepLinkPreset("Order 42", url: URL(string: "myapp://orders/42")!)],
+    continueUserActivity: router.handle,
+    openURL: router.open
+)
 ```
 
-Without a handler, an activity goes where the system sends it in a UIKit or AppKit app: on iOS,
-the first window scene delegate with `scene(_:continue:)`, else the app delegate's
+Presets lists one URL for each scheme the app's Info.plist declares under `CFBundleURLTypes`
+(`DeepLinkPreset.bundleURLSchemes`) unless the app passes its own; with neither, it says how to
+add some.
+
+Without `openURL`, the system opens the URL as it does a tapped link, and the plugin says when it
+couldn't and why; on the Mac a scheme the app declares opens in the running copy of the app.
+Without `continueUserActivity`, an activity goes where the system sends it in a UIKit or AppKit
+app: on iOS, the first window scene delegate with `scene(_:continue:)`, else the app delegate's
 `application(_:continue:restorationHandler:)`; on the Mac, the app delegate's. When the app has
 none of these, the plugin says so rather than dropping the activity.
 
@@ -1877,7 +1896,7 @@ ContentView()
 | `DebugDrawerFileBrowserPlugin` | The app's Documents, Library, tmp, bundle and app group containers, with folder totals and dates, previews of text, JSON, property lists and images, and files imported, renamed, deleted and shared, the bundle read-only |
 | `DebugDrawerLocationPlugin` | Spoofed CLLocationManager locations: presets, a custom latitude and longitude, and GPX routes played at a chosen speed |
 | `DebugDrawerLoadedLibrariesPlugin` | Every loaded image, grouped as app, third-party and system, with UUIDs and load addresses |
-| `DebugDrawerDeepLinkPlugin` | Opens URLs, continues universal links and activities of the app's own type with their userInfo in the app, and keeps a history of each |
+| `DebugDrawerDeepLinkPlugin` | Opens URLs in the app's own handler or through the system, continues universal links and activities of the app's own type with their userInfo in the app, and keeps a history of each |
 | `DebugDrawerCookiesPlugin` | Browse, search, copy and delete `HTTPCookieStorage.shared`'s cookies, and `WKWebsiteDataStore.default()`'s where WebKit exists |
 | `DebugDrawerLaunchTimePlugin` | Launch time: process start to `installLaunchTime()` (pre-main), from there to the first frame, and the total |
 | `DebugDrawerTweaksPlugin` | The app's own debug settings: toggles, pickers, text fields, steppers and actions, in sections, read through typed accessors |

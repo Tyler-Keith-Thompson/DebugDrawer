@@ -1,9 +1,4 @@
 #if DEBUG
-    #if os(macOS)
-        import AppKit
-    #elseif os(iOS)
-        import UIKit
-    #endif
     import Combine
     import Foundation
 
@@ -21,14 +16,32 @@
         @Published private(set) var activities: [DeepLinkActivity]
         @Published private(set) var outcome: DeepLinkOutcome?
 
+        /// The URLs listed under Presets.
+        let presets: [DeepLinkPreset]
+
         private let delivery: any UserActivityDelivering
+        private let openURL: (@MainActor (URL) -> Bool)?
+        private let system: any SystemURLOpening
         private let defaults: UserDefaults
 
         /// - Parameters:
+        ///   - presets: The URLs listed under Presets.
         ///   - delivery: Where continued activities go.
+        ///   - openURL: Where opened URLs go, in place of the system, when given; it returns
+        ///     whether it handled the URL.
+        ///   - system: Opens URLs when there's no `openURL`.
         ///   - defaults: Where the history is kept.
-        init(delivery: any UserActivityDelivering, defaults: UserDefaults = .standard) {
+        init(
+            presets: [DeepLinkPreset] = [],
+            delivery: any UserActivityDelivering,
+            openURL: (@MainActor (URL) -> Bool)? = nil,
+            system: any SystemURLOpening = _SystemURLOpening(),
+            defaults: UserDefaults = .standard
+        ) {
+            self.presets = presets
             self.delivery = delivery
+            self.openURL = openURL
+            self.system = system
             self.defaults = defaults
             history = defaults.stringArray(forKey: Self.historyKey) ?? []
             // History written by another version that no longer decodes starts empty.
@@ -36,22 +49,23 @@
                 .flatMap { try? JSONDecoder().decode([DeepLinkActivity].self, from: $0) } ?? []
         }
 
-        /// Opens `url` as the system opens a tapped link, and records it.
-        func open(_ url: URL) {
+        /// Hands `url` to the `openURL` handler, or without one opens it as the system opens a
+        /// tapped link, records it, and says what came of it.
+        func open(_ url: URL) async {
             let opened = url.absoluteString
             history = Self.recording(opened, in: history)
             defaults.set(history, forKey: Self.historyKey)
 
-            #if os(macOS)
-                NSWorkspace.shared.open(url)
+            if let openURL {
+                outcome = openURL(url) ? .handled(opened) : .notHandled(opened)
+                return
+            }
+            do {
+                try await system.open(url)
                 outcome = .opened(opened)
-            #elseif os(iOS)
-                UIApplication.shared.open(url) { [weak self] success in
-                    Task { @MainActor in
-                        self?.outcome = success ? .opened(opened) : .couldNotOpen(opened)
-                    }
-                }
-            #endif
+            } catch {
+                outcome = .couldNotOpen(opened, reason: error.localizedDescription)
+            }
         }
 
         /// Hands `activity` to the app's continuation path, and records it.

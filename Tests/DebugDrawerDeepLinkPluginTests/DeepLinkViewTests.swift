@@ -1,6 +1,7 @@
 // ViewInspector is linked on Apple platforms only, and the views are tested on the Mac.
 #if os(macOS)
     @testable import DebugDrawerDeepLinkPlugin
+    import DebugDrawer
     import Foundation
     import SwiftUI
     import Testing
@@ -164,6 +165,49 @@
             let view = try sut.inspect()
 
             #expect(throws: Never.self) { try view.find(text: "This app has no handler: pass continueUserActivity: to installDeepLink") }
+        }
+
+        @Test("installDeepLink hands the plugin the presets and the openURL handler, and an opened URL reaches the handler")
+        func installPassesPresetsAndHandler() async throws {
+            var received: [URL] = []
+            let presets = try [DeepLinkPreset("Order 42", url: #require(URL(string: "myapp://orders/42")))]
+            let url = try #require(URL(string: "myapp://orders/42"))
+
+            DebugDrawer.shared.installDeepLink(presets: presets, openURL: { received.append($0); return true })
+
+            let plugin = DebugDrawer.shared.globalPlugins.first { $0.id == "DeepLinkPlugin" }
+            DebugDrawer.shared.unregisterGlobal(id: "DeepLinkPlugin")
+            let model = try #require(plugin).body.inspect().find(DeepLinkPluginView.self).actualView().model
+            UserDefaults.standard.removeObject(forKey: DeepLinkModel.historyKey)
+            defer { UserDefaults.standard.removeObject(forKey: DeepLinkModel.historyKey) }
+            await model.open(url)
+            #expect(model.presets == presets)
+            #expect(received == [url])
+            #expect(model.outcome == .handled("myapp://orders/42"))
+        }
+
+        @Test("With no presets, Presets says how to declare URL schemes or pass presets:")
+        func emptyPresets() throws {
+            let sut = DeepLinkForm(urlText: .constant(""), presets: [], onOpen: { _ in }, onContinue: { _ in }, onClear: {})
+
+            let view = try sut.inspect()
+
+            #expect(throws: Never.self) { try view.find(text: "No presets") }
+            #expect(throws: Never.self) {
+                try view.find(text: "Declare URL schemes under CFBundleURLTypes in Info.plist, or pass presets: to installDeepLink.")
+            }
+        }
+
+        @Test("Tapping a preset puts its URL in the field")
+        func presetFillsField() throws {
+            var urlText = ""
+            let binding = Binding(get: { urlText }, set: { urlText = $0 })
+            let presets = try [DeepLinkPreset("Orders", url: #require(URL(string: "myapp://")))]
+            let sut = DeepLinkForm(urlText: binding, presets: presets, onOpen: { _ in }, onContinue: { _ in }, onClear: {})
+
+            try sut.inspect().find(text: "Orders").find(ViewType.Button.self, relation: .parent).tap()
+
+            #expect(urlText == "myapp://")
         }
     }
 #endif

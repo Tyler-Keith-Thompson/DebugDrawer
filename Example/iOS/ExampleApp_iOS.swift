@@ -307,7 +307,7 @@ struct ExampleContentView_iOS: View {
 
                 // The Deep Link Tester's universal links and activities, as the app receives them.
                 Section("Deep Links") {
-                    ExampleContinuedActivityRow()
+                    ExampleDeepLinkRow()
                 }
 
                 // Colors the Color Vision plugin simulates.

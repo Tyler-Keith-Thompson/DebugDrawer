@@ -6,16 +6,11 @@
     /// its userInfo; the result of the last send; the presets; and the URLs opened and the
     /// activities continued before.
     struct DeepLinkForm: View {
-        /// A named example URL.
-        struct Preset: Equatable {
-            var label: String
-            var url: String
-        }
-
         @Binding var urlText: String
         /// What came of the last send; nil before one.
         let outcome: DeepLinkOutcome?
-        let presets: [Preset]
+        /// The URLs listed under Presets; an empty state says how to add some while there are none.
+        let presets: [DeepLinkPreset]
         /// URLs opened before, most recent first.
         let history: [String]
         /// Activities continued before, most recent first.
@@ -34,7 +29,7 @@
         init(
             urlText: Binding<String>,
             outcome: DeepLinkOutcome? = nil,
-            presets: [Preset],
+            presets: [DeepLinkPreset],
             history: [String] = [],
             activities: [DeepLinkActivity] = [],
             mode: DeepLinkMode? = nil,
@@ -192,36 +187,46 @@
 
         private var presetsSection: some View {
             DebugDrawerSection("Presets") {
-                // At accessibility text sizes a preset's name leaves its URL too little width, so
-                // the URL sits below the name.
-                let presetLayout = dynamicTypeSize.isAccessibilitySize
-                    ? AnyLayout(VStackLayout(alignment: .leading, spacing: 0))
-                    : AnyLayout(HStackLayout())
-                ForEach(presets, id: \.url) { preset in
-                    Button {
-                        use(preset.url)
-                    } label: {
-                        presetLayout {
-                            Text(preset.label)
-                                .debugDrawerFont(.body)
-                            if !dynamicTypeSize.isAccessibilitySize {
-                                Spacer()
-                            }
-                            Text(preset.url)
-                                .debugDrawerFont(.code)
-                                .debugDrawerForegroundStyle(.tertiary)
-                                .lineLimit(3)
-                                .truncationMode(.middle)
-                                // Stacked, the URL is otherwise offered one line's height and
-                                // truncates rather than wrapping.
-                                .fixedSize(horizontal: false, vertical: dynamicTypeSize.isAccessibilitySize)
-                        }
-                        .padding(.vertical, 3)
+                if presets.isEmpty {
+                    DebugDrawerEmptyState("No presets", systemImage: "link") {
+                        Text("Declare URL schemes under CFBundleURLTypes in Info.plist, or pass presets: to installDeepLink.")
                     }
-                    .debugDrawerButtonStyle(.plain)
-                    .accessibilityHint("Puts the URL in the field")
+                } else {
+                    ForEach(presets, id: \.self) { preset in
+                        presetRow(preset)
+                    }
                 }
             }
+        }
+
+        private func presetRow(_ preset: DeepLinkPreset) -> some View {
+            // At accessibility text sizes a preset's name leaves its URL too little width, so the
+            // URL sits below the name.
+            let presetLayout = dynamicTypeSize.isAccessibilitySize
+                ? AnyLayout(VStackLayout(alignment: .leading, spacing: 0))
+                : AnyLayout(HStackLayout())
+            return Button {
+                use(preset.url.absoluteString)
+            } label: {
+                presetLayout {
+                    Text(preset.label)
+                        .debugDrawerFont(.body)
+                    if !dynamicTypeSize.isAccessibilitySize {
+                        Spacer()
+                    }
+                    Text(preset.url.absoluteString)
+                        .debugDrawerFont(.code)
+                        .debugDrawerForegroundStyle(.tertiary)
+                        .lineLimit(3)
+                        .truncationMode(.middle)
+                        // Stacked, the URL is otherwise offered one line's height and truncates
+                        // rather than wrapping.
+                        .fixedSize(horizontal: false, vertical: dynamicTypeSize.isAccessibilitySize)
+                }
+                .padding(.vertical, 3)
+            }
+            .debugDrawerButtonStyle(.plain)
+            .accessibilityHint("Puts the URL in the field")
         }
 
         /// The typed URL, or nil while the field is empty or not a URL.

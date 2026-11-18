@@ -22,11 +22,11 @@
             "In an iPad's drawer: with no URL typed and no history, the form shows the mode picker, the field, a disabled Open and the presets",
             arguments: [DynamicTypeSize.large, .accessibility3]
         )
-        func empty(size: DynamicTypeSize) {
-            let presets: [DeepLinkForm.Preset] = [
-                .init(label: "HTTPS", url: "https://example.com/path"),
-                .init(label: "Custom Scheme", url: "myapp://deeplink/screen"),
-                .init(label: "Mail", url: "mailto:test@example.com")
+        func empty(size: DynamicTypeSize) throws {
+            let presets: [DeepLinkPreset] = [
+                try DeepLinkPreset("HTTPS", url: #require(URL(string: "https://example.com/path"))),
+                try DeepLinkPreset("Custom Scheme", url: #require(URL(string: "myapp://deeplink/screen"))),
+                try DeepLinkPreset("Mail", url: #require(URL(string: "mailto:test@example.com")))
             ]
             let sut = DeepLinkForm(urlText: .constant(""), presets: presets, onOpen: { _ in }, onContinue: { _ in }, onClear: {})
 
@@ -68,10 +68,10 @@
             "In an iPad's drawer: after an open, the form shows the URL with an Open link, the result and the history",
             arguments: [DynamicTypeSize.large, .accessibility3]
         )
-        func afterOpening(size: DynamicTypeSize) {
-            let presets: [DeepLinkForm.Preset] = [
-                .init(label: "HTTPS", url: "https://example.com/path"),
-                .init(label: "Custom Scheme", url: "myapp://deeplink/screen")
+        func afterOpening(size: DynamicTypeSize) throws {
+            let presets: [DeepLinkPreset] = [
+                try DeepLinkPreset("HTTPS", url: #require(URL(string: "https://example.com/path"))),
+                try DeepLinkPreset("Custom Scheme", url: #require(URL(string: "myapp://deeplink/screen")))
             ]
             let sut = DeepLinkForm(
                 urlText: .constant("myapp://orders/42"),
@@ -121,10 +121,10 @@
             "In an iPad's drawer: after continuing an https URL, the form shows Universal Link, Continue, where it went and the activity history",
             arguments: [DynamicTypeSize.large, .accessibility3]
         )
-        func universalLink(size: DynamicTypeSize) {
-            let presets: [DeepLinkForm.Preset] = [
-                .init(label: "HTTPS", url: "https://example.com/path"),
-                .init(label: "Custom Scheme", url: "myapp://deeplink/screen")
+        func universalLink(size: DynamicTypeSize) throws {
+            let presets: [DeepLinkPreset] = [
+                try DeepLinkPreset("HTTPS", url: #require(URL(string: "https://example.com/path"))),
+                try DeepLinkPreset("Custom Scheme", url: #require(URL(string: "myapp://deeplink/screen")))
             ]
             let activities = [
                 DeepLinkActivity(activityType: NSUserActivityTypeBrowsingWeb, webpageURL: URL(string: "https://example.com/orders/42"), userInfo: []),
@@ -182,7 +182,7 @@
             "In an iPad's drawer: in Activity mode with no handler, the form shows the type, a row of each userInfo type, Add Key and what to do",
             arguments: [DynamicTypeSize.large, .accessibility3]
         )
-        func activity(size: DynamicTypeSize) {
+        func activity(size: DynamicTypeSize) throws {
             let draft = ActivityDraft(activityType: "com.example.app.viewOrder", fields: [
                 UserInfoField(key: "orderID", kind: .number, text: "42"),
                 UserInfoField(key: "title", kind: .string, text: "Ada's order"),

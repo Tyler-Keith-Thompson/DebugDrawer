@@ -32,6 +32,7 @@ import DebugDrawerScreenshotPlugin
 import DebugDrawerTweaksPlugin
 import DebugDrawerUserDefaultsPlugin
 import DebugDrawerViewInspectorPlugin
+import Foundation
 
 // Every global plugin, each with its defaults, for the examples with no SwiftUI root: the UIKit app
 // and the AppKit app link this one library rather than each keeping a copy, and show that such a
@@ -43,7 +44,10 @@ import DebugDrawerViewInspectorPlugin
 public enum ExamplePlugins {
     /// Installs every global plugin. Each compiles in release too, where it does nothing; Background
     /// Tasks does nothing on macOS either, which has no BGTaskScheduler.
-    public static func install() {
+    ///
+    /// - Parameter openURL: Where the Deep Link Tester sends the URLs it opens: the app's own
+    ///   routing, which returns whether it took the URL.
+    public static func install(openURL: @escaping @MainActor (URL) -> Bool) {
         // First, so a crash in the rest of startup is recorded.
         CrashReports.install()
         Localization.install()
@@ -61,9 +65,10 @@ public enum ExamplePlugins {
         AppStateReset.install()
         UserDefaultsBrowser.install()
         FileBrowser.install()
-        // No handler: an activity the Deep Link Tester sends goes where the system sends it, to the
-        // UIKit app's scene(_:continue:) or the AppKit app's application(_:continue:restorationHandler:).
-        DebugDrawer.shared.installDeepLink()
+        // No continueUserActivity handler: an activity the Deep Link Tester sends goes where the
+        // system sends it, to the UIKit app's scene(_:continue:) or the AppKit app's
+        // application(_:continue:restorationHandler:). A URL it opens goes to the app's own routing.
+        DebugDrawer.shared.installDeepLink(openURL: openURL)
         DebugDrawer.shared.installNetwork()
         DebugDrawer.shared.installConsole()
         DebugDrawer.shared.installDiskIO()

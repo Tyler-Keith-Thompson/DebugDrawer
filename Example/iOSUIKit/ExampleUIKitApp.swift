@@ -7,14 +7,19 @@ import UIKit
 // A UIKit app with no SwiftUI root: a scene delegate, a navigation controller and a view
 // controller of UIKit views, with no `.debugDrawer()` anywhere. The scene delegate attaches the
 // drawer with `attach(to:)`, and the drawer shows every global plugin the SwiftUI example does.
-// The Deep Link Tester is installed with no handler, so an activity it sends goes to the scene
-// delegate's scene(_:continue:), as a universal link, a Handoff or a Spotlight result does in such
-// an app.
+// The Deep Link Tester is installed with no continueUserActivity handler, so an activity it sends
+// goes to the scene delegate's scene(_:continue:), as a universal link, a Handoff or a Spotlight
+// result does in such an app. A URL it opens goes to the scene delegate's own routing, which
+// scene(_:openURLContexts:) uses for a URL the system opens.
 
 @main
 final class ExampleUIKitAppDelegate: UIResponder, UIApplicationDelegate {
     func application(_: UIApplication, didFinishLaunchingWithOptions _: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
-        ExamplePlugins.install()
+        ExamplePlugins.install(openURL: { url in
+            UIApplication.shared.connectedScenes
+                .compactMap { $0.delegate as? ExampleUIKitSceneDelegate }
+                .first?.route(url, via: "openURL") ?? false
+        })
         return true
     }
 
@@ -35,8 +40,8 @@ final class ExampleUIKitAppDelegate: UIResponder, UIApplicationDelegate {
     }
 }
 
-/// Shows the app's one screen, attaches the drawer to the scene, and shows each activity the scene
-/// continues.
+/// Shows the app's one screen, attaches the drawer to the scene, and shows each URL the scene
+/// opens and activity it continues.
 final class ExampleUIKitSceneDelegate: UIResponder, UIWindowSceneDelegate {
     var window: UIWindow?
     private let screen = ExampleUIKitViewController()
@@ -60,5 +65,20 @@ final class ExampleUIKitSceneDelegate: UIResponder, UIWindowSceneDelegate {
 
     func scene(_: UIScene, continue userActivity: NSUserActivity) {
         screen.showContinued(userActivity)
+    }
+
+    func scene(_: UIScene, openURLContexts contexts: Set<UIOpenURLContext>) {
+        for context in contexts {
+            route(context.url, via: "scene(_:openURLContexts:)")
+        }
+    }
+
+    /// Takes `url` when it is of the app's own scheme, which Info.plist declares, and says
+    /// whether it did.
+    @discardableResult
+    func route(_ url: URL, via route: String) -> Bool {
+        guard url.scheme?.lowercased() == "debugdrawer-example-uikit" else { return false }
+        screen.showOpened(url, via: route)
+        return true
     }
 }
