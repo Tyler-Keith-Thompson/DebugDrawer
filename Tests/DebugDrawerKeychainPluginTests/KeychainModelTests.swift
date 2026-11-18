@@ -192,6 +192,21 @@
             #expect(sut.selection == nil)
         }
 
+        @Test("A delete the keychain refuses reports why")
+        func refusedDelete() throws {
+            let keychain = FakeKeychain()
+            keychain.seed(.genericPassword, [kSecAttrService as String: "com.example.App", kSecAttrAccount as String: "ada"])
+            let sut = KeychainModel(keychain: keychain)
+            sut.reload()
+            let item = try #require(sut.shownItems.first)
+            keychain.refusal = KeychainError(status: errSecInteractionNotAllowed)
+            let expected = KeychainIssue(action: "Couldn't delete", error: KeychainError(status: errSecInteractionNotAllowed))
+
+            sut.delete(item)
+
+            #expect(sut.issue == expected)
+        }
+
         @Test("Opening an item reads its password; opening it again closes it")
         func toggleReadsValue() throws {
             let keychain = FakeKeychain()

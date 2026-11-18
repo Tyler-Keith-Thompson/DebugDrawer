@@ -155,6 +155,22 @@
             #expect(message.hasSuffix("(-34018)"))
         }
 
+        @Test("A refused delete shows Keychain refused with the reason under the list")
+        func refusedDeleteShown() throws {
+            var filter = KeychainFilter()
+            let issue = KeychainIssue(action: "Couldn't delete", error: KeychainError(status: errSecInteractionNotAllowed))
+            let sut = KeychainListView(
+                items: [], accessGroups: [], filter: Binding(get: { filter }, set: { filter = $0 }), selection: nil, failure: nil, issue: issue,
+                redaction: .standard, actions: KeychainListActions()
+            )
+
+            let title = try sut.inspect().find(text: "Keychain refused").string()
+            let actual = try sut.inspect().find(text: issue.message).string()
+
+            #expect(title == "Keychain refused")
+            #expect(actual == issue.message)
+        }
+
         @Test("The form hides the password until Show password, then saves every field typed")
         func formRevealsAndSaves() async throws {
             var saved: [GenericPassword] = []
