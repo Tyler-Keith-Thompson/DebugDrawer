@@ -1,6 +1,7 @@
 // iOS draws the row's controls with UIKit and scales text with Dynamic Type, so these run on the
-// iOS simulator.
-#if os(iOS)
+// iOS simulator; not on Mac Catalyst, as UIKit can't make a window in xctest, which runs package
+// tests on Mac Catalyst without an NSApplication.
+#if os(iOS) && !targetEnvironment(macCatalyst)
     import DebugDrawer
     import SwiftUI
     import Testing

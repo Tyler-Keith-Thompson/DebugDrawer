@@ -51,9 +51,12 @@ APPLE_ONLY_PACKAGE_EXCLUDED_PLATFORMS = {
     # so it compiles only for visionOS 26 and later. The tests that inspect views are under
     # `#if !os(visionOS)`.
     "viewinspector": ["visionOS"],
-    # 1.19.7's Swift Testing attachment calls Image(data:), which nothing declares for visionOS.
-    # Every snapshot test is under `#if os(macOS)` or `#if os(iOS)`.
-    "swift-snapshot-testing": ["visionOS"],
+    # 1.19.7's Swift Testing attachment calls Image(data:), which nothing declares for visionOS,
+    # and on Mac Catalyst, where UIImage doesn't conform to Testing's AttachableAsImage,
+    # AssertSnapshot.swift:648's Attachment.record(_:named:as:sourceLocation:) doesn't compile
+    # (an upstream bug, unfixed as of 1.19.7, the newest release). Every snapshot test is under
+    # `#if os(macOS)` or `#if os(iOS) && !targetEnvironment(macCatalyst)`.
+    "swift-snapshot-testing": ["visionOS", "macCatalyst"],
 }
 
 # Test targets with nothing to run off Apple platforms (all their tests under `#if os(macOS)`), by

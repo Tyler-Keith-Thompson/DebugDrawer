@@ -51,7 +51,9 @@
             #expect(actual == expected)
         }
     }
-#elseif os(iOS) && DEBUG
+// UIKit can't make a window in xctest, which runs package tests on Mac Catalyst without an
+// NSApplication, so the iOS tests run on the iOS simulator alone.
+#elseif os(iOS) && DEBUG && !targetEnvironment(macCatalyst)
     @testable import DebugDrawer
     import SwiftUI
     import Testing

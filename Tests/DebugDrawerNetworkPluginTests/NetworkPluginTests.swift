@@ -50,11 +50,14 @@
             #expect(entry.durationLabel == "1.50s")
         }
 
-        // A store of its own: clearing the shared one would drop the requests the interception
-        // suites are waiting to see logged.
+        // A store and a WebSocket recorder of its own: clearing the shared ones would drop the
+        // requests and connections the interception suites are waiting to see logged.
         @Test("A cleared store shows no entries, and its status filter starts at All")
         func networkStoreFilterStatus() {
-            let store = NetworkStore(ignoreStorage: FakeNetworkIgnoreListStorage())
+            let store = NetworkStore(
+                ignoreStorage: FakeNetworkIgnoreListStorage(),
+                webSocketRecorder: NetworkWebSocketRecorder(connectionCapacity: 10, frameCapacity: 10)
+            )
             store.clear()
             #expect(store.filteredEntries.isEmpty)
             #expect(store.filterStatus == .all)

@@ -88,24 +88,28 @@
                 }
             }
 
-            @Test("A hosted view reads the override while one is set, and the system's value while it is cleared")
-            func hostReadsOverrideWhenSetAndSystemValueWhenCleared() async throws {
-                for setting in settings {
-                    for systemValue in [false, true] {
-                        overrides[keyPath: setting.override] = nil
-                        try await expectHostReads(systemValue, setting, systemValue: systemValue,
-                                                  "cleared should read the system value")
+            // ViewHosting hosts the view in a window, which UIKit can't make in xctest, which runs
+            // package tests on Mac Catalyst without an NSApplication.
+            #if !targetEnvironment(macCatalyst)
+                @Test("A hosted view reads the override while one is set, and the system's value while it is cleared")
+                func hostReadsOverrideWhenSetAndSystemValueWhenCleared() async throws {
+                    for setting in settings {
+                        for systemValue in [false, true] {
+                            overrides[keyPath: setting.override] = nil
+                            try await expectHostReads(systemValue, setting, systemValue: systemValue,
+                                                      "cleared should read the system value")
 
-                        overrides[keyPath: setting.override] = !systemValue
-                        try await expectHostReads(!systemValue, setting, systemValue: systemValue,
-                                                  "the override should win")
+                            overrides[keyPath: setting.override] = !systemValue
+                            try await expectHostReads(!systemValue, setting, systemValue: systemValue,
+                                                      "the override should win")
 
-                        overrides[keyPath: setting.override] = nil
-                        try await expectHostReads(systemValue, setting, systemValue: systemValue,
-                                                  "clearing should restore the system value")
+                            overrides[keyPath: setting.override] = nil
+                            try await expectHostReads(systemValue, setting, systemValue: systemValue,
+                                                      "clearing should restore the system value")
+                        }
                     }
                 }
-            }
+            #endif
 
             @Test("Reset All clears every setting's override")
             func resetAllClearsEverySetting() {

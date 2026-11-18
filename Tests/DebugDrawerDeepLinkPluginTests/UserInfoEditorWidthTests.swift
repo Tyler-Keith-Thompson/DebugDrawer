@@ -69,24 +69,28 @@
             #expect(actual <= width)
         }
 
-        @Test("At the default text size in an iPad's drawer, rows of every type stay in columns, shorter than the rows stacked")
-        func defaultSizeKeepsColumns() {
-            let width: CGFloat = 286
-            let fields = [
-                UserInfoField(key: "orderID", kind: .number, text: "42"),
-                UserInfoField(key: "title", kind: .string, text: "Ada's order"),
-                UserInfoField(key: "gift", kind: .boolean, isOn: true)
-            ]
-            let controller = UIHostingController(rootView: UserInfoEditor(fields: .constant(fields))
-                .environment(\.locale, Locale(identifier: "en_US"))
-                .environment(\.dynamicTypeSize, .large))
-            controller.safeAreaRegions = []
-            // Too narrow for the grid, so the rows stack.
-            let stacked = controller.sizeThatFits(in: CGSize(width: 200, height: 8000)).height
+        // This pins the iPad's layout. Mac Catalyst's editor comes out no shorter at 286 points than
+        // at 200, where the iPad's rows stack.
+        #if !targetEnvironment(macCatalyst)
+            @Test("At the default text size in an iPad's drawer, rows of every type stay in columns, shorter than the rows stacked")
+            func defaultSizeKeepsColumns() {
+                let width: CGFloat = 286
+                let fields = [
+                    UserInfoField(key: "orderID", kind: .number, text: "42"),
+                    UserInfoField(key: "title", kind: .string, text: "Ada's order"),
+                    UserInfoField(key: "gift", kind: .boolean, isOn: true)
+                ]
+                let controller = UIHostingController(rootView: UserInfoEditor(fields: .constant(fields))
+                    .environment(\.locale, Locale(identifier: "en_US"))
+                    .environment(\.dynamicTypeSize, .large))
+                controller.safeAreaRegions = []
+                // Too narrow for the grid, so the rows stack.
+                let stacked = controller.sizeThatFits(in: CGSize(width: 200, height: 8000)).height
 
-            let actual = controller.sizeThatFits(in: CGSize(width: width, height: 8000)).height
+                let actual = controller.sizeThatFits(in: CGSize(width: width, height: 8000)).height
 
-            #expect(actual < stacked)
-        }
+                #expect(actual < stacked)
+            }
+        #endif
     }
 #endif

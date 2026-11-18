@@ -22,6 +22,16 @@
     #include <time.h>
     #include <unistd.h>
 
+    #if defined(__LLVM_INSTR_PROFILE_GENERATE)
+        // Built for code coverage, clang makes this image reference the profile runtime through
+        // __llvm_profile_runtime unless the image defines that symbol itself, and Xcode links a
+        // package's dynamic library without the runtime. On the iOS simulator -dead_strip drops the
+        // reference; for Mac Catalyst and macOS nothing does, so the link fails. Defining it opts
+        // this image out of writing a profile, which suits it: the hooks run on every read and
+        // write in the process, the profile runtime's own included.
+        int __llvm_profile_runtime = 0;
+    #endif
+
     // NULL until DebugDrawerDiskIOInterposerStart: every hook then calls straight through.
     static _Atomic(DebugDrawerDiskIOInterposerHandler) handler = NULL;
 

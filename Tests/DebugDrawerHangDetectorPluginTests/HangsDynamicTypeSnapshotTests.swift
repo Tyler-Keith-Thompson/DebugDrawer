@@ -1,5 +1,5 @@
 // iOS scales text with Dynamic Type, so the large-text snapshots run on the iOS simulator.
-#if os(iOS)
+#if os(iOS) && !targetEnvironment(macCatalyst)
     @testable import DebugDrawerHangDetectorPlugin
     import SnapshotTesting
     import SwiftUI

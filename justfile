@@ -162,10 +162,20 @@ spm-catalyst:
 spm-catalyst-example:
     python3 {{PROJECT_ROOT}}/scripts/catalyst_example.py build
 
-[doc('Run the tests via SwiftPM: on the Mac (arguments go to swift test), then the visionOS ones in its simulator')]
+# Every test target, built for Mac Catalyst and run in a Mac window's process, so the
+# targetEnvironment(macCatalyst) branches run as well as build. Snapshot tests sit out
+# (APPLE_ONLY_PACKAGE_EXCLUDED_PLATFORMS in scripts/modules.py), and so do tests that make a UIKit
+# window: xctest runs them without an NSApplication.
+[doc('Run every test target through SwiftPM for Mac Catalyst')]
+spm-catalyst-test:
+    xcodebuild test -quiet -scheme DebugDrawer-Package -destination 'platform=macOS,variant=Mac Catalyst' \
+        -derivedDataPath {{PROJECT_ROOT}}/.build/xcode-catalyst-test
+
+[doc('Run the tests via SwiftPM: on the Mac (arguments go to swift test), then the visionOS ones in its simulator and every one for Mac Catalyst')]
 spm-test *args="":
     {{SWIFT}} test {{args}}
     just spm-visionos-test
+    just spm-catalyst-test
 
 [doc('Verify both build systems agree — run before pushing')]
 verify: test spm-test

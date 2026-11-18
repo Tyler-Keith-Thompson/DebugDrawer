@@ -74,6 +74,7 @@ Every shell command gets a timeout. macOS has no `timeout`; use
 | `just test-release` | `--config=release`: builds and runs only the `XPerformanceTests` targets |
 | `just release-check` | Example apps built optimized, and every public symbol present in release (`scripts/release_api.py`); a `just deploy` gate |
 | `just spm-visionos-test` | Core's tests (`TESTED_PLATFORMS`) through SwiftPM in the visionOS simulator, through a scheme holding only that test target; `just spm-test` runs it. Bazel runs them as `//Tests/DebugDrawerTests:DebugDrawerTests_visionOS` in a new simulator (`tools/visionos_test_runner.bzl`) |
+| `just spm-catalyst-test` | Every test target through SwiftPM for Mac Catalyst (`xcodebuild test -scheme DebugDrawer-Package`), so `targetEnvironment(macCatalyst)` branches run; `just spm-test` runs it. Snapshot tests sit under `#if os(iOS) && !targetEnvironment(macCatalyst)`, as SnapshotTesting doesn't compile there, and so does a test that makes a UIKit window: xctest has no NSApplication |
 | `just spm-catalyst-example` | Build the iOS example as a Mac Catalyst app without launching it: every `Example/iOS` file, the example libraries and products their imports name; `just spm` runs it |
 | `just spm-test`, `just verify` | SwiftPM tests; both build systems |
 | `just modules` | Regenerate build files from `scripts/modules.py` |

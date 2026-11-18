@@ -64,59 +64,63 @@
     @MainActor
     @Suite("Drawer hit testing")
     struct DrawerHitTestingTests {
-        @Test("While the drawer is open, its window takes a touch on the panel and lets one beside it fall through to the app's windows")
-        func touchBesidePanelFallsThrough() {
-            let presentation = DrawerPresentation()
-            presentation.isOpen = true
-            presentation.panelFrame = CGRect(x: 700, y: 20, width: 316, height: 728)
-            let sut = DrawerSceneWindow(scene: nil, drawer: .shared, presentation: presentation)
-            sut.frame = CGRect(x: 0, y: 0, width: 1024, height: 768)
-            sut.isHidden = false
-            defer { sut.isHidden = true }
-            sut.layoutIfNeeded()
-            let besidePanel = CGPoint(x: 100, y: 384)
-            let onPanel = CGPoint(x: 800, y: 384)
+        // UIKit can't make a window in xctest, which runs package tests on Mac Catalyst without an
+        // NSApplication.
+        #if !targetEnvironment(macCatalyst)
+            @Test("While the drawer is open, its window takes a touch on the panel and lets one beside it fall through to the app's windows")
+            func touchBesidePanelFallsThrough() {
+                let presentation = DrawerPresentation()
+                presentation.isOpen = true
+                presentation.panelFrame = CGRect(x: 700, y: 20, width: 316, height: 728)
+                let sut = DrawerSceneWindow(scene: nil, drawer: .shared, presentation: presentation)
+                sut.frame = CGRect(x: 0, y: 0, width: 1024, height: 768)
+                sut.isHidden = false
+                defer { sut.isHidden = true }
+                sut.layoutIfNeeded()
+                let besidePanel = CGPoint(x: 100, y: 384)
+                let onPanel = CGPoint(x: 800, y: 384)
 
-            let beside = sut.hitTest(besidePanel, with: nil)
-            let on = sut.hitTest(onPanel, with: nil)
+                let beside = sut.hitTest(besidePanel, with: nil)
+                let on = sut.hitTest(onPanel, with: nil)
 
-            #expect(beside == nil)
-            #expect(on != nil)
-        }
+                #expect(beside == nil)
+                #expect(on != nil)
+            }
 
-        @Test("While the drawer is closed, its window takes no touch, even where the panel was")
-        func touchWhileClosedFallsThrough() {
-            let presentation = DrawerPresentation()
-            presentation.panelFrame = CGRect(x: 700, y: 20, width: 316, height: 728)
-            let sut = DrawerSceneWindow(scene: nil, drawer: .shared, presentation: presentation)
-            sut.frame = CGRect(x: 0, y: 0, width: 1024, height: 768)
-            let wherePanelWas = CGPoint(x: 800, y: 384)
+            @Test("While the drawer is closed, its window takes no touch, even where the panel was")
+            func touchWhileClosedFallsThrough() {
+                let presentation = DrawerPresentation()
+                presentation.panelFrame = CGRect(x: 700, y: 20, width: 316, height: 728)
+                let sut = DrawerSceneWindow(scene: nil, drawer: .shared, presentation: presentation)
+                sut.frame = CGRect(x: 0, y: 0, width: 1024, height: 768)
+                let wherePanelWas = CGPoint(x: 800, y: 384)
 
-            let actual = sut.hitTest(wherePanelWas, with: nil)
+                let actual = sut.hitTest(wherePanelWas, with: nil)
 
-            #expect(actual == nil)
-        }
+                #expect(actual == nil)
+            }
 
-        @Test("While a compact drawer is open, its window takes a touch outside the panel, where its backdrop closes the drawer")
-        func touchOutsideCompactPanelIsTaken() {
-            let presentation = DrawerPresentation()
-            presentation.isOpen = true
-            presentation.layout = .compact
-            presentation.panelFrame = CGRect(x: 8, y: 70, width: 386, height: 760)
-            let sut = DrawerSceneWindow(scene: nil, drawer: .shared, presentation: presentation)
-            sut.frame = CGRect(x: 0, y: 0, width: 402, height: 874)
-            sut.isHidden = false
-            defer { sut.isHidden = true }
-            sut.layoutIfNeeded()
-            let statusBar = CGPoint(x: 201, y: 20)
-            let onPanel = CGPoint(x: 201, y: 437)
+            @Test("While a compact drawer is open, its window takes a touch outside the panel, where its backdrop closes the drawer")
+            func touchOutsideCompactPanelIsTaken() {
+                let presentation = DrawerPresentation()
+                presentation.isOpen = true
+                presentation.layout = .compact
+                presentation.panelFrame = CGRect(x: 8, y: 70, width: 386, height: 760)
+                let sut = DrawerSceneWindow(scene: nil, drawer: .shared, presentation: presentation)
+                sut.frame = CGRect(x: 0, y: 0, width: 402, height: 874)
+                sut.isHidden = false
+                defer { sut.isHidden = true }
+                sut.layoutIfNeeded()
+                let statusBar = CGPoint(x: 201, y: 20)
+                let onPanel = CGPoint(x: 201, y: 437)
 
-            let outside = sut.hitTest(statusBar, with: nil)
-            let on = sut.hitTest(onPanel, with: nil)
+                let outside = sut.hitTest(statusBar, with: nil)
+                let on = sut.hitTest(onPanel, with: nil)
 
-            #expect(outside != nil)
-            #expect(on != nil)
-        }
+                #expect(outside != nil)
+                #expect(on != nil)
+            }
+        #endif
 
         @Test("The touch rule: only an open drawer takes a touch; a regular one only on its panel, a compact one anywhere",
               arguments: [

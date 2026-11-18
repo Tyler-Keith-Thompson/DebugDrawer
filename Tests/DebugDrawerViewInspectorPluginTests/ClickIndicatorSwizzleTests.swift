@@ -73,36 +73,40 @@
             #expect(method_getImplementation(ddSendEvent) == original)
         }
 
-        @Test("With click indicators off, the swapped-in sendEvent(_:) forwards the event once and draws nothing")
-        func indicatorsOffForwardAndDrawNothing() {
-            DebugDrawer.shared.installViewInspector()
-            ViewBorderController.shared.isClickIndicatorEnabled = false
-            let sut = ForwardingProbeWindow()
-            let event = BeganTouchEvent()
+        // UIKit can't make a window in xctest, which runs package tests on Mac Catalyst without an
+        // NSApplication.
+        #if !targetEnvironment(macCatalyst)
+            @Test("With click indicators off, the swapped-in sendEvent(_:) forwards the event once and draws nothing")
+            func indicatorsOffForwardAndDrawNothing() {
+                DebugDrawer.shared.installViewInspector()
+                ViewBorderController.shared.isClickIndicatorEnabled = false
+                let sut = ForwardingProbeWindow()
+                let event = BeganTouchEvent()
 
-            sut.sendEvent(event)
+                sut.sendEvent(event)
 
-            #expect(sut.forwarded.count == 1)
-            #expect(sut.forwarded.first === event)
-            #expect(sut.subviews.isEmpty)
-        }
+                #expect(sut.forwarded.count == 1)
+                #expect(sut.forwarded.first === event)
+                #expect(sut.subviews.isEmpty)
+            }
 
-        // The ripple goes in the overlay window over the window's scene; the SwiftPM test runner
-        // connects no scene, so this pins what the app's window sees: the event, once, and no view.
-        @Test("With click indicators on, the swapped-in sendEvent(_:) forwards the event once and adds nothing to the app's window")
-        func indicatorsOnForwardAndAddNothing() {
-            DebugDrawer.shared.installViewInspector()
-            let controller = ViewBorderController.shared
-            let sut = ForwardingProbeWindow()
-            let event = BeganTouchEvent()
+            // The ripple goes in the overlay window over the window's scene; the SwiftPM test runner
+            // connects no scene, so this pins what the app's window sees: the event, once, and no view.
+            @Test("With click indicators on, the swapped-in sendEvent(_:) forwards the event once and adds nothing to the app's window")
+            func indicatorsOnForwardAndAddNothing() {
+                DebugDrawer.shared.installViewInspector()
+                let controller = ViewBorderController.shared
+                let sut = ForwardingProbeWindow()
+                let event = BeganTouchEvent()
 
-            controller.isClickIndicatorEnabled = true
-            sut.sendEvent(event)
-            controller.isClickIndicatorEnabled = false
+                controller.isClickIndicatorEnabled = true
+                sut.sendEvent(event)
+                controller.isClickIndicatorEnabled = false
 
-            #expect(sut.forwarded.count == 1)
-            #expect(sut.forwarded.first === event)
-            #expect(sut.subviews.isEmpty)
-        }
+                #expect(sut.forwarded.count == 1)
+                #expect(sut.forwarded.first === event)
+                #expect(sut.subviews.isEmpty)
+            }
+        #endif
     }
 #endif

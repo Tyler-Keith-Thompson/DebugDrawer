@@ -67,25 +67,29 @@
                 }
             }
 
-            @Test("Changing and resetting overrides keeps the host's @State and @StateObject: its tree is never rebuilt")
-            func togglingOverridesKeepsHostState() async throws {
-                await change({
-                    ViewHosting.host(view: StatefulHost(reports: reports).debugAccessibilityOverrides())
-                }, until: "size=")
-                defer { ViewHosting.expel() }
-                let first = try #require(tokens.first)
+            // ViewHosting hosts the view in a window, which UIKit can't make in xctest, which runs
+            // package tests on Mac Catalyst without an NSApplication.
+            #if !targetEnvironment(macCatalyst)
+                @Test("Changing and resetting overrides keeps the host's @State and @StateObject: its tree is never rebuilt")
+                func togglingOverridesKeepsHostState() async throws {
+                    await change({
+                        ViewHosting.host(view: StatefulHost(reports: reports).debugAccessibilityOverrides())
+                    }, until: "size=")
+                    defer { ViewHosting.expel() }
+                    let first = try #require(tokens.first)
 
-                await change({ overrides.dynamicTypeSize = .accessibility2 }, until: "size=accessibility2")
-                await change({ overrides.dynamicTypeSize = nil }, until: "size=large")
-                await change({ overrides.layoutDirection = .rightToLeft }, until: "dir=rightToLeft")
-                await change({ overrides.locale = Locale(identifier: "fr") }, until: "locale=fr")
-                await change({ overrides.reduceMotion = true }, until: "motion=true")
-                await change({ overrides.boldText = true }, until: "bold=true")
-                await change({ overrides.reset() }, until: "size=large dir=leftToRight")
+                    await change({ overrides.dynamicTypeSize = .accessibility2 }, until: "size=accessibility2")
+                    await change({ overrides.dynamicTypeSize = nil }, until: "size=large")
+                    await change({ overrides.layoutDirection = .rightToLeft }, until: "dir=rightToLeft")
+                    await change({ overrides.locale = Locale(identifier: "fr") }, until: "locale=fr")
+                    await change({ overrides.reduceMotion = true }, until: "motion=true")
+                    await change({ overrides.boldText = true }, until: "bold=true")
+                    await change({ overrides.reset() }, until: "size=large dir=leftToRight")
 
-                #expect(Lifetime.created == 1, "the host's @StateObject was recreated: its tree was rebuilt")
-                #expect(Set(tokens) == [first], "the host's @State was reset: its tree was rebuilt")
-            }
+                    #expect(Lifetime.created == 1, "the host's @StateObject was recreated: its tree was rebuilt")
+                    #expect(Set(tokens) == [first], "the host's @State was reset: its tree was rebuilt")
+                }
+            #endif
 
             /// Sets every override, then returns each one to System from its own control,
             /// checking that the others stay set.

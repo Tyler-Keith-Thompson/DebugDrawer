@@ -30,29 +30,33 @@
             #expect(actual == [ObjectIdentifier(UIApplication.shared)])
         }
 
-        @Test("After a tap, the section keeps when the warning was posted and says so")
-        func postedAt() async throws {
-            let expected = Date(timeIntervalSince1970: 1_800_000_189)
-            let sut = MemoryWarningSection { expected }
-            var before: Date?
-            var actual: Date?
-            var texts: [String] = []
+        // ViewHosting hosts the view in a window, which UIKit can't make in xctest, which runs
+        // package tests on Mac Catalyst without an NSApplication.
+        #if !targetEnvironment(macCatalyst)
+            @Test("After a tap, the section keeps when the warning was posted and says so")
+            func postedAt() async throws {
+                let expected = Date(timeIntervalSince1970: 1_800_000_189)
+                let sut = MemoryWarningSection { expected }
+                var before: Date?
+                var actual: Date?
+                var texts: [String] = []
 
-            try await ViewHosting.host(sut) {
-                try await sut.inspection.inspect { view in
-                    before = try view.actualView().postedAt
-                    try view.find(button: "Simulate Memory Warning").tap()
+                try await ViewHosting.host(sut) {
+                    try await sut.inspection.inspect { view in
+                        before = try view.actualView().postedAt
+                        try view.find(button: "Simulate Memory Warning").tap()
+                    }
+                    try await sut.inspection.inspect { view in
+                        actual = try view.actualView().postedAt
+                        texts = try view.findAll(ViewType.Text.self).map { try $0.string() }
+                    }
                 }
-                try await sut.inspection.inspect { view in
-                    actual = try view.actualView().postedAt
-                    texts = try view.findAll(ViewType.Text.self).map { try $0.string() }
-                }
+
+                #expect(before == nil)
+                #expect(actual == expected)
+                #expect(texts.contains { $0.hasPrefix("Posted at ") })
             }
-
-            #expect(before == nil)
-            #expect(actual == expected)
-            #expect(texts.contains { $0.hasPrefix("Posted at ") })
-        }
+        #endif
 
         @Test("The help text says only observers receive the warning, and claims nothing of view controllers or caches")
         func helpText() throws {

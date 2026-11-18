@@ -1,5 +1,5 @@
 // Only iOS draws the backdrop, so its snapshots run on the iOS simulator.
-#if os(iOS)
+#if os(iOS) && !targetEnvironment(macCatalyst)
     @testable import DebugDrawer
     import SnapshotTesting
     import SwiftUI
