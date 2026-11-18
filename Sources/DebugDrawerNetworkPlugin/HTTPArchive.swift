@@ -171,7 +171,7 @@
             let responseCookies = HTTPArchive.responseCookies(in: entry.responseHeaders ?? [:], url: entry.url)
             let requestHeaders = redaction.redacting(headers: entry.requestHeaders, cookies: requestCookies)
             let responseHeaders = redaction.redacting(headers: entry.responseHeaders ?? [:], cookies: responseCookies)
-            let requestBody = entry.requestBody.map { redaction.redacting(json: $0) }
+            let requestBody = entry.redactedRequestBody(redaction)
             let responseBody = entry.redactedResponseBody(redaction)
             let time = (entry.duration ?? 0) * 1000
 
@@ -194,7 +194,7 @@
                         encoding: text == nil ? "base64" : nil
                     )
                 },
-                bodySize: entry.requestBody?.count ?? 0
+                bodySize: entry.requestBodySize ?? 0
             )
             // HAR carries a body that isn't text in base64, and says so.
             let responseText = responseBody.flatMap { String(bytes: $0, encoding: .utf8) }

@@ -8,6 +8,15 @@ the entry becomes the GitHub release's notes.
 
 ## [Unreleased]
 
+### Added
+
+- DD-199: `NetworkEntry.requestBodySize`, `isRequestBodyTruncated` and `requestSizeLabel`: Network keeps each request body to `installNetwork(bodyLimit:)`, as it does each response body, marked truncated with its full size.
+
+### Fixed
+
+- DD-199: with Network installed, a request whose body is a stream reaches the server with every byte of it, rather than an empty body; a body past the body limit is sent from a temporary file, with its `Content-Length`.
+- DD-200: on iOS, View Inspector swaps `UIWindow.sendEvent(_:)` once, in `installViewInspector()`, rather than when click indicators are first turned on.
+
 ## [0.1.2] - 2026-11-17
 
 ### Added

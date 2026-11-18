@@ -19,6 +19,7 @@
                 path: components.map { $0.path.isEmpty ? "/" : $0.path } ?? entry.request.url,
                 requestHeaders: entry.request.headers.headerFields,
                 requestBody: entry.request.postData.flatMap { $0.text.isEmpty ? nil : Data(harText: $0.text, encoding: $0.encoding) },
+                requestBodySize: entry.request.bodySize > 0 ? entry.request.bodySize : nil,
                 statusCode: entry.response.status > 0 ? entry.response.status : nil,
                 responseHeaders: entry.response.status > 0 ? entry.response.headers.headerFields : nil,
                 responseBody: entry.response.content.text.flatMap { Data(harText: $0, encoding: entry.response.content.encoding) },

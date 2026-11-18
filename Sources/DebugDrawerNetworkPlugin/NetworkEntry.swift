@@ -9,7 +9,20 @@ public struct NetworkEntry: Identifiable, Sendable {
     public let host: String
     public let path: String
     public let requestHeaders: [String: String]
+    /// The request's body as the log keeps it: all of it, or its first bytes when it was larger
+    /// than `installNetwork(bodyLimit:)` allows (`isRequestBodyTruncated`). The server gets the
+    /// whole body either way.
     public let requestBody: Data?
+    /// How many bytes the request's body had, all told: more than `requestBody` holds when the
+    /// log kept only its first bytes. `nil` when there is no body.
+    public let requestBodySize: Int?
+
+    /// Whether the log kept only the first bytes of the request's body, which had
+    /// `requestBodySize` bytes in all.
+    public var isRequestBodyTruncated: Bool {
+        requestBody.map { (requestBodySize ?? 0) > $0.count } ?? false
+    }
+
     public var statusCode: Int?
     public var responseHeaders: [String: String]?
     /// The response's body as the log keeps it: all of it, or its first bytes when it was larger
@@ -60,6 +73,7 @@ public struct NetworkEntry: Identifiable, Sendable {
         path: String,
         requestHeaders: [String: String],
         requestBody: Data?,
+        requestBodySize: Int? = nil,
         statusCode: Int? = nil,
         responseHeaders: [String: String]? = nil,
         responseBody: Data? = nil,
@@ -79,6 +93,7 @@ public struct NetworkEntry: Identifiable, Sendable {
         self.path = path
         self.requestHeaders = requestHeaders
         self.requestBody = requestBody
+        self.requestBodySize = requestBody.map { max(requestBodySize ?? $0.count, $0.count) }
         self.statusCode = statusCode
         self.responseHeaders = responseHeaders
         response = responseBody.map { NetworkResponseBody($0, size: responseBodySize) }
@@ -109,6 +124,12 @@ public struct NetworkEntry: Identifiable, Sendable {
     /// ("2 KB"), or "—" when there is none.
     public var responseSizeLabel: String {
         responseBodySize.map(Self.sizeLabel) ?? "—"
+    }
+
+    /// The size of the request's body, all of it even when the log kept only its first bytes
+    /// ("2 KB"), or "—" when there is none.
+    public var requestSizeLabel: String {
+        requestBodySize.map(Self.sizeLabel) ?? "—"
     }
 
     /// `bytes` as the log shows a size: "512 B", "2 KB", "1.5 MB".

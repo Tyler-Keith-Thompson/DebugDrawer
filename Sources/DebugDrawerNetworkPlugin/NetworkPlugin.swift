@@ -57,10 +57,11 @@ public extension DebugDrawer {
     ///   - sessions: How many earlier launches' requests are kept on disk, in how many bytes,
     ///     and where; each request is written, redacted, as it completes, and the log shows
     ///     the earlier sessions under Previous. ``NetworkSessionPersistence/off`` writes none.
-    ///   - bodyLimit: The most bytes of each response body the log keeps, 1 MiB unless given.
-    ///     A larger body is kept to its first `bodyLimit` bytes and marked truncated, with its
-    ///     full size, so a large download or a stream costs the log no more; the app still gets
-    ///     every byte. Applies to the requests that start after the call. Traps when negative.
+    ///   - bodyLimit: The most bytes of each request and response body the log keeps, 1 MiB
+    ///     unless given. A larger body is kept to its first `bodyLimit` bytes and marked
+    ///     truncated, with its full size, so a large upload, download or stream costs the log no
+    ///     more; the server and the app still get every byte. Applies to the requests that start
+    ///     after the call. Traps when negative.
     func installNetwork(
         mocks: [NetworkMockRule] = [],
         conditions: [NetworkConditionProfile] = [],

@@ -67,6 +67,12 @@
                 }
                 NetworkReplayLinkRows(entry: entry, links: links, onShow: onShow)
 
+                if entry.isRequestBodyTruncated, let kept = entry.requestBody {
+                    DebugDrawerIssueRow("Request body truncated", severity: .warning) {
+                        Text("The log keeps the first \(NetworkEntry.sizeLabel(kept.count)) of \(entry.requestSizeLabel).")
+                    }
+                }
+
                 if entry.isResponseBodyTruncated, let kept = entry.responseBody {
                     DebugDrawerIssueRow("Response body truncated", severity: .warning) {
                         Text("The log keeps the first \(NetworkEntry.sizeLabel(kept.count)) of \(entry.responseSizeLabel).")
@@ -150,7 +156,8 @@
 
             if let body = entry.requestBody, let pretty = body.prettyBody {
                 collapsibleSection("Request Body") {
-                    codeBlock(pretty, redacted: redaction.redacting(json: body).prettyBody ?? pretty)
+                    // A truncated body the rules can't be read against is masked whole until revealed.
+                    codeBlock(pretty, redacted: entry.redactedRequestBody(redaction).map { $0.prettyBody ?? pretty } ?? DebugDrawerRedaction.mask)
                 }
             }
 

@@ -20,6 +20,9 @@
         private var delivery: NetworkConditionedDelivery?
         /// The log's record of a conditioned request, completed when its delivery ends.
         private var conditionedEntry: NetworkEntry?
+        /// The temporary file of a request body past the body limit, which the forwarded request
+        /// streams from; held for as long as the request is, and removed with it.
+        private var requestBodyFile: NetworkBodyFile?
 
         override static func canInit(with request: URLRequest) -> Bool {
             guard URLProtocol.property(forKey: handledKey, in: request) == nil else { return false }
@@ -47,20 +50,18 @@
             URLProtocol.setProperty(true, forKey: Self.handledKey, in: mutable)
 
             let url = request.url?.absoluteString ?? ""
-            // httpBody is often nil — URLSession moves it to httpBodyStream internally
-            var body = request.httpBody
-            if body == nil, let stream = request.httpBodyStream {
-                stream.open()
-                var data = Data()
-                let bufferSize = 4096
-                let buffer = UnsafeMutablePointer<UInt8>.allocate(capacity: bufferSize)
-                defer { buffer.deallocate(); stream.close() }
-                while stream.hasBytesAvailable {
-                    let read = stream.read(buffer, maxLength: bufferSize)
-                    guard read > 0 else { break }
-                    data.append(buffer, count: read)
-                }
-                if !data.isEmpty { body = data }
+            // httpBody is often nil: URLSession moves it to httpBodyStream itself. Reading a
+            // stream uses it up, so the forwarded request carries the bytes read instead.
+            let body: NetworkRequestBody?
+            do {
+                body = try NetworkRequestBody.read(from: request, limit: capture.limit)
+            } catch {
+                client?.urlProtocol(self, didFailWithError: error)
+                return
+            }
+            body?.forward(in: mutable)
+            if case let .file(file) = body?.source {
+                requestBodyFile = file
             }
             let entry = NetworkEntry(
                 timestamp: Date(),
@@ -69,7 +70,8 @@
                 host: request.url?.host ?? "",
                 path: request.url?.path ?? "/",
                 requestHeaders: request.allHTTPHeaderFields ?? [:],
-                requestBody: body,
+                requestBody: body?.recorded,
+                requestBodySize: body?.size,
                 isComplete: false,
                 replayOf: request.replayOf
             )
@@ -215,6 +217,12 @@
             } else {
                 deliveryBody.append(data)
             }
+        }
+
+        /// A new stream of the request's body, for the session to send it over again (a redirect,
+        /// an authentication challenge); `nil` when the body isn't a stream.
+        func forwardingNeedsNewBodyStream() -> InputStream? {
+            requestBodyFile?.stream
         }
 
         func forwardingDidCollect(_ metrics: URLSessionTaskMetrics) {

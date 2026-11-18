@@ -55,6 +55,10 @@
             owner(of: dataTask)?.forwardingDidLoad(data)
         }
 
+        func urlSession(_: URLSession, task: URLSessionTask, needNewBodyStream completionHandler: @escaping @Sendable (InputStream?) -> Void) {
+            completionHandler(owner(of: task)?.forwardingNeedsNewBodyStream())
+        }
+
         func urlSession(_: URLSession, task: URLSessionTask, didFinishCollecting metrics: URLSessionTaskMetrics) {
             owner(of: task)?.forwardingDidCollect(metrics)
         }

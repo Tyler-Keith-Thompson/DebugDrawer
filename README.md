@@ -561,10 +561,11 @@ recorded on the tasks themselves (Network WebSockets, below).
 The plugin sends each request it captures on a session of its own, with the default
 configuration, and hands the response to the app's task. The request goes out as the app made it,
 with no header added, but the app's own session's delegate, cache, cookie storage and timeouts
-don't apply to it, and redirects are followed for it. The log keeps the newest 200 requests (set
-`NetworkStore.shared.capacity` for another number) and the first megabyte of each response body,
-marked truncated with its full size beyond that; `installNetwork(bodyLimit:)` takes another limit.
-The app always gets the whole body.
+don't apply to it, and redirects are followed for it. A body the app streams is sent with its
+length (`Content-Length`) rather than in chunks. The log keeps the newest 200 requests (set
+`NetworkStore.shared.capacity` for another number) and the first megabyte of each request and
+response body, marked truncated with its full size beyond that; `installNetwork(bodyLimit:)` takes
+another limit. The server and the app always get the whole body.
 
 ### Network mocks: canned responses without changing the server
 
@@ -1708,7 +1709,7 @@ The lists the plugins keep in memory have these limits:
 | Plugin | Keeps | Set with |
 |---|---|---|
 | Console | The newest 2,000 lines | `ConsoleLogStore.shared.capacity` |
-| Network | The newest 200 requests, 1 MB of each response body, 50 WebSocket connections of 500 frames | `NetworkStore.shared.capacity`, `installNetwork(bodyLimit:)` |
+| Network | The newest 200 requests, 1 MB of each request and response body, 50 WebSocket connections of 500 frames | `NetworkStore.shared.capacity`, `installNetwork(bodyLimit:)` |
 | Disk I/O | The newest 500 calls | `DiskIOStore.shared.capacity` |
 | Analytics | The newest 1,000 events | `AnalyticsEvents.install(capacity:)` |
 | Screen Recording | The newest 5 recordings | `ScreenRecording.install(capacity:)` |

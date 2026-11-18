@@ -18,8 +18,8 @@
                 parts.append("-H '\(key): \(value.shellQuoted)'")
             }
 
-            if let requestBody,
-               let body = String(data: redaction.redacting(json: requestBody), encoding: .utf8),
+            if let requestBody = redactedRequestBody(redaction),
+               let body = String(data: requestBody, encoding: .utf8),
                !body.isEmpty {
                 parts.append("-d '\(body.shellQuoted)'")
             }

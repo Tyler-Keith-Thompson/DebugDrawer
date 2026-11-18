@@ -42,8 +42,13 @@
         /// character the limit split in two, if any, so a text body that was cut still reads as
         /// UTF-8 text.
         var body: NetworkResponseBody {
-            guard size > data.count else { return NetworkResponseBody(data) }
-            return NetworkResponseBody(data.droppingSplitUTF8Character, size: size)
+            NetworkResponseBody(keptData, size: size)
+        }
+
+        /// The bytes the log keeps: all of them, or, for a body cut short, the bytes kept without
+        /// the last character the limit split in two, as `body` keeps them.
+        var keptData: Data {
+            size > data.count ? data.droppingSplitUTF8Character : data
         }
     }
 

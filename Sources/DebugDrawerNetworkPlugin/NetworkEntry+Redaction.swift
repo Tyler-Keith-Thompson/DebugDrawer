@@ -17,5 +17,19 @@
             }
             return redaction.redacting(json: body)
         }
+
+        /// The request body with the values `redaction` calls sensitive masked, as it leaves the
+        /// log (a HAR file, a cURL command, the session on disk) or shows before it is revealed;
+        /// `nil` when there is none.
+        ///
+        /// A body the log kept only the first bytes of is `nil` too whenever `redaction` masks any
+        /// JSON key or path, as for `redactedResponseBody(_:)`.
+        func redactedRequestBody(_ redaction: DebugDrawerRedaction) -> Data? {
+            guard let body = requestBody else { return nil }
+            if isRequestBodyTruncated, !redaction.keyPatterns.isEmpty || !redaction.jsonPaths.isEmpty {
+                return nil
+            }
+            return redaction.redacting(json: body)
+        }
     }
 #endif
