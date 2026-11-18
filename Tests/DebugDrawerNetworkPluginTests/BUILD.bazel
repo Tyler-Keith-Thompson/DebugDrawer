@@ -55,7 +55,7 @@ macos_unit_test(
 )
 
 # The speed-reliant tests (PERFORMANCE_TESTS in scripts/modules.py): debug and `--config=release`
-# both run them.
+# both run them, each alone after every other action (`exclusive`).
 swift_library(
     name = "DebugDrawerNetworkPluginPerformanceTestsLibrary",
     testonly = True,
@@ -85,6 +85,7 @@ swift_library(
 swift_test(
     name = "DebugDrawerNetworkPluginPerformanceTests",
     size = "medium",
+    tags = ["exclusive"],
     deps = [":DebugDrawerNetworkPluginPerformanceTestsLibrary"],
 )
 

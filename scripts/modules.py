@@ -252,6 +252,12 @@ PERFORMANCE_TESTS = [
 # Performance tests run up to their one-minute limits each, so their targets get "medium" (300 s).
 PERFORMANCE_TEST_SIZE = "medium"
 
+# The tag on each performance target's swift_test: Bazel runs an `exclusive` test alone, after
+# every other action of the invocation, so a wall-clock budget is measured on an otherwise idle
+# build rather than beside compiles and other tests. It changes neither caching nor where the test
+# runs. Only the test gets it; its library compiles in parallel like any other.
+PERFORMANCE_TEST_TAG = "exclusive"
+
 # The tag .bazelrc's release config filters out of builds and tests (see PERFORMANCE_TESTS).
 RELEASE_EXCLUDED_TAG = "debug-only"
 
@@ -760,9 +766,13 @@ def test_support_build_bazel():
     )
 
 
-def test_targets_bazel(name, deps, size, srcs, tags):
-    """One test module: its library, the swift_test that `bazel test` runs, and the Xcode bundle."""
+def test_targets_bazel(name, deps, size, srcs, tags, test_tags=()):
+    """One test module: its library, the swift_test that `bazel test` runs, and the Xcode bundle.
+
+    `tags` go on the library and every runner; `test_tags` go on the swift_test alone."""
     tags_attr = f"    tags = {tags},\n".replace("'", '"') if tags else ""
+    test_tags_attr = (f"    tags = {list(tags) + list(test_tags)},\n".replace("'", '"')
+                      if tags or test_tags else "")
     # SnapshotTesting finds a reference beside the test file through #filePath, which Bazel makes
     # relative to the workspace, and a test runs from its runfiles: so the references go in them.
     data_attr = ('    data = glob(["__Snapshots__/**"], allow_empty = True),\n'
@@ -792,7 +802,7 @@ def test_targets_bazel(name, deps, size, srcs, tags):
         "swift_test(\n"
         f'    name = "{name}",\n'
         f'    size = "{size}",\n'
-        f"{tags_attr}"
+        f"{test_tags_attr}"
         f"{compatible_attr}"
         f'    deps = [":{name}Library"],\n'
         ")\n\n"
@@ -906,8 +916,9 @@ def test_build_bazel(name, deps):
         + f"# {performance_target(name)} below. " + excluded_note
         + test_targets_bazel(name, deps, size, 'glob(["**/*.swift"], exclude = ["Performance/**"])', [RELEASE_EXCLUDED_TAG])
         + "\n# The speed-reliant tests (PERFORMANCE_TESTS in scripts/modules.py): debug and `--config=release`\n"
-        + "# both run them.\n"
-        + test_targets_bazel(performance_target(name), deps, PERFORMANCE_TEST_SIZE, 'glob(["Performance/**/*.swift"])', [])
+        + f"# both run them, each alone after every other action (`{PERFORMANCE_TEST_TAG}`).\n"
+        + test_targets_bazel(performance_target(name), deps, PERFORMANCE_TEST_SIZE, 'glob(["Performance/**/*.swift"])', [],
+                             [PERFORMANCE_TEST_TAG])
     )
 
 
