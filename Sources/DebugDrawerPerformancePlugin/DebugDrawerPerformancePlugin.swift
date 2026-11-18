@@ -34,80 +34,75 @@ public struct PerformancePlugin: DebugDrawerPlugin {
 // MARK: - Convenience installer
 
 public extension DebugDrawer {
+    /// Registers the Performance plugin. It samples only while its view or its HUD readout is on
+    /// screen.
     func installPerformance() {
         #if DEBUG
-            PerformanceMonitor.shared.start()
             registerGlobal(PerformancePlugin())
         #endif
     }
 }
 
 #if DEBUG
-    #if os(macOS)
-        import AppKit
-    #elseif os(iOS)
-        import UIKit
-    #endif
-    import Combine
-    import QuartzCore
-
     // MARK: - Performance metrics
 
+    /// The frame rate, memory and threads, sampled while something shows them: the plugin's view
+    /// or its HUD readout. Each one that appears adds a viewer and removes it when it disappears;
+    /// sampling runs from the first viewer to the last, so nothing samples while both are closed.
     @MainActor
     final class PerformanceMonitor: ObservableObject {
         static let shared = PerformanceMonitor()
 
-        @Published var fps: Int = 0
-        @Published var footprintMB: Double = 0
-        @Published var footprintHistory: [Double] = []
-        @Published var fpsHistory: [Int] = []
-        @Published var isMonitoring = false
-        /// The display's highest refresh rate, read when monitoring starts.
-        @Published var maximumFPS = 60
+        /// Frames per second over the last second.
+        @Published private(set) var fps: Int = 0
+        /// The frames dropped while sampling, over the monitor's life.
+        @Published private(set) var droppedFrames = 0
+        @Published private(set) var footprintMB: Double = 0
+        /// The highest footprint since the process started, in megabytes.
+        @Published private(set) var peakFootprintMB: Double = 0
+        @Published private(set) var footprintHistory: [Double] = []
+        @Published private(set) var fpsHistory: [Int] = []
+        /// Whether the sampler is running: while at least one view shows the numbers.
+        @Published private(set) var isMonitoring = false
+        /// The display link's frame rate, which a smooth frame rate reaches.
+        @Published private(set) var maximumFPS = 60
         /// The process's threads, busiest first, sampled with the rest each second.
-        @Published var threads: [ThreadCPU] = []
+        @Published private(set) var threads: [ThreadCPU] = []
 
-        private var displayLink: CADisplayLink?
-        private var frameCount = 0
-        private var lastFPSTime: CFTimeInterval = 0
-        private var cancellable: AnyCancellable?
-        private let historySize = 60
+        private let sampler: any PerformanceSampler
         private let threadSampler: any ThreadSampler
+        private var viewers = 0
+        /// The frames' timestamps since the last tick.
+        private var frameTimestamps: [TimeInterval] = []
+        /// The last frame of the tick before, which starts this tick's first gap.
+        private var previousFrame: TimeInterval?
+        private var frameDuration: TimeInterval = 1.0 / 60
+        private let historySize = 60
 
-        private init() {
+        private convenience init() {
             // The monitor is made on the main actor, so this is the main thread's ID.
-            threadSampler = MachThreadSampler(mainThreadID: MachThreadSampler.currentThreadID())
+            self.init(
+                sampler: DisplayLinkSampler(),
+                threadSampler: MachThreadSampler(mainThreadID: MachThreadSampler.currentThreadID())
+            )
         }
 
-        func start() {
-            guard !isMonitoring else { return }
-            isMonitoring = true
-
-            // Memory, FPS history and threads sampled every second via Timer
-            cancellable = Timer.publish(every: 1, on: .main, in: .common)
-                .autoconnect()
-                .sink { [weak self] _ in self?.sample() }
-
-            // FPS: a display link on the main run loop, so frameCount is only touched on the main actor.
-            #if os(macOS)
-                guard let screen = NSScreen.main else { return }
-                let link = screen.displayLink(target: self, selector: #selector(displayLinkFired))
-            #else
-                let link = CADisplayLink(target: self, selector: #selector(displayLinkFired))
-            #endif
-            maximumFPS = Self.displayMaximumFPS ?? maximumFPS
-            link.add(to: .main, forMode: .common)
-            displayLink = link
-            lastFPSTime = CACurrentMediaTime()
+        init(sampler: any PerformanceSampler, threadSampler: any ThreadSampler) {
+            self.sampler = sampler
+            self.threadSampler = threadSampler
         }
 
-        func stop() {
-            guard isMonitoring else { return }
-            isMonitoring = false
-            cancellable?.cancel()
-            cancellable = nil
-            displayLink?.invalidate()
-            displayLink = nil
+        /// Counts a view that shows the numbers; the first one starts sampling.
+        func addViewer() {
+            viewers += 1
+            if viewers == 1 { start() }
+        }
+
+        /// Uncounts a view that showed the numbers; the last one stops sampling.
+        func removeViewer() {
+            guard viewers > 0 else { return }
+            viewers -= 1
+            if viewers == 0 { stop() }
         }
 
         /// The device's physical memory, in megabytes (MiB).
@@ -115,83 +110,96 @@ public extension DebugDrawer {
             Double(ProcessInfo.processInfo.physicalMemory) / (1024 * 1024)
         }
 
-        /// The highest refresh rate of the app's displays, or `nil` when none is on screen.
-        private static var displayMaximumFPS: Int? {
-            #if os(macOS)
-                NSScreen.main?.maximumFramesPerSecond
-            #else
-                UIApplication.shared.connectedScenes
-                    .compactMap { ($0 as? UIWindowScene)?.screen.maximumFramesPerSecond }
-                    .max()
-            #endif
+        private func start() {
+            isMonitoring = true
+            // The time nothing sampled is no gap between frames.
+            previousFrame = nil
+            frameTimestamps = []
+            sampler.start(
+                frame: { [weak self] timestamp, duration in self?.recordFrame(at: timestamp, duration: duration) },
+                tick: { [weak self] in self?.sample() }
+            )
+            sampleMemoryAndThreads()
         }
 
-        @objc private func displayLinkFired() {
-            frameCount += 1
+        private func stop() {
+            isMonitoring = false
+            sampler.stop()
+        }
+
+        private func recordFrame(at timestamp: TimeInterval, duration: TimeInterval) {
+            frameTimestamps.append(timestamp)
+            if duration > 0 { frameDuration = duration }
         }
 
         private func sample() {
-            // FPS
-            let now = CACurrentMediaTime()
-            let elapsed = now - lastFPSTime
-            if elapsed > 0 {
-                fps = Int(Double(frameCount) / elapsed)
-            }
-            frameCount = 0
-            lastFPSTime = now
-
+            let window = (previousFrame.map { [$0] } ?? []) + frameTimestamps
+            let statistics = FrameStatistics(timestamps: window, frameDuration: frameDuration)
+            previousFrame = window.last
+            frameTimestamps.removeAll(keepingCapacity: true)
+            fps = statistics.framesPerSecond
+            droppedFrames += statistics.droppedFrames
+            maximumFPS = Int((1 / frameDuration).rounded())
             fpsHistory.append(fps)
             if fpsHistory.count > historySize { fpsHistory.removeFirst() }
 
-            // Memory
-            footprintMB = MemoryFootprint.currentMB()
+            sampleMemoryAndThreads()
             footprintHistory.append(footprintMB)
             if footprintHistory.count > historySize { footprintHistory.removeFirst() }
+        }
 
+        private func sampleMemoryAndThreads() {
+            let footprint = MemoryFootprint.current()
+            footprintMB = footprint.megabytes
+            peakFootprintMB = footprint.peakMegabytes
             threads = threadSampler.sample()
         }
     }
 
     struct PerformancePluginView: View {
-        @ObservedObject private var monitor = PerformanceMonitor.shared
+        @ObservedObject var monitor = PerformanceMonitor.shared
 
         var body: some View {
             VStack(alignment: .leading, spacing: 0) {
-                DebugDrawerRow("Monitor", isOn: Binding(
-                    get: { monitor.isMonitoring },
-                    set: { $0 ? monitor.start() : monitor.stop() }
-                ))
-                if monitor.isMonitoring {
-                    PerformanceReadout(
-                        fps: monitor.fps,
-                        fpsHistory: monitor.fpsHistory,
-                        maximumFPS: monitor.maximumFPS,
-                        footprintMB: monitor.footprintMB,
-                        footprintHistory: monitor.footprintHistory,
-                        physicalMemoryMB: PerformanceMonitor.physicalMemoryMB
-                    )
-                    ThreadsSection(threads: monitor.threads)
-                }
+                PerformanceReadout(
+                    fps: monitor.fps,
+                    fpsHistory: monitor.fpsHistory,
+                    maximumFPS: monitor.maximumFPS,
+                    droppedFrames: monitor.droppedFrames,
+                    footprintMB: monitor.footprintMB,
+                    footprintHistory: monitor.footprintHistory,
+                    peakFootprintMB: monitor.peakFootprintMB,
+                    physicalMemoryMB: PerformanceMonitor.physicalMemoryMB
+                )
+                ThreadsSection(threads: monitor.threads)
                 // UIKit's platforms only: the Mac has no public way to simulate memory pressure.
                 #if os(iOS) || os(tvOS) || os(visionOS)
                     MemoryWarningSection { MemoryWarningSimulator().post() }
                 #endif
             }
+            // Sampling runs while the drawer shows this view: closing the drawer, collapsing the
+            // section or scrolling it away removes it, which stops it.
+            .onAppear { monitor.addViewer() }
+            .onDisappear { monitor.removeViewer() }
         }
     }
 
-    /// The frame rate against the display's refresh rate and the memory footprint against the
-    /// device's memory, as gauges, their recent history as sparklines, and the lowest and average
-    /// frame rate and the peak footprint.
+    /// The frame rate against the display link's rate and the memory footprint against the
+    /// device's memory, as gauges, their recent history as sparklines, the lowest and average
+    /// frame rate, the frames dropped, and the peak footprint.
     struct PerformanceReadout: View {
         let fps: Int
         /// Frames per second, one sample a second, oldest first.
         let fpsHistory: [Int]
-        /// The display's highest refresh rate, which a smooth frame rate reaches.
+        /// The display link's frame rate, which a smooth frame rate reaches.
         let maximumFPS: Int
+        /// The frames dropped while sampling.
+        let droppedFrames: Int
         let footprintMB: Double
         /// The memory footprint in megabytes, one sample a second, oldest first.
         let footprintHistory: [Double]
+        /// The highest footprint since the process started, in megabytes.
+        let peakFootprintMB: Double
         /// The device's physical memory in megabytes.
         let physicalMemoryMB: Double
 
@@ -209,6 +217,8 @@ public extension DebugDrawer {
                     DebugDrawerSparkline("Frame rate history", data: fpsHistory.map(Double.init), severity: frameSeverity)
                     DebugDrawerKeyValueRow("Lowest", value: "\(fpsHistory.min() ?? 0) fps")
                     DebugDrawerKeyValueRow("Average", value: "\(averageFPS) fps")
+                    // The section says what is dropped; "Dropped Frames" would wrap in the label column.
+                    DebugDrawerKeyValueRow("Dropped", value: "\(droppedFrames)")
                 }
                 DebugDrawerSection("Memory") {
                     DebugDrawerGaugeRow(
@@ -218,7 +228,7 @@ public extension DebugDrawer {
                         severity: memoryFraction >= 0.5 ? .warning : nil
                     )
                     DebugDrawerSparkline("Footprint history", data: footprintHistory)
-                    DebugDrawerKeyValueRow("Peak", value: "\((footprintHistory.max() ?? 0).formatted(.number.precision(.fractionLength(0)))) MB")
+                    DebugDrawerKeyValueRow("Peak", value: "\(peakFootprintMB.formatted(.number.precision(.fractionLength(0)))) MB")
                 }
             }
         }

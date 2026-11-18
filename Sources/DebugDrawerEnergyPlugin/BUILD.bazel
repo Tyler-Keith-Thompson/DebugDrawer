@@ -3,7 +3,7 @@
 load("//tools:docc.bzl", "docc_archive")
 load("//tools:swift_rules.bzl", "swift_library")
 
-# Battery, CPU load and thermal state.
+# Battery, CPU load and thermal state, sampled only while shown.
 swift_library(
     name = "DebugDrawerEnergyPlugin",
     srcs = glob(["**/*.swift"]),

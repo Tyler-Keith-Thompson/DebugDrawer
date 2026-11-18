@@ -27,9 +27,10 @@ public struct EnergyPlugin: DebugDrawerPlugin {
 // MARK: - Convenience installer
 
 public extension DebugDrawer {
+    /// Registers the Energy plugin. It samples only while its view is on screen, or between the
+    /// app's own ``EnergyMonitor/start()`` and ``EnergyMonitor/stop()``.
     func installEnergy() {
         #if DEBUG
-            EnergyMonitor.shared.start()
             registerGlobal(EnergyPlugin())
         #endif
     }
@@ -87,8 +88,11 @@ public extension EnergyMonitor {
         @Published public private(set) var batteryHistory: [BatterySnapshot] = []
         @Published public private(set) var cpuHistory: [Double] = []
 
-        private var cancellable: AnyCancellable?
+        private let timer: any SamplingTimer
         private let historySize = 120 // 2 minutes at 1s intervals
+        /// The Energy views on screen; sampling runs while there is one, or the app asked for it.
+        private var viewers = 0
+        private var isStartedByApp = false
 
         /// Turned on while monitoring (iOS reports no battery level otherwise), then put back.
         private let batteryMonitoring: BatteryMonitoringSwitch?
@@ -102,29 +106,56 @@ public extension EnergyMonitor {
             #endif
         }
 
-        init(batteryMonitoring: BatteryMonitoringSwitch?) {
+        init(batteryMonitoring: BatteryMonitoringSwitch?, timer: any SamplingTimer = RunLoopSamplingTimer()) {
             self.batteryMonitoring = batteryMonitoring
+            self.timer = timer
         }
 
+        /// Samples once a second until ``stop()``, whether or not the Energy view is on screen.
+        /// The drawer needs no call: its view samples while it is shown.
         public func start() {
-            guard !isMonitoring else { return }
+            isStartedByApp = true
+            updateSampling()
+        }
+
+        /// Ends what ``start()`` began. Sampling goes on while the Energy view is on screen.
+        public func stop() {
+            isStartedByApp = false
+            updateSampling()
+        }
+
+        /// Counts an Energy view on screen; the first one starts sampling.
+        func addViewer() {
+            viewers += 1
+            updateSampling()
+        }
+
+        /// Uncounts an Energy view; the last one stops sampling unless the app started it.
+        func removeViewer() {
+            guard viewers > 0 else { return }
+            viewers -= 1
+            updateSampling()
+        }
+
+        private func updateSampling() {
+            let isWanted = isStartedByApp || viewers > 0
+            if isWanted, !isMonitoring { beginSampling() }
+            if !isWanted, isMonitoring { endSampling() }
+        }
+
+        private func beginSampling() {
             isMonitoring = true
             if let batteryMonitoring {
                 hostBatteryMonitoring = batteryMonitoring.isEnabled
                 batteryMonitoring.isEnabled = true
             }
             sample()
-
-            cancellable = Timer.publish(every: 1, on: .main, in: .common)
-                .autoconnect()
-                .sink { [weak self] _ in self?.sample() }
+            timer.start { [weak self] in self?.sample() }
         }
 
-        public func stop() {
-            guard isMonitoring else { return }
+        private func endSampling() {
             isMonitoring = false
-            cancellable?.cancel()
-            cancellable = nil
+            timer.stop()
             if let batteryMonitoring, let hostBatteryMonitoring {
                 batteryMonitoring.isEnabled = hostBatteryMonitoring
                 self.hostBatteryMonitoring = nil
@@ -202,23 +233,28 @@ public extension EnergyMonitor {
             return totalUsage
         }
 
+        /// The thermal state in a word.
         public var thermalLabel: String {
-            switch thermalState {
-            case .nominal: "Nominal"
-            case .fair: "Fair"
-            case .serious: "Serious"
-            case .critical: "Critical"
-            @unknown default: "Unknown"
-            }
+            reading.thermalLabel
         }
 
         /// This process's CPU use, bucketed. It is not Xcode's Energy Impact: that also
         /// weighs GPU, network, location and wakeups, which aren't measured here.
         public var cpuLoad: String {
-            if cpuUsage < 5 { return "Low" }
-            if cpuUsage < 20 { return "Moderate" }
-            if cpuUsage < 50 { return "High" }
-            return "Very High"
+            reading.cpuLoad
+        }
+
+        /// The values sampled last, for the view.
+        var reading: EnergyReading {
+            EnergyReading(
+                cpuUsage: cpuUsage,
+                cpuHistory: cpuHistory,
+                batteryLevel: batteryLevel,
+                batteryHistory: batteryHistory.map(\.level),
+                isCharging: isCharging,
+                powerSource: powerSource,
+                thermalState: thermalState
+            )
         }
     }
 #else
@@ -274,78 +310,11 @@ public extension EnergyMonitor {
         var processorCount = ProcessInfo.processInfo.activeProcessorCount
 
         var body: some View {
-            VStack(alignment: .leading, spacing: 0) {
-                DebugDrawerRow("Monitor", isOn: Binding(
-                    get: { monitor.isMonitoring },
-                    set: { $0 ? monitor.start() : monitor.stop() }
-                ))
-                if monitor.isMonitoring {
-                    DebugDrawerSection("Processor") {
-                        // CPU load, not Energy Impact: no energy counters behind it.
-                        DebugDrawerKeyValueRow("CPU Load", value: monitor.cpuLoad)
-                        DebugDrawerGaugeRow(
-                            "CPU",
-                            value: "\(monitor.cpuUsage.formatted(.number.precision(.fractionLength(1))))%",
-                            fraction: monitor.cpuUsage / Double(100 * max(processorCount, 1)),
-                            severity: monitor.cpuLoadSeverity
-                        )
-                        DebugDrawerSparkline(
-                            "CPU history",
-                            data: monitor.cpuHistory,
-                            range: 0 ... max(100, monitor.cpuHistory.max() ?? 100),
-                            severity: monitor.cpuLoadSeverity
-                        )
-                    }
-                    // A desktop Mac has no battery.
-                    if monitor.batteryLevel >= 0 {
-                        DebugDrawerSection("Battery") {
-                            DebugDrawerGaugeRow(
-                                monitor.isCharging ? "Charging" : "Battery",
-                                value: "\(monitor.batteryLevel)%",
-                                fraction: Double(monitor.batteryLevel) / 100,
-                                severity: monitor.batterySeverity
-                            )
-                            DebugDrawerSparkline(
-                                "Battery history",
-                                data: monitor.batteryHistory.map { Double($0.level) },
-                                range: 0 ... 100,
-                                severity: monitor.batterySeverity
-                            )
-                        }
-                    }
-                    DebugDrawerSection("Device") {
-                        DebugDrawerIssueRow("Thermal State", status: monitor.thermalLabel, severity: monitor.thermalSeverity)
-                        DebugDrawerKeyValueRow("Power Source", value: monitor.powerSource)
-                    }
-                }
-            }
-        }
-    }
-
-    extension EnergyMonitor {
-        /// How heavy the CPU load is: `nil` (the accent) while low or moderate, a warning while
-        /// high, an error while very high.
-        var cpuLoadSeverity: DebugDrawerIssueGlyph.Severity? {
-            if cpuUsage < 20 { return nil }
-            return cpuUsage < 50 ? .warning : .error
-        }
-
-        /// How low the battery is: `nil` while charging or above 20%, a warning to 10%, an error
-        /// below.
-        var batterySeverity: DebugDrawerIssueGlyph.Severity? {
-            if isCharging || batteryLevel > 20 { return nil }
-            return batteryLevel > 10 ? .warning : .error
-        }
-
-        /// The issue glyph for the thermal state: ok while nominal, a warning while fair or
-        /// serious, an error while critical.
-        var thermalSeverity: DebugDrawerIssueGlyph.Severity {
-            switch thermalState {
-            case .nominal: .ok
-            case .fair, .serious: .warning
-            case .critical: .error
-            @unknown default: .neutral
-            }
+            EnergyReadout(reading: monitor.reading, processorCount: processorCount)
+                // Sampling runs while the drawer shows this view: closing the drawer, collapsing
+                // the section or scrolling it away removes it, which stops it.
+                .onAppear { monitor.addViewer() }
+                .onDisappear { monitor.removeViewer() }
         }
     }
 #endif

@@ -1,31 +1,32 @@
 #if DEBUG
     @testable import DebugDrawer
     @testable import DebugDrawerEnergyPlugin
-    import XCTest
+    import Testing
 
     @MainActor
-    final class EnergyPluginTests: XCTestCase {
-        func testMonitorStartStop() {
-            let monitor = EnergyMonitor.shared
-            monitor.stop()
-            XCTAssertFalse(monitor.isMonitoring)
-            monitor.start()
-            XCTAssertTrue(monitor.isMonitoring)
-            monitor.stop()
-            XCTAssertFalse(monitor.isMonitoring)
+    @Suite("Energy plugin")
+    struct EnergyPluginTests {
+        @Test("start() samples and stop() ends it")
+        func startStop() {
+            let sut = EnergyMonitor(batteryMonitoring: nil)
+
+            sut.start()
+            let monitoringAfterStart = sut.isMonitoring
+            sut.stop()
+
+            #expect(monitoringAfterStart)
+            #expect(!sut.isMonitoring)
         }
 
-        func testThermalLabels() {
-            let monitor = EnergyMonitor.shared
-            // Just ensure the computed properties don't crash
-            _ = monitor.thermalLabel
-            _ = monitor.cpuLoad
-        }
+        @Test("The plugin is titled Energy with the bolt icon")
+        func conformance() {
+            let expectedTitle = "Energy"
+            let expectedIcon = "bolt.fill"
 
-        func testPluginConformance() {
-            let plugin = EnergyPlugin()
-            XCTAssertEqual(plugin.title, "Energy")
-            XCTAssertEqual(plugin.icon, "bolt.fill")
+            let sut = EnergyPlugin()
+
+            #expect(sut.title == expectedTitle)
+            #expect(sut.icon == expectedIcon)
         }
     }
 #endif

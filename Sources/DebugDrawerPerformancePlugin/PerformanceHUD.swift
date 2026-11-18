@@ -1,29 +1,20 @@
 import DebugDrawer
 import SwiftUI
 
-/// Performance's HUD readout: the frame rate and memory now. It monitors while it is on screen
-/// if nothing else started monitoring.
+/// Performance's HUD readout: the frame rate and memory now. Performance samples while it is on
+/// screen.
 ///
 /// The type exists in every build; in release it draws nothing and monitors nothing.
 public struct PerformanceHUD: View {
     #if DEBUG
-        @ObservedObject private var monitor = PerformanceMonitor.shared
-        @State private var startedMonitoring = false
+        @ObservedObject var monitor = PerformanceMonitor.shared
     #endif
 
     public var body: some View {
         #if DEBUG
             PerformanceHUDReadout(fps: monitor.fps, maximumFPS: monitor.maximumFPS, footprintMB: monitor.footprintMB)
-                .onAppear {
-                    guard !monitor.isMonitoring else { return }
-                    monitor.start()
-                    startedMonitoring = true
-                }
-                .onDisappear {
-                    guard startedMonitoring else { return }
-                    monitor.stop()
-                    startedMonitoring = false
-                }
+                .onAppear { monitor.addViewer() }
+                .onDisappear { monitor.removeViewer() }
         #else
             EmptyView()
         #endif

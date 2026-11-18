@@ -1,32 +1,28 @@
 #if DEBUG
     @testable import DebugDrawer
     @testable import DebugDrawerPerformancePlugin
-    import XCTest
+    import Testing
 
     @MainActor
-    final class PerformancePluginTests: XCTestCase {
-        func testMonitorStartStop() {
-            let monitor = PerformanceMonitor.shared
-            XCTAssertFalse(monitor.isMonitoring)
-            monitor.start()
-            XCTAssertTrue(monitor.isMonitoring)
-            monitor.stop()
-            XCTAssertFalse(monitor.isMonitoring)
+    @Suite("Performance plugin")
+    struct PerformancePluginTests {
+        @Test("The plugin is titled Performance and has an identifier")
+        func conformance() {
+            let expectedTitle = "Performance"
+
+            let sut = PerformancePlugin()
+
+            #expect(sut.title == expectedTitle)
+            #expect(!sut.id.isEmpty)
         }
 
-        func testMonitorInitialValues() {
-            let monitor = PerformanceMonitor.shared
-            monitor.stop()
-            // FPS and memory should have been sampled if previously started
-            // Just verify no crash on access
-            _ = monitor.fps
-            _ = monitor.footprintMB
-        }
+        @Test("Installing the plugin samples nothing until its view or HUD shows")
+        func installStartsNothing() {
+            let sut = DebugDrawer.shared
 
-        func testPluginConformance() {
-            let plugin = PerformancePlugin()
-            XCTAssertEqual(plugin.title, "Performance")
-            XCTAssertFalse(plugin.id.isEmpty)
+            sut.installPerformance()
+
+            #expect(!PerformanceMonitor.shared.isMonitoring)
         }
     }
 #endif

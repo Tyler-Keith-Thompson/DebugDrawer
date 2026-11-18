@@ -3,7 +3,7 @@
 load("//tools:docc.bzl", "docc_archive")
 load("//tools:swift_rules.bzl", "swift_library")
 
-# Live FPS and memory with sparkline graphs, CPU per thread, and a simulated memory warning.
+# Live FPS, dropped frames and memory with sparkline graphs, CPU per thread, and a simulated memory warning, sampled only while shown.
 swift_library(
     name = "DebugDrawerPerformancePlugin",
     srcs = glob(["**/*.swift"]),
