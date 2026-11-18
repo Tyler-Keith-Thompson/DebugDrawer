@@ -97,13 +97,14 @@ bench-check *args="":
 resolve:
     cd {{PROJECT_ROOT}}/swift && {{SWIFT}} package resolve
 
-[doc('Build via SwiftPM too, to verify the published package (the Mac, then the visionOS, tvOS, watchOS and Mac Catalyst modules)')]
+[doc('Build via SwiftPM too, to verify the published package (the Mac, then the visionOS, tvOS, watchOS and Mac Catalyst modules, and the iOS example for Mac Catalyst)')]
 spm:
     {{SWIFT}} build
     just spm-visionos
     just spm-tvos
     just spm-watchos
     just spm-catalyst
+    just spm-catalyst-example
 
 # `swift build` builds for the host only, so xcodebuild builds the modules ported to another
 # platform (EXTRA_PLATFORMS in scripts/modules.py) for its simulator, from the same Package.swift.
@@ -134,6 +135,13 @@ spm-catalyst:
         xcodebuild build -quiet -scheme "$module" -destination 'generic/platform=macOS,variant=Mac Catalyst' \
             -derivedDataPath {{PROJECT_ROOT}}/.build/xcode-catalyst SWIFT_TREAT_WARNINGS_AS_ERRORS=YES
     done
+
+# The package holds every Example/iOS file and every example library and product their imports
+# name, derived from the sources (scripts/catalyst_example.py); a file left out
+# (CATALYST_EXAMPLE_EXCLUDE=Example/iOS/<file>) fails the build.
+[doc('Build the iOS example as a Mac Catalyst app through SwiftPM, without launching it')]
+spm-catalyst-example:
+    python3 {{PROJECT_ROOT}}/scripts/catalyst_example.py build
 
 [doc('Run the tests via SwiftPM')]
 spm-test *args="":
@@ -240,7 +248,8 @@ run target="macOS" *args="":
             ;;
         catalyst|Catalyst)
             # The iOS example as a Mac Catalyst app, built through SwiftPM (Bazel has no Catalyst).
-            bash {{PROJECT_ROOT}}/scripts/run-catalyst-example.sh {{args}}
+            python3 {{PROJECT_ROOT}}/scripts/catalyst_example.py build
+            python3 {{PROJECT_ROOT}}/scripts/catalyst_example.py launch {{args}}
             ;;
         visionOS|visionos)
             run_in_simulator ExampleApp_visionOS "{{VISIONOS_DEVICE}}" com.debugdrawer.example.visionos \

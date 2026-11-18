@@ -26,6 +26,7 @@ Example/                         The macOS, iOS, visionOS, tvOS and watchOS exam
 Benchmarks/                      The interception benchmarks: a SwiftPM package of its own (ordo-one/benchmark),
                                  generated from BENCHMARKS, with the committed main baseline (Benchmarks/README.md)
 scripts/modules.py               The module graph
+scripts/catalyst_example.py      The iOS example as a Mac Catalyst app: a SwiftPM package derived from Example's sources
 scripts/release.py               The release gates `just deploy` runs (changelog entry, API breaks)
 tools/                           Bazel rule wrappers (warnings as errors, Swift 6 mode), DocC rules;
                                  tools/bazel turns BuildBuddy on when the Keychain holds its key, and
@@ -72,6 +73,7 @@ Every shell command gets a timeout. macOS has no `timeout`; use
 | `just filter <pattern>` | Tests whose name matches |
 | `just test-release` | `--config=release`: builds and runs only the `XPerformanceTests` targets |
 | `just release-check` | Example apps built optimized, and every public symbol present in release (`scripts/release_api.py`); a `just deploy` gate |
+| `just spm-catalyst-example` | Build the iOS example as a Mac Catalyst app without launching it: every `Example/iOS` file, the example libraries and products their imports name; `just spm` runs it |
 | `just spm-test`, `just verify` | SwiftPM tests; both build systems |
 | `just modules` | Regenerate build files from `scripts/modules.py` |
 | `just resolve` | Re-resolve Bazel's SwiftPM dependencies after editing `PACKAGES` |

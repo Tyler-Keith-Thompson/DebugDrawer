@@ -17,3 +17,12 @@ python_test(
     src = "release_api_test.py",
     data = ["release_api.py"],
 )
+
+# How the Mac Catalyst example's package is derived from Example's sources
+# (scripts/catalyst_example.py, which `just spm-catalyst-example` and `just run catalyst` run).
+python_test(
+    name = "catalyst_example_test",
+    size = "small",
+    src = "catalyst_example_test.py",
+    data = ["catalyst_example.py"],
+)
