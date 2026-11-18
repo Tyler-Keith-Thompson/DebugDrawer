@@ -11,6 +11,7 @@ the entry becomes the GitHub release's notes.
 ### Added
 
 - DD-199: `NetworkEntry.requestBodySize`, `isRequestBodyTruncated` and `requestSizeLabel`: Network keeps each request body to `installNetwork(bodyLimit:)`, as it does each response body, marked truncated with its full size.
+- DD-84: HTTP Cookies lists the cookies web views keep in `WKWebsiteDataStore.default()` beside `HTTPCookieStorage.shared`'s, where WebKit exists, each row marked URLSession or WKWebView, and deletes each from its own store.
 
 ### Changed
 
@@ -22,6 +23,7 @@ the entry becomes the GitHub release's notes.
 - DD-204: Network's Resend no longer sends only the kept part of a request body the log cut short: Resend is unavailable and says why, and Edit and Resend shows the body as cut, with its full size, and won't send until the body is edited or removed.
 - DD-200: on iOS, View Inspector swaps `UIWindow.sendEvent(_:)` once, in `installViewInspector()`, rather than when click indicators are first turned on.
 - DD-201: in a Mac or Mac Catalyst app outside the App Sandbox, Screen Recording and Design Overlay save to `Caches/<bundle identifier>/DebugDrawer`, which App State Reset clears and no other app shares, rather than the shared `Caches/DebugDrawer`; files already in the shared folder are left there.
+- DD-84: HTTP Cookies keeps a row's expanded state with its cookie (by store, name, domain and path) rather than its position, so deleting a row no longer expands the next; Delete All asks in place first and deletes only the cookies the filter shows, and the count and Copy follow the filter.
 
 ## [0.1.2] - 2026-11-17
 

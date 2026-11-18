@@ -3,7 +3,7 @@
 load("//tools:docc.bzl", "docc_archive")
 load("//tools:swift_rules.bzl", "swift_library")
 
-# Browse and delete HTTPCookieStorage cookies.
+# Browse and delete HTTPCookieStorage's cookies, and WKWebView's where WebKit exists.
 swift_library(
     name = "DebugDrawerCookiesPlugin",
     srcs = glob(["**/*.swift"]),

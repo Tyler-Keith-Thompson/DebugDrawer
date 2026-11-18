@@ -15,10 +15,11 @@
                 .name: "theme", .value: "dark", .domain: "example.com", .path: "/"
             ]))
             let redaction = DebugDrawerRedaction(keys: ["session"])
-            let expected = [session, theme].report(redaction: redaction)
+            let cookies = [StoredCookie(cookie: session, store: .urlSession), StoredCookie(cookie: theme, store: .urlSession)]
+            let expected = cookies.report(redaction: redaction)
             var actual = DebugDrawerReport()
 
-            CookiesPlugin.contribute([session, theme], to: &actual, redaction: redaction)
+            CookiesPlugin.contribute(cookies, to: &actual, redaction: redaction)
 
             let file = try #require(actual.files.first)
             let text = try #require(String(bytes: file.data, encoding: .utf8))

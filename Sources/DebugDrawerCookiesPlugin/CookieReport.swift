@@ -10,17 +10,19 @@
         }
     }
 
-    extension [HTTPCookie] {
-        /// The text Copy puts on the clipboard: each cookie's name, value, domain, path, secure
-        /// flag and expiry, with sensitive values masked.
+    extension [StoredCookie] {
+        /// The text Copy puts on the clipboard: each cookie's name, value, domain, path, store,
+        /// secure flag and expiry, with sensitive values masked.
         func report(redaction: DebugDrawerRedaction) -> String {
             var report = "HTTP Cookies (\(count))\n"
             report += String(repeating: "=", count: 40) + "\n"
-            for cookie in self {
+            for stored in self {
+                let cookie = stored.cookie
                 report += "\nName: \(cookie.name)\n"
                 report += "Value: \(cookie.redactedValue(redaction))\n"
                 report += "Domain: \(cookie.domain)\n"
                 report += "Path: \(cookie.path)\n"
+                report += "Store: \(stored.store.title)\n"
                 report += "Secure: \(cookie.isSecure)\n"
                 if let expires = cookie.expiresDate {
                     report += "Expires: \(expires)\n"

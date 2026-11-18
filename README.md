@@ -354,10 +354,12 @@ These need only their install call:
   App, Third-Party (frameworks embedded in the app) and System, each with its path, UUID, load
   address and a framework's version, with a filter and Copy List.
 - **HTTP Cookies** lists `HTTPCookieStorage.shared`'s cookies by domain, read when its view appears
-  and on Refresh, searched by name or domain; a row expands to its value, domain, path, flags and
-  expiry. Each can be deleted, or all of them, and Copy copies them all as text. A web view's
-  cookies are in WebKit's own store, which it doesn't read. Values are masked as the redaction
-  rules say, which by default mask every cookie.
+  and on Refresh, searched by name or domain; a row expands to its value, domain, path, store,
+  flags and expiry. Where WebKit exists (macOS and iOS; not tvOS or watchOS), it also lists the
+  cookies web views keep in `WKWebsiteDataStore.default().httpCookieStore`, each row marked
+  URLSession or WKWebView by the store it is in. Each can be deleted from its own store, and Delete
+  All, after asking in place, deletes the cookies the filter shows; the count and Copy follow the
+  filter too. Values are masked as the redaction rules say, which by default mask every cookie.
 - **Launch Time** measures from the process's start (from the kernel) to the `installLaunchTime()`
   call, as pre-main, and from there to the first time the main run loop goes idle, as the first
   frame, so call it as early as the app can: in `App.init` or
@@ -1835,7 +1837,7 @@ ContentView()
 | `DebugDrawerLocationPlugin` | Spoofed CLLocationManager locations: presets, a custom latitude and longitude, and GPX routes played at a chosen speed |
 | `DebugDrawerLoadedLibrariesPlugin` | Every loaded image, grouped as app, third-party and system, with UUIDs and load addresses |
 | `DebugDrawerDeepLinkPlugin` | Opens URLs, continues universal links and activities of the app's own type with their userInfo in the app, and keeps a history of each |
-| `DebugDrawerCookiesPlugin` | Browse, search, copy and delete `HTTPCookieStorage.shared`'s cookies |
+| `DebugDrawerCookiesPlugin` | Browse, search, copy and delete `HTTPCookieStorage.shared`'s cookies, and `WKWebsiteDataStore.default()`'s where WebKit exists |
 | `DebugDrawerLaunchTimePlugin` | Launch time: process start to `installLaunchTime()` (pre-main), from there to the first frame, and the total |
 | `DebugDrawerTweaksPlugin` | The app's own debug settings: toggles, pickers, text fields, steppers and actions, in sections, read through typed accessors |
 | `DebugDrawerFeatureFlagsPlugin` | The app's feature flags through an adapter to its flag service: live values, local overrides that persist, search, an overridden-only filter and Reset All |

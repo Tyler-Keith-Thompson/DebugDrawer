@@ -16,7 +16,8 @@
             ]))
             let redaction = DebugDrawerRedaction(keys: ["session"])
 
-            let actual = [session, theme].report(redaction: redaction)
+            let actual = [StoredCookie(cookie: session, store: .urlSession), StoredCookie(cookie: theme, store: .urlSession)]
+                .report(redaction: redaction)
 
             #expect(actual.contains("Name: session_id\nValue: [REDACTED]\n"))
             #expect(actual.contains("Name: theme\nValue: dark\n"))
@@ -29,13 +30,13 @@
                 .name: "theme", .value: "dark", .domain: "example.com", .path: "/"
             ]))
 
-            let actual = [theme].report(redaction: .standard)
+            let actual = [StoredCookie(cookie: theme, store: .webView)].report(redaction: .standard)
 
             #expect(actual.contains("Value: [REDACTED]\n"))
             #expect(!actual.contains("dark"))
         }
 
-        @Test("With no rules, Copy carries each cookie's value")
+        @Test("With no rules, Copy carries each cookie's value, and names the store it is in")
         func noRules() throws {
             let theme = try #require(HTTPCookie(properties: [
                 .name: "theme", .value: "dark", .domain: "example.com", .path: "/"
@@ -48,11 +49,12 @@
             Value: dark
             Domain: example.com
             Path: /
+            Store: WKWebView
             Secure: false
 
             """
 
-            let actual = [theme].report(redaction: .none)
+            let actual = [StoredCookie(cookie: theme, store: .webView)].report(redaction: .none)
 
             #expect(actual == expected)
         }
