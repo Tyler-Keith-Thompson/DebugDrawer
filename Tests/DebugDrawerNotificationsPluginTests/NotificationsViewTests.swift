@@ -162,52 +162,174 @@
             #expect(refusedText == "The system refused it: Not allowed")
         }
 
-        @Test("A pending notification shows its title, body, identifier and trigger, and Remove removes that one")
-        func pendingRow() throws {
+        @Test("A notification is one line, its name, its delivery time and Remove; Remove removes that one")
+        func collapsedRow() throws {
             var removed: [String] = []
             let notification = ListedNotification(
-                id: "order-7", title: "Shipped", body: "On its way", categoryIdentifier: "ORDER",
-                trigger: .timeInterval(seconds: 30, repeats: false, next: nil)
+                id: "order-7", title: "Shipped", subtitle: "Today", body: "On its way", categoryIdentifier: "ORDER",
+                trigger: .push, deliveredAt: Date(timeIntervalSince1970: 1_800_000_000), userInfo: UserInfoText(["orderID": 7])
             )
             let sut = NotificationListSection(
-                kind: .pending, notifications: [notification], redaction: .standard, onRemove: { removed.append($0) }, onRemoveAll: {}
+                kind: .delivered, notifications: [notification], redaction: .standard, onRemove: { removed.append($0) }, onRemoveAll: {}
             )
 
-            let heading = try sut.inspect().find(text: "Pending (1)").string()
+            let heading = try sut.inspect().find(text: "Delivered (1)").string()
             let title = try sut.inspect().find(text: "Shipped").string()
-            let body = try sut.inspect().find(text: "On its way").string()
-            let identifier = try sut.inspect().find(text: "order-7").string()
-            let details = try sut.inspect().find(text: "After 30 sec · category ORDER").string()
+            let expand = try sut.inspect().find(ViewType.Button.self) { try $0.accessibilityLabel().string() == "Shipped" }
+            let state = try expand.accessibilityValue().string()
             try sut.inspect().find(ViewType.Button.self) { try $0.accessibilityLabel().string() == "Remove Shipped" }.tap()
 
-            #expect(heading == "Pending (1)")
+            #expect(heading == "Delivered (1)")
             #expect(title == "Shipped")
-            #expect(body == "On its way")
-            #expect(identifier == "order-7")
-            #expect(details == "After 30 sec · category ORDER")
+            #expect(state == "Collapsed")
             #expect(removed == ["order-7"])
+            #expect(throws: (any Error).self) { try sut.inspect().find(text: "Today") }
+            #expect(throws: (any Error).self) { try sut.inspect().find(text: "On its way") }
+            #expect(throws: (any Error).self) { try sut.inspect().find(text: "order-7") }
+            #expect(throws: (any Error).self) { try sut.inspect().find(ViewType.Text.self) { try $0.string().contains("orderID") } }
         }
 
-        @Test("A delivered notification shows when it was delivered, and its userInfo masked under the rules")
-        func deliveredRow() throws {
+        @Test("Opening a pending notification shows its subtitle, body, identifier, trigger and category, and its userInfo")
+        func expandedPendingRow() async throws {
+            let notification = ListedNotification(
+                id: "order-7", title: "Shipped", subtitle: "Today", body: "On its way", categoryIdentifier: "ORDER",
+                trigger: .timeInterval(seconds: 30, repeats: false, next: nil), userInfo: UserInfoText(["orderID": 7])
+            )
+            let sut = ListedNotificationRow(notification: notification, redaction: .standard, onRemove: {})
+            var collapsedTexts: [String] = []
+            var expandedTexts: [String] = []
+            var expandedState = ""
+
+            try await ViewHosting.host(sut) {
+                try await sut.inspection.inspect { view in
+                    collapsedTexts = try view.findAll(ViewType.Text.self).map { try $0.string() }
+                    try view.find(ViewType.Button.self) { try $0.accessibilityLabel().string() == "Shipped" }.tap()
+                }
+                try await sut.inspection.inspect { view in
+                    expandedTexts = try view.findAll(ViewType.Text.self).map { try $0.string() }
+                    expandedState = try view.find(ViewType.Button.self) { try $0.accessibilityLabel().string() == "Shipped" }
+                        .accessibilityValue().string()
+                }
+            }
+
+            #expect(!collapsedTexts.contains("Today"))
+            #expect(!collapsedTexts.contains("order-7"))
+            #expect(expandedTexts.contains("Today"))
+            #expect(expandedTexts.contains("On its way"))
+            #expect(expandedTexts.contains("order-7"))
+            #expect(expandedTexts.contains("After 30 sec · category ORDER"))
+            #expect(expandedTexts.contains { $0.contains(#""orderID" : 7"#) })
+            #expect(expandedState == "Expanded")
+        }
+
+        @Test("Opening a delivered notification shows when it was delivered, and its userInfo masked under the rules")
+        func expandedDeliveredRow() async throws {
             let notification = ListedNotification(
                 id: "order-7", title: "Shipped", trigger: .push, deliveredAt: Date(timeIntervalSince1970: 1_800_000_000),
                 userInfo: UserInfoText(["authToken": "secret"])
             )
-            let sut = NotificationListSection(
-                kind: .delivered, notifications: [notification], redaction: .standard, onRemove: { _ in }, onRemoveAll: {}
-            )
+            let sut = ListedNotificationRow(notification: notification, redaction: .standard, onRemove: {})
+            var texts: [String] = []
 
-            // An offline inspect() reads the default locale and time zone, so only the year is
-            // pinned; the snapshots pin the rest in a fixed locale.
-            let delivered = try sut.inspect()
-                .find(ViewType.Text.self) { try $0.string().hasPrefix("Delivered ") && $0.string().contains("2027") }
-                .string()
-            let userInfo = try sut.inspect().find(ViewType.Text.self) { try $0.string().contains("authToken") }.string()
+            try await ViewHosting.host(sut) {
+                try await sut.inspection.inspect { view in
+                    try view.find(ViewType.Button.self) { try $0.accessibilityLabel().string() == "Shipped" }.tap()
+                }
+                try await sut.inspection.inspect { view in
+                    texts = try view.findAll(ViewType.Text.self).map { try $0.string() }
+                }
+            }
 
+            // The hosted view reads the Mac's locale and time zone, so only the year is pinned;
+            // the snapshots pin the rest in a fixed locale.
+            let delivered = texts.first { $0.hasPrefix("Delivered ") } ?? ""
+            let userInfo = texts.first { $0.contains("authToken") } ?? ""
             #expect(delivered.contains("2027"))
             #expect(userInfo.contains(DebugDrawerRedaction.mask))
             #expect(!userInfo.contains("secret"))
+        }
+
+        @Test("A list shows its newest five, delivered ones by delivery time, until Show All lists every one")
+        func showAll() async throws {
+            let notifications = (0 ..< 8).map { index in
+                ListedNotification(
+                    id: "n\(index)", title: "Note \(index)", trigger: .push, deliveredAt: Date(timeIntervalSince1970: Double(index * 60))
+                )
+            }
+            let sut = NotificationListSection(
+                kind: .delivered, notifications: notifications, redaction: .standard, onRemove: { _ in }, onRemoveAll: {}
+            )
+            let expectedNewest = ["n7", "n6", "n5", "n4", "n3"]
+            let expectedAll = ["n7", "n6", "n5", "n4", "n3", "n2", "n1", "n0"]
+            var newest: [String] = []
+            var all: [String] = []
+            var fewerLabel = ""
+
+            try await ViewHosting.host(sut) {
+                try await sut.inspection.inspect { view in
+                    newest = try view.findAll(ListedNotificationRow.self).map { try $0.actualView().notification.id }
+                    try view.find(button: "Show All (8)").tap()
+                }
+                try await sut.inspection.inspect { view in
+                    all = try view.findAll(ListedNotificationRow.self).map { try $0.actualView().notification.id }
+                    fewerLabel = try view.find(button: "Show Newest 5").accessibilityLabel().string()
+                }
+            }
+
+            #expect(newest == expectedNewest)
+            #expect(all == expectedAll)
+            #expect(fewerLabel == "Show the newest 5 delivered notifications only")
+        }
+
+        @Test("Pending requests list the last one added first, and five or fewer offer no Show All")
+        func pendingOrder() throws {
+            let notifications = (0 ..< 5).map { ListedNotification(id: "n\($0)", title: "Note \($0)") }
+            let sut = NotificationListSection(
+                kind: .pending, notifications: notifications, redaction: .standard, onRemove: { _ in }, onRemoveAll: {}
+            )
+            let expected = ["n4", "n3", "n2", "n1", "n0"]
+
+            let actual = try sut.inspect().findAll(ListedNotificationRow.self).map { try $0.actualView().notification.id }
+            let labels = try sut.inspect().findAll(ViewType.Button.self).map { try $0.accessibilityLabel().string() }
+
+            #expect(actual == expected)
+            #expect(!labels.contains { $0.hasPrefix("Show all") })
+        }
+
+        @Test("With 50 pending and 50 delivered the token, settings and composer still show, and each list shows five one-line rows")
+        func manyNotifications() throws {
+            let snapshot = NotificationCenterSnapshot(
+                settings: NotificationSettings(authorization: .authorized, items: [.init(name: "Alerts", value: "On")]),
+                pending: (0 ..< 50).map { ListedNotification(id: "p\($0)", title: "Pending \($0)", body: "Body", userInfo: UserInfoText(["n": $0])) },
+                delivered: (0 ..< 50).map {
+                    ListedNotification(
+                        id: "d\($0)", title: "Delivered \($0)", subtitle: "Subtitle", trigger: .push,
+                        deliveredAt: Date(timeIntervalSince1970: Double($0)), userInfo: UserInfoText(["n": $0])
+                    )
+                }
+            )
+            let sut = NotificationsView(
+                registration: .registered(deviceToken: Data([0x0A])), center: .loaded(snapshot), authorizationRequest: .idle, sendState: .idle,
+                draft: .constant(#"{"aps": {"alert": "Hi"}}"#), delay: .constant(.now), redaction: .none, actions: NotificationsActions()
+            )
+            let expectedRows = ["p49", "p48", "p47", "p46", "p45", "d49", "d48", "d47", "d46", "d45"]
+            let expectedShowAll = ["Show all 50 pending notifications", "Show all 50 delivered notifications"]
+
+            let token = try sut.inspect().find(text: "0a").string()
+            let alerts = try sut.inspect().find(text: "Alerts").string()
+            let editor = try sut.inspect().find(ViewType.TextEditor.self).accessibilityLabel().string()
+            let rows = try sut.inspect().findAll(ListedNotificationRow.self).map { try $0.actualView().notification.id }
+            // Copy Token has no label of its own, so buttons without one are skipped.
+            let showAll = try sut.inspect().findAll(ViewType.Button.self).compactMap { try? $0.accessibilityLabel().string() }
+                .filter { $0.hasPrefix("Show all") }
+
+            #expect(token == "0a")
+            #expect(alerts == "Alerts")
+            #expect(editor == "APNs payload")
+            #expect(rows == expectedRows)
+            #expect(showAll == expectedShowAll)
+            #expect(throws: (any Error).self) { try sut.inspect().find(text: "Subtitle") }
+            #expect(throws: (any Error).self) { try sut.inspect().find(text: "p49") }
         }
 
         @Test("Remove All removes the list; an empty list says so and offers no Remove All")
@@ -253,7 +375,7 @@
             )
             let expected = [
                 "Request notification access", "Refresh notifications", "Send the payload as a local notification",
-                "Remove One", "Remove all pending notifications", "Remove Two", "Remove all delivered notifications"
+                "One", "Remove One", "Remove all pending notifications", "Two", "Remove Two", "Remove all delivered notifications"
             ]
 
             let actual = try sut.inspect().findAll(ViewType.Button.self).map { try $0.accessibilityLabel().string() }

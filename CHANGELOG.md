@@ -26,6 +26,7 @@ the entry becomes the GitHub release's notes.
 
 ### Fixed
 
+- DD-175: Notifications' Pending and Delivered lists no longer show every notification in full, which with dozens of them made the plugin thousands of points tall and buried the token, settings and composer: each notification is one line, its title and time, that opens to its subtitle, body, identifier, details and `userInfo`, and each list shows its newest five until Show All.
 - DD-169: Crash Reports reads a stack frame whose image name has spaces (`My App`) with that name, and a frame in an Objective-C class method (`+[NSException raise:format:]`) with that method as its symbol, rather than showing the whole line or the address as the symbol.
 - DD-176: Apple frameworks' debug chatter no longer pushes the app's own lines out of the Console: it leaves out the debug and info lines of subsystems starting with `com.apple.`, keeping their notice, error and fault lines and every line of the app's own. `installConsole(sessions:includeSystemDebugLogs:)` keeps them with `includeSystemDebugLogs: true`; `installConsole(sessions:)` remains, deprecated, and forwards to it.
 - DD-164: at accessibility text sizes the drawer's search results put their title and plugin name under the icon, across the row's whole width, wrapping only between words, rather than truncating or breaking a long word such as "Accessibility" mid-word; at other sizes a result keeps its one-line layout.

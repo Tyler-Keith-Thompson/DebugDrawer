@@ -1194,9 +1194,11 @@ Notifications. In debug builds the plugin shows:
   app in the background, `mutable-content` doesn't run a notification service extension, and a
   payload over 4 KB would be refused by APNs. Sending asks for authorization first if the user
   hasn't decided.
-- **Pending** and **Delivered**, each with its count: each request and notification with its title,
-  subtitle, body, identifier, trigger (after an interval, on a date, at a location) or delivery
-  time, category, thread, badge and `userInfo`, each removable, and Remove All.
+- **Pending** and **Delivered**, each with its count, newest first: each request and notification
+  on one line, its title and the time it was delivered or fires next, removable; opening one shows
+  its subtitle, body, identifier, trigger (after an interval, on a date, at a location) or delivery
+  time, category, thread, badge and `userInfo`. Each list shows its newest five until Show All, and
+  has Remove All.
 
 While the app is in front, the system shows a notification only if the app's
 `UNUserNotificationCenterDelegate` asks for a banner in `userNotificationCenter(_:willPresent:)`;
