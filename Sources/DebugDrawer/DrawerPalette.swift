@@ -51,6 +51,8 @@
         static let pushFill = Color(light: 0xFFFFFF, dark: 0x3A3A3E)
         static let pushBorder = Color(light: 0xCBCBCF, dark: 0x4A4A4F)
         static let pushShadow = Color(light: 0xD4D4D8, dark: 0x141416)
+        /// Over the app behind the compact panel, as a sheet dims what it covers.
+        static let backdrop = Color.black.opacity(0.2)
     }
 
     extension DrawerPalette {

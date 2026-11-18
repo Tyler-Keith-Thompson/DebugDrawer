@@ -26,6 +26,7 @@ the entry becomes the GitHub release's notes.
 
 ### Fixed
 
+- DD-159: on iOS a tap outside the compact panel (an iPhone in portrait, Slide Over) closes the drawer, as one outside a sheet does: the panel leaves a strip of the app above it, and a dimmed backdrop over what it leaves of the app takes the tap. Beside a regular panel (an iPad, an iPhone in landscape) taps still reach the app.
 - DD-90: Network bounds the bodies it keeps in total, not only each one, so 200 large requests no longer hold hundreds of megabytes; Console says how many older lines it dropped once it passes its capacity.
 - DD-85: the Deep Link Tester reports each opened URL honestly: handled or not handled by `openURL`, opened by the system, or an error saying why the system couldn't open it, where the Mac reported Opened whatever `NSWorkspace` did. On the Mac a scheme the app declares opens in the running copy rather than another installed one, and the presets no longer include `myapp://` or the private `App-prefs:` scheme.
 - DD-5: with several windows or scenes, a local plugin is listed only in the drawer of the window whose views registered it, rather than in every window's drawer; the same plugin registered from two windows stays in each until its own view leaves. On iPadOS, `toggle()` acts on the scene holding the key window when two scenes are foreground-active, and on macOS, while the app isn't active, on its frontmost window rather than the last one attached.

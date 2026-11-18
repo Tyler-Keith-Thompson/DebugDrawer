@@ -97,22 +97,48 @@
             #expect(actual == nil)
         }
 
-        @Test("The touch rule: only an open drawer takes a touch, and only on its panel", arguments: [
-            (CGPoint(x: 800, y: 384), true, true),
-            (CGPoint(x: 699, y: 384), true, false),
-            (CGPoint(x: 800, y: 384), false, false)
-        ])
-        func touchRule(point: CGPoint, isOpen: Bool, expected: Bool) {
+        @Test("While a compact drawer is open, its window takes a touch outside the panel, where its backdrop closes the drawer")
+        func touchOutsideCompactPanelIsTaken() {
+            let presentation = DrawerPresentation()
+            presentation.isOpen = true
+            presentation.layout = .compact
+            presentation.panelFrame = CGRect(x: 8, y: 70, width: 386, height: 760)
+            let sut = DrawerSceneWindow(scene: nil, drawer: .shared, presentation: presentation)
+            sut.frame = CGRect(x: 0, y: 0, width: 402, height: 874)
+            sut.isHidden = false
+            defer { sut.isHidden = true }
+            sut.layoutIfNeeded()
+            let statusBar = CGPoint(x: 201, y: 20)
+            let onPanel = CGPoint(x: 201, y: 437)
+
+            let outside = sut.hitTest(statusBar, with: nil)
+            let on = sut.hitTest(onPanel, with: nil)
+
+            #expect(outside != nil)
+            #expect(on != nil)
+        }
+
+        @Test("The touch rule: only an open drawer takes a touch; a regular one only on its panel, a compact one anywhere",
+              arguments: [
+                  (CGPoint(x: 800, y: 384), DrawerPanelLayout.regular, true, true),
+                  (CGPoint(x: 699, y: 384), DrawerPanelLayout.regular, true, false),
+                  (CGPoint(x: 800, y: 384), DrawerPanelLayout.regular, false, false),
+                  (CGPoint(x: 800, y: 384), DrawerPanelLayout.compact, true, true),
+                  (CGPoint(x: 699, y: 10), DrawerPanelLayout.compact, true, true),
+                  (CGPoint(x: 699, y: 10), DrawerPanelLayout.compact, false, false)
+              ])
+        func touchRule(point: CGPoint, layout: DrawerPanelLayout, isOpen: Bool, expected: Bool) {
             let panelFrame = CGRect(x: 700, y: 20, width: 316, height: 728)
 
-            let actual = DrawerSceneWindow.takesTouch(at: point, panelFrame: panelFrame, isOpen: isOpen)
+            let actual = DrawerSceneWindow.takesTouch(at: point, panelFrame: panelFrame, layout: layout, isOpen: isOpen)
 
             #expect(actual == expected)
         }
 
-        @Test("With no panel drawn, the drawer's window takes no touch")
-        func noPanelTakesNoTouch() {
-            let actual = DrawerSceneWindow.takesTouch(at: CGPoint(x: 10, y: 10), panelFrame: nil, isOpen: true)
+        @Test("With no panel drawn, the drawer's window takes no touch, at either width",
+              arguments: [DrawerPanelLayout.regular, .compact])
+        func noPanelTakesNoTouch(layout: DrawerPanelLayout) {
+            let actual = DrawerSceneWindow.takesTouch(at: CGPoint(x: 10, y: 10), panelFrame: nil, layout: layout, isOpen: true)
 
             #expect(!actual)
         }

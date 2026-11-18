@@ -6,8 +6,9 @@
 
     // A window of the drawer's own, above the app's windows, rather than an overlay in the app's
     // root view: a sheet, a full-screen cover or an alert is presented above that root view, so
-    // an overlay in it is covered by what it needs to inspect. The window lets every touch outside
-    // the panel fall through to the app's windows below it.
+    // an overlay in it is covered by what it needs to inspect. Beside a regular panel the window
+    // lets every touch fall through to the app's windows below it; around a compact one, which
+    // leaves the app no room to use, a tap closes the drawer.
 
     /// The drawer's window in one scene: at a level above alerts, hosting the panel, and hidden
     /// while the drawer is closed.
@@ -41,24 +42,34 @@
             fatalError("The drawer's window is made in code.")
         }
 
-        /// Takes a touch only on the open panel; everywhere else `nil`, so UIKit offers it to the
-        /// app's windows below.
+        /// Takes a touch on the open panel, and anywhere on the backdrop behind a compact one, which
+        /// closes the drawer; everywhere else `nil`, so UIKit offers it to the app's windows below.
         override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
-            guard Self.takesTouch(at: point, panelFrame: presentation.panelFrame, isOpen: presentation.isOpen) else { return nil }
+            guard Self.takesTouch(
+                at: point,
+                panelFrame: presentation.panelFrame,
+                layout: presentation.layout,
+                isOpen: presentation.isOpen
+            ) else { return nil }
             return super.hitTest(point, with: event)
         }
 
-        /// Whether the drawer's window takes a touch at `point`: only while the drawer is open, and
-        /// only on its panel.
+        /// Whether the drawer's window takes a touch at `point`: only while the drawer is open and
+        /// its panel drawn; then on a regular panel only, so the app beside it stays usable, and
+        /// anywhere around a compact one, whose backdrop closes the drawer like a sheet's.
         ///
         /// - Parameters:
         ///   - point: The touch, in the window's coordinates.
         ///   - panelFrame: Where the panel is drawn, or `nil` while it isn't.
+        ///   - layout: The panel's width class.
         ///   - isOpen: Whether the drawer is open.
         /// - Returns: `true` when the touch belongs to the drawer.
-        static func takesTouch(at point: CGPoint, panelFrame: CGRect?, isOpen: Bool) -> Bool {
+        static func takesTouch(at point: CGPoint, panelFrame: CGRect?, layout: DrawerPanelLayout, isOpen: Bool) -> Bool {
             guard isOpen, let panelFrame else { return false }
-            return panelFrame.contains(point)
+            switch layout {
+            case .regular: return panelFrame.contains(point)
+            case .compact: return true
+            }
         }
 
         func drawerWillShow() {

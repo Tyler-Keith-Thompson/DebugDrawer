@@ -31,9 +31,9 @@
             #expect(actual == expected)
         }
 
-        @Test("A compact panel keeps an 8 point margin inside the safe area on every side")
+        @Test("A compact panel keeps an 8 point margin inside the safe area, and a 36 point strip of the app above it to tap")
         func compactInsets() {
-            let expected = EdgeInsets(top: 8, leading: 8, bottom: 8, trailing: 8)
+            let expected = EdgeInsets(top: 36, leading: 8, bottom: 8, trailing: 8)
 
             let actual = EdgeInsets.drawerPanel(layout: .compact)
 

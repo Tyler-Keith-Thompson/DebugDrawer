@@ -76,6 +76,9 @@
                 panelRow
                     .padding(.drawerPanel(layout: presentation.layout))
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
+                #if os(iOS)
+                    .background { backdrop }
+                #endif
                 .onGeometryChange(for: CGFloat.self) { proxy in
                     proxy.size.width + proxy.safeAreaInsets.leading + proxy.safeAreaInsets.trailing
                 } action: { width in
@@ -102,12 +105,30 @@
                             }
                         }
                         .drawerPanelSurface()
+                        // The whole panel takes a tap, its bare surface too (a ShapeStyle
+                        // background isn't hit-testable), so one between its controls never
+                        // reaches the backdrop behind it and closes the drawer.
+                        .contentShape(.rect(cornerRadius: 10))
                         // Where the panel is, for the window's hit testing: only the panel takes
                         // touches (DrawerSceneWindow).
                         .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { presentation.panelFrame = $0 }
                         .onDisappear { presentation.panelFrame = nil }
                         .transition(.move(edge: .trailing).combined(with: .opacity))
                     }
+                }
+            }
+        #endif
+
+        #if os(iOS)
+            /// Behind a compact panel, the dimmed strips it leaves of the app (the status bar, the
+            /// margins, the home indicator), which close the drawer when tapped; the window takes
+            /// every touch while it shows (DrawerSceneWindow). A regular panel has none: the app
+            /// beside it stays usable. A narrow Mac Catalyst window is laid out as an iPhone's, so
+            /// it gets the backdrop too.
+            @ViewBuilder var backdrop: some View {
+                if isShown, presentation.layout == .compact {
+                    DrawerBackdrop(close: close)
+                        .transition(.opacity)
                 }
             }
         #endif
