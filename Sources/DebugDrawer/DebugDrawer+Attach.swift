@@ -65,9 +65,10 @@
             }
 
             /// The app's window behind `window`: the window a sheet is on, or the window a drawer
-            /// panel belongs to.
+            /// panel or overlay belongs to.
             static func appWindow(for window: NSWindow) -> NSWindow {
                 if let panel = window as? DrawerChildPanel, let host = panel.host { return appWindow(for: host) }
+                if let overlay = window as? DrawerOverlayWindow, let host = overlay.host { return appWindow(for: host) }
                 if let parent = window.sheetParent { return appWindow(for: parent) }
                 return window
             }
@@ -251,15 +252,15 @@
         @MainActor package var debugDrawerAppKeyWindow: UIWindow? {
             let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
             guard let scene = scenes.first(where: { $0.activationState == .foregroundActive }) else { return nil }
-            let appWindows = scene.windows.filter { !($0 is DrawerSceneWindow) }
+            let appWindows = scene.windows.filter { !isDebugDrawerWindow($0) }
             return appWindows.first(where: \.isKeyWindow)
                 ?? appWindows.filter { !$0.isHidden }.max { $0.windowLevel < $1.windowLevel }
         }
 
-        /// Whether `window` is the drawer's own, which a plugin that draws the app's windows leaves
-        /// out.
+        /// Whether `window` is the drawer's own (its window or an overlay), which a plugin that
+        /// draws or inspects the app's windows leaves out.
         @MainActor package func isDebugDrawerWindow(_ window: UIWindow) -> Bool {
-            window is DrawerSceneWindow
+            window is DrawerSceneWindow || window is DrawerOverlayWindow
         }
     #endif
 #else

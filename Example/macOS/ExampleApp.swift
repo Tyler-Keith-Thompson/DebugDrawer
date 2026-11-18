@@ -163,6 +163,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Links DebugDrawerDiskIOInterposer (Example/BUILD.bazel): Swift's Data and FileHandle calls too.
         DebugDrawer.shared.unsafeInstallDiskIOWithInterposing()
         DebugDrawer.shared.installViewInspector()
+        ExampleViewInspector.applyLaunchArguments()
         DebugDrawer.shared.installAccessibility()
         DebugDrawer.shared.installPerformance()
         DebugDrawer.shared.installEnergy()

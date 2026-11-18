@@ -151,6 +151,7 @@ struct DebugDrawerExampleiOSApp: App {
         // Data and FileHandle calls too; built without it, this does what installDiskIO() does.
         DebugDrawer.shared.unsafeInstallDiskIOWithInterposing()
         DebugDrawer.shared.installViewInspector()
+        ExampleViewInspector.applyLaunchArguments()
         DebugDrawer.shared.installAccessibility()
         DebugDrawer.shared.installPerformance()
         DebugDrawer.shared.installEnergy()

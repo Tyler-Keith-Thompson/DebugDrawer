@@ -87,13 +87,14 @@
             #expect(sut.subviews.isEmpty)
         }
 
-        @Test("With click indicators on, the swapped-in sendEvent(_:) forwards the event once and draws a ripple for the touch that began")
-        func indicatorsOnForwardAndDrawARipple() {
+        // The ripple goes in the overlay window over the window's scene; the SwiftPM test runner
+        // connects no scene, so this pins what the app's window sees: the event, once, and no view.
+        @Test("With click indicators on, the swapped-in sendEvent(_:) forwards the event once and adds nothing to the app's window")
+        func indicatorsOnForwardAndAddNothing() {
             DebugDrawer.shared.installViewInspector()
             let controller = ViewBorderController.shared
             let sut = ForwardingProbeWindow()
             let event = BeganTouchEvent()
-            let expectedRipples = 1
 
             controller.isClickIndicatorEnabled = true
             sut.sendEvent(event)
@@ -101,7 +102,7 @@
 
             #expect(sut.forwarded.count == 1)
             #expect(sut.forwarded.first === event)
-            #expect(sut.subviews.count == expectedRipples)
+            #expect(sut.subviews.isEmpty)
         }
     }
 #endif

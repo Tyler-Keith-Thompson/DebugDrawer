@@ -72,22 +72,22 @@
     // MARK: - Grid modifier
 
     /// Draws the View Inspector's alignment grid over the content while it is turned on.
+    ///
+    /// The grid is drawn in the drawer's overlay window over the content's frame, not in the
+    /// content: an empty view behind the content tells the View Inspector where it is, so the
+    /// app's own snapshots of the content don't show the grid.
     public struct DebugGridModifier: ViewModifier {
         @ObservedObject private var controller = ViewBorderController.shared
 
         /// A modifier that follows ``ViewBorderController/shared``.
         public init() {}
 
-        /// The content, with the grid over it while the grid is on.
+        /// The content, marked for the grid while the grid is on.
         public func body(content: Content) -> some View {
             content
-                .overlay {
+                .background {
                     if controller.isGridEnabled {
-                        GridOverlayView(
-                            spacing: controller.gridSpacing,
-                            color: controller.gridColor.color,
-                            opacity: controller.gridOpacity
-                        )
+                        GridProbe(controller: controller)
                     }
                 }
         }

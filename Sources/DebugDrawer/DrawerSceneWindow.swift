@@ -71,7 +71,7 @@
             guard !presentation.isOpen else { return }
             if isKeyWindow {
                 windowScene?.windows
-                    .filter { !($0 is DrawerSceneWindow) && !$0.isHidden }
+                    .filter { !isDebugDrawerWindow($0) && !$0.isHidden }
                     .max { $0.windowLevel < $1.windowLevel }?
                     .makeKey()
             }

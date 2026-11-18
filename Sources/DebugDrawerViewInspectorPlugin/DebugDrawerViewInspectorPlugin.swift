@@ -7,8 +7,9 @@ import SwiftUI
 // The public API compiles in every configuration; the implementation under `#if DEBUG` below does
 // not, so release builds get an empty view and an installer that registers nothing.
 
-/// View borders by depth, the alignment grid, click indicators, slowed animations, the key
-/// window's view hierarchy and the render counts of the views tracked with `.trackRenders(_:)`.
+/// View borders by depth, the alignment grid, click indicators and slowed animations over the
+/// app's windows, the key window's view hierarchy and the render counts of the views tracked with
+/// `.trackRenders(_:)`.
 public struct ViewInspectorPlugin: DebugDrawerPlugin {
     public var title = "View Inspector"
     public var category = "Interface"
@@ -28,9 +29,10 @@ public struct ViewInspectorPlugin: DebugDrawerPlugin {
 // MARK: - Convenience installer
 
 public extension DebugDrawer {
-    /// Registers the View Inspector plugin. Its switches act on the app's key window; the grid
-    /// shows only under `.debugGrid()`. On iOS it also swaps `UIWindow.sendEvent(_:)` once, so
-    /// the click indicators switch can show touches; the swap forwards every event unchanged.
+    /// Registers the View Inspector plugin. Its borders, grid and click indicators are drawn in a
+    /// window of the drawer's own over each of the app's windows, never in them; the grid shows
+    /// only over views under `.debugGrid()`. On iOS it also swaps `UIWindow.sendEvent(_:)` once,
+    /// so the click indicators switch can show touches; the swap forwards every event unchanged.
     func installViewInspector() {
         #if DEBUG
             #if os(iOS)
@@ -106,14 +108,7 @@ public extension DebugDrawer {
             }
 
             DebugDrawerSection("Animation") {
-                DebugDrawerRow("Animation Speed") {
-                    Slider(value: $controller.animationSpeed, in: 1 ... 10, step: 0.5)
-                        .accessibilityLabel("Animation speed")
-                } accessory: {
-                    Text(controller.animationSpeed == 1.0 ? "Normal" : "\(controller.animationSpeed, specifier: "%.1f")×")
-                        .debugDrawerFont(.value)
-                        .accessibilityHidden(true)
-                }
+                AnimationSpeedRow(slowdown: $controller.animationSpeed)
             }
 
             // Counts only views the app tracks with .trackRenders(_:); the drawer tracks none of its own.

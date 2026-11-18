@@ -372,10 +372,14 @@ These need only their install call:
   app has localizations) and the accessibility settings SwiftUI reads: Reduce Motion, Increase
   Contrast, Bold Text, Reduce Transparency, Differentiate Without Color and Invert Colors, each of
   those beside the system's value. Reset All clears them; they last until the app quits.
-- **View Inspector** draws a border around every AppKit or UIKit view in the key window, colored
-  by its depth, the alignment grid where `.debugGrid()` is applied, a ripple where each click or
-  touch lands, slows animations up to ten times, and lists the key window's view hierarchy with
-  each view's class and accessibility label. Its render counts follow below (View Inspector).
+- **View Inspector** outlines every AppKit or UIKit view in the app's windows, colored by its
+  depth, draws the alignment grid over the views `.debugGrid()` is applied to and a ripple where
+  each click or touch lands, makes animations up to ten times slower, and lists the key window's
+  view hierarchy with each view's class and accessibility label. The outlines, grid and ripples are
+  drawn in a window of the drawer's own over the app's, which takes no clicks or touches, so they
+  change no view or layer of the app's and don't appear in the app's own snapshots or screenshots
+  of its windows. Slow Animations divides the speed of each window's root layer and gives back the
+  speed it had at Normal. Its render counts follow below (View Inspector).
 
 ### Deep links: URLs, universal links and user activities
 
