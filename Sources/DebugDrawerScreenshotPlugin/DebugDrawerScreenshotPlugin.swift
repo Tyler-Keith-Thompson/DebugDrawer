@@ -6,6 +6,8 @@ import SwiftUI
 // The public API compiles in every configuration; the implementation under `#if DEBUG` below does
 // not, so release builds get an empty view and an installer that registers nothing.
 
+/// Captures the app's key window: on macOS to a PNG on the Desktop or to the clipboard, on iOS to
+/// the clipboard.
 public struct ScreenshotPlugin: DebugDrawerPlugin {
     public var title = "Screenshot"
     public var category = "Interface"
@@ -25,6 +27,7 @@ public struct ScreenshotPlugin: DebugDrawerPlugin {
 // MARK: - Convenience installer
 
 public extension DebugDrawer {
+    /// Registers the Screenshot plugin.
     func installScreenshot() {
         #if DEBUG
             registerGlobal(ScreenshotPlugin())

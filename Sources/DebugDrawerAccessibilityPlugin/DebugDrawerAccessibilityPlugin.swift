@@ -6,6 +6,8 @@ import SwiftUI
 // The public API compiles in every configuration; the implementation under `#if DEBUG` below does
 // not, so release builds get an empty view and an installer that registers nothing.
 
+/// Overrides of the color scheme, Dynamic Type, layout direction, locale and the system
+/// accessibility settings SwiftUI reads, for the views under `.debugAccessibilityOverrides()`.
 public struct AccessibilityPlugin: DebugDrawerPlugin {
     public var title = "Accessibility"
     public var category = "Interface"
@@ -25,6 +27,8 @@ public struct AccessibilityPlugin: DebugDrawerPlugin {
 // MARK: - Convenience installer
 
 public extension DebugDrawer {
+    /// Registers the Accessibility plugin. Its overrides apply to the views under
+    /// `.debugAccessibilityOverrides()`.
     func installAccessibility() {
         #if DEBUG
             registerGlobal(AccessibilityPlugin())

@@ -32,8 +32,8 @@ public struct ConsolePlugin: DebugDrawerPlugin {
 // MARK: - Convenience installer
 
 public extension DebugDrawer {
-    /// Install the console capture plugin. Call once at app startup.
-    /// Captures stdout, stderr, and os_log entries.
+    /// Installs the Console plugin. Call it once, at startup. It captures the process's os_log
+    /// entries, the lines sent to ``ConsoleLogSink`` and, on macOS, stdout and stderr.
     ///
     /// - Parameter sessions: How many earlier launches' lines are kept on disk, in how many
     ///   bytes, and where; each line is written as it is captured, and the console shows the

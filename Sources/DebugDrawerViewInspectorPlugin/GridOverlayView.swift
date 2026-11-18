@@ -71,11 +71,14 @@
 
     // MARK: - Grid modifier
 
+    /// Draws the View Inspector's alignment grid over the content while it is turned on.
     public struct DebugGridModifier: ViewModifier {
         @ObservedObject private var controller = ViewBorderController.shared
 
+        /// A modifier that follows ``ViewBorderController/shared``.
         public init() {}
 
+        /// The content, with the grid over it while the grid is on.
         public func body(content: Content) -> some View {
             content
                 .overlay {
@@ -91,6 +94,10 @@
     }
 
     public extension View {
+        /// Draws the View Inspector's alignment grid over this view while it is turned on in the
+        /// drawer. In release builds it returns the view unchanged.
+        ///
+        /// - Returns: The view with the grid over it.
         func debugGrid() -> some View {
             modifier(DebugGridModifier())
         }

@@ -3,10 +3,10 @@ import Foundation
 /// MetricKit's payloads in the debug drawer: the daily metrics and the diagnostics the system
 /// delivers to the app, kept across launches.
 ///
-/// ``install(directory:)`` subscribes to `MXMetricManager` where MetricKit exists (iOS, macOS,
-/// visionOS; macOS reports a subset of the metrics), first keeping the payloads the system still
-/// holds from before. MetricKit delivers to every subscriber, so an analytics SDK, Crash Reports
-/// or Hangs subscribing as well still gets each payload.
+/// ``install(directory:)`` subscribes to `MXMetricManager` (macOS reports a subset of the metrics
+/// iOS does), first keeping the payloads the system still holds from before. MetricKit delivers to
+/// every subscriber, so an analytics SDK, Crash Reports or Hangs subscribing as well still gets
+/// each payload.
 ///
 /// The type exists in every build, so the calls compile unchanged in release, where they do
 /// nothing.

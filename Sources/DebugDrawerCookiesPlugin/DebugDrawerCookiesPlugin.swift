@@ -6,6 +6,8 @@ import SwiftUI
 // The public API compiles in every configuration; the implementation under `#if DEBUG` below does
 // not, so release builds get an empty view and an installer that registers nothing.
 
+/// `HTTPCookieStorage.shared`'s cookies, searched by name or domain, each expanded to its
+/// attributes and deletable, or all of them.
 public struct CookiesPlugin: DebugDrawerPlugin {
     public var title = "HTTP Cookies"
     public var category = "Logs & Network"
@@ -25,6 +27,7 @@ public struct CookiesPlugin: DebugDrawerPlugin {
 // MARK: - Convenience installer
 
 public extension DebugDrawer {
+    /// Registers the HTTP Cookies plugin, which lists `HTTPCookieStorage.shared`'s cookies.
     func installCookies() {
         #if DEBUG
             registerGlobal(CookiesPlugin())

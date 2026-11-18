@@ -7,6 +7,8 @@ import SwiftUI
 // The public API compiles in every configuration; the implementation under `#if DEBUG` below does
 // not, so release builds get an empty view and an installer that registers nothing.
 
+/// Every image loaded into the process, grouped as App, Third-Party and System, each with its
+/// path, UUID, load address and, for a framework, its version.
 public struct LoadedLibrariesPlugin: DebugDrawerPlugin {
     public var title = "Loaded Libraries"
     public var category = "App"
@@ -26,6 +28,7 @@ public struct LoadedLibrariesPlugin: DebugDrawerPlugin {
 // MARK: - Convenience installer
 
 public extension DebugDrawer {
+    /// Registers the Loaded Libraries plugin, which reads the loaded images when its view appears.
     func installLoadedLibraries() {
         #if DEBUG
             registerGlobal(LoadedLibrariesPlugin())

@@ -7,6 +7,8 @@ import SwiftUI
 // The public API compiles in every configuration; the implementation under `#if DEBUG` below does
 // not, so release builds get an empty view and an installer that registers nothing.
 
+/// View borders by depth, the alignment grid, click indicators, slowed animations, the key
+/// window's view hierarchy and the render counts of the views tracked with `.trackRenders(_:)`.
 public struct ViewInspectorPlugin: DebugDrawerPlugin {
     public var title = "View Inspector"
     public var category = "Interface"
@@ -26,6 +28,8 @@ public struct ViewInspectorPlugin: DebugDrawerPlugin {
 // MARK: - Convenience installer
 
 public extension DebugDrawer {
+    /// Registers the View Inspector plugin. Its switches act on the app's key window; the grid
+    /// shows only under `.debugGrid()`.
     func installViewInspector() {
         #if DEBUG
             registerGlobal(ViewInspectorPlugin())
@@ -151,6 +155,9 @@ public extension DebugDrawer {
     import SwiftUI
 
     public extension View {
+        /// Returns the view unchanged: release builds draw no grid.
+        ///
+        /// - Returns: This view.
         func debugGrid() -> some View { self }
     }
 #endif

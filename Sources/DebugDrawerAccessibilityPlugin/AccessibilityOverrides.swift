@@ -27,20 +27,32 @@
 
     // MARK: - Override state
 
+    /// The environment values the Accessibility plugin overrides for the views under
+    /// `.debugAccessibilityOverrides()`. Each is `nil` while the system's value applies.
     @MainActor
     public final class AccessibilityOverrides: ObservableObject {
+        /// The overrides the plugin edits and `.debugAccessibilityOverrides()` applies.
         public static let shared = AccessibilityOverrides()
 
+        /// The color scheme, light or dark.
         @Published public var colorScheme: ColorScheme?
+        /// The Dynamic Type size.
         @Published public var dynamicTypeSize: DynamicTypeSize?
+        /// The layout direction, left to right or right to left.
         @Published public var layoutDirection: LayoutDirection?
+        /// The locale, one of ``availableLocales``.
         @Published public var locale: Locale?
-        /// System accessibility settings; nil means the system's value is used.
+        /// Reduce Motion.
         @Published public var reduceMotion: Bool?
+        /// Increase Contrast, as SwiftUI's `colorSchemeContrast`.
         @Published public var increaseContrast: Bool?
+        /// Bold Text, as SwiftUI's `legibilityWeight`.
         @Published public var boldText: Bool?
+        /// Reduce Transparency.
         @Published public var reduceTransparency: Bool?
+        /// Differentiate Without Color.
         @Published public var differentiateWithoutColor: Bool?
+        /// Invert Colors.
         @Published public var invertColors: Bool?
 
         /// Available localizations discovered from the app bundle.
@@ -53,6 +65,7 @@
             availableLocales = ids.map { Locale(identifier: $0) }
         }
 
+        /// Clears every override, so the system's values apply again.
         public func reset() {
             colorScheme = nil
             dynamicTypeSize = nil
@@ -66,6 +79,7 @@
             invertColors = nil
         }
 
+        /// Whether any value is overridden.
         public var hasOverrides: Bool {
             colorScheme != nil || dynamicTypeSize != nil ||
                 layoutDirection != nil || locale != nil ||
@@ -76,11 +90,14 @@
 
     // MARK: - Environment modifier
 
+    /// Applies ``AccessibilityOverrides/shared`` to the content's environment.
     public struct AccessibilityOverridesModifier: ViewModifier {
         @ObservedObject private var overrides = AccessibilityOverrides.shared
 
+        /// A modifier that follows ``AccessibilityOverrides/shared``.
         public init() {}
 
+        /// The content, with each value that is overridden set in its environment.
         public func body(content: Content) -> some View {
             // Every modifier is always applied, so the host's view tree keeps its shape
             // (and its state) whether or not an override is set.
@@ -107,6 +124,11 @@
     }
 
     public extension View {
+        /// Applies the Accessibility plugin's overrides to this view and the views under it. Place
+        /// it above `.debugDrawer()`, so the drawer keeps the system's values. In release builds
+        /// it returns the view unchanged.
+        ///
+        /// - Returns: The view with the overrides in its environment.
         func debugAccessibilityOverrides() -> some View {
             modifier(AccessibilityOverridesModifier())
         }

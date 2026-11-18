@@ -5,8 +5,9 @@ Add the package, write a plugin, attach the drawer to the app's root view and op
 ## Overview
 
 DebugDrawer requires Swift 6.3. The drawer and the shipped plugins support macOS 15 and iOS 17
-or later, Mac Catalyst included. This module also builds for visionOS 1, tvOS 17 and watchOS 10
-or later, where an app registers plugins of its own.
+or later. This module also builds for Mac Catalyst, visionOS 1, tvOS 17 and watchOS 10 or
+later, as some of the shipped plugins do; the package's README lists which. On a platform a
+plugin doesn't build for, an app registers plugins of its own.
 
 ### Add the package
 
@@ -15,7 +16,7 @@ is a library of its own:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/Tyler-Keith-Thompson/DebugDrawer", from: "0.0.4"),
+    .package(url: "https://github.com/Tyler-Keith-Thompson/DebugDrawer", from: "0.1.1"),
 ],
 ```
 

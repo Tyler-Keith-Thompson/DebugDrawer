@@ -179,8 +179,9 @@
         /// Place it once, at the root of the app's view hierarchy. While the drawer is open, Cmd-K
         /// focuses its search field, which finds plugins and their ``DebugDrawerPlugin/actions``;
         /// Cmd-Option-Down and Cmd-Option-Up move to the next and previous plugin; Escape clears the
-        /// search, then closes the drawer. Opening it is the app's job: call
-        /// ``DebugDrawer/toggle()``.
+        /// search, then returns from a plugin shown alone to the list, then closes the drawer. The
+        /// drawer binds no key or gesture that opens it: opening it is the app's job, from a
+        /// trigger of its own that calls ``DebugDrawer/toggle()``.
         ///
         /// In release builds it returns the view unchanged.
         ///

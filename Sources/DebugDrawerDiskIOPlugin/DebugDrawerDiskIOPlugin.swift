@@ -60,16 +60,19 @@ public extension DebugDrawer {
     /// The recorded calls, newest first, and the totals of every call since the last clear.
     @MainActor
     public final class DiskIOStore: ObservableObject {
+        /// The store `installDiskIO()` fills and the plugin shows.
         public static let shared = DiskIOStore(recorder: .shared)
 
         /// The newest calls, at most ``capacity``, newest first.
         @Published public private(set) var events: [IOEvent] = []
         /// Every call since the last clear, including the ones ``events`` no longer keeps.
         @Published public private(set) var totals = DiskIOTotals()
+        /// The operation the list shows alone, or `nil` for every operation.
         @Published public var filterOp: IOEvent.Operation?
+        /// Whether the list shows only the calls made on the main thread.
         @Published public var mainThreadOnly = false
 
-        /// How many calls ``events`` keeps.
+        /// How many calls ``events`` keeps, 500 unless set; the totals count every call regardless.
         public var capacity = 500 {
             didSet { recorder.setLimit(capacity) }
         }
@@ -78,26 +81,32 @@ public extension DebugDrawer {
         private let recorder: DiskIORecorder
         private var cancellable: AnyCancellable?
 
+        /// The reads since the last clear.
         public var totalReads: Int {
             totals.reads
         }
 
+        /// The writes since the last clear.
         public var totalWrites: Int {
             totals.writes
         }
 
+        /// The bytes read since the last clear.
         public var totalBytesRead: Int64 {
             totals.bytesRead
         }
 
+        /// The bytes written since the last clear.
         public var totalBytesWritten: Int64 {
             totals.bytesWritten
         }
 
+        /// The calls made on the main thread since the last clear.
         public var mainThreadOps: Int {
             totals.mainThreadCalls
         }
 
+        /// The kept calls that pass ``filterOp`` and ``mainThreadOnly``, newest first.
         public var filteredEvents: [IOEvent] {
             var result = events
             if let op = filterOp { result = result.filter { $0.operation == op } }
@@ -113,12 +122,15 @@ public extension DebugDrawer {
             }
         }
 
+        /// Swizzles the file methods ``DiskIOPlugin`` lists, so the app's calls through them are
+        /// recorded. `installDiskIO()` calls it; a second call does nothing.
         public func install() {
             guard !installed else { return }
             installed = true
             DiskIOSwizzler.install()
         }
 
+        /// Forgets the recorded calls and starts the totals over.
         public func clear() {
             events.removeAll()
             totals = DiskIOTotals()

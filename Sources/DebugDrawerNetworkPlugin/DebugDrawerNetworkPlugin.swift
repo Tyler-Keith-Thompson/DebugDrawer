@@ -15,16 +15,24 @@ public extension NetworkStore {
 }
 
 #if DEBUG
+    /// The requests and WebSocket connections the Network plugin captured, newest first, with the
+    /// log's filters, its mock rules, conditioning profiles, ignore list and earlier sessions.
     @MainActor
     public final class NetworkStore: ObservableObject {
         /// The store `installNetwork()` fills and the plugin shows, its ignore list in the app's
         /// storage beside the mock rules.
         public static let shared = NetworkStore(ignoreStorage: _NetworkIgnoreListStorage(directory: _NetworkMockStorage.defaultDirectory))
 
+        /// The captured requests, newest first, at most ``capacity``.
         @Published public private(set) var entries: [NetworkEntry] = []
+        /// The log's filter text, matched, ignoring case, against each request's method, URL,
+        /// GraphQL operation name and response body.
         @Published public var filterText = ""
+        /// The log's status filter.
         @Published public var filterStatus: StatusFilter = .all
 
+        /// How many requests ``entries`` keeps, 200 unless set; the oldest goes when a new one
+        /// would pass it.
         public var capacity = 200
 
         /// The requests the log shows that pass the status filter and the filter text, without
@@ -215,6 +223,9 @@ public extension NetworkStore {
             self.ignoreStorage = ignoreStorage
         }
 
+        /// Starts capturing: registers the plugin's URL protocol for `URLSession.shared`, adds it
+        /// to every `URLSessionConfiguration` made from then on, and records WebSocket tasks.
+        /// `installNetwork()` calls it; a second call does nothing.
         public func install() {
             guard !installed else { return }
             installed = true

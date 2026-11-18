@@ -8,6 +8,8 @@ import SwiftUI
 // The public API compiles in every configuration; the implementation under `#if DEBUG` below does
 // not, so release builds get an empty view and an installer that samples and registers nothing.
 
+/// The battery, the power source, the thermal state and this process's CPU load, from
+/// ``EnergyMonitor``.
 public struct EnergyPlugin: DebugDrawerPlugin {
     public var title = "Energy"
     public var category = "Performance"
@@ -39,10 +41,15 @@ public extension DebugDrawer {
 // MARK: - Battery snapshot
 
 public extension EnergyMonitor {
+    /// One battery sample.
     struct BatterySnapshot: Identifiable {
+        /// Identifies the sample in a list.
         public let id = UUID()
+        /// When it was taken.
         public let timestamp: Date
+        /// The charge in percent.
         public let level: Int
+        /// Whether the battery was charging.
         public let isCharging: Bool
     }
 }
@@ -74,18 +81,30 @@ public extension EnergyMonitor {
 
     // MARK: - Energy monitor
 
+    /// The battery, the power source, the thermal state and this process's CPU use, sampled once a
+    /// second while the Energy view is on screen or between ``start()`` and ``stop()``.
     @MainActor
     public final class EnergyMonitor: ObservableObject {
+        /// The monitor the Energy plugin shows.
         public static let shared = EnergyMonitor()
 
-        @Published public private(set) var batteryLevel: Int = -1 // -1 = no battery (desktop Mac)
+        /// The battery's charge in percent, or -1 where there is no battery (a desktop Mac).
+        @Published public private(set) var batteryLevel: Int = -1
+        /// Whether the battery is charging or full on external power.
         @Published public private(set) var isCharging = false
+        /// What powers the device: "AC Power", "Battery Power" on the Mac or "Battery" on iOS, or
+        /// "Unknown" before the first sample.
         @Published public private(set) var powerSource = "Unknown"
+        /// The system's thermal state.
         @Published public private(set) var thermalState: ProcessInfo.ThermalState = .nominal
+        /// This process's CPU use in percent, summed over its threads, so above 100 on several cores.
         @Published public private(set) var cpuUsage: Double = 0
+        /// Whether the monitor is sampling.
         @Published public private(set) var isMonitoring = false
 
+        /// The newest 120 battery samples, two minutes' worth, oldest first.
         @Published public private(set) var batteryHistory: [BatterySnapshot] = []
+        /// The newest 120 CPU samples, two minutes' worth, oldest first.
         @Published public private(set) var cpuHistory: [Double] = []
 
         private let timer: any SamplingTimer

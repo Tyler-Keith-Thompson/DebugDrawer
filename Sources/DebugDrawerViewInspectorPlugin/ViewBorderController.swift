@@ -13,23 +13,33 @@
 
     #if os(macOS)
 
+    /// The View Inspector's switches over the app's key window: view borders by depth, the
+    /// alignment grid `.debugGrid()` draws, click indicators and the animation speed.
     @MainActor
     public final class ViewBorderController: ObservableObject {
+        /// The controller the View Inspector plugin and `.debugGrid()` share.
         public static let shared = ViewBorderController()
 
+        /// Whether every view in the key window has a border colored by its depth.
         @Published public var isBordersEnabled = false {
             didSet { isBordersEnabled ? startObserving() : stopObserving() }
         }
 
+        /// Whether `.debugGrid()` draws its grid.
         @Published public var isGridEnabled = false
+        /// The grid's spacing in points.
         @Published public var gridSpacing: CGFloat = 8
+        /// The grid's color.
         @Published public var gridColor: GridColor = .blue
+        /// The grid's opacity, from 0 to 1.
         @Published public var gridOpacity: Double = 0.15
 
+        /// Whether each click or touch in the app shows a ripple where it landed.
         @Published public var isClickIndicatorEnabled = false {
             didSet { isClickIndicatorEnabled ? ClickIndicatorMonitor.shared.start() : ClickIndicatorMonitor.shared.stop() }
         }
 
+        /// How many times slower the key window's Core Animation runs: 1 is normal speed.
         @Published public var animationSpeed: Double = 1.0 {
             didSet {
                 guard let window = debugDrawerAppKeyWindow else { return }
@@ -37,6 +47,7 @@
             }
         }
 
+        /// The grid's color.
         public enum GridColor: String, CaseIterable {
             case blue, red, green, white, gray
 
@@ -115,23 +126,33 @@
 
     #elseif os(iOS)
 
+    /// The View Inspector's switches over the app's key window: view borders by depth, the
+    /// alignment grid `.debugGrid()` draws, click indicators and the animation speed.
     @MainActor
     public final class ViewBorderController: ObservableObject {
+        /// The controller the View Inspector plugin and `.debugGrid()` share.
         public static let shared = ViewBorderController()
 
+        /// Whether every view in the key window has a border colored by its depth.
         @Published public var isBordersEnabled = false {
             didSet { isBordersEnabled ? applyBorders() : removeBorders() }
         }
 
+        /// Whether `.debugGrid()` draws its grid.
         @Published public var isGridEnabled = false
+        /// The grid's spacing in points.
         @Published public var gridSpacing: CGFloat = 8
+        /// The grid's color.
         @Published public var gridColor: GridColor = .blue
+        /// The grid's opacity, from 0 to 1.
         @Published public var gridOpacity: Double = 0.15
 
+        /// Whether each click or touch in the app shows a ripple where it landed.
         @Published public var isClickIndicatorEnabled = false {
             didSet { isClickIndicatorEnabled ? ClickIndicatorMonitor.shared.start() : ClickIndicatorMonitor.shared.stop() }
         }
 
+        /// How many times slower the key window's Core Animation runs: 1 is normal speed.
         @Published public var animationSpeed: Double = 1.0 {
             didSet {
                 guard let window = Self.keyWindow else { return }
@@ -139,6 +160,7 @@
             }
         }
 
+        /// The grid's color.
         public enum GridColor: String, CaseIterable {
             case blue, red, green, white, gray
 

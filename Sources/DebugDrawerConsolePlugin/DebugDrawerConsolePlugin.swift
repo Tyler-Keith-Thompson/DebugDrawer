@@ -319,6 +319,7 @@ import SwiftUI
             }
         }
 
+        /// Forgets the captured lines; an earlier launch's session on disk stays.
         public func clear() {
             lines.removeAll()
         }

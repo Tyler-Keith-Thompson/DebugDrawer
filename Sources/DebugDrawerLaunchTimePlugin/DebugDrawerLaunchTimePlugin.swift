@@ -6,6 +6,8 @@ import SwiftUI
 // The public API compiles in every configuration; the implementation under `#if DEBUG` below does
 // not, so release builds get an empty view and an installer that measures and registers nothing.
 
+/// How long the app took to launch: from the process's start to `installLaunchTime()`
+/// (pre-main), from there to the first frame, and the total.
 public struct LaunchTimePlugin: DebugDrawerPlugin {
     public var title = "Launch Time"
     public var category = "Performance"

@@ -6,6 +6,8 @@ import SwiftUI
 // The public API compiles in every configuration; the implementation under `#if DEBUG` below does
 // not, so release builds get an empty view and an installer that samples and registers nothing.
 
+/// The frame rate, dropped frames, memory footprint with its peak and CPU use per thread, as
+/// they change.
 public struct PerformancePlugin: DebugDrawerPlugin {
     public var title = "Performance"
     public var category = "Performance"
