@@ -44,6 +44,18 @@ python_test(
     data = ["sign_example.py"],
 )
 
+# What SKIP_TESTS leaves out of every SwiftPM test run, in each runner's form (scripts/test_skips.py,
+# which just spm-test's stages and just test-ios run). It reads the test targets from modules.py.
+python_test(
+    name = "test_skips_test",
+    size = "small",
+    src = "test_skips_test.py",
+    data = [
+        "modules.py",
+        "test_skips.py",
+    ],
+)
+
 # The module graph's check that no two snapshot references of one test target share a base name
 # (scripts/modules.py, which `just modules` and `just record-snapshots` run).
 python_test(

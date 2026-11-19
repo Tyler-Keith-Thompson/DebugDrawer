@@ -42,7 +42,16 @@ record-snapshots:
 # worktrees don't launch their test hosts over each other. An IOS_DESTINATION given (CI's) wins.
 IOS_DESTINATION := env("IOS_DESTINATION", "")
 
-[doc('Run the SwiftPM tests on an iOS simulator (the Dynamic Type snapshots), this checkout’s own unless IOS_DESTINATION names one')]
+# Tests to leave out of every SwiftPM test run: spm-test-mac's swift test, spm-platform-test's,
+# spm-catalyst-test's and test-ios's xcodebuild. Entries go comma- or space-separated in
+# xcodebuild's -skip-testing form, Target, Target/Suite or Target/Suite/test() (a Swift Testing
+# function keeps its parentheses and labels, or xcodebuild skips nothing), and
+# scripts/test_skips.py writes them as each runner takes them: `--skip` regexes for swift test,
+# `-skip-testing:` for xcodebuild. Exported, so the stages spm-test runs as recipes of their own see
+# it whether it was given before the recipe (`just SKIP_TESTS=... spm-test`) or in the environment.
+export SKIP_TESTS := env("SKIP_TESTS", "")
+
+[doc('Run the SwiftPM tests on an iOS simulator (the Dynamic Type snapshots), this checkout’s own unless IOS_DESTINATION names one; SKIP_TESTS="Target/Suite/test(),…" leaves tests out, as in spm-test')]
 test-ios *env="":
     #!/usr/bin/env bash
     set -euo pipefail
@@ -51,8 +60,9 @@ test-ios *env="":
         destination="platform=iOS Simulator,id=$(python3 {{PROJECT_ROOT}}/scripts/ios_simulator.py udid)"
     fi
     skips=$(python3 {{PROJECT_ROOT}}/scripts/modules.py performance-targets | sed 's/^/-skip-testing:/')
+    skipped=$(python3 {{PROJECT_ROOT}}/scripts/test_skips.py xcodebuild)
     env {{env}} xcodebuild test -quiet -scheme DebugDrawer-Package -destination "$destination" \
-        -derivedDataPath {{PROJECT_ROOT}}/.build/xcode-ios $skips
+        -derivedDataPath {{PROJECT_ROOT}}/.build/xcode-ios $skips $skipped
 
 [doc('Delete the simulator just test-ios made for this checkout (run it before removing a worktree)')]
 ios-simulator-delete:
@@ -150,8 +160,9 @@ spm-platform-test platform destination:
     #!/usr/bin/env bash
     set -euo pipefail
     for scheme in $(python3 {{PROJECT_ROOT}}/scripts/modules.py platform-test-schemes {{platform}}); do
+        skipped=$(python3 {{PROJECT_ROOT}}/scripts/test_skips.py xcodebuild "$scheme")
         xcodebuild test -quiet -scheme "$scheme" -destination '{{destination}}' \
-            -derivedDataPath {{PROJECT_ROOT}}/.build/xcode-{{lowercase(platform)}}
+            -derivedDataPath {{PROJECT_ROOT}}/.build/xcode-{{lowercase(platform)}} $skipped
     done
 
 # The simulator `just spm-visionos-test` runs the visionOS tests in.
@@ -194,10 +205,11 @@ spm-catalyst-test:
     #!/usr/bin/env bash
     set -euo pipefail
     skips=$(python3 {{PROJECT_ROOT}}/scripts/modules.py performance-targets | sed 's/^/-skip-testing:/')
+    skipped=$(python3 {{PROJECT_ROOT}}/scripts/test_skips.py xcodebuild)
     home=$(mktemp -d)
     trap 'rm -rf "$home"' EXIT
     xcodebuild test -quiet -scheme DebugDrawer-Package -destination 'platform=macOS,variant=Mac Catalyst' \
-        -derivedDataPath {{PROJECT_ROOT}}/.build/xcode-catalyst-test TEST_RUNNER_CFFIXED_USER_HOME="$home" $skips
+        -derivedDataPath {{PROJECT_ROOT}}/.build/xcode-catalyst-test TEST_RUNNER_CFFIXED_USER_HOME="$home" $skips $skipped
 
 # Plugins keep their files in Application Support and Caches under the home folder, which on macOS
 # Foundation reads from CFFIXED_USER_HOME (never HOME), so the test process and every exit test's
@@ -206,19 +218,21 @@ spm-catalyst-test:
 # The arguments pass through as given (positional), so a quoted filter such as "A|B" stays one.
 # The performance targets (PERFORMANCE_TESTS in scripts/modules.py) are built but skipped: their
 # wall-clock budgets hold only in the optimized build Bazel runs each alone (`just test-release`),
-# not in a debug build beside every other test. Further --skip arguments add to that one.
+# not in a debug build beside every other test. Further --skip arguments add to that one, and so do
+# the tests SKIP_TESTS names; a --skip reaches only this stage, SKIP_TESTS every one.
 [doc('Run the SwiftPM tests on the Mac but the performance ones, in a temporary home folder (arguments go to swift test)')]
 [positional-arguments]
 spm-test-mac *args:
     #!/usr/bin/env bash
     set -euo pipefail
+    skipped=$(python3 {{PROJECT_ROOT}}/scripts/test_skips.py swift-test)
     {{SWIFT}} build --build-tests
     home=$(mktemp -d)
     trap 'rm -rf "$home"' EXIT
     skip=$(python3 {{PROJECT_ROOT}}/scripts/modules.py swift-test-performance-skip)
-    CFFIXED_USER_HOME="$home" {{SWIFT}} test --skip-build --skip "$skip" "$@"
+    CFFIXED_USER_HOME="$home" {{SWIFT}} test --skip-build --skip "$skip" $skipped "$@"
 
-[doc('Run the tests via SwiftPM but the performance ones: on the Mac (arguments go to swift test), then the visionOS ones in its simulator and the rest for Mac Catalyst')]
+[doc('Run the tests via SwiftPM but the performance ones: on the Mac (arguments go to swift test), then the visionOS ones in its simulator and the rest for Mac Catalyst. To skip a test in every stage, name it in SKIP_TESTS, e.g. SKIP_TESTS="DebugDrawerTests/CaptureBufferTests/countBound(),DebugDrawerNetworkPluginTests/NetworkWebSocketExitTests" just spm-test; a --skip reaches swift test only')]
 [positional-arguments]
 spm-test *args:
     just spm-test-mac "$@"
