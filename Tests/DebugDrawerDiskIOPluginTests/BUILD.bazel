@@ -21,6 +21,7 @@ swift_library(
     deps = [
         "//Sources/DebugDrawerDiskIOPlugin",
         "//Sources/DebugDrawer",
+        "//Tests/DebugDrawerInterceptionContract",
         "//Sources/DebugDrawerDiskIOInterposer",
     ] + select({
         # Apple-only packages (APPLE_ONLY_PACKAGES in scripts/modules.py).

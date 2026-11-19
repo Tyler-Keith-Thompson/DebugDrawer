@@ -20,6 +20,7 @@ Sources/DebugDrawer<Name>Plugin/ One module per shipped plugin
 Tests/<Module>Tests/             One test target per module; Performance/ holds speed-reliant tests
 Tests/DebugDrawerTests/          The core's tests and the README examples, verbatim
 Tests/DebugDrawerTestSupport/    Shared test fixtures (data only)
+Tests/DebugDrawerInterceptionContract/  The interception contract's checks (TEST_HELPERS), test-only
 Example/                         The macOS, iOS, visionOS, tvOS and watchOS example apps, a UIKit-only and an
                                  AppKit-only one, and the libraries they share: TestBench (actions that give each
                                  plugin data) and Plugins (every plugin with its defaults) (hand-written BUILD.bazel)
@@ -46,6 +47,8 @@ the umbrella module and `swift/Package.swift` from it. Never edit the generated 
 - Add a module: a row in `MODULES` (name, group, description, dependencies), then `just modules`.
 - Add a test target: a row in `TEST_TARGETS`. A target with a `Performance/` directory of Swift
   sources must be listed in `PERFORMANCE_TESTS`, and the reverse.
+- Add a test helper (shared checks several test targets run): a row in `TEST_HELPERS`. It is a
+  testonly library visible only to `//Tests/...`, which no module may list.
 - Add an executable: a row in `EXECUTABLES` (name, description, dependencies). It holds only
   `@main`; its code lives in a module, where tests reach it.
 - Add a dynamic library (C code that must be an image of its own, loaded at launch, such as
@@ -133,6 +136,9 @@ the *default* sections below where they differ:
   (DiskIO, Network, render tracking, Location) are installed only as a drawer installs the plugin
   (`install(in:)`, which its `install*()` call leads to), and its `uninstall(from:)` puts back each
   original implementation it replaced (`MethodReplacements`, copied into each plugin that swizzles).
+  An interception plugin keeps the contract in `WritingPlugins.md` (idempotent, reversible, no
+  change in what the app sees, bounded capture, the drawer's own activity left out), and its test
+  target runs the `DebugDrawerInterceptionContract` checks.
 - **No timing hacks.** No `DispatchQueue.asyncAfter` or `Task.sleep` to wait for some other event;
   use events (Combine, callbacks, notifications, `onAppear`).
 - **SwiftUI first.** AppKit or UIKit only where SwiftUI can't do it (swizzling, URLProtocol,
@@ -353,7 +359,8 @@ library with none of that can skip this section.
 - Swift Testing (`import Testing`, `@Suite`, `@Test`, `#expect`, `#require`). Never XCTest.
 - Each test is self-contained and portable: no assertion or setup helpers, not DRY; a test
   copied to another file still works. Shared fixture data in `DebugDrawerTestSupport` is tolerated;
-  shared assertions are not.
+  shared assertions are not, except the interception contract's checks
+  (`DebugDrawerInterceptionContract`), which every interception plugin must pass alike.
 - Test names state the rule they pin ("The checked spelling throws EmptyName for an empty name").
 - **Sociable.** A test runs the real code under test and its real collaborators wherever they are
   fast and deterministic, and mocks only the seams that reach out (network, disk, clock) or that

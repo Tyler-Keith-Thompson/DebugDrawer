@@ -13,7 +13,9 @@
     /// What the forwarding session and a conditioned delivery report is handed to that thread
     /// before it touches the state or the client, so nothing races `stopLoading()`.
     final class DebugNetworkProtocol: URLProtocol, @unchecked Sendable {
-        private static let handledKey = "com.debugdrawer.network.handled"
+        /// The request property that marks a request the plugin sends itself (the forwarded copy of
+        /// one it captured), which it then leaves alone, so nothing is captured twice.
+        static let handledKey = "com.debugdrawer.network.handled"
 
         /// Where `startLoading()` was called; the client is called there, and the state changed.
         private var clientThread: NetworkClientThread?

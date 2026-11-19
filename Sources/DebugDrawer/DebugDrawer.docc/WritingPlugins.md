@@ -264,3 +264,42 @@ change, so a view compares it to skip work when nothing changed. A ``CaptureBuff
 value, `Codable` when the elements are, for a bug report or an export. In release builds the
 buffer keeps nothing.
 
+### Intercepting the app's calls
+
+A plugin that changes how the app's own calls run (it swizzles a method, registers a URL protocol,
+installs a hook or a monitor) keeps a contract, so the app behaves the same with it as without and
+the developer can trust what it shows. The Network, Disk I/O, Location and View Inspector plugins
+keep it, and a plugin of your own that intercepts should too:
+
+- **Idempotent install.** Installing twice is installing once. ``DebugDrawerPlugin/install(in:)``
+  runs once per drawer that adds the plugin, so the plugin counts the drawers holding it and
+  intercepts on the first; replacing a method that already runs the plugin's code does nothing,
+  so no call is intercepted, or recorded, twice.
+- **Reversible.** ``DebugDrawerPlugin/uninstall(from:)``, from the last drawer holding the
+  plugin, puts back exactly what the install changed: each replaced method gets the implementation
+  it had (set back, not swapped a second time), a registered class is unregistered, a hook or
+  monitor is removed, a switch is turned off. A second uninstall changes nothing, and installing
+  again intercepts again. A method other code has replaced again since stays, and the plugin's
+  code under it calls straight through while uninstalled.
+- **No change in what the app sees.** With the plugin installed, a call returns, throws and writes
+  what it would without it, beyond what the plugin is for and only while the developer turns that
+  on: a mock rule's response, a simulated location, slowed animations. The plugin observes and
+  passes the call on unchanged.
+- **Bounded capture.** Whatever the plugin keeps of the app's calls has a cap: a
+  ``CaptureBuffer`` with a count and a byte bound, a dictionary that evicts its oldest key, weak
+  references to the app's objects. A long session costs bounded memory however busy the app is.
+- **The drawer's own activity is filtered out.** What the drawer and its plugins do themselves
+  (saving their settings, writing a bug report, a request a plugin sends on the app's behalf,
+  drawing the drawer) never shows among the app's calls. File work runs with
+  ``DebugDrawerActivity/isDrawerWork`` bound to `true`; a request a plugin sends itself carries
+  a mark its interception skips; the drawer's views are never tracked.
+
+Interception starts in ``DebugDrawerPlugin/install(in:)``, not when the app's `install*()` call
+runs or when the module loads, so nothing is intercepted, or kept, before a drawer adds the plugin.
+
+The shipped plugins' test targets check the contract with shared checks: installing twice and in a
+second drawer, uninstalling and installing again, the app's results with the plugin and without,
+the capture's bound and the drawer's own work. Each runs in a child process of its own
+(`#expect(processExitsWith:)`), since installing changes the whole process. A swizzle's check
+compares the method implementations it reads before the install and after the uninstall.
+

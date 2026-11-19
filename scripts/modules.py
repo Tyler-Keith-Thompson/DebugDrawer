@@ -2,8 +2,8 @@
 """The module graph, written once.
 
 Package.swift, swift/Package.swift, every Sources/*/BUILD.bazel and Tests/*/BUILD.bazel, the
-umbrella module, tools/performance_tests.bzl, tools/executables.bzl, tools/dynamic_libraries.bzl
-and Benchmarks/Package.swift are generated from the tables below, so SwiftPM and Bazel cannot
+umbrella module, tools/performance_tests.bzl, tools/executables.bzl, tools/dynamic_libraries.bzl,
+tools/test_helpers.bzl and Benchmarks/Package.swift are generated from the tables below, so SwiftPM and Bazel cannot
 drift. Run `just modules` after editing them. `//:package_swift_test` fails when Package.swift disagrees with the Bazel graph.
 
 Modules are named after the concept they hold, with a `Module` suffix only where the module
@@ -197,20 +197,20 @@ EXECUTABLES = [
 TEST_TARGETS = [
     ("DebugDrawerTests", ["DebugDrawer", "viewinspector/ViewInspector", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
     ("DebugDrawerConsolePluginTests", ["DebugDrawerConsolePlugin", "DebugDrawer", "viewinspector/ViewInspector", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
-    ("DebugDrawerViewInspectorPluginTests", ["DebugDrawerViewInspectorPlugin", "DebugDrawer", "viewinspector/ViewInspector", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
+    ("DebugDrawerViewInspectorPluginTests", ["DebugDrawerViewInspectorPlugin", "DebugDrawer", "DebugDrawerInterceptionContract", "viewinspector/ViewInspector", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
     ("DebugDrawerAccessibilityPluginTests", ["DebugDrawerAccessibilityPlugin", "DebugDrawer", "viewinspector/ViewInspector", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
     ("DebugDrawerAppInfoPluginTests", ["DebugDrawerAppInfoPlugin", "DebugDrawer", "viewinspector/ViewInspector", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
     ("DebugDrawerUserDefaultsPluginTests", ["DebugDrawerUserDefaultsPlugin", "DebugDrawer", "viewinspector/ViewInspector", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
     ("DebugDrawerPerformancePluginTests", ["DebugDrawerPerformancePlugin", "DebugDrawer", "viewinspector/ViewInspector", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
-    ("DebugDrawerNetworkPluginTests", ["DebugDrawerNetworkPlugin", "DebugDrawer", "viewinspector/ViewInspector", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
+    ("DebugDrawerNetworkPluginTests", ["DebugDrawerNetworkPlugin", "DebugDrawer", "DebugDrawerInterceptionContract", "viewinspector/ViewInspector", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
     ("DebugDrawerKeychainPluginTests", ["DebugDrawerKeychainPlugin", "DebugDrawer", "viewinspector/ViewInspector", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
     ("DebugDrawerScreenshotPluginTests", ["DebugDrawerScreenshotPlugin", "DebugDrawer", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
     ("DebugDrawerFileBrowserPluginTests", ["DebugDrawerFileBrowserPlugin", "DebugDrawer", "viewinspector/ViewInspector", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
-    ("DebugDrawerDiskIOPluginTests", ["DebugDrawerDiskIOPlugin", "DebugDrawer", "DebugDrawerDiskIOInterposer", "viewinspector/ViewInspector", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
+    ("DebugDrawerDiskIOPluginTests", ["DebugDrawerDiskIOPlugin", "DebugDrawer", "DebugDrawerInterceptionContract", "DebugDrawerDiskIOInterposer", "viewinspector/ViewInspector", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
     ("DebugDrawerEnergyPluginTests", ["DebugDrawerEnergyPlugin", "DebugDrawer", "viewinspector/ViewInspector", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
     ("DebugDrawerLaunchTimePluginTests", ["DebugDrawerLaunchTimePlugin", "DebugDrawer", "viewinspector/ViewInspector", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
     ("DebugDrawerLoadedLibrariesPluginTests", ["DebugDrawerLoadedLibrariesPlugin", "DebugDrawer", "viewinspector/ViewInspector", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
-    ("DebugDrawerLocationPluginTests", ["DebugDrawerLocationPlugin", "DebugDrawer", "viewinspector/ViewInspector", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
+    ("DebugDrawerLocationPluginTests", ["DebugDrawerLocationPlugin", "DebugDrawer", "DebugDrawerInterceptionContract", "viewinspector/ViewInspector", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
     ("DebugDrawerDeepLinkPluginTests", ["DebugDrawerDeepLinkPlugin", "DebugDrawer", "viewinspector/ViewInspector", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
     ("DebugDrawerCookiesPluginTests", ["DebugDrawerCookiesPlugin", "DebugDrawer", "viewinspector/ViewInspector", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
     ("DebugDrawerTweaksPluginTests", ["DebugDrawerTweaksPlugin", "DebugDrawer", "viewinspector/ViewInspector", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
@@ -234,6 +234,17 @@ TEST_TARGETS = [
 # The modules the test-support target depends on (fixtures are usually written against the
 # vocabulary module). Empty is fine.
 TEST_SUPPORT_DEPENDENCIES = []
+
+# Test helpers: (name, description, dependencies). Shared checks that several test targets run,
+# where TEST_SUPPORT holds data alone. Each lives in Tests/<name>: a plain target no product names
+# in Package.swift, and a testonly swift_library in Bazel visible only to the test packages, so no
+# library can link one; check() fails when a module or executable lists one. A test target lists it
+# among its dependencies like a module; its PERFORMANCE_TESTS target leaves it out.
+TEST_HELPERS = [
+    ("DebugDrawerInterceptionContract",
+     "The interception contract's checks (WritingPlugins.md), which interception plugins' tests run.",
+     ["DebugDrawer"]),
+]
 
 # Bazel test sizes above the default "small" (60 s timeout), for suites whose solo run takes more
 # than about 15 s on a laptop or 30 s on a four-core CI runner, and so can pass 60 s when other
@@ -332,8 +343,16 @@ def check():
     for name in APPLE_ONLY_TESTS:
         assert name in dict(TEST_TARGETS), f"APPLE_ONLY_TESTS names unknown test target {name}"
     packages = [p[0] for p in PACKAGES]
+    helpers = [h[0] for h in TEST_HELPERS]
+    assert len(helpers) == len(set(helpers)), "duplicate test helper"
+    assert not set(helpers) & set(names + [PROJECT, TEST_SUPPORT]), "a test helper shares a module's name"
+    for name, _, deps in TEST_HELPERS:
+        for d in deps:
+            assert "/" not in d and d in names, f"test helper {name} depends on {d}, which isn't a module"
     for name, deps in [(m[0], m[3]) for m in MODULES] + [(e[0], e[2]) for e in EXECUTABLES]:
         for d in deps:
+            # A test helper is testonly: only test targets link it.
+            assert d not in helpers, f"{name} depends on the test helper {d}; only a test target may"
             if "/" in d:
                 assert d.split("/")[0] in packages, f"{name} depends on unknown package {d}"
             else:
@@ -356,7 +375,7 @@ def check():
             if "/" in d:
                 assert d.split("/")[0] in packages, f"{name} depends on unknown package {d}"
             else:
-                assert d in names + dynamic + [PROJECT, TEST_SUPPORT], f"{name} depends on unknown {d}"
+                assert d in names + dynamic + helpers + [PROJECT, TEST_SUPPORT], f"{name} depends on unknown {d}"
     for name in PERFORMANCE_TESTS:
         assert name in tests, f"PERFORMANCE_TESTS names unknown test target {name}"
         assert not simulator_test(name), f"{name} runs in the simulator, which PERFORMANCE_TESTS doesn't support"
@@ -508,9 +527,19 @@ def bazel_label(d):
     if "/" in d:
         package, product = d.split("/")
         return f"@swiftpkg_{package.replace('-', '_')}//:{product}"
-    if d == TEST_SUPPORT:
-        return f"//Tests/{TEST_SUPPORT}"
+    if d == TEST_SUPPORT or d in test_helpers():
+        return f"//Tests/{d}"
     return f"//Sources/{d}"
+
+
+def test_helpers():
+    """The names of TEST_HELPERS."""
+    return [h[0] for h in TEST_HELPERS]
+
+
+def performance_dependencies(deps):
+    """A PERFORMANCE_TESTS target's dependencies: its test target's, without the test helpers."""
+    return [d for d in deps if d not in test_helpers()]
 
 
 def excluded(path):
@@ -597,6 +626,12 @@ def package_swift():
         f'    .target(name: "{TEST_SUPPORT}", {support_deps_arg}path: "Tests/{TEST_SUPPORT}", exclude: bazelFiles),',
         "",
     ]
+    if TEST_HELPERS:
+        lines += ["    // Shared checks the test targets run (TEST_HELPERS in scripts/modules.py); no product names them."]
+        for name, _, deps in TEST_HELPERS:
+            dl = ", ".join(spm_dep(d) for d in deps)
+            lines.append(f'    .target(name: "{name}", dependencies: [{dl}], path: "Tests/{name}", exclude: bazelFiles),')
+        lines.append("")
     for name, deps in package_tests():
         dl = ", ".join(spm_dep(d) for d in deps)
         files = excluded(f"Tests/{name}")
@@ -609,7 +644,7 @@ def package_swift():
         ]
         for name, deps in TEST_TARGETS:
             if name in PERFORMANCE_TESTS:
-                dl = ", ".join(spm_dep(d) for d in deps)
+                dl = ", ".join(spm_dep(d) for d in performance_dependencies(deps))
                 lines.append(f'    .testTarget(name: "{performance_target(name)}", dependencies: [{dl}], path: "Tests/{name}/Performance"),')
     lines += [
         "]",
@@ -805,6 +840,37 @@ def test_support_build_bazel():
     )
 
 
+def test_helper_build_bazel(name, description, deps):
+    return (
+        "# GENERATED by scripts/modules.py — edit TEST_HELPERS there, then run `just modules`.\n\n"
+        'load("//tools:swift_rules.bzl", "swift_library")\n\n'
+        f"# {description}\n"
+        "# Test-only (TEST_HELPERS in scripts/modules.py): visible to the test packages, and to the root\n"
+        "# package's //:package_swift_test, so no library under Sources/ can depend on it.\n"
+        "swift_library(\n"
+        f'    name = "{name}",\n'
+        "    testonly = True,\n"
+        '    srcs = glob(["**/*.swift"]),\n'
+        f'    module_name = "{name}",\n'
+        f"{bazel_deps(deps)}"
+        '    visibility = [\n'
+        '        "//:__pkg__",\n'
+        '        "//Tests:__subpackages__",\n'
+        "    ],\n"
+        ")\n"
+    )
+
+
+def test_helpers_bzl():
+    packages = "".join(f'    "Tests/{name}",\n' for name in test_helpers())
+    return (
+        '"""GENERATED by scripts/modules.py (TEST_HELPERS) — edit the table there, then run `just modules`."""\n\n'
+        "# The packages under Tests/ that hold a test helper, a library rather than tests: the root\n"
+        "# BUILD.bazel leaves them out of the test bundles and checks them against Package.swift.\n"
+        f"TEST_HELPER_PACKAGES = [\n{packages}]\n"
+    )
+
+
 def test_targets_bazel(name, deps, size, srcs, tags, test_tags=()):
     """One test module: its library, the swift_test that `bazel test` runs, and the Xcode bundle.
 
@@ -965,7 +1031,7 @@ def test_build_bazel(name, deps):
         + test_targets_bazel(name, deps, size, 'glob(["**/*.swift"], exclude = ["Performance/**"])', [RELEASE_EXCLUDED_TAG])
         + "\n# The speed-reliant tests (PERFORMANCE_TESTS in scripts/modules.py): debug and `--config=release`\n"
         + f"# both run them, each alone after every other action (`{PERFORMANCE_TEST_TAG}`).\n"
-        + test_targets_bazel(performance_target(name), deps, PERFORMANCE_TEST_SIZE, 'glob(["Performance/**/*.swift"])', [],
+        + test_targets_bazel(performance_target(name), performance_dependencies(deps), PERFORMANCE_TEST_SIZE, 'glob(["Performance/**/*.swift"])', [],
                              [PERFORMANCE_TEST_TAG])
     )
 
@@ -1111,6 +1177,9 @@ def main():
         write(os.path.join(ROOT, "Sources", name, "BUILD.bazel"), dynamic_library_build_bazel(name, description))
     write(os.path.join(ROOT, "tools", "dynamic_libraries.bzl"), dynamic_libraries_bzl())
     write(os.path.join(ROOT, "Tests", TEST_SUPPORT, "BUILD.bazel"), test_support_build_bazel())
+    for name, description, deps in TEST_HELPERS:
+        write(os.path.join(ROOT, "Tests", name, "BUILD.bazel"), test_helper_build_bazel(name, description, deps))
+    write(os.path.join(ROOT, "tools", "test_helpers.bzl"), test_helpers_bzl())
     write(os.path.join(ROOT, "tools", "executables.bzl"), executables_bzl())
     write(os.path.join(ROOT, "tools", "performance_tests.bzl"), performance_tests_bzl())
     names = [m[0] for m in package_modules()]

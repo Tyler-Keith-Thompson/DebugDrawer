@@ -2,6 +2,7 @@
 // lives here rather than in DebugDrawerTests, which links core alone. ViewInspector is linked on
 // Apple platforms only, and the views are tested on the Mac.
 #if os(macOS) && DEBUG
+    import DebugDrawer
     @testable import DebugDrawerViewInspectorPlugin
     import SwiftUI
     import Testing
@@ -27,6 +28,8 @@
     struct ViewInspectorREADMEExamplesTests {
         @Test("View Inspector: a tracked row shows its title and total, and its body is counted under OrderRow")
         func trackRenders() throws {
+            // The README's app installs the plugin at launch, which starts the counting.
+            DebugDrawer.shared.installViewInspector()
             let sut = OrderRow(title: "Coffee beans", total: "$18.00")
             let before = RenderTracker.shared.counts["OrderRow", default: 0]
             let expectedTexts = ["Coffee beans", "$18.00"]

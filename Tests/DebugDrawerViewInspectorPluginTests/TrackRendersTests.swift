@@ -51,6 +51,8 @@
             let siblingName = "Sibling-\(UUID().uuidString)"
             let inputs = ScreenInputs()
             let tracker = RenderTracker.shared
+            // Renders are counted while the plugin is installed.
+            DebugDrawer.shared.installViewInspector()
             let sut = Screen(inputs: inputs, trackedName: trackedName, siblingName: siblingName)
             ViewHosting.host(view: sut)
             defer { ViewHosting.expel() }

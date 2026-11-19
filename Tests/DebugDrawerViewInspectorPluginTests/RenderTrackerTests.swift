@@ -20,6 +20,39 @@
             #expect(actual == expected)
         }
 
+        @Test("A new name past the capacity drops the name counted first, while a known name only counts")
+        func capacityDropsTheOldestName() {
+            let sut = RenderTracker()
+            sut.capacity = 2
+            let expected = ["AvatarView": 2, "Badge": 1]
+
+            sut.record("FeedView")
+            sut.record("AvatarView")
+            sut.record("AvatarView")
+            sut.record("Badge")
+            let actual = sut.counts
+
+            #expect(actual == expected)
+        }
+
+        @Test("Lowering the capacity drops the oldest names at once, and a capacity of 0 keeps none")
+        func lowerCapacity() {
+            let sut = RenderTracker()
+            sut.record("FeedView")
+            sut.record("AvatarView")
+            sut.record("Badge")
+            let expectedAfterLowering: [String: Int] = ["Badge": 1]
+
+            sut.capacity = 1
+            let afterLowering = sut.counts
+            sut.capacity = 0
+            sut.record("SettingsView")
+            let actual = sut.counts
+
+            #expect(afterLowering == expectedAfterLowering)
+            #expect(actual.isEmpty)
+        }
+
         @Test("Entries list the busiest first, and names in order among equal counts")
         func busiestFirst() {
             let counts = ["SettingsView": 2, "FeedView": 24, "AvatarView": 2, "Badge": 7]

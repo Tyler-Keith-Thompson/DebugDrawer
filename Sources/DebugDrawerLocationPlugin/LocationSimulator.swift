@@ -211,7 +211,10 @@
             }
         }
 
-        private func updatingManagers() -> [CLLocationManager] {
+        /// The managers between `startUpdatingLocation` and `stopUpdatingLocation` that are still
+        /// alive: the simulator holds each weakly and lets go of the released ones here, so it
+        /// keeps no more than the app does.
+        func updatingManagers() -> [CLLocationManager] {
             state.withLockUnchecked { state in
                 state.updating.removeAll { $0.manager == nil }
                 return state.updating.compactMap(\.manager)

@@ -6,6 +6,7 @@ load("//tools:dynamic_libraries.bzl", "DYNAMIC_LIBRARY_PACKAGES")
 load("//tools:executables.bzl", "EXECUTABLE_PACKAGES")
 load("//tools:performance_tests.bzl", "PERFORMANCE_TEST_PACKAGES")
 load("//tools:swiftpm.bzl", "swiftpm_manifest_test")
+load("//tools:test_helpers.bzl", "TEST_HELPER_PACKAGES")
 
 # Nothing here builds for iOS only (IOS_MODULES in scripts/modules.py, which writes tools/ios.bzl
 # for an app), and no tests run in the simulator.
@@ -24,11 +25,14 @@ APP_TARGETS = [
 # `Tests/` with a BUILD.bazel holding a swift_test is a test bundle. Listing them by hand means a
 # new suite is invisible in Xcode until somebody remembers to come back here.
 #
-# DebugDrawerTestSupport lives under Tests/ too, but it is a library, so it is excluded by name.
+# DebugDrawerTestSupport and the test helpers (TEST_HELPERS in scripts/modules.py) live under
+# Tests/ too, but they are libraries, so they are excluded by name.
+TEST_LIBRARY_PACKAGES = ["Tests/DebugDrawerTestSupport"] + TEST_HELPER_PACKAGES
+
 TEST_PACKAGES = sorted([
     package
     for package in subpackages(include = ["Tests/*"])
-    if package != "Tests/DebugDrawerTestSupport"
+    if package not in TEST_LIBRARY_PACKAGES
 ])
 
 # Xcode runs each package's .xctest bundle target; `bazel test` runs its swift_test (see
@@ -125,7 +129,7 @@ swiftpm_manifest_test(
         "//" + package
         for package in sorted(subpackages(include = ["Sources/*"]))
         if package not in IOS_PACKAGES
-    ] + ["//Tests/DebugDrawerTestSupport"] + [
+    ] + ["//" + package for package in TEST_LIBRARY_PACKAGES] + [
         "//" + package + ":" + module + "Library"
         for package in TEST_PACKAGES
         if package not in SIMULATOR_TEST_PACKAGES

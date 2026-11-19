@@ -24,8 +24,19 @@
         /// Every tracked name, busiest first, as of the last turn that recorded.
         @Published private(set) var entries: [Entry] = []
 
-        /// Body evaluations by name, up to the moment; not observed.
+        /// Body evaluations by name, up to the moment; not observed. At most ``capacity`` names.
         private(set) var counts: [String: Int] = [:]
+
+        /// How many names ``counts`` keeps, 1,000 unless set. An app can name views from its data
+        /// (`.trackRenders("Row \(id)")`), so a new name past it drops the name first counted
+        /// longest ago, and memory stays bounded however many names a session meets. Setting a
+        /// lower one drops the oldest names at once.
+        var capacity = 1000 {
+            didSet { evictPastCapacity() }
+        }
+
+        /// The names in ``counts``, in the order each was first counted.
+        private var names: [String] = []
 
         private let recorded = PassthroughSubject<Void, Never>()
         private var isPublishPending = false
@@ -47,7 +58,11 @@
         @discardableResult
         func record(_ name: String) -> Int {
             let count = counts[name, default: 0] + 1
+            if count == 1 {
+                names.append(name)
+            }
             counts[name] = count
+            evictPastCapacity()
             if !isPublishPending {
                 isPublishPending = true
                 recorded.send()
@@ -58,12 +73,24 @@
         /// Forgets every count.
         func reset() {
             counts = [:]
+            names = []
             entries = []
         }
 
-        /// Whether `.trackRenders(_:)` counts: from launch, and again once the View Inspector
-        /// plugin is installed after an uninstall turned it off.
-        var isTracking = true
+        /// Whether `.trackRenders(_:)` counts: from the View Inspector plugin's install to its
+        /// uninstall, so an app that never installs it counts nothing and keeps no names.
+        var isTracking = false
+
+        private func evictPastCapacity() {
+            // Only a name past the capacity evicts, so the array's O(n) removal stays off the path
+            // that counts a name already known.
+            let excess = names.count - max(capacity, 0)
+            guard excess > 0 else { return }
+            for name in names.prefix(excess) {
+                counts[name] = nil
+            }
+            names.removeFirst(excess)
+        }
 
         private func publish() {
             isPublishPending = false

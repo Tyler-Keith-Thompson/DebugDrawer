@@ -163,5 +163,34 @@ class SwiftPMPerformanceSkipTests(unittest.TestCase):
         self.assertIsNone(actual)
 
 
+class TestHelperTests(unittest.TestCase):
+    """A test helper (TEST_HELPERS) is linked by test targets alone."""
+
+    def test_a_helper_is_testonly_and_visible_only_to_the_test_packages_and_the_manifest_check(self):
+        actual = modules.test_helper_build_bazel("ContractChecks", "Shared checks.", ["DebugDrawer"])
+
+        self.assertIn("    testonly = True,\n", actual)
+        self.assertIn('        "//Tests:__subpackages__",\n', actual)
+        self.assertIn('        "//:__pkg__",\n', actual)
+        self.assertNotIn("//visibility:public", actual)
+
+    def test_a_module_that_lists_a_helper_fails_the_check(self):
+        helper = modules.TEST_HELPERS[0][0]
+        saved = modules.MODULES
+        modules.MODULES = saved + [("Leaky", "Core", "Depends on a test helper.", ["DebugDrawer", helper])]
+        try:
+            with self.assertRaisesRegex(AssertionError, "test helper"):
+                modules.check()
+        finally:
+            modules.MODULES = saved
+
+    def test_a_performance_target_leaves_the_helpers_out(self):
+        helper = modules.TEST_HELPERS[0][0]
+
+        actual = modules.performance_dependencies(["DebugDrawer", helper, "viewinspector/ViewInspector"])
+
+        self.assertEqual(actual, ["DebugDrawer", "viewinspector/ViewInspector"])
+
+
 if __name__ == "__main__":
     unittest.main()
