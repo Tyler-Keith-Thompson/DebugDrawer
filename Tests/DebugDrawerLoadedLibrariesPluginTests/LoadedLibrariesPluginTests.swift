@@ -38,10 +38,12 @@
 
         @Test func thisProcessMainExecutableIsAppWhenItsBundleIsTheApp() throws {
             // dyld's image 0 is the main executable. Under a test runner that's the runner,
-            // so treat its directory as the app bundle to check loadAll() end to end.
+            // so treat its directory as the app bundle to check dyld's list through the model end to end.
             let executable = String(cString: try #require(_dyld_get_image_name(0)))
             let bundle = (executable as NSString).deletingLastPathComponent
-            let main = try #require(LoadedLibrary.loadAll(bundlePath: bundle).first { $0.path == executable })
+            let model = LoadedLibrariesModel(images: _LoadedImageList(), bundlePath: bundle)
+            model.perform(LoadedLibrariesCommand(.refresh))
+            let main = try #require(model.snapshot.libraries.first { $0.path == executable })
             #expect(main.category == .app)
         }
 
@@ -56,7 +58,9 @@
             let path = String(cString: try #require(info.dli_fname))
             let base = UInt(bitPattern: info.dli_fbase)
 
-            let libraries = LoadedLibrary.loadAll()
+            let model = LoadedLibrariesModel(images: _LoadedImageList())
+            model.perform(LoadedLibrariesCommand(.refresh))
+            let libraries = model.snapshot.libraries
             let image = try #require(libraries.first { $0.path == path }, "\(path) not listed")
             #expect(image.loadAddress == base)
             #expect(image.loadAddressLabel == String(format: "0x%llx", UInt64(base)))
