@@ -305,6 +305,9 @@ run target="macOS" *args="":
             {{BAZEL}} build //Example:ExampleApp_macOS
             APP_ZIP=$({{BAZEL}} cquery //Example:ExampleApp_macOS --output=files 2>/dev/null | grep '\.zip$')
             unzip -qo "$APP_ZIP" -d "$RUN_DIR"
+            # Re-signed with the Keychain's Apple Development identity (or DEBUGDRAWER_SIGN_IDENTITY;
+            # `-` for ad hoc) and kept at this path, so macOS keeps its privacy grants across rebuilds.
+            python3 {{PROJECT_ROOT}}/scripts/sign_example.py "$RUN_DIR/DebugDrawerExample.app"
             open "$RUN_DIR/DebugDrawerExample.app"
             ;;
         iOS|ios)

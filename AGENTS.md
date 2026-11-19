@@ -28,6 +28,7 @@ Benchmarks/                      The interception benchmarks: a SwiftPM package 
 scripts/modules.py               The module graph
 scripts/catalyst_example.py      The iOS example as a Mac Catalyst app: a SwiftPM package derived from Example's sources
 scripts/release.py               The release gates `just deploy` runs (changelog entry, API breaks)
+scripts/sign_example.py          Re-signs the Mac example `just run` installs with the Keychain's Apple Development identity
 tools/                           Bazel rule wrappers (warnings as errors, Swift 6 mode), DocC rules;
                                  tools/bazel turns BuildBuddy on when the Keychain holds its key, and
                                  on macOS sweeps stale output bases once a day (tools/sweep-output-bases):
@@ -82,7 +83,7 @@ Every shell command gets a timeout. macOS has no `timeout`; use
 | `just resolve` | Re-resolve Bazel's SwiftPM dependencies after editing `PACKAGES` |
 | `just docs` | Combined DocC site into `.build/docs` |
 | `just generate` | Xcode project from the Bazel graph |
-| `just run [macOS\|iOS\|appkit\|uikit\|catalyst\|visionOS\|tvOS\|watchOS]` | Build and launch an example app (`catalyst`: the iOS one as a Mac Catalyst app, through SwiftPM); `-RunTestBench all` runs the test bench at launch |
+| `just run [macOS\|iOS\|appkit\|uikit\|catalyst\|visionOS\|tvOS\|watchOS]` | Build and launch an example app (`catalyst`: the iOS one as a Mac Catalyst app, through SwiftPM); `-RunTestBench all` runs the test bench at launch. `macOS` installs at `/tmp/debugdrawer-example` and signs with the Keychain's Apple Development identity (`scripts/sign_example.py`; `DEBUGDRAWER_SIGN_IDENTITY` overrides it, `-` for ad hoc, with a warning), so privacy grants survive a rebuild |
 | `just deploy [patch\|minor\|major] [allow-breaking] [dry-run]` | Check the release gates, verify, then tag, push the tag and create the GitHub release (the owner's call); `dry-run` runs only the gates |
 | `just buildbuddy-key` | Store the BuildBuddy key in the Keychain (once per Mac; builds then use the remote cache) |
 | `just template-update` | Merge the project template's changes since `.template.json`'s commit; resolve conflicts, then `just modules`, `just test` |
