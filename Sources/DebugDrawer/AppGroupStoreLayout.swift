@@ -53,15 +53,14 @@ import Foundation
             commands = directory.appending(path: "commands", directoryHint: .isDirectory)
         }
 
-        /// Makes both directories, as either side may start first; `false` when it can't.
-        func create() -> Bool {
-            do {
-                try FileManager.default.createDirectory(at: snapshots, withIntermediateDirectories: true)
-                try FileManager.default.createDirectory(at: commands, withIntermediateDirectories: true)
-                return true
-            } catch {
-                return false
-            }
+        /// Makes both directories, as either side may start first, and checks this process may
+        /// read, write and search each: both sides write to both.
+        ///
+        /// - Throws: ``DebugDrawerTransportError/accessDenied`` when the system refuses, and
+        ///   `otherwise` when the directories can't be made for any other reason.
+        func create(otherwise: DebugDrawerTransportError) throws(DebugDrawerTransportError) {
+            try DirectoryAccess.prepare(snapshots, need: .readWrite, otherwise: otherwise)
+            try DirectoryAccess.prepare(commands, need: .readWrite, otherwise: otherwise)
         }
 
         /// The file holding `pluginID`'s snapshot.

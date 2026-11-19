@@ -29,11 +29,14 @@ import Foundation
         ///
         /// - Parameter socketPath: The server's ``DebugDrawerSocketServer/socketPath``.
         /// - Throws: ``DebugDrawerTransportError/socketPathTooLong`` when the socket's file name
-        ///   doesn't fit a socket's address, and ``DebugDrawerTransportError/unreachable`` when nothing listens
-        ///   there.
+        ///   doesn't fit a socket's address, ``DebugDrawerTransportError/accessDenied`` when the
+        ///   system refuses access to the socket or its directory, and
+        ///   ``DebugDrawerTransportError/unreachable`` when nothing listens there.
         public init(socketPath: String) throws(DebugDrawerTransportError) {
             guard UnixSocketAddress.isReachable(socketPath) else { throw .socketPathTooLong }
-            guard let descriptor = UnixSocketAddress.connect(to: socketPath) else { throw .unreachable }
+            guard let descriptor = UnixSocketAddress.connect(to: socketPath) else {
+                throw DirectoryAccess.failure(errno, at: socketPath, otherwise: .unreachable)
+            }
             let connection = SocketConnection(descriptor: descriptor)
             let models = RemoteModels(link: .stream) {
                 connection.send($0)

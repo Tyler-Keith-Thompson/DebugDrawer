@@ -20,7 +20,8 @@ import os
 
         /// Makes a socket at `path` and listens on it.
         ///
-        /// - Throws: ``DebugDrawerTransportError/socketPathTooLong`` or
+        /// - Throws: ``DebugDrawerTransportError/socketPathTooLong``,
+        ///   ``DebugDrawerTransportError/accessDenied`` when the system refuses the bind, or
         ///   ``DebugDrawerTransportError/cannotServe``.
         init(path: String) throws(DebugDrawerTransportError) {
             guard UnixSocketAddress.isReachable(path) else { throw .socketPathTooLong }
@@ -28,8 +29,9 @@ import os
             guard descriptor >= 0 else { throw .cannotServe }
             guard UnixSocketAddress.bind(descriptor, to: path),
                   listen(descriptor, SOMAXCONN) == 0 else {
+                let code = errno
                 Darwin.close(descriptor)
-                throw .cannotServe
+                throw DirectoryAccess.failure(code, at: path, otherwise: .cannotServe)
             }
             // Non-blocking, so the accept loop ends when no connection waits, and one that leaves
             // before it is accepted can't stall it.

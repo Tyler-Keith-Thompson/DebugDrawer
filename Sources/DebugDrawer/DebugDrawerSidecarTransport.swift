@@ -36,11 +36,8 @@ import os
     /// on it, and its app-group store when it doesn't, switching back and forth on its own.
     ///
     /// ```swift
-    /// let container = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: "group.com.example.debug")!
-    /// let sidecar = try DebugDrawerSidecarTransport(
-    ///     socketPath: container.appending(path: "drawer.sock").path,
-    ///     storeDirectory: container.appending(path: "DebugDrawer")
-    /// )
+    /// let group = try DebugDrawerAppGroupContainer(groupIdentifier: "TEAMID.com.example.debug")
+    /// let sidecar = try DebugDrawerSidecarTransport(socketPath: group.socketPath, storeDirectory: group.storeDirectory)
     /// ```
     ///
     /// The plugin transports it hands out show each snapshot the app publishes while the socket is
@@ -58,6 +55,13 @@ import os
         /// How the transport reaches the app now: ``Channel/store`` until the app's hello arrives
         /// over the socket.
         @Published public private(set) var channel = Channel.store
+
+        /// Why the app's socket can't be used, while it can't: ``DebugDrawerTransportError/accessDenied``
+        /// when the system refused the connection (the socket belongs to another user, or this app
+        /// may not reach the app group's container). It is `nil` on the socket, and while the app
+        /// simply isn't listening. The transport reads the store meanwhile, and tries the socket
+        /// again each time the socket is made.
+        @Published public private(set) var socketError: DebugDrawerTransportError?
 
         private let socketPath: String
         private let store: DebugDrawerAppGroupStoreTransport
@@ -85,13 +89,16 @@ import os
         ///     directory is made if it doesn't exist.
         ///   - storeDirectory: The app's ``DebugDrawerAppGroupStoreServer/directory``.
         /// - Throws: ``DebugDrawerTransportError/socketPathTooLong`` when the socket's file name
-        ///   doesn't fit a socket's address, and ``DebugDrawerTransportError/unreachable`` when
-        ///   either directory can't be made or watched.
+        ///   doesn't fit a socket's address, ``DebugDrawerTransportError/accessDenied`` when the
+        ///   system refuses access to either directory (the app group missing from this app's
+        ///   entitlements, or the person declining macOS's prompt), and
+        ///   ``DebugDrawerTransportError/unreachable`` when either can't be made or watched for
+        ///   another reason. Nothing is written then.
         public init(socketPath: String, storeDirectory: URL) throws(DebugDrawerTransportError) {
             guard UnixSocketAddress.isReachable(socketPath) else { throw .socketPathTooLong }
             let directory = URL(filePath: socketPath, directoryHint: .notDirectory).deletingLastPathComponent()
             // The app may not have started yet; its server makes the socket here when it does.
-            try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            try DirectoryAccess.prepare(directory, need: .read, otherwise: .unreachable)
             guard let watcher = DirectoryWatcher(directory: directory) else { throw .unreachable }
             store = try DebugDrawerAppGroupStoreTransport(directory: storeDirectory)
             socketDirectory = watcher
@@ -176,7 +183,16 @@ import os
                 socketChangedWhileReaching = true
                 return
             }
-            guard let candidate = try? DebugDrawerSocketTransport(socketPath: socketPath) else { return }
+            let candidate: DebugDrawerSocketTransport
+            do {
+                candidate = try DebugDrawerSocketTransport(socketPath: socketPath)
+            } catch {
+                // Nothing listening is the app not running; a refusal is something to fix, and
+                // the store, in the same container, is read meanwhile.
+                let reason: DebugDrawerTransportError? = error == .accessDenied ? .accessDenied : nil
+                if socketError != reason { socketError = reason }
+                return
+            }
             socketChangedWhileReaching = false
             reaching = Task { [weak self] in
                 let isAgreed = await candidate.handshake()
@@ -199,6 +215,7 @@ import os
         /// every plugin transport reads from it.
         private func adopt(_ adopted: DebugDrawerSocketTransport) {
             socket = adopted
+            socketError = nil
             channel = .socket
             store.isReading = false
             let waiting = leftInStore
@@ -278,6 +295,9 @@ import os
     public final class DebugDrawerSidecarTransport: DebugDrawerTransport, ObservableObject {
         /// Always ``Channel/store``.
         @Published public private(set) var channel = Channel.store
+
+        /// Always `nil`.
+        @Published public private(set) var socketError: DebugDrawerTransportError?
 
         /// Throws ``DebugDrawerTransportError/unreachable``.
         ///

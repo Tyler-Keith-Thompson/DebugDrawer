@@ -33,8 +33,8 @@ import os
     /// starts, as the app comes back to the foreground, and as each lands while it runs.
     ///
     /// ```swift
-    /// let container = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: "group.com.example.debug")!
-    /// let server = DebugDrawerAppGroupStoreServer(registry: registry, directory: container.appending(path: "DebugDrawer"))
+    /// let group = try DebugDrawerAppGroupContainer(groupIdentifier: "TEAMID.com.example.debug")
+    /// let server = DebugDrawerAppGroupStoreServer(registry: registry, directory: group.storeDirectory)
     /// try server.start()
     /// ```
     ///
@@ -73,11 +73,14 @@ import os
         /// and goes on doing both as they change, and as the app comes back to the foreground.
         /// Does nothing while the server runs.
         ///
-        /// - Throws: ``DebugDrawerTransportError/cannotServe`` when the store's directories can't
-        ///   be made or watched.
+        /// - Throws: ``DebugDrawerTransportError/accessDenied`` when the system refuses access to
+        ///   the store's directories (the app group missing from the app's entitlements, or the
+        ///   person declining macOS's prompt), and ``DebugDrawerTransportError/cannotServe`` when
+        ///   they can't be made or watched for another reason. Nothing is written then.
         public func start() throws(DebugDrawerTransportError) {
             guard session == nil else { return }
-            guard layout.create(), let watcher = DirectoryWatcher(directory: layout.commands) else { throw .cannotServe }
+            try layout.create(otherwise: .cannotServe)
+            guard let watcher = DirectoryWatcher(directory: layout.commands) else { throw .cannotServe }
             layout.removeCutOffSnapshots()
             let layout = layout
             let session = RegistrySession(registry: registry, link: .store) { message in

@@ -86,7 +86,7 @@ import Foundation
             switch error {
             case .disconnected, .cancelled:
                 return
-            case .unreachable, .socketPathTooLong, .cannotServe, .mismatchedTypes, .incompatibleVersion:
+            case .unreachable, .socketPathTooLong, .cannotServe, .mismatchedTypes, .incompatibleVersion, .accessDenied, .noAppGroupContainer:
                 firstOutcome.yield(.failure(error))
                 firstOutcome.finish()
             }

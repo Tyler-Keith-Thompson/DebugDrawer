@@ -177,10 +177,10 @@
         let socketServer: DebugDrawerSocketServer
         let storeServer: DebugDrawerAppGroupStoreServer
 
-        init(model: CounterModel, container: URL) throws {
+        init(model: CounterModel, group: DebugDrawerAppGroupContainer) throws {
             registry.register(model, id: "MyApp.CounterPlugin")
-            socketServer = DebugDrawerSocketServer(registry: registry, socketPath: container.appending(path: "drawer.sock").path)
-            storeServer = DebugDrawerAppGroupStoreServer(registry: registry, directory: container.appending(path: "DebugDrawer"))
+            socketServer = DebugDrawerSocketServer(registry: registry, socketPath: group.socketPath)
+            storeServer = DebugDrawerAppGroupStoreServer(registry: registry, directory: group.storeDirectory)
             try socketServer.start()
             try storeServer.start()
         }
@@ -188,11 +188,9 @@
 
     // WritingPlugins.md
     @MainActor
-    func counterTransport(container: URL) async throws -> DebugDrawerPluginTransport<CounterModel.Snapshot, CounterModel.Command> {
-        let sidecar = try DebugDrawerSidecarTransport(
-            socketPath: container.appending(path: "drawer.sock").path,
-            storeDirectory: container.appending(path: "DebugDrawer")
-        )
+    func counterTransport(group: DebugDrawerAppGroupContainer) async throws
+        -> DebugDrawerPluginTransport<CounterModel.Snapshot, CounterModel.Command> {
+        let sidecar = try DebugDrawerSidecarTransport(socketPath: group.socketPath, storeDirectory: group.storeDirectory)
         return try await sidecar.connect(toPlugin: "MyApp.CounterPlugin", snapshot: CounterModel.Snapshot.self, command: CounterModel.Command.self)
     }
 
@@ -209,10 +207,11 @@
         func modelFromAnotherProcess() async throws {
             let container = FileManager.default.temporaryDirectory.appending(path: "DocumentationExamplesTests-\(UUID().uuidString)")
             try FileManager.default.createDirectory(at: container, withIntermediateDirectories: true)
+            let group = try DebugDrawerAppGroupContainer(groupIdentifier: "TEAMID.com.example.debug") { _ in container }
             let model = CounterModel()
-            let sharing = try CounterSharing(model: model, container: container)
+            let sharing = try CounterSharing(model: model, group: group)
 
-            let sut = try await counterTransport(container: container)
+            let sut = try await counterTransport(group: group)
             sut.send(.increment)
             for await snapshot in sut.snapshots() where snapshot.count == 1 {
                 break

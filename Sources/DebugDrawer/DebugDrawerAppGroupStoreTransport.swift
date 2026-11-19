@@ -44,11 +44,14 @@ import os
         ///
         /// - Parameter directory: The store's directory, the app's
         ///   ``DebugDrawerAppGroupStoreServer/directory``.
-        /// - Throws: ``DebugDrawerTransportError/unreachable`` when the directory can't be made or
-        ///   watched.
+        /// - Throws: ``DebugDrawerTransportError/accessDenied`` when the system refuses access to
+        ///   the directory (the app group missing from the app's entitlements, or the person
+        ///   declining macOS's prompt), and ``DebugDrawerTransportError/unreachable`` when it can't
+        ///   be made or watched for another reason. Nothing is written then.
         public init(directory: URL) throws(DebugDrawerTransportError) {
             let layout = AppGroupStoreLayout(directory: directory)
-            guard layout.create(), let watcher = DirectoryWatcher(directory: layout.snapshots) else { throw .unreachable }
+            try layout.create(otherwise: .unreachable)
+            guard let watcher = DirectoryWatcher(directory: layout.snapshots) else { throw .unreachable }
             self.layout = layout
             self.watcher = watcher
             weak var leaving: DebugDrawerAppGroupStoreTransport?

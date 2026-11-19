@@ -44,12 +44,16 @@ import os
             call(path) { Darwin.bind(descriptor, $0, $1) } == 0
         }
 
-        /// A new stream socket connected to `path`, or `nil` when nothing listens there.
+        /// A new stream socket connected to `path`, or `nil` when it can't connect: `errno` says
+        /// why (ECONNREFUSED or ENOENT when nothing listens, EACCES or EPERM when the system
+        /// refuses).
         static func connect(to path: String) -> Int32? {
             let descriptor = socket(AF_UNIX, SOCK_STREAM, 0)
             guard descriptor >= 0 else { return nil }
             guard call(path, { Darwin.connect(descriptor, $0, $1) }) == 0 else {
+                let code = errno
                 Darwin.close(descriptor)
+                errno = code
                 return nil
             }
             return descriptor
@@ -67,16 +71,20 @@ import os
                 return -1
             }
             let directory = URL(filePath: path, directoryHint: .notDirectory).deletingLastPathComponent().path
-            return workingDirectory.withLockUnchecked {
+            let (result, code) = workingDirectory.withLockUnchecked { () -> (Int32, Int32) in
                 // Search permission is all that changing back takes; reading "/" may be denied
                 // in a sandbox, searching it never is.
                 let previous = open(".", O_SEARCH | O_CLOEXEC)
-                guard previous >= 0 else { return -1 }
+                guard previous >= 0 else { return (-1, errno) }
                 defer { Darwin.close(previous) }
-                guard chdir(directory) == 0 else { return -1 }
+                guard chdir(directory) == 0 else { return (-1, errno) }
                 defer { _ = fchdir(previous) }
-                return withSocketAddress(address, body)
+                let result = withSocketAddress(address, body)
+                return (result, errno)
             }
+            // Changing back and closing ran after the call; its `errno` is the one that counts.
+            errno = code
+            return result
         }
 
         /// The last component of `path`.

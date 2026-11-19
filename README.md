@@ -2060,6 +2060,26 @@ socket while the app answers on it and the store while it doesn't, switching eac
 without losing a command or performing one twice ("Reaching a model from another process" in
 Writing Global and Local Plugins).
 
+**A sidecar on the Mac.** There both apps run at once, so the socket is the norm and the store the
+fallback. Both apps find the group's container with `DebugDrawerAppGroupContainer`, sandboxed or
+not, and hand its `socketPath` and `storeDirectory` to the servers and the sidecar transport. List
+the group in each app's debug entitlements and sign both with the same team; on the Mac, prefix
+the group with the team ID (or list a `group.` one in a provisioning profile), so macOS doesn't
+ask whether one app may access another's data:
+
+```xml
+<key>com.apple.security.application-groups</key>
+<array>
+    <string>TEAMID.com.example.debug</string>
+</array>
+```
+
+If the system refuses the container (the sandbox without the group, a declined prompt, the
+files' modes), the server's `start()` or the transport's initializer throws
+`DebugDrawerTransportError.accessDenied`, whose `localizedDescription` says what to fix, and
+nothing is written anywhere; a group with no container throws `noAppGroupContainer`. A sidecar
+refused only the socket publishes `socketError` and reads the store.
+
 On the Mac, `DebugDrawerNetworkBrowser` lists the devices advertising, and a
 `DebugDrawerNetworkTransport` connects to one. It is a `DebugDrawerTransport`, so once paired it
 hands out the same transports the plugins' views draw from:

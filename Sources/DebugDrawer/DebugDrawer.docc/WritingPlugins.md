@@ -342,10 +342,10 @@ final class CounterSharing {
     let socketServer: DebugDrawerSocketServer
     let storeServer: DebugDrawerAppGroupStoreServer
 
-    init(model: CounterModel, container: URL) throws {
+    init(model: CounterModel, group: DebugDrawerAppGroupContainer) throws {
         registry.register(model, id: "MyApp.CounterPlugin")
-        socketServer = DebugDrawerSocketServer(registry: registry, socketPath: container.appending(path: "drawer.sock").path)
-        storeServer = DebugDrawerAppGroupStoreServer(registry: registry, directory: container.appending(path: "DebugDrawer"))
+        socketServer = DebugDrawerSocketServer(registry: registry, socketPath: group.socketPath)
+        storeServer = DebugDrawerAppGroupStoreServer(registry: registry, directory: group.storeDirectory)
         try socketServer.start()
         try storeServer.start()
     }
@@ -360,11 +360,9 @@ or comes back.
 
 ```swift
 @MainActor
-func counterTransport(container: URL) async throws -> DebugDrawerPluginTransport<CounterModel.Snapshot, CounterModel.Command> {
-    let sidecar = try DebugDrawerSidecarTransport(
-        socketPath: container.appending(path: "drawer.sock").path,
-        storeDirectory: container.appending(path: "DebugDrawer")
-    )
+func counterTransport(group: DebugDrawerAppGroupContainer) async throws
+    -> DebugDrawerPluginTransport<CounterModel.Snapshot, CounterModel.Command> {
+    let sidecar = try DebugDrawerSidecarTransport(socketPath: group.socketPath, storeDirectory: group.storeDirectory)
     return try await sidecar.connect(toPlugin: "MyApp.CounterPlugin", snapshot: CounterModel.Snapshot.self, command: CounterModel.Command.self)
 }
 ```
@@ -394,6 +392,49 @@ build the same code for an app talking to its own extensions. A socket's address
 directory, so only the file name must fit. Everything here is for debug builds:
 release builds get stand-ins whose connections throw ``DebugDrawerTransportError/unreachable``
 and whose servers serve nothing.
+
+**The group's container.** Both sides resolve it with ``DebugDrawerAppGroupContainer``, which
+calls `FileManager.containerURL(forSecurityApplicationGroupIdentifier:)` and keeps the socket at
+`DebugDrawer/drawer.sock` and the store in `DebugDrawer/` there:
+
+```swift
+let group = try DebugDrawerAppGroupContainer(groupIdentifier: "TEAMID.com.example.debug")
+```
+
+It throws ``DebugDrawerTransportError/noAppGroupContainer`` where the system gives the group no
+container (on iOS, visionOS, tvOS and watchOS, when the app's entitlements lack it), rather than
+the transports falling back to a directory the group doesn't protect.
+
+**On the Mac.** Both apps run at once there, so the socket is the norm and the store the
+fallback, read while the app isn't running. `containerURL` gives `~/Library/Group
+Containers/<group>` to a sandboxed app and to one outside the sandbox alike, so a host app that
+isn't sandboxed and a sandboxed sidecar find the same directory; outside the sandbox only the
+files' modes guard it, as they guard the rest of the user's home, which is one more reason the
+servers run in debug builds only. Grant the group so macOS doesn't have to ask:
+
+- List the group in `com.apple.security.application-groups` in both apps' entitlements, in the
+  debug configuration.
+- Sign both apps with the same team, and name the group with that team's ID as its prefix
+  (`TEAMID.com.example.debug`), or with `group.` and a provisioning profile that lists it.
+
+Without that (a group the signature doesn't vouch for, an ad hoc signature, another team's app),
+macOS asks the person, the first time an app reaches the container, whether it may access data
+from other apps, and the call that reached it waits for the answer.
+
+**When access is refused.** When the sandbox, a declined prompt or the files' modes refuse the
+container (EACCES or EPERM), the call that first reached it throws
+``DebugDrawerTransportError/accessDenied``: ``DebugDrawerSocketServer/start()``,
+``DebugDrawerAppGroupStoreServer/start()``, ``DebugDrawerSocketTransport/init(socketPath:)``,
+``DebugDrawerAppGroupStoreTransport/init(directory:)`` and
+``DebugDrawerSidecarTransport/init(socketPath:storeDirectory:)``. Each checks that it may read,
+write and search its directories before it writes, so a directory it can't write fails there,
+not in every later write. Nothing is written then, in the container or anywhere else. A sidecar
+that reaches the store but is refused the socket (a socket another user made, say) publishes
+``DebugDrawerSidecarTransport/socketError`` as `accessDenied`, reads the store meanwhile, and
+tries the socket again each time it is made. Each error's `localizedDescription` says what to
+fix, and the refused path is logged under the `DebugDrawer` subsystem's `DirectoryAccess`
+category. A person who declined the prompt is asked again after
+`tccutil reset SystemPolicyAppData <bundle ID>`.
 
 **The wire.** Whatever leaves the process is one message: a JSON object with the envelope's
 format `version` (1), its `kind` (`hello`, `subscribe`, `unsubscribe`, `snapshot`, `command` or
