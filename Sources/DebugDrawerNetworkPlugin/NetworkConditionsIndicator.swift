@@ -41,12 +41,17 @@ import SwiftUI
 /// The type exists in every build; in release it draws nothing.
 public struct NetworkConditionsHUD: View {
     #if DEBUG
-        @ObservedObject var conditions: NetworkConditionsModel
+        @StateObject private var transport: DebugDrawerPluginTransport<NetworkSnapshot, NetworkCommand>
+
+        /// - Parameter transport: Joins the readout to the model; made once, for its lifetime.
+        init(transport: @escaping @autoclosure () -> DebugDrawerPluginTransport<NetworkSnapshot, NetworkCommand>) {
+            _transport = StateObject(wrappedValue: transport())
+        }
     #endif
 
     public var body: some View {
         #if DEBUG
-            NetworkConditionsHUDReadout(summary: conditions.profiles.activeSummary)
+            NetworkConditionsHUDReadout(summary: transport.snapshot.conditionProfiles.activeSummary)
         #else
             EmptyView()
         #endif

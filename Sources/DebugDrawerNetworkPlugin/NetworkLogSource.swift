@@ -1,7 +1,7 @@
 #if DEBUG
     /// Which requests the Network log shows: the ones the app made since it launched, the ones an
     /// earlier launch kept on disk, or the ones in an imported HAR file.
-    enum NetworkLogSource: Hashable, CaseIterable, Sendable {
+    enum NetworkLogSource: Hashable, CaseIterable, Codable, Sendable {
         case captured
         case previous
         case imported

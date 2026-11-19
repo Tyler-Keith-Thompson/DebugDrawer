@@ -55,6 +55,13 @@
             }
         }
 
+        func writeBody(_ data: Data, named name: String) throws {
+            try state.withLock { state in
+                guard !state.failsWriting else { throw WriteFailed() }
+                state.bodies[name] = data
+            }
+        }
+
         func body(named name: String) -> Data? {
             state.withLock { $0.bodies[name] }
         }

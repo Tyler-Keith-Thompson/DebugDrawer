@@ -3,7 +3,7 @@
     ///
     /// A category is muted within its subsystem: categories are named per subsystem
     /// (`networking` in two frameworks is two categories), so muting one leaves the other.
-    enum ConsoleMute: Hashable, Sendable {
+    enum ConsoleMute: Hashable, Codable, Sendable {
         /// Every line logged to the subsystem (`com.example.shop`).
         case subsystem(String)
         /// The lines logged to the category in the subsystem.

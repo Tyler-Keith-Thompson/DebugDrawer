@@ -10,7 +10,7 @@
     /// Plain domains only, without the mock rules' wildcards: a domain already covers its
     /// subdomains, which is what `*.example.com` would say, and a suffix comparison costs less per
     /// request than a pattern.
-    struct NetworkIgnoredDomain: Hashable, Sendable {
+    struct NetworkIgnoredDomain: Hashable, Codable, Sendable {
         /// Why typed text isn't a host or domain.
         enum ParseError: Error, Equatable {
             /// Nothing but spaces.

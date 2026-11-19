@@ -7,7 +7,7 @@
     /// about as long as decoding it, and the text view draws on the main actor. The page is
     /// worked out off the main actor when a session opens (``prepared(log:filter:)``), so opening
     /// hands the main actor a page whose size doesn't depend on the session's.
-    struct ConsoleSessionPage: Sendable {
+    struct ConsoleSessionPage: Equatable, Codable, Sendable {
         /// How many lines a page starts with, and how many more each Show Earlier adds: as many as
         /// the console keeps of the current session.
         static let lineCount = 2000

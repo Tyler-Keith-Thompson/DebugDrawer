@@ -3,7 +3,7 @@
 
     /// The requests in a HAR file read into the drawer, which the log shows in place of the
     /// captured ones, read-only, until it is cleared.
-    struct NetworkImportedLog: Sendable {
+    struct NetworkImportedLog: Equatable, Codable, Sendable {
         /// The file's name, `network.har`.
         let fileName: String
         /// The archive's requests, the newest first, as the log lists captured ones.

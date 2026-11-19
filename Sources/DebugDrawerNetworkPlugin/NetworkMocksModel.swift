@@ -3,7 +3,7 @@
     import os
 
     /// What went wrong reading or saving the rules, which the Mocks section shows.
-    enum NetworkMocksIssue: Equatable {
+    enum NetworkMocksIssue: Equatable, Codable, Sendable {
         /// The saved file isn't in the format; the rules start empty.
         case unreadable
         /// The saved file is in a later format; the rules start empty.
@@ -129,30 +129,40 @@
         /// Copies the file at `url` into the storage as a body, and returns its name; `nil` when
         /// it can't be read or kept.
         func importBody(from url: URL) -> String? {
-            // A file from the importer on iOS is outside the sandbox until it is accessed.
-            let isAccessing = url.startAccessingSecurityScopedResource()
-            defer {
-                if isAccessing { url.stopAccessingSecurityScopedResource() }
-            }
-            do {
-                let data = try Data(contentsOf: url)
-                let name = try storage.addBody(data, fileExtension: url.pathExtension)
-                return name
-            } catch {
-                Self.logger.error("Network mock body not imported: \(error.localizedDescription, privacy: .public)")
+            guard let upload = NetworkMockBodyUpload(contentsOf: url) else {
+                Self.logger.error("Network mock body not read")
                 issue = .fileUnreadable
                 return nil
             }
+            return add(upload) ? upload.name : nil
+        }
+
+        /// Keeps `upload` in the storage as a body file, under its name; whether it was kept.
+        @discardableResult
+        func add(_ upload: NetworkMockBodyUpload) -> Bool {
+            do {
+                try storage.writeBody(upload.data, named: upload.name)
+                return true
+            } catch {
+                Self.logger.error("Network mock body not imported: \(error.localizedDescription, privacy: .public)")
+                issue = .fileUnreadable
+                return false
+            }
+        }
+
+        /// Records that a body file the user chose couldn't be read where the view read it.
+        func noteUnreadableBody() {
+            issue = .fileUnreadable
         }
 
         /// A new rule that answers requests like `entry` as the server did, not yet saved. A body
         /// that isn't text is kept as a file.
         func rule(mocking entry: NetworkEntry) -> NetworkMockRule {
-            var rule = NetworkMockRule(mocking: entry)
-            if let data = NetworkMockRule.binaryBody(of: entry), let name = try? storage.addBody(data, fileExtension: nil) {
-                rule.response.body = .file(name)
+            let prefill = NetworkMockPrefill(mocking: entry)
+            if let upload = prefill.upload {
+                add(upload)
             }
-            return rule
+            return prefill.rule
         }
 
         /// Saves the rules and answers from them.

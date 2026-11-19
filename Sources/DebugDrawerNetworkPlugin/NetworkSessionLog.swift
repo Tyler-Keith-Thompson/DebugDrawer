@@ -3,7 +3,7 @@
 
     /// What a session kept on disk holds, read back: its header, its requests as the log shows
     /// them, and the archive entries they were read from.
-    struct NetworkSessionLog: Sendable {
+    struct NetworkSessionLog: Equatable, Codable, Sendable {
         let summary: NetworkSessionSummary
         /// The file's header; `nil` when its first line isn't one, as when the file was deleted
         /// and started again partway through the session.

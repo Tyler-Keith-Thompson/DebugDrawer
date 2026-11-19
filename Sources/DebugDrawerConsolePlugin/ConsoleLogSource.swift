@@ -1,7 +1,7 @@
 #if DEBUG
     /// Which lines the console shows: the ones captured since the app launched, or the ones an
     /// earlier launch kept on disk.
-    enum ConsoleLogSource: Hashable, CaseIterable, Sendable {
+    enum ConsoleLogSource: Hashable, CaseIterable, Codable, Sendable {
         case captured
         case previous
 

@@ -3,7 +3,6 @@ import DebugDrawer
 import Foundation
 import os
 import OSLogClient
-import SwiftUI
 
 #if DEBUG
     // MARK: - Log store
@@ -97,33 +96,39 @@ import SwiftUI
         /// The captured lines the console lists: those the level, search, mutes and time range
         /// pass.
         public var filteredLines: [LogLine] {
-            filter.apply(to: lines)
+            logSnapshot.filteredLines
         }
 
         /// The lines the console lists: the captured ones the filter passes, or, while `source` is
         /// `.previous`, the earlier session's page of them.
         var shownLines: [LogLine] {
-            switch source {
-            case .captured: filteredLines
-            case .previous: previousPage?.lines ?? []
-            }
+            logSnapshot.shownLines
         }
 
         /// How many of the source's lines the mutes hide, of those the other filters pass; while
         /// `showsMuted`, how many they would hide.
         var mutedCount: Int {
-            switch source {
-            case .captured: filter.mutedCount(in: lines)
-            case .previous: previousPage?.mutedCount ?? 0
-            }
+            logSnapshot.mutedCount
         }
 
         /// The mutes the menu offers for the source's lines.
         var muteChoices: [ConsoleMute] {
-            switch source {
-            case .captured: ConsoleMute.choices(in: lines, excluding: filter.mutes)
-            case .previous: previousPage?.muteChoices ?? []
-            }
+            logSnapshot.muteChoices
+        }
+
+        /// The console as a value: what ``ConsoleModel`` hands the plugin's view.
+        var logSnapshot: ConsoleLogSnapshot {
+            ConsoleLogSnapshot(
+                lines: lines,
+                droppedLineCount: droppedLineCount,
+                filter: filter,
+                searchText: searchText,
+                searchIsRegularExpression: searchIsRegularExpression,
+                searchIssue: searchIssue,
+                muteIssue: muteIssue,
+                source: source,
+                previousPage: previousPage
+            )
         }
 
         /// Whether the console shows the captured lines or an earlier session's; it is `.captured`

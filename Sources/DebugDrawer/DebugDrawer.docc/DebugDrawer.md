@@ -37,6 +37,8 @@ and the API a host calls compiles to stand-ins that do nothing.
 - ``DebugDrawerPlugin``
 - ``DebugDrawerAction``
 - ``CaptureBuffer``
+- ``DebugDrawerPluginModel``
+- ``DebugDrawerPluginTransport``
 
 ### Building a Plugin's View
 

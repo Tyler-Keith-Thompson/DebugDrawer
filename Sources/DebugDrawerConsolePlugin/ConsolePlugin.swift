@@ -18,7 +18,7 @@ public struct ConsolePlugin: DebugDrawerPlugin {
 
     public var body: some View {
         #if DEBUG
-            ConsolePluginView()
+            ConsolePluginView(transport: .direct(to: ConsoleModel.shared))
         #else
             EmptyView()
         #endif
@@ -27,7 +27,7 @@ public struct ConsolePlugin: DebugDrawerPlugin {
     /// How many lines the console holds.
     public var headerAccessory: some View {
         #if DEBUG
-            ConsoleHeaderAccessoryView()
+            ConsoleHeaderAccessoryView(transport: .direct(to: ConsoleModel.shared))
         #else
             EmptyView()
         #endif
@@ -99,13 +99,18 @@ public extension DebugDrawer {
 }
 
 #if DEBUG
-    /// The Console plugin's header accessory, read from the shared store as the plugin's body
-    /// reads it.
+    /// The Console plugin's header accessory, drawn from the model's snapshots as the plugin's body
+    /// is.
     struct ConsoleHeaderAccessoryView: View {
-        @ObservedObject private var store = ConsoleLogStore.shared
+        @StateObject private var transport: DebugDrawerPluginTransport<ConsoleSnapshot, ConsoleCommand>
+
+        /// - Parameter transport: Joins the view to the model; made once, for the view's lifetime.
+        init(transport: @escaping @autoclosure () -> DebugDrawerPluginTransport<ConsoleSnapshot, ConsoleCommand>) {
+            _transport = StateObject(wrappedValue: transport())
+        }
 
         var body: some View {
-            ConsoleHeaderSummary(lineCount: store.lines.count)
+            ConsoleHeaderSummary(lineCount: transport.snapshot.log.lines.count)
         }
     }
 

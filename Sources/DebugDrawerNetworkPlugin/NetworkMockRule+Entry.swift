@@ -39,4 +39,25 @@
         /// hands over the body decoded and whole, and a mock sends its own length.
         private static let headersNotReplayed: Set = ["content-length", "content-encoding", "transfer-encoding"]
     }
+
+    /// What Mock This starts the editor from: a rule that answers requests like an entry and, when
+    /// the entry's body isn't text, the file the rule's body names, to keep in the storage.
+    struct NetworkMockPrefill: Equatable, Sendable {
+        /// The rule, not yet saved; its body names `upload` when there is one.
+        let rule: NetworkMockRule
+        /// The body file to keep before the rule is saved; `nil` when the body is text or empty.
+        let upload: NetworkMockBodyUpload?
+
+        /// The rule for `entry`, with its body as a file when it isn't text.
+        ///
+        /// - Parameter entry: The captured request to answer like.
+        init(mocking entry: NetworkEntry) {
+            var rule = NetworkMockRule(mocking: entry)
+            upload = NetworkMockRule.binaryBody(of: entry).map { NetworkMockBodyUpload(data: $0, fileExtension: nil) }
+            if let upload {
+                rule.response.body = .file(upload.name)
+            }
+            self.rule = rule
+        }
+    }
 #endif

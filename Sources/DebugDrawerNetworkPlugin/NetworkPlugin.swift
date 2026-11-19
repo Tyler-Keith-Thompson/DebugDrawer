@@ -19,7 +19,7 @@ public struct NetworkPlugin: DebugDrawerPlugin {
 
     public var body: some View {
         #if DEBUG
-            NetworkPluginView()
+            NetworkPluginView(transport: .direct(to: NetworkModel.shared))
         #else
             EmptyView()
         #endif
@@ -29,7 +29,7 @@ public struct NetworkPlugin: DebugDrawerPlugin {
     /// on, when any are.
     public var headerAccessory: some View {
         #if DEBUG
-            NetworkHeaderAccessoryView()
+            NetworkHeaderAccessoryView(transport: .direct(to: NetworkModel.shared))
         #else
             EmptyView()
         #endif
@@ -39,7 +39,7 @@ public struct NetworkPlugin: DebugDrawerPlugin {
     /// release builds.
     @MainActor public var hud: NetworkConditionsHUD? {
         #if DEBUG
-            NetworkConditionsHUD(conditions: .shared)
+            NetworkConditionsHUD(transport: .direct(to: NetworkModel.shared))
         #else
             nil
         #endif

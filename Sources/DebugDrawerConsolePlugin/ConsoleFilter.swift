@@ -6,7 +6,7 @@
     ///
     /// The mutes hide what they match unless `showsMuted`, which turns them off for now without
     /// forgetting them, so a mute never hides lines without the console saying how many.
-    struct ConsoleFilter: Equatable {
+    struct ConsoleFilter: Equatable, Codable, Sendable {
         /// The lowest level shown.
         var level = LogLine.Level.debug
         /// What a line's text, subsystem, category or metadata must match.

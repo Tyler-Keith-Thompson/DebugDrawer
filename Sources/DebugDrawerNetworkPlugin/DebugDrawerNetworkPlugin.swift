@@ -2,10 +2,9 @@ import Combine
 import DebugDrawer
 import Foundation
 import os
-import SwiftUI
 
 public extension NetworkStore {
-    enum StatusFilter: String, CaseIterable {
+    enum StatusFilter: String, CaseIterable, Codable, Sendable {
         case all = "All"
         case success = "2xx"
         case clientError = "4xx"
@@ -62,14 +61,14 @@ public extension NetworkStore {
         /// those to an ignored host unless `showsIgnored`: the captured ones, or the earlier
         /// session's or the imported ones while they show.
         public var filteredEntries: [NetworkEntry] {
-            Self.entries(shownEntries, matching: filterStatus, text: filterText, ignoring: showsIgnored ? [] : ignoredDomains)
+            logSnapshot.filteredEntries
         }
 
         /// The WebSocket connections the log shows that pass the status filter and the filter
         /// text, without those to an ignored host unless `showsIgnored`: the captured ones, none
         /// while an imported file shows.
         var filteredWebSockets: [NetworkWebSocketConnection] {
-            Self.connections(shownWebSockets, matching: filterStatus, text: filterText, ignoring: showsIgnored ? [] : ignoredDomains)
+            logSnapshot.filteredWebSockets
         }
 
         /// The hosts and domains whose requests and connections the log hides, with their
@@ -87,7 +86,7 @@ public extension NetworkStore {
         /// The WebSocket connections the log shows: the captured ones, none while an earlier
         /// session or an imported file shows, whose connections are listed as their handshakes.
         var shownWebSockets: [NetworkWebSocketConnection] {
-            source == .captured ? webSockets : []
+            logSnapshot.shownWebSockets
         }
 
         /// The WebSocket connections the app opened, the latest first, with their frames.
@@ -96,11 +95,7 @@ public extension NetworkStore {
         /// Which requests the log shows: the captured ones, the earlier session's while `source`
         /// is `.previous`, or the imported file's while it is `.imported`.
         var shownEntries: [NetworkEntry] {
-            switch source {
-            case .captured: entries
-            case .previous: previousLog?.entries ?? []
-            case .imported: importedLog?.entries ?? []
-            }
+            logSnapshot.shownEntries
         }
 
         /// The requests a HAR file held, while one is imported.
@@ -300,12 +295,7 @@ public extension NetworkStore {
         /// the filter text are to an ignored host: the ones the ignore list hides, or, while
         /// `showsIgnored`, the ones it would.
         var ignoredCount: Int {
-            guard !ignoredDomains.isEmpty else { return 0 }
-            let requests = Self.entries(shownEntries, matching: filterStatus, text: filterText)
-                .count { ignoredDomains.ignores(host: $0.host) }
-            let connections = Self.connections(shownWebSockets, matching: filterStatus, text: filterText)
-                .count { ignoredDomains.ignores(host: $0.host) }
-            return requests + connections
+            logSnapshot.ignoredCount
         }
 
         /// Reads the saved ignore list, then adds each of `domains` it doesn't hold, at the end.

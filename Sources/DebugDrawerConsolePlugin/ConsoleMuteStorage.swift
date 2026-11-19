@@ -47,7 +47,7 @@
     }
 
     /// What went wrong reading or saving the mutes.
-    enum ConsoleMuteIssue: Equatable {
+    enum ConsoleMuteIssue: Equatable, Codable, Sendable {
         /// The saved file isn't in the format; nothing is muted.
         case unreadable
         /// The saved file is in a later format; nothing is muted.

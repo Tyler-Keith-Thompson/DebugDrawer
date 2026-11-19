@@ -6,7 +6,7 @@
     ///
     /// A session file is JSON Lines: this header, then one ``ConsoleSessionLine`` per line, each
     /// log line as it was captured.
-    struct ConsoleSessionHeader: Codable, Equatable {
+    struct ConsoleSessionHeader: Codable, Equatable, Sendable {
         /// The format of the lines this header heads; a reader skips a file of a later one.
         ///
         /// A key a line may leave out, such as `subsystem` and `category`, keeps the format: a

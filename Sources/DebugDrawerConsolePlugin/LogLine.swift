@@ -1,8 +1,7 @@
-import DebugDrawer
 import Foundation
 
-public struct LogLine: Identifiable, Sendable {
-    public let id = UUID()
+public struct LogLine: Identifiable, Equatable, Codable, Sendable {
+    public let id: UUID
     public let timestamp: Date
     public let text: String
     public let source: Source
@@ -28,9 +27,10 @@ public struct LogLine: Identifiable, Sendable {
     ///   - category: The os_log category; empty for stdout and stderr.
     ///   - metadata: The fields the app's logger attached; empty for os_log, stdout and stderr.
     init(
-        timestamp: Date, text: String, source: Source, level: Level, subsystem: String = "", category: String = "",
+        id: UUID = UUID(), timestamp: Date, text: String, source: Source, level: Level, subsystem: String = "", category: String = "",
         metadata: [String: String] = [:]
     ) {
+        self.id = id
         self.timestamp = timestamp
         self.text = text
         self.source = source
@@ -41,24 +41,14 @@ public struct LogLine: Identifiable, Sendable {
     }
 
     /// Where a line was captured from.
-    public enum Source: String, Sendable {
+    public enum Source: String, Codable, Sendable {
         case stdout, stderr, oslog
         /// The app's own logger, through ``ConsoleLogSink``.
         case sink
     }
 
-    public enum Level: Comparable, Sendable {
+    public enum Level: Comparable, Codable, Sendable {
         case debug, info, notice, error, fault
-
-        /// The issue glyph a line of this level carries: an error for an error or a fault, none
-        /// otherwise. os_log has no warning level (`Logger.warning` logs at the error level),
-        /// so no level draws the warning glyph.
-        var severity: DebugDrawerIssueGlyph.Severity? {
-            switch self {
-            case .error, .fault: .error
-            case .debug, .info, .notice: nil
-            }
-        }
 
         var label: String? {
             switch self {

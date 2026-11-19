@@ -6,13 +6,13 @@
     ///
     /// The frame keeps the first ``keptBytes`` of its payload, enough for a preview, a copy and an
     /// export of the messages most apps send, while a stream of large frames stays bounded.
-    struct NetworkWebSocketFrame: Identifiable, Equatable, Sendable {
-        enum Direction: Equatable, Sendable {
+    struct NetworkWebSocketFrame: Identifiable, Equatable, Codable, Sendable {
+        enum Direction: Equatable, Codable, Sendable {
             case sent
             case received
         }
 
-        enum Kind: Equatable, Sendable {
+        enum Kind: Equatable, Codable, Sendable {
             case text
             case binary
             case ping

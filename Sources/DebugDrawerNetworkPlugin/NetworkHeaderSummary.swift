@@ -2,15 +2,21 @@
     import DebugDrawer
     import SwiftUI
 
-    /// The Network plugin's header accessory, read from the shared store, mocks and conditions as
-    /// the plugin's body reads them.
+    /// The Network plugin's header accessory, drawn from the model's snapshots as the plugin's body
+    /// is.
     struct NetworkHeaderAccessoryView: View {
-        @ObservedObject private var store = NetworkStore.shared
-        @ObservedObject private var mocks = NetworkMocksModel.shared
-        @ObservedObject private var conditions = NetworkConditionsModel.shared
+        @StateObject private var transport: DebugDrawerPluginTransport<NetworkSnapshot, NetworkCommand>
+
+        /// - Parameter transport: Joins the view to the model; made once, for the view's lifetime.
+        init(transport: @escaping @autoclosure () -> DebugDrawerPluginTransport<NetworkSnapshot, NetworkCommand>) {
+            _transport = StateObject(wrappedValue: transport())
+        }
 
         var body: some View {
-            NetworkHeaderSummary(entries: store.entries, activeMocks: mocks.enabledCount, conditions: conditions.profiles)
+            let snapshot = transport.snapshot
+            NetworkHeaderSummary(
+                entries: snapshot.log.captured, activeMocks: snapshot.enabledMockCount, conditions: snapshot.conditionProfiles
+            )
         }
     }
 

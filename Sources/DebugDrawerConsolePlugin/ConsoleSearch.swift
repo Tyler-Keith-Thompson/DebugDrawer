@@ -16,7 +16,7 @@
         case pattern(NSRegularExpression)
 
         /// The search field's text isn't a regular expression `NSRegularExpression` reads.
-        struct InvalidPattern: Error, Equatable {
+        struct InvalidPattern: Error, Equatable, Codable {
             /// The problem in a sentence, under the field.
             var message: String {
                 "Not a valid regular expression. The list keeps the last valid search."
@@ -50,6 +50,40 @@
             case .all: true
             case let .text(query): line.searchedFields.contains { $0.range(of: query, options: .caseInsensitive) != nil }
             case let .pattern(pattern): line.searchedFields.contains { pattern.finds(in: $0) }
+            }
+        }
+    }
+
+    // A compiled pattern isn't `Codable`, so a search is carried as the field's text and compiled
+    // again when it is read.
+    extension ConsoleSearch: Codable {
+        private enum CodingKeys: String, CodingKey {
+            case query, isRegularExpression
+        }
+
+        init(from decoder: any Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            let query = try container.decode(String.self, forKey: .query)
+            let isRegularExpression = try container.decode(Bool.self, forKey: .isRegularExpression)
+            do {
+                try self.init(query, isRegularExpression: isRegularExpression)
+            } catch {
+                throw DecodingError.dataCorruptedError(forKey: .query, in: container, debugDescription: error.message)
+            }
+        }
+
+        func encode(to encoder: any Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            switch self {
+            case .all:
+                try container.encode("", forKey: .query)
+                try container.encode(false, forKey: .isRegularExpression)
+            case let .text(query):
+                try container.encode(query, forKey: .query)
+                try container.encode(false, forKey: .isRegularExpression)
+            case let .pattern(pattern):
+                try container.encode(pattern.pattern, forKey: .query)
+                try container.encode(true, forKey: .isRegularExpression)
             }
         }
     }

@@ -225,6 +225,79 @@ drawer.unregisterGlobal(id: SocketPlugin(monitor: monitor).id) // uninstall(from
 
 In release builds a drawer of your own is a stand-in too: it holds nothing and calls no hook.
 
+### A model apart from the view
+
+A plugin whose data should be read, or driven, without its view (by a test, by another tool, or
+from another process) splits into a model and a view. The model adopts
+``DebugDrawerPluginModel``: it holds no SwiftUI types, takes its services through its initializer,
+describes everything the view shows as a `Codable` snapshot, and changes only when it performs a
+`Codable` command. Colors, fonts and formatting stay in the view.
+
+```swift
+@MainActor
+final class CounterModel: DebugDrawerPluginModel {
+    struct Snapshot: Codable, Equatable, Sendable {
+        var count = 0
+    }
+
+    enum Command: Codable, Sendable {
+        case increment
+        case reset
+    }
+
+    @Published private(set) var snapshot = Snapshot()
+
+    func perform(_ command: Command) {
+        switch command {
+        case .increment: snapshot.count += 1
+        case .reset: snapshot.count = 0
+        }
+    }
+}
+```
+
+The view takes a ``DebugDrawerPluginTransport`` rather than the model: it draws the transport's
+``DebugDrawerPluginTransport/snapshot`` and hands what the user does to
+``DebugDrawerPluginTransport/send(_:)``. The plugin's body joins the two in the process with
+``DebugDrawerPluginTransport/direct(to:)``, through which the snapshot is the model's own and a
+command is performed before `send` returns, so a control bound to the snapshot reads back the
+value it just set:
+
+```swift
+struct CounterView: View {
+    @StateObject private var transport: DebugDrawerPluginTransport<CounterModel.Snapshot, CounterModel.Command>
+
+    init(transport: @escaping @autoclosure () -> DebugDrawerPluginTransport<CounterModel.Snapshot, CounterModel.Command>) {
+        _transport = StateObject(wrappedValue: transport())
+    }
+
+    var body: some View {
+        DebugDrawerKeyValueRow("Count", value: "\(transport.snapshot.count)")
+        Button("Add One") { transport.send(.increment) }
+    }
+}
+
+struct CounterPlugin: DebugDrawerPlugin {
+    let model: CounterModel
+    var title = "Counter"
+    var icon = "number.circle"
+
+    var body: some View {
+        CounterView(transport: .direct(to: model))
+    }
+}
+```
+
+Nothing else changes: the plugin registers as any other does, and its lifecycle hooks start and
+stop the model's work as they would without one. The transport watches the model only while a view
+holds it, so a hidden section costs nothing.
+``DebugDrawerPluginTransport/snapshots()`` hands the same changes out as a stream of values, the
+current snapshot first, for a connection to forward elsewhere; on the other side,
+``DebugDrawerPluginTransport/init(initial:snapshots:send:)`` makes a transport from such a stream
+and a closure that carries the commands back. A plugin that doesn't adopt the protocol keeps
+working as it does. The Network and Console plugins are built this way (`NetworkModel`,
+`ConsoleModel`).
+
 ### Capturing what the app does
 
 A plugin that records events as the app makes them (log lines, requests, file calls) keeps them

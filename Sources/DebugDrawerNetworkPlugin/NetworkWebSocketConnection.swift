@@ -3,9 +3,9 @@
 
     /// A WebSocket connection the app opened with `URLSessionWebSocketTask`: where to, when, the
     /// frames that went each way, the latest first, and whether it is still open.
-    struct NetworkWebSocketConnection: Identifiable, Equatable, Sendable {
+    struct NetworkWebSocketConnection: Identifiable, Equatable, Codable, Sendable {
         /// Whether the connection is open, and how it ended when it isn't.
-        enum State: Equatable, Sendable {
+        enum State: Equatable, Codable, Sendable {
             case open
             /// The app or the server closed it, with a close code and maybe a reason.
             case closed(NetworkWebSocketClose)
@@ -90,8 +90,8 @@
     }
 
     /// How a WebSocket connection was closed: by which side, with which code and reason, and when.
-    struct NetworkWebSocketClose: Equatable, Sendable {
-        enum Side: Equatable, Sendable {
+    struct NetworkWebSocketClose: Equatable, Codable, Sendable {
+        enum Side: Equatable, Codable, Sendable {
             case app
             case server
         }

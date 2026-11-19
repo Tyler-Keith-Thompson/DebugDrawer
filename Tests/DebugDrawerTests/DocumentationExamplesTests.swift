@@ -123,9 +123,71 @@
         }
     }
 
+    // WritingPlugins.md
+    @MainActor
+    final class CounterModel: DebugDrawerPluginModel {
+        struct Snapshot: Codable, Equatable, Sendable {
+            var count = 0
+        }
+
+        enum Command: Codable, Sendable {
+            case increment
+            case reset
+        }
+
+        @Published private(set) var snapshot = Snapshot()
+
+        func perform(_ command: Command) {
+            switch command {
+            case .increment: snapshot.count += 1
+            case .reset: snapshot.count = 0
+            }
+        }
+    }
+
+    // WritingPlugins.md
+    struct CounterView: View {
+        @StateObject private var transport: DebugDrawerPluginTransport<CounterModel.Snapshot, CounterModel.Command>
+
+        init(transport: @escaping @autoclosure () -> DebugDrawerPluginTransport<CounterModel.Snapshot, CounterModel.Command>) {
+            _transport = StateObject(wrappedValue: transport())
+        }
+
+        var body: some View {
+            DebugDrawerKeyValueRow("Count", value: "\(transport.snapshot.count)")
+            Button("Add One") { transport.send(.increment) }
+        }
+    }
+
+    // WritingPlugins.md
+    struct CounterPlugin: DebugDrawerPlugin {
+        let model: CounterModel
+        var title = "Counter"
+        var icon = "number.circle"
+
+        var body: some View {
+            CounterView(transport: .direct(to: model))
+        }
+    }
+
     @MainActor
     @Suite("Documentation examples")
     struct DocumentationExamplesTests {
+        @Test("Writing plugins: commands sent through a direct transport change the model, and its snapshot round-trips through JSON")
+        func modelApartFromTheView() throws {
+            let model = CounterModel()
+            let sut = DebugDrawerPluginTransport.direct(to: model)
+            let expected = CounterModel.Snapshot(count: 2)
+
+            sut.send(.increment)
+            sut.send(.increment)
+            let actual = try JSONDecoder().decode(CounterModel.Snapshot.self, from: JSONEncoder().encode(sut.snapshot))
+
+            #expect(actual == expected)
+            #expect(model.snapshot == expected)
+            #expect(AnyDebugDrawerPlugin(CounterPlugin(model: model)).title == "Counter")
+        }
+
         @Test("Writing plugins: a store keeps its events in a capture buffer and counts the ones it dropped")
         func captureBuffer() {
             let sut = EventStore()

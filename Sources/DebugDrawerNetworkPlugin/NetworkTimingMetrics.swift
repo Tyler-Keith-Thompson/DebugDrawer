@@ -1,12 +1,8 @@
-import DebugDrawer
 import Foundation
-import SwiftUI
-
-// MARK: - Timing model
 
 /// The phases of one HTTP transaction, taken from `URLSessionTaskTransactionMetrics`.
-public struct NetworkTimingMetrics: Sendable, Equatable {
-    public struct Phase: Sendable, Equatable, Identifiable {
+public struct NetworkTimingMetrics: Sendable, Equatable, Codable {
+    public struct Phase: Sendable, Equatable, Identifiable, Codable {
         public let kind: Kind
         /// Seconds from the start of the fetch to the start of this phase.
         public let start: TimeInterval
@@ -114,35 +110,12 @@ public struct NetworkTimingMetrics: Sendable, Equatable {
 
 // Declared in an extension so the type nests one level deep, not two.
 extension NetworkTimingMetrics.Phase {
-    public enum Kind: String, CaseIterable, Sendable {
+    public enum Kind: String, CaseIterable, Codable, Sendable {
         case dns = "DNS"
         case connect = "Connect"
         case tls = "TLS"
         case request = "Request"
         case timeToFirstByte = "TTFB"
         case response = "Response"
-    }
-}
-
-// MARK: - Timing view
-
-/// A request's phases as gauges, as Xcode's debug gauges show a measure: each phase's bar
-/// filled by its share of the whole request, then how the connection was made.
-struct NetworkTimingView: View {
-    let metrics: NetworkTimingMetrics
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            ForEach(metrics.phases) { phase in
-                DebugDrawerGaugeRow(
-                    phase.kind.rawValue,
-                    value: NetworkTimingMetrics.label(for: phase.duration),
-                    fraction: metrics.total > 0 ? phase.duration / metrics.total : 0
-                )
-            }
-            DebugDrawerKeyValueRow("Protocol", value: metrics.protocolName ?? "—")
-            DebugDrawerKeyValueRow("Reused", value: metrics.isReusedConnection ? "Yes" : "No")
-            DebugDrawerKeyValueRow("Cache hit", value: metrics.isCacheHit ? "Yes" : "No")
-        }
     }
 }

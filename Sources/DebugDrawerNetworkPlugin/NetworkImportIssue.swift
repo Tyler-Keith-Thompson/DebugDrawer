@@ -1,6 +1,6 @@
 #if DEBUG
     /// A HAR file that couldn't be imported, and why.
-    struct NetworkImportIssue: Equatable, Sendable {
+    struct NetworkImportIssue: Equatable, Codable, Sendable {
         let fileName: String
         let error: HTTPArchive.ReadError
 

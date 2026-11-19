@@ -13,6 +13,8 @@
         /// Keeps `data` as a body file and returns its name; `fileExtension` (without the dot) keeps
         /// its type, `nil` for none.
         func addBody(_ data: Data, fileExtension: String?) throws -> String
+        /// Keeps `data` as the body file named `name`, replacing one of that name.
+        func writeBody(_ data: Data, named name: String) throws
         /// The body file named `name`, or `nil` when there is none.
         func body(named name: String) -> Data?
         /// Removes the body file named `name`, if there is one.
@@ -56,11 +58,15 @@
         }
 
         func addBody(_ data: Data, fileExtension: String?) throws -> String {
+            let upload = NetworkMockBodyUpload(data: data, fileExtension: fileExtension)
+            try writeBody(upload.data, named: upload.name)
+            return upload.name
+        }
+
+        func writeBody(_ data: Data, named name: String) throws {
             try DebugDrawerActivity.$isDrawerWork.withValue(true) {
                 try FileManager.default.createDirectory(at: bodies, withIntermediateDirectories: true)
-                let name = UUID().uuidString + (fileExtension.map { $0.isEmpty ? "" : "." + $0 } ?? "")
                 try data.write(to: bodies.appending(path: name), options: .atomic)
-                return name
             }
         }
 

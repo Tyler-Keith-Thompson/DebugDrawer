@@ -3,7 +3,7 @@
 
     extension HTTPArchive {
         /// Why a file couldn't be read as an HTTP Archive.
-        enum ReadError: Error, Equatable {
+        enum ReadError: Error, Equatable, Codable {
             /// The file couldn't be opened.
             case unreadableFile
             /// The file isn't JSON.

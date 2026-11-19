@@ -1,8 +1,8 @@
 import Foundation
 
 /// A request the log holds: what the app sent, and once it completes, what came back.
-public struct NetworkEntry: Identifiable, Sendable {
-    public let id = UUID()
+public struct NetworkEntry: Identifiable, Equatable, Codable, Sendable {
+    public let id: UUID
     public let timestamp: Date
     public let method: String
     public let url: String
@@ -66,6 +66,7 @@ public struct NetworkEntry: Identifiable, Sendable {
     public let graphQLOperationName: String?
 
     init(
+        id: UUID = UUID(),
         timestamp: Date,
         method: String,
         url: String,
@@ -86,6 +87,7 @@ public struct NetworkEntry: Identifiable, Sendable {
         conditionEffect: NetworkConditionEffect? = nil,
         replayOf: UUID? = nil
     ) {
+        self.id = id
         self.timestamp = timestamp
         self.method = method
         self.url = url
@@ -167,7 +169,7 @@ extension Data {
 }
 
 /// A response body the log holds, with the text its filter searches.
-struct NetworkResponseBody: Sendable {
+struct NetworkResponseBody: Equatable, Sendable {
     /// The bytes kept: the whole body, or its first bytes.
     let data: Data
     /// How many bytes the body had, all told; at least `data.count`.
@@ -186,6 +188,25 @@ struct NetworkResponseBody: Sendable {
         self.data = data
         self.size = max(size ?? data.count, data.count)
         searchText = data.prettyBody?.lowercased()
+    }
+}
+
+// The search text is worked out again from the bytes rather than carried, so a snapshot holds the
+// body once.
+extension NetworkResponseBody: Codable {
+    private enum CodingKeys: String, CodingKey {
+        case data, size
+    }
+
+    init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        try self.init(container.decode(Data.self, forKey: .data), size: container.decode(Int.self, forKey: .size))
+    }
+
+    func encode(to encoder: any Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(data, forKey: .data)
+        try container.encode(size, forKey: .size)
     }
 }
 

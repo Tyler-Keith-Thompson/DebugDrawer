@@ -2,7 +2,7 @@
     import Foundation
 
     /// What a session kept on disk holds, read back: its header and its log lines.
-    struct ConsoleSessionLog: Sendable {
+    struct ConsoleSessionLog: Equatable, Codable, Sendable {
         let summary: ConsoleSessionSummary
         /// The file's header; `nil` when its first line isn't one, as when the file was deleted
         /// and started again partway through the session.

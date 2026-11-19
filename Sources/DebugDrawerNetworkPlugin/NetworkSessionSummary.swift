@@ -3,7 +3,7 @@
 
     /// A session kept on disk, as the list of sessions names it: when it started and how large it
     /// is, read from its file's name and size without opening it.
-    struct NetworkSessionSummary: Identifiable, Hashable, Sendable {
+    struct NetworkSessionSummary: Identifiable, Hashable, Codable, Sendable {
         /// The file's name, `<start>-<UUID>.jsonl`.
         let id: String
         /// When the session started.

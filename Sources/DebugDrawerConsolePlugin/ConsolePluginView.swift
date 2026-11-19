@@ -5,42 +5,54 @@
     /// The plugin's body: search, the toolbar, the lines and, under them, what the time range and
     /// the mutes hide. The lines are the captured ones, or, read-only, those of a session an
     /// earlier launch kept, under Previous.
+    ///
+    /// It draws ``ConsoleModel``'s snapshots from its transport and sends it commands; it keeps
+    /// only what is its own: whether the lines follow new ones.
     struct ConsolePluginView: View {
-        @ObservedObject private var store = ConsoleLogStore.shared
-        @ObservedObject private var sessions = ConsoleSessionsModel.shared
+        @StateObject private var transport: DebugDrawerPluginTransport<ConsoleSnapshot, ConsoleCommand>
         @Environment(\.locale) private var locale
         @Environment(\.timeZone) private var timeZone
         @State private var isFollowing = true
 
+        /// - Parameter transport: Joins the view to the model; made once, for the view's lifetime.
+        ///   The shared model's, in the process, unless given.
+        init(
+            transport: @escaping @autoclosure () -> DebugDrawerPluginTransport<ConsoleSnapshot, ConsoleCommand> = .direct(to: ConsoleModel.shared)
+        ) {
+            _transport = StateObject(wrappedValue: transport())
+        }
+
         var body: some View {
-            let visibleLines = store.shownLines
+            let snapshot = transport.snapshot
+            let log = snapshot.log
+            let visibleLines = log.shownLines
             VStack(alignment: .leading, spacing: 0) {
                 ConsoleSearchField(
-                    text: $store.searchText,
-                    isRegularExpression: $store.searchIsRegularExpression,
-                    issue: store.searchIssue
+                    text: binding(\.log.searchText) { .filter(.setSearchText($0)) },
+                    isRegularExpression: binding(\.log.searchIsRegularExpression) { .filter(.setSearchIsRegularExpression($0)) },
+                    issue: log.searchIssue
                 ) {
                     ConsoleMoreMenu(
-                        timeRange: $store.timeRange,
-                        mutes: store.filter.mutes,
-                        muteChoices: store.muteChoices,
-                        mute: { store.mute($0) },
-                        unmute: { store.unmute($0) },
+                        timeRange: binding(\.log.filter.timeRange) { .filter(.setTimeRange($0)) },
+                        mutes: log.filter.mutes,
+                        muteChoices: log.muteChoices,
+                        mute: { send(.filter(.mute($0))) },
+                        unmute: { send(.filter(.unmute($0))) },
                         copyAll: { debugDrawerCopyToClipboard(visibleLines.copiedText) }
                     )
                 }
 
-                if !sessions.sessions.isEmpty {
-                    ConsoleLogSourcePicker(source: $store.source)
+                if !snapshot.sessions.isEmpty {
+                    ConsoleLogSourcePicker(source: binding(\.log.source) { .lines(.setSource($0)) })
                 }
-                if store.source == .previous {
+                if log.source == .previous {
                     ConsolePreviousSessionPicker(
-                        sessions: sessions.sessions,
-                        shown: store.previousLog,
-                        select: { id in Task { await showPrevious(id) } },
-                        deleteAll: { Task { await deletePrevious(sessions.sessions.map(\.id)) } }
+                        sessions: snapshot.sessions,
+                        shown: log.previousLog,
+                        select: { send(.sessions(.show($0))) },
+                        deleteAll: { send(.sessions(.delete(snapshot.sessions.map(\.id)))) }
                     )
-                    if let unreadable = sessions.unreadable {
+                    if let unreadable = snapshot.unreadableSession {
                         DebugDrawerIssueRow("Not read", severity: .error) {
                             Text("The session of \(unreadable.title(locale: locale, timeZone: timeZone)) couldn't be read.")
                         }
@@ -51,17 +63,11 @@
                 // re-creating the NSSegmentedControl on every log batch.
                 ConsoleToolbarView(
                     isFollowing: $isFollowing,
-                    filterLevel: $store.filterLevel,
-                    clear: {
-                        if store.source == .previous, let shown = store.previousLog {
-                            Task { await deletePrevious([shown.summary.id]) }
-                        } else {
-                            store.clear()
-                        }
-                    },
-                    source: store.source
+                    filterLevel: binding(\.log.filter.level) { .filter(.setLevel($0)) },
+                    clear: { send(.lines(.clearShown)) },
+                    source: log.source
                 )
-                if let issue = store.muteIssue {
+                if let issue = log.muteIssue {
                     DebugDrawerIssueRow("Mutes", status: issue == .notSaved ? "Not saved" : "Not read", severity: .warning) {
                         Text(issue.message)
                     }
@@ -74,72 +80,59 @@
                         perform: perform
                     )
                     // A new text view for each source and session, so each opens at its end.
-                    .id(shownSession)
+                    .id(shownSession(log))
                     .frame(minHeight: 120, maxHeight: 300)
                 }
 
-                switch store.source {
+                switch log.source {
                 case .captured:
-                    ConsoleDroppedHint(count: store.droppedLineCount)
+                    ConsoleDroppedHint(count: log.droppedLineCount)
                 case .previous:
-                    ConsoleEarlierLinesHint(count: store.previousPage?.earlierCount ?? 0) { store.showEarlierPreviousLines() }
+                    ConsoleEarlierLinesHint(count: log.previousPage?.earlierCount ?? 0) { send(.lines(.showEarlier)) }
                 }
-                ConsoleTimeRangeHint(timeRange: store.timeRange) { store.timeRange = .all }
+                ConsoleTimeRangeHint(timeRange: log.filter.timeRange) { send(.filter(.setTimeRange(.all))) }
                 ConsoleMutedHint(
-                    count: store.mutedCount,
-                    mutes: store.filter.mutes,
-                    isShowing: store.showsMuted,
-                    toggle: { store.showsMuted.toggle() },
-                    unmute: { store.unmute($0) },
-                    unmuteAll: { store.unmuteAll() }
+                    count: log.mutedCount,
+                    mutes: log.filter.mutes,
+                    isShowing: log.filter.showsMuted,
+                    toggle: { send(.filter(.setShowsMuted(!log.filter.showsMuted))) },
+                    unmute: { send(.filter(.unmute($0))) },
+                    unmuteAll: { send(.filter(.unmuteAll)) }
                 )
             }
             // Listed again each time the plugin shows: writing the current session may have
             // deleted the oldest for room.
-            .task { await sessions.reload() }
-            // Previous shows the newest session until another is picked.
-            .task(id: store.source) {
-                if store.source == .previous, store.previousLog == nil, let newest = sessions.sessions.first {
-                    await showPrevious(newest.id)
-                }
-            }
-            .onChange(of: sessions.sessions) { _, kept in
-                if kept.isEmpty { store.hidePrevious() }
-            }
+            .task { send(.sessions(.reload)) }
             // Each source and session opens at its end. Under Previous there is no Resume to
             // follow again, so scrolling up in one session doesn't leave the next scrolled up too.
-            .onChange(of: shownSession) { isFollowing = true }
+            .onChange(of: shownSession(log)) { isFollowing = true }
         }
 
         /// The session the lines are from: `nil` for the captured ones.
-        private var shownSession: ConsoleSessionSummary.ID? {
-            store.source == .previous ? store.previousLog?.summary.id : nil
+        private func shownSession(_ log: ConsoleLogSnapshot) -> ConsoleSessionSummary.ID? {
+            log.source == .previous ? log.previousLog?.summary.id : nil
         }
 
         /// Runs what a line's context menu offers.
         private func perform(_ action: ConsoleLineAction) {
             switch action {
-            case let .mute(mute): store.mute(mute)
-            case let .showSince(date): store.timeRange = .since(date)
+            case let .mute(mute): send(.filter(.mute(mute)))
+            case let .showSince(date): send(.filter(.setTimeRange(.since(date))))
             }
         }
 
-        /// Reads the earlier session with `id` and shows its lines.
-        private func showPrevious(_ id: ConsoleSessionSummary.ID) async {
-            if let log = await sessions.log(of: id) {
-                await store.showPrevious(log)
-            }
+        private func send(_ action: ConsoleCommand.Action) {
+            transport.send(ConsoleCommand(action))
         }
 
-        /// Deletes the earlier sessions with `ids`, then shows the newest left, or the captured
-        /// lines when none is.
-        private func deletePrevious(_ ids: [ConsoleSessionSummary.ID]) async {
-            await sessions.delete(ids)
-            if let newest = sessions.sessions.first {
-                await showPrevious(newest.id)
-            } else {
-                store.hidePrevious()
-            }
+        /// A binding that reads the latest snapshot at `keyPath` and sends `command` for each
+        /// change: read back at once through a direct transport, so a text field never sees its
+        /// old value after an edit.
+        private func binding<Value>(
+            _ keyPath: KeyPath<ConsoleSnapshot, Value>,
+            _ command: @escaping (Value) -> ConsoleCommand.Action
+        ) -> Binding<Value> {
+            Binding(get: { transport.snapshot[keyPath: keyPath] }, set: { send(command($0)) })
         }
     }
 

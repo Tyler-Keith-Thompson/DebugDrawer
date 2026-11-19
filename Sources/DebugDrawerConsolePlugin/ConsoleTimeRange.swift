@@ -7,7 +7,7 @@
     /// "Last 5 Minutes" counts back from the newest line rather than from the clock, so it reads an
     /// earlier session's last five minutes as it does the current one's, and the window moves as
     /// lines arrive, with no timer to move it.
-    enum ConsoleTimeRange: Hashable, Sendable {
+    enum ConsoleTimeRange: Hashable, Codable, Sendable {
         /// Every line.
         case all
         /// The lines logged in the minutes up to the newest line.

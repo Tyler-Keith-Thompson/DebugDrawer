@@ -2,7 +2,7 @@ import Foundation
 
 /// What a conditioning profile did to a request: which profile, the latency it added, the
 /// bandwidth it capped the response at, and the failure it ended the request with, if any.
-public struct NetworkConditionEffect: Hashable, Sendable {
+public struct NetworkConditionEffect: Hashable, Codable, Sendable {
     /// The name of the profile that applied.
     public let profileName: String
     /// How long the request waited before it was answered or sent.

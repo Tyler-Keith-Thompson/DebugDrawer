@@ -4,7 +4,7 @@
 
     /// Where a resend of a captured request stands, which that request's detail shows. A resend
     /// that got its answer has no status: its own entry in the log is the result.
-    enum NetworkReplayStatus: Equatable {
+    enum NetworkReplayStatus: Equatable, Codable, Sendable {
         /// Sent, and waiting for the answer.
         case sending
         /// No answer came; the message says why.
