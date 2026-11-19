@@ -13,6 +13,8 @@
         // Kept by cookie, not by position, so a row deleted above another doesn't pass its
         // expanded state on.
         @State var expanded: Set<StoredCookie.ID> = []
+        /// The tallest the list grows before it scrolls; scales with Dynamic Type, as its rows do.
+        @ScaledMetric(relativeTo: .body) private var listHeight: CGFloat = 300
         let inspection = Inspection<Self>() // from/for ViewInspector.
 
         /// - Parameter transport: Joins the view to the model; made once, for the view's lifetime.
@@ -53,7 +55,7 @@
                             }
                         }
                     }
-                    .frame(maxHeight: 300)
+                    .frame(maxHeight: listHeight)
                 }
             }
             .onAppear { transport.send(CookiesCommand(.reload)) }

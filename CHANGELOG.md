@@ -32,6 +32,7 @@ the entry becomes the GitHub release's notes.
 
 ### Fixed
 
+- DD-239: at accessibility text sizes the HTTP Cookies list grows with its rows instead of stopping at 300 points, so it shows two whole cookies before it scrolls rather than less than two; at the default size it is as tall as before.
 - DD-217: `just generate` writes the Xcode project to `xcode/DebugDrawer.xcodeproj` instead of the repository's root, where xcodebuild picked it over `Package.swift` and `just test-ios`, `just spm-platform`, `just spm-visionos-test`, `just spm-catalyst` and `just spm-catalyst-test` failed for want of the package's schemes. It warns when an older project is still at the root.
 - DD-213: View Inspector's view borders no longer show through a sheet. On iOS the outlines of the views a sheet, form sheet, popover or alert is presented over (and of an earlier sheet under a stacked one) stop at its edge, as do those under an opaque window above theirs, while every part outside it is still drawn; an over-full-screen presentation with a see-through background hides nothing. On the Mac a sheet already covered its window's outlines, and an opaque child window of the app's now does too.
 - DD-205: a window attached with `DebugDrawer.shared.attach(to:)`, in a UIKit or AppKit app with no SwiftUI view, now shows the floating HUD and plugins' toasts as a `.debugDrawer()` window does. They are drawn in windows of the drawer's own above the app's sheets and alerts, once per window even when it has both, and only the HUD and the toast take taps and clicks; the rest reach the app.
