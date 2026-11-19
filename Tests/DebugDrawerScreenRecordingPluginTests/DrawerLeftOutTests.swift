@@ -9,7 +9,7 @@
     // The drawer is the process's one drawer, so the suite opens it and closes it again; nothing
     // else in this target reads whether it is open.
     @MainActor
-    @Suite(.serialized)
+    @Suite(.serialized, .timeLimit(.minutes(1)))
     struct DrawerLeftOutTests {
         @Test(
             "With the drawer open, a recorded frame shows the app where the panel is, the right way up; the panel's own window is left out"

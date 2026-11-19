@@ -10,7 +10,7 @@
     import SwiftUI
     import Testing
 
-    @Suite("Screen Recording install, in a child process")
+    @Suite("Screen Recording install, in a child process", .timeLimit(.minutes(1)))
     struct ScreenRecordingInstallExitTests {
         @Test("Install registers the plugin, with a HUD readout, in the Interface category")
         func install() async {

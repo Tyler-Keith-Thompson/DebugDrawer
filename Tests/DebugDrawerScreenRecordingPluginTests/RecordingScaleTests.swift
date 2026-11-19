@@ -3,7 +3,7 @@
     @testable import DebugDrawerScreenRecordingPlugin
     import Testing
 
-    @Suite
+    @Suite(.timeLimit(.minutes(1)))
     struct RecordingScaleTests {
         @Test("A window whose longest side fits 1920 pixels at the screen's scale is recorded at that scale")
         func screenScale() {

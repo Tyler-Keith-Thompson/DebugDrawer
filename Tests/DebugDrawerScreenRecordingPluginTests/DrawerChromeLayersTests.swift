@@ -5,7 +5,7 @@
     import Testing
 
     @MainActor
-    @Suite
+    @Suite(.timeLimit(.minutes(1)))
     struct DrawerChromeLayersTests {
         @Test(
             "The layers painted from a chrome start to its end are listed, topmost only, boundary included; the app's layers and ancestors are not"

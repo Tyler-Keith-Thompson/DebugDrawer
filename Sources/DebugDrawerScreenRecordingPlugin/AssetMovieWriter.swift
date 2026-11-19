@@ -3,7 +3,6 @@
     import CoreGraphics
     import CoreVideo
     import DebugDrawer
-    import os
 
     /// Writes frames as H.264 in a QuickTime movie with AVAssetWriter.
     ///
@@ -13,6 +12,7 @@
     @MainActor
     final class AssetMovieWriter: MovieWriter {
         private let url: URL
+        private let makeAssetWriter: (URL) throws -> AVAssetWriter
         private var session: Session?
         /// A frame couldn't be appended; finish throws.
         private var hasFailed = false
@@ -27,13 +27,22 @@
             let firstTime: TimeInterval
             /// The last frame appended's time, `nil` until the first is.
             var lastTime: TimeInterval?
-            /// The latest frame the encoder wasn't ready for, appended at finish if no later one is.
+            /// The latest frame the encoder wasn't ready for, appended at finish if no later one is
+            /// and the encoder is ready for it then.
             var heldFrame: RecordedFrame?
         }
 
         /// A writer of a new movie at `url`, replacing any file there once the first frame arrives.
-        init(url: URL) {
+        ///
+        /// - Parameters:
+        ///   - url: Where the movie is written.
+        ///   - makeAssetWriter: The asset writer of a QuickTime movie at a URL.
+        init(
+            url: URL,
+            makeAssetWriter: @escaping (URL) throws -> AVAssetWriter = { try AVAssetWriter(outputURL: $0, fileType: .mov) }
+        ) {
             self.url = url
+            self.makeAssetWriter = makeAssetWriter
         }
 
         func append(_ frame: RecordedFrame) {
@@ -58,34 +67,44 @@
             write(frame)
         }
 
+        /// Finishes without waiting for the encoder: a held frame it isn't ready for is not written,
+        /// and the frame before it stays on screen until the held one's time instead. Rejected:
+        /// waiting for `requestMediaDataWhenReady`, which a writer that fails or is cancelled
+        /// meanwhile, or a real-time input on a healthy one, may never call, so finish never
+        /// returned.
         func finish() async throws(RecordingFailure) -> Duration {
-            guard let held = session?.heldFrame ?? nil, let input = session?.input else {
-                return try await close()
+            if let held = session?.heldFrame, session?.input.isReadyForMoreMediaData == true {
+                write(held)
             }
-            await Self.readiness(of: input)
-            write(held)
             return try await close()
         }
 
-        /// Ends the movie at its last frame and closes the file.
+        /// Ends the movie at its last frame, or at a held frame's time, and closes the file.
         private func close() async throws(RecordingFailure) -> Duration {
             guard let session else { throw hasFailed ? .writeFailed : .noFrames }
             self.session = nil
-            guard let lastTime = session.lastTime else {
-                session.writer.cancelWriting()
+            // A writer that failed or was cancelled has no movie to close, and a cancelled one
+            // raises an Objective-C exception on endSession.
+            let isWriting = session.writer.status == .writing
+            guard isWriting, let lastTime = session.lastTime else {
+                if session.writer.status != .cancelled { session.writer.cancelWriting() }
                 // The drawer's own work, which Disk I/O leaves out, as below.
                 DebugDrawerActivity.$isDrawerWork.withValue(true) { try? FileManager.default.removeItem(at: url) }
-                throw hasFailed ? .writeFailed : .noFrames
+                throw hasFailed || !isWriting ? .writeFailed : .noFrames
             }
-            // The last frame stays on screen for one frame's length rather than none.
-            let length = lastTime - session.firstTime + Self.frameLength
+            // The last frame stays on screen for one frame's length rather than none, and until a
+            // held frame's time when that one wasn't written.
+            let length = max(lastTime, session.heldFrame?.time ?? lastTime) - session.firstTime + Self.frameLength
             session.input.markAsFinished()
             session.writer.endSession(atSourceTime: CMTime(seconds: length, preferredTimescale: Self.timescale))
             let writer = UncheckedWriter(writer: session.writer)
             await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
                 writer.writer.finishWriting { continuation.resume() }
             }
-            guard !hasFailed, session.writer.status == .completed else { throw .writeFailed }
+            guard !hasFailed, session.writer.status == .completed else {
+                DebugDrawerActivity.$isDrawerWork.withValue(true) { try? FileManager.default.removeItem(at: url) }
+                throw .writeFailed
+            }
             return .seconds(length)
         }
 
@@ -105,25 +124,6 @@
             self.session = session
         }
 
-        /// Returns once `input` is ready for more data: the event AVFoundation sends through
-        /// `requestMediaDataWhenReady`, which calls its block until the input is marked finished,
-        /// so only the first call resumes. `OSAllocatedUnfairLock` rather than `Mutex`, which needs
-        /// iOS 18; switch to `Mutex` once iOS 18 is the minimum.
-        private static func readiness(of input: AVAssetWriterInput) async {
-            guard !input.isReadyForMoreMediaData else { return }
-            let unchecked = UncheckedInput(input: input)
-            await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
-                let resumed = OSAllocatedUnfairLock(initialState: false)
-                unchecked.input.requestMediaDataWhenReady(on: DispatchQueue(label: "com.debugdrawer.screenRecording.readiness")) {
-                    let isFirst = resumed.withLock { wasResumed in
-                        defer { wasResumed = true }
-                        return !wasResumed
-                    }
-                    if isFirst { continuation.resume() }
-                }
-            }
-        }
-
         /// The size movies are written at for `image`: its own, each side rounded down to an even
         /// number of pixels, as H.264 needs.
         static func movieSize(of image: CGImage) -> (width: Int, height: Int) {
@@ -139,7 +139,7 @@
             let (width, height) = Self.movieSize(of: frame.image)
             guard width >= 2, height >= 2 else { return nil }
             DebugDrawerActivity.$isDrawerWork.withValue(true) { try? FileManager.default.removeItem(at: url) }
-            guard let writer = try? AVAssetWriter(outputURL: url, fileType: .mov) else { return nil }
+            guard let writer = try? makeAssetWriter(url) else { return nil }
             let input = AVAssetWriterInput(mediaType: .video, outputSettings: [
                 AVVideoCodecKey: AVVideoCodecType.h264,
                 AVVideoWidthKey: width,
@@ -180,12 +180,6 @@
             context.interpolationQuality = .high
             context.draw(image, in: bounds.fitting(width: CGFloat(image.width), height: CGFloat(image.height)))
         }
-    }
-
-    /// The writer's input, handed to its readiness callback, which runs once before the input is
-    /// touched again.
-    private struct UncheckedInput: @unchecked Sendable {
-        let input: AVAssetWriterInput
     }
 
     /// The asset writer, handed to its own completion handler. AVAssetWriter isn't Sendable; the

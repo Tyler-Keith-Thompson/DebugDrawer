@@ -7,7 +7,7 @@
     import MachO
     import Testing
 
-    @Suite
+    @Suite(.timeLimit(.minutes(1)))
     struct ReleaseInstallTests {
         @MainActor
         @Test("In release, install compiles, and the binary it is linked into doesn't link AVFoundation, ReplayKit or ScreenCaptureKit")
