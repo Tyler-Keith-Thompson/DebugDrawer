@@ -127,6 +127,8 @@
             self.defaults = defaults
             hudLayout = HUDLayout(from: defaults)
             noticesMutedPlugins = Set(defaults.stringArray(forKey: Self.noticesMutedDefaultsKey) ?? [])
+            // Here rather than at the property: `self` can't be passed until every property is set.
+            detachedPresentation.drawer = self
         }
 
         // MARK: - Global

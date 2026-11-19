@@ -146,7 +146,7 @@
         /// A new window's drawer, open if the drawer was opened before any window was attached
         /// (an app that toggles it at launch), which leaves the detached drawer closed.
         private func adoptDetachedState() -> DrawerPresentation {
-            let presentation = DrawerPresentation()
+            let presentation = DrawerPresentation(drawer: self)
             #if os(macOS) || os(iOS)
                 observeKeyWindowChanges()
                 guard attachments.isEmpty else { return presentation }

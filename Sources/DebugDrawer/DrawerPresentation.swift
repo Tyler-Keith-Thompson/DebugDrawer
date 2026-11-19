@@ -20,7 +20,7 @@
             }
             didSet {
                 guard isOpen != oldValue else { return }
-                DebugDrawer.shared.presentationDidChange()
+                drawer?.presentationDidChange()
             }
         }
 
@@ -45,7 +45,17 @@
         /// The window the drawer is drawn in, told when to show and that the panel has gone.
         weak var host: (any DrawerPresentationHost)?
 
-        init() {}
+        /// The drawer this window's drawer belongs to, told each time it opens or closes so its
+        /// ``DebugDrawer/isOpen`` follows; `nil` for one made apart from any drawer, which tells
+        /// no one. Weak, as the drawer holds its presentations.
+        weak var drawer: DebugDrawer?
+
+        /// Makes a closed window's drawer.
+        ///
+        /// - Parameter drawer: The drawer it belongs to, told as it opens and closes.
+        init(drawer: DebugDrawer? = nil) {
+            self.drawer = drawer
+        }
     }
 
     /// A window of the drawer's own, which shows itself when the drawer opens and hides once the

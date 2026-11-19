@@ -46,6 +46,7 @@ the entry becomes the GitHub release's notes.
 
 ### Fixed
 
+- DD-251: a drawer made with `DebugDrawer()` or `DebugDrawer(defaults:)` follows its own windows' drawers: its `isOpen` and `$isOpen` change as `toggle()`, `toggle(in:)`, `open()`, `close()`, `performWhileHidden` or a tap outside the compact panel opens or closes one of them, and `DebugDrawer.shared` is no longer told of (or republishes for) another drawer's changes.
 - DD-82: `installDeepLink(presets:continueUserActivity:openURL:)` keeps the Deep Link Tester's history of opened URLs and continued activities in the defaults of the drawer it is called on, so a drawer made with `DebugDrawer(defaults:)` no longer writes it into `DebugDrawer.shared`'s suite. `DebugDrawer.shared` keeps it where it always has.
 - DD-239: at accessibility text sizes the HTTP Cookies list grows with its rows instead of stopping at 300 points, so it shows two whole cookies before it scrolls rather than less than two; at the default size it is as tall as before.
 - DD-240: at accessibility text sizes the Console's lines, the Network request list, Disk I/O's list of calls and the Loaded Libraries list grow with their rows instead of stopping at a fixed height (Console's 120 to 300 points, Network's and Loaded Libraries' 300, Disk I/O's 250), so each shows as many rows before it scrolls as at the default size, where they are as tall as before.
