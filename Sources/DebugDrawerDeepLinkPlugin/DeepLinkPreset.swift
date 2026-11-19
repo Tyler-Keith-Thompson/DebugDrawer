@@ -13,7 +13,7 @@ import Foundation
 ///
 /// The type exists in every build, so the call compiles unchanged in release, where nothing
 /// lists it.
-public struct DeepLinkPreset: Hashable, Sendable {
+public struct DeepLinkPreset: Hashable, Codable, Sendable {
     /// The name shown beside the URL.
     public var label: String
     /// The URL a tap puts in the field.

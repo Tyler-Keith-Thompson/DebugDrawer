@@ -22,17 +22,25 @@ public struct DeepLinkPlugin: DebugDrawerPlugin {
     public var icon = "link"
 
     #if DEBUG
-        let model: DeepLinkModel
+        /// The model the plugin shows, or `nil` for the shared one.
+        private let model: DeepLinkModel?
+        /// The presets and handlers the model takes as a drawer installs the plugin.
+        let configuration: DeepLinkConfiguration
 
         /// The plugin with no handlers: it lists ``DeepLinkPreset/bundleURLSchemes``, opens URLs
         /// through the system, and continues an activity in the app's scene or app delegate.
         @MainActor
         public init() {
-            self.init(model: DeepLinkModel(presets: DeepLinkPreset.bundleURLSchemes, delivery: _UserActivityDelivering(handler: nil)))
+            self.init(configuration: .standard)
         }
 
-        init(model: DeepLinkModel) {
+        /// - Parameters:
+        ///   - model: The model to show in place of the shared one.
+        ///   - configuration: The presets and handlers the model takes as a drawer installs the
+        ///     plugin.
+        init(model: DeepLinkModel? = nil, configuration: DeepLinkConfiguration) {
             self.model = model
+            self.configuration = configuration
         }
     #else
         /// The plugin with no handlers: it lists ``DeepLinkPreset/bundleURLSchemes``, opens URLs
@@ -43,15 +51,18 @@ public struct DeepLinkPlugin: DebugDrawerPlugin {
 
     public var body: some View {
         #if DEBUG
-            DeepLinkPluginView(model: model)
+            DeepLinkPluginView(transport: .direct(to: model ?? .shared))
         #else
             EmptyView()
         #endif
     }
 
-    /// Counts `drawer` as one that holds the plugin.
+    /// Counts `drawer` as one that holds the plugin, and hands the model the plugin's presets and
+    /// handlers and the history kept in the drawer's defaults.
     @MainActor public func install(in drawer: DebugDrawer) {
         #if DEBUG
+            let model = model ?? .shared
+            model.configure(configuration, store: _DeepLinkHistoryStore(defaults: drawer.defaults))
             model.install(in: ObjectIdentifier(drawer))
         #endif
     }
@@ -60,7 +71,7 @@ public struct DeepLinkPlugin: DebugDrawerPlugin {
     /// or activity sent. The history of URLs and activities stays in the drawer's defaults.
     @MainActor public func uninstall(from drawer: DebugDrawer) {
         #if DEBUG
-            model.uninstall(from: ObjectIdentifier(drawer))
+            (model ?? .shared).uninstall(from: ObjectIdentifier(drawer))
         #endif
     }
 }
@@ -106,10 +117,9 @@ public extension DebugDrawer {
         openURL: (@MainActor (URL) -> Bool)? = nil
     ) {
         #if DEBUG
-            let model = DeepLinkModel(
-                presets: presets, delivery: _UserActivityDelivering(handler: continueUserActivity), openURL: openURL, defaults: defaults
-            )
-            let plugin = DeepLinkPlugin(model: model)
+            let plugin = DeepLinkPlugin(configuration: DeepLinkConfiguration(
+                presets: presets, delivery: _UserActivityDelivering(handler: continueUserActivity), openURL: openURL
+            ))
             unregisterGlobal(id: plugin.id)
             registerGlobal(plugin)
         #endif
@@ -127,27 +137,3 @@ public extension DebugDrawer {
         installDeepLink(presets: DeepLinkPreset.bundleURLSchemes, continueUserActivity: continueUserActivity, openURL: nil)
     }
 }
-
-#if DEBUG
-    // MARK: - View
-
-    /// Reads the model and keeps the typed URL; `DeepLinkForm` draws them.
-    struct DeepLinkPluginView: View {
-        @ObservedObject var model: DeepLinkModel
-        @State private var urlText = ""
-
-        var body: some View {
-            DeepLinkForm(
-                urlText: $urlText,
-                outcome: model.outcome,
-                presets: model.presets,
-                history: model.history,
-                activities: model.activities,
-                onOpen: { url in Task { await model.open(url) } },
-                onContinue: { model.continue($0) },
-                onClear: { model.clearHistory() }
-            )
-        }
-    }
-
-#endif

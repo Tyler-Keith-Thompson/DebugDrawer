@@ -1,6 +1,6 @@
 #if DEBUG
     /// Where a sent activity went in the app.
-    enum UserActivityDelivery: Hashable, Sendable {
+    enum UserActivityDelivery: Hashable, Codable, Sendable {
         /// The handler passed to `installDeepLink(continueUserActivity:)` received it.
         case handler
         /// A window scene's delegate received it through `scene(_:continue:)`.
