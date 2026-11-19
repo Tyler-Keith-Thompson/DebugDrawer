@@ -9,6 +9,8 @@ import os
 // server answers on is not.
 
 #if DEBUG
+    import Combine
+
     /// Serves a ``DebugDrawerModelRegistry``'s models over a Unix domain socket, to each
     /// ``DebugDrawerSocketTransport`` that connects while it runs.
     ///
@@ -31,6 +33,7 @@ import os
         private var listener: SocketListener?
         /// Each connected viewer, until it disconnects.
         private var viewers: [ObjectIdentifier: (connection: SocketConnection, session: RegistrySession)] = [:]
+        private let disconnected = PassthroughSubject<Void, Never>()
 
         /// A server of `registry`'s models at `socketPath`; it listens once started.
         ///
@@ -45,6 +48,18 @@ import os
         /// Whether the server is listening.
         public var isRunning: Bool {
             listener != nil
+        }
+
+        /// How many viewers are connected.
+        public var viewerCount: Int {
+            viewers.count
+        }
+
+        /// Publishes each time a viewer disconnects on its own, as a sidecar that quits or closes
+        /// its transport does, once ``viewerCount`` no longer counts it; not for the viewers
+        /// ``stop()`` disconnects.
+        public var viewerDisconnections: AnyPublisher<Void, Never> {
+            disconnected.eraseToAnyPublisher()
         }
 
         /// Makes the socket and listens on it. Does nothing while the server runs.
@@ -106,7 +121,9 @@ import os
                     session.receive(message)
                 }
                 session.close()
-                self?.viewers[key] = nil
+                // `stop()` has already removed the viewers it disconnected.
+                guard let self, self.viewers.removeValue(forKey: key) != nil else { return }
+                self.disconnected.send()
             }
         }
 
@@ -131,6 +148,8 @@ import os
         }
     }
 #else
+    import Combine
+
     // The release stand-in: the same members, serving nothing.
 
     /// Release builds serve nothing: this stand-in never listens.
@@ -151,6 +170,16 @@ import os
         /// Always `false`.
         public var isRunning: Bool {
             false
+        }
+
+        /// Always 0.
+        public var viewerCount: Int {
+            0
+        }
+
+        /// Publishes nothing.
+        public var viewerDisconnections: AnyPublisher<Void, Never> {
+            Empty().eraseToAnyPublisher()
         }
 
         /// Does nothing.

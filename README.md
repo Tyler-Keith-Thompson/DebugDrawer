@@ -2254,6 +2254,64 @@ In a debug build the receiver runs beside the drawer: show the same model in a p
 re-exports the receiver's module. Keep the receiver's store directory apart from a debug
 `DebugDrawerAppGroupStoreServer`'s, as both perform the commands left there.
 
+### Sidecar sessions in the background: keeping the app reachable
+
+On iPhone the sidecar and the app take turns in the foreground, and a backgrounded app is
+suspended within seconds, so it stops answering on the socket. A `DebugDrawerBackgroundKeeper`
+keeps it running while a session is open, through only what each platform sanctions for that, and
+lets go as the session ends:
+
+```swift
+@MainActor
+final class SidecarBackground {
+    let keeper: DebugDrawerBackgroundKeeper
+
+    init(sessions: DebugDrawerSessions, socketServer: DebugDrawerSocketServer) {
+        keeper = DebugDrawerBackgroundKeeper(sessions: sessions, socketServer: socketServer)
+    }
+
+    /// From a Start Debug Session button, before switching to the sidecar.
+    func startDebugSession() {
+        keeper.startSession(duration: 10 * 60, title: "Debug session", subtitle: "Inspector is connected")
+    }
+}
+```
+
+While a session is open the keeper holds the platform's short request, whoever opened the
+session. `startSession(duration:title:subtitle:)` is for a person's action in the app: it opens a
+session (or uses the open one) and, on iOS and iPadOS 26 and later, submits a
+`BGContinuedProcessingTask`, which the system shows with the session's progress and a way to stop
+it. Its identifier is `continuedProcessingIdentifierPrefix` (by default the bundle identifier and
+`.DebugDrawerSession`) plus the session's ID, so list the prefix with a wildcard in the debug
+configuration's Info.plist; no `UIBackgroundModes` entry is needed:
+
+```xml
+<key>BGTaskSchedulerPermittedIdentifiers</key>
+<array>
+    <string>$(PRODUCT_BUNDLE_IDENTIFIER).DebugDrawerSession.*</string>
+</array>
+```
+
+Every request ends as the session ends or expires. The session ends when the last sidecar
+disconnects from the socket (not when the app stops its own server), when the person stops the
+continued processing task in the system's progress, or when the system expires that task, so
+nothing keeps the app running for a sidecar that is gone, and the session's changes revert.
+`keeper.request` publishes what is held (`DebugDrawerBackgroundRequest`: `none`, `backgroundTask`,
+`continuedProcessing`, `activity`), to show beside the session indicator.
+
+| Platform | What the keeper holds | Limits |
+|---|---|---|
+| iOS, iPadOS 26 and later | From `startSession`: a `BGContinuedProcessingTask`, with the system's progress UI; otherwise a UIKit background task | The task must be submitted from a person's action while the app is in the foreground, and runs at once or not at all (`.fail`): when the system refuses it, the session keeps the background task. The system may end it at any time (the person stopping it, resources, a task that looks stalled): its progress is the session's elapsed time, reported at each command the sidecar sends, so an idle sidecar may see it expire. The Simulator refuses it ("BGTaskScheduler is not available on this platform"), so check it on a device. |
+| iOS, iPadOS before 26; tvOS; visionOS | A UIKit background task (`beginBackgroundTask(withName:expirationHandler:)`) | About 30 seconds once the app is in the background, a handoff rather than a session; no system indicator, so the app's own session indicator is the one shown. When it expires the keeper holds nothing until the app returns to the foreground, then asks again. |
+| macOS, Mac Catalyst | A `ProcessInfo` activity (`.userInitiatedAllowingIdleSystemSleep`) | Apps aren't suspended there; the activity keeps App Nap from slowing the app, and lets the Mac sleep when idle. It doesn't expire; no system indicator. |
+| watchOS | Nothing | `WKExtendedRuntimeSession` runs only for its own session types (self care, mindfulness, physical therapy, smart alarm), none of which a debug session is, so a backgrounded watch app is suspended as usual. |
+
+The keeper never claims an audio, location or VoIP background mode. It is part of
+`DebugDrawerReceiver`, like the sessions, and works in every build: a release build that links the
+receiver makes it with `DebugDrawerBackgroundKeeper(sessions: receiver.sessions)` (there is no
+socket server to pass), and it holds a request only while a session is open, which the receiver
+allows only for the capabilities the host enables.
+
 ### What the plugins need from the app
 
 No plugin needs an Info.plist key or an entitlement to install. Some of what they show depends on

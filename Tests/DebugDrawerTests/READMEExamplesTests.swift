@@ -225,6 +225,20 @@
     }
 
     @MainActor
+    final class SidecarBackground {
+        let keeper: DebugDrawerBackgroundKeeper
+
+        init(sessions: DebugDrawerSessions, socketServer: DebugDrawerSocketServer) {
+            keeper = DebugDrawerBackgroundKeeper(sessions: sessions, socketServer: socketServer)
+        }
+
+        /// From a Start Debug Session button, before switching to the sidecar.
+        func startDebugSession() {
+            keeper.startSession(duration: 10 * 60, title: "Debug session", subtitle: "Inspector is connected")
+        }
+    }
+
+    @MainActor
     @Suite("README examples")
     struct READMEExamplesTests {
         @Test(
@@ -304,6 +318,27 @@
             #expect(flags.overrides.isEmpty)
             #expect(Array(sut.sessions.auditLog.dropFirst().map(\.event)) == expectedEvents)
         }
+
+        #if os(macOS)
+            @Test("Sidecar sessions in the background: a person's start opens a session the keeper holds an activity for, and ending it lets go")
+            func sidecarBackground() {
+                let sessions = DebugDrawerSessions(maximumDuration: 15 * 60)
+                let socketPath = FileManager.default.temporaryDirectory.appending(path: "README-\(UUID().uuidString).sock").path
+                let sut = SidecarBackground(sessions: sessions, socketServer: DebugDrawerSocketServer(
+                    registry: DebugDrawerModelRegistry(sessions: sessions), socketPath: socketPath
+                ))
+                let expectedSeconds = 10 * 60
+
+                sut.startDebugSession()
+                let during = sut.keeper.request
+                let expires = sessions.snapshot.session.map { Int($0.expires.timeIntervalSince($0.opened).rounded()) }
+                sessions.end()
+
+                #expect(during == .activity)
+                #expect(expires == expectedSeconds)
+                #expect(sut.keeper.request == .none)
+            }
+        #endif
 
         @Test("Sending reports")
         func sendingReports() throws {

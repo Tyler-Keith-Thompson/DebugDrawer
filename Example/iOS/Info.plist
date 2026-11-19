@@ -36,6 +36,9 @@
     <array>
         <string>com.debugdrawer.example.refresh</string>
         <string>com.debugdrawer.example.cleanup</string>
+        <!-- The sidecar session's continued processing task (DebugDrawerBackgroundKeeper), which
+             needs no UIBackgroundModes entry. -->
+        <string>com.debugdrawer.example.ios.DebugDrawerSession.*</string>
     </array>
     <key>UIBackgroundModes</key>
     <array>

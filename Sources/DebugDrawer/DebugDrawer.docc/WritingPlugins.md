@@ -511,6 +511,22 @@ it in the receiver, and in a debug build can show the same model in its drawer t
 `DebugDrawer` re-exports it; it serves no socket and holds no view. The README's "Production
 builds: the receiver" shows the setup.
 
+**In the background.** A ``DebugDrawerBackgroundKeeper`` made with the sessions keeps the app
+running while one is open, so a sidecar in the foreground keeps the socket, and ends every request
+as the session ends or expires; ``DebugDrawerBackgroundKeeper/request`` says what it holds. It
+asks only for what the platform sanctions, and claims no background mode:
+
+| Platform | Request | Limits |
+|---|---|---|
+| iOS, iPadOS 26 and later | ``DebugDrawerBackgroundRequest/continuedProcessing`` from ``DebugDrawerBackgroundKeeper/startSession(duration:title:subtitle:)``, else ``DebugDrawerBackgroundRequest/backgroundTask`` | Started from a person's action in the foreground, with `<prefix>.*` in `BGTaskSchedulerPermittedIdentifiers`; runs at once or falls back; the system shows its progress and may end it, which ends the session. The Simulator refuses it. |
+| iOS, iPadOS before 26; tvOS; visionOS | ``DebugDrawerBackgroundRequest/backgroundTask`` | About 30 seconds in the background, no system indicator; asked for again as the app returns to the foreground. |
+| macOS, Mac Catalyst | ``DebugDrawerBackgroundRequest/activity`` | Keeps App Nap away; never expires; idle sleep allowed. |
+| watchOS | ``DebugDrawerBackgroundRequest/none`` | `WKExtendedRuntimeSession` serves only its own session types, none of them a debug session. |
+
+Made with the ``DebugDrawerSocketServer``, the keeper also ends the session when the last viewer
+disconnects from the socket on its own (``DebugDrawerSocketServer/viewerDisconnections``), not
+when the app stops the server. The keeper is part of `DebugDrawerReceiver` and works in release builds too. The README's "Sidecar sessions in the background" has the setup.
+
 **Why it is built this way.** The protocol hands out ``DebugDrawerPluginTransport``s rather than
 raw messages, so a view never changes and the in-process transport keeps `direct(to:)`'s
 synchronous commands; a protocol rather than a compile-time choice, so a viewer can hold two

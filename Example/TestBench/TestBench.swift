@@ -62,6 +62,10 @@ public enum TestBench {
             perform: { await ExampleSidecar.openSession(duration: 60) }
         ),
         TestBenchAction(
+            id: "sidecar.startDebugSession", title: "Start a Debug Session (Keeps the App Running)", plugin: "Sidecar Session",
+            isIncludedInAll: false, perform: ExampleSidecar.startDebugSession
+        ),
+        TestBenchAction(
             id: "sidecar.elevateLogLevel", title: "Elevate the Log Level", plugin: "Sidecar Session", isIncludedInAll: false,
             perform: ExampleSidecar.elevateLogLevel
         ),
