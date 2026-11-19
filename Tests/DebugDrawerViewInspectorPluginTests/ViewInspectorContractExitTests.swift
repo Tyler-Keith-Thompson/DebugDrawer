@@ -49,7 +49,7 @@
         func processState() throws -> ProcessState {
             let controller = ViewBorderController.shared
             return ProcessState(
-                isTrackingRenders: RenderTracker.shared.isTracking,
+                isTrackingRenders: RenderTracking.tracker === RenderTracker.shared,
                 isBordersEnabled: controller.isBordersEnabled,
                 isGridEnabled: controller.isGridEnabled,
                 isClickIndicatorEnabled: controller.isClickIndicatorEnabled,

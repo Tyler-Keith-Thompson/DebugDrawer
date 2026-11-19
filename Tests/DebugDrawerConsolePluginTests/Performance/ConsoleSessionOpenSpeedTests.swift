@@ -38,8 +38,11 @@
                 name: ConsoleSessionSummary.name(started: started, id: UUID()), byteCount: data.count
             )))
             let log = ConsoleSessionLog(summary: summary, data: data)
-            let store = ConsoleLogStore.shared
-            let host = NSHostingView(rootView: ConsolePluginView().frame(width: 400, height: 700))
+            // A store of its own, whose mutes are read from a folder that doesn't exist: none.
+            let mutes = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+            let store = ConsoleLogStore(muteStorage: _ConsoleMuteStorage(directory: mutes))
+            let model = ConsoleModel(store: store, sessions: ConsoleSessionsModel())
+            let host = NSHostingView(rootView: ConsolePluginView(transport: .direct(to: model)).frame(width: 400, height: 700))
             let window = NSWindow(contentRect: CGRect(x: 0, y: 0, width: 400, height: 700), styleMask: .borderless, backing: .buffered, defer: true)
             window.contentView = host
             host.layoutSubtreeIfNeeded()

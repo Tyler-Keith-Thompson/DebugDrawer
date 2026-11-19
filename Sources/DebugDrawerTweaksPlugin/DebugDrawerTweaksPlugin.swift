@@ -18,19 +18,26 @@ public struct TweaksPlugin: DebugDrawerPlugin {
 
     #if DEBUG
         let sections: [TweakSection]
+        /// The values the plugin shows and edits: the shared store `Tweak.value` reads, unless
+        /// given another.
+        let store: TweakStore
 
+        /// - Parameters:
+        ///   - sections: The sections, in the order shown.
+        ///   - store: The values to show and edit.
         /// - Precondition: No two tweaks in `sections` share a key, since they would share a
         ///   stored value.
-        init(sections: [TweakSection]) {
+        init(sections: [TweakSection], store: TweakStore = .shared) {
             let keys = sections.flatMap(\.tweaks).map(\.key)
             precondition(Set(keys).count == keys.count, "Two tweaks share a key")
             self.sections = sections
+            self.store = store
         }
     #endif
 
     public var body: some View {
         #if DEBUG
-            TweaksPluginView(sections: sections, store: .shared)
+            TweaksPluginView(sections: sections, store: store)
         #else
             EmptyView()
         #endif

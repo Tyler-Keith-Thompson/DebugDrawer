@@ -4,7 +4,8 @@
 
     /// Records the app's WebSocket traffic, which never passes through a URL protocol: the
     /// connections `URLSession` creates, the messages and pings sent and received on them, and how
-    /// each closed, into ``NetworkWebSocketRecorder/shared``.
+    /// each closed, into the recorder of the route requests are captured into
+    /// (``NetworkInterception/route``).
     ///
     /// Only `install()` changes anything, until `uninstall()` puts it back, and only public selectors of
     /// `NSURLSession` and of the class `URLSession`'s web socket tasks are: the three
@@ -35,9 +36,10 @@
 
         @MainActor private static let replacements = MethodReplacements()
 
-        /// The recorder the replacements write to.
+        /// The recorder the replacements write to: the route's as the call is made, so a
+        /// connection opened before another drawer installed the plugin records nothing more.
         private static var recorder: NetworkWebSocketRecorder {
-            .shared
+            NetworkInterception.route.webSockets
         }
 
         // `URLSessionWebSocketTask` is a class cluster: the tasks a session makes are of a class

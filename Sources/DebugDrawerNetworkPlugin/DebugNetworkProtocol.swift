@@ -40,6 +40,9 @@
         private var delivery: NetworkConditionedDelivery?
         /// The log's record of a conditioned request, completed when its delivery ends.
         private var conditionedEntry: NetworkEntry?
+        /// Where the request is logged and finds its mocks and conditions: the route of the drawer
+        /// that installed the plugin last when it started, kept for the request's whole life.
+        private var route = NetworkRoute.shared
         /// The temporary file of a request body past the body limit, which the forwarded request
         /// streams from; held for as long as the request is, and removed with it. Set before the
         /// forwarded request starts, so its session may read it from its own queue.
@@ -69,6 +72,7 @@
 
         override func startLoading() {
             clientThread = .current
+            route = NetworkInterception.route
             // An NSURLRequest's mutableCopy is an NSMutableURLRequest.
             guard let mutable = (request as NSURLRequest).mutableCopy() as? NSMutableURLRequest else {
                 client?.urlProtocol(self, didFailWithError: URLError(.unknown))
@@ -105,8 +109,8 @@
             entryId = entry.id
             startTime = CFAbsoluteTimeGetCurrent()
 
-            let answer = request.url.flatMap { NetworkMockRules.shared.answer(method: entry.method, url: $0) }
-            if let requestURL = request.url, let plan = NetworkConditions.shared.plan(for: requestURL) {
+            let answer = request.url.flatMap { route.mocks.answer(method: entry.method, url: $0) }
+            if let requestURL = request.url, let plan = route.conditions.plan(for: requestURL) {
                 condition(entry, to: requestURL, by: plan, answer: answer, network: mutable as URLRequest)
                 return
             }
@@ -116,8 +120,8 @@
                 return
             }
 
-            Task { @MainActor in
-                NetworkStore.shared.recordStart(entry)
+            Task { @MainActor [route] in
+                route.store.recordStart(entry)
             }
 
             startNetwork(mutable as URLRequest)
@@ -162,8 +166,8 @@
             entry.conditionEffect = plan.effect
             entry.mockRuleName = plan.effect.failure == nil ? answer?.ruleName : nil
             conditionedEntry = entry
-            Task { @MainActor [entry] in
-                NetworkStore.shared.recordStart(entry)
+            Task { @MainActor [entry, route] in
+                route.store.recordStart(entry)
             }
             let delivery = NetworkConditionedDelivery(plan: plan) { [weak self] event in
                 self?.onClientThread { [weak self] in
@@ -219,8 +223,8 @@
                 duration: CFAbsoluteTimeGetCurrent() - startTime,
                 error: error?.localizedDescription
             )
-            Task { @MainActor in
-                NetworkStore.shared.recordCompletion(id: entry.id, completion)
+            Task { @MainActor [route] in
+                route.store.recordCompletion(id: entry.id, completion)
             }
         }
 
@@ -249,8 +253,8 @@
             entry.response = capture.body
             entry.duration = CFAbsoluteTimeGetCurrent() - startTime
             entry.isComplete = true
-            Task { @MainActor [entry] in
-                NetworkStore.shared.recordStart(entry)
+            Task { @MainActor [entry, route] in
+                route.store.recordStart(entry)
             }
         }
     }
@@ -317,8 +321,8 @@
         func forwardingDidCollect(_ metrics: URLSessionTaskMetrics) {
             onClientThread { [self] in
                 guard let id = entryId, let timing = NetworkTimingMetrics(metrics) else { return }
-                Task { @MainActor in
-                    NetworkStore.shared.recordMetrics(id: id, metrics: timing)
+                Task { @MainActor [route] in
+                    route.store.recordMetrics(id: id, metrics: timing)
                 }
             }
         }
@@ -380,8 +384,8 @@
                 error: error?.localizedDescription
             )
             guard let id = entryId else { return }
-            Task { @MainActor in
-                NetworkStore.shared.recordCompletion(id: id, completion)
+            Task { @MainActor [route] in
+                route.store.recordCompletion(id: id, completion)
             }
         }
     }

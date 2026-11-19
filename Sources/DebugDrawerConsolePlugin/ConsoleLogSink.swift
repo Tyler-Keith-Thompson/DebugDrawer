@@ -64,16 +64,17 @@ public enum ConsoleLogSink {
 
 #if DEBUG
     extension ConsoleLogSink {
-        /// Hands `line` to the shared store, which lives on the main actor.
+        /// Hands `line` to the store capture goes to, which lives on the main actor: the latest
+        /// install's, or the shared store before any.
         private static func ingest(_ line: LogLine) {
             if Thread.isMainThread {
-                MainActor.assumeIsolated { ConsoleLogStore.shared.ingest(line) }
+                MainActor.assumeIsolated { ConsoleCapture.store.ingest(line) }
             } else {
                 // The main queue runs blocks in the order they were submitted, so a logger
                 // thread's lines arrive in the order it logged them; a task per line promises no
                 // order.
                 DispatchQueue.main.async {
-                    MainActor.assumeIsolated { ConsoleLogStore.shared.ingest(line) }
+                    MainActor.assumeIsolated { ConsoleCapture.store.ingest(line) }
                 }
             }
         }

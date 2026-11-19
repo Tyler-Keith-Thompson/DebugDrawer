@@ -14,8 +14,8 @@
                 let defaults = try #require(UserDefaults(suiteName: suite))
                 defer { defaults.removePersistentDomain(forName: suite) }
                 let drawer = DebugDrawer(defaults: defaults)
-                let overrides = AccessibilityOverrides.shared
-                let sut = AccessibilityPlugin()
+                let overrides = AccessibilityOverrides(localizations: [])
+                let sut = AccessibilityPlugin(model: AccessibilityModel(overrides: overrides, system: _AccessibilitySystemSettings()))
                 drawer.registerGlobal(sut)
                 overrides.colorScheme = .dark
                 overrides.dynamicTypeSize = .accessibility3
@@ -44,6 +44,7 @@
                 #expect(overrides.reduceTransparency == nil)
                 #expect(overrides.differentiateWithoutColor == nil)
                 #expect(overrides.invertColors == nil)
+                #expect(!AccessibilityOverrides.shared.hasOverrides)
             }
 
             @Test("Overrides stay while another drawer still holds the plugin, and clear once the last removes it")
@@ -53,15 +54,17 @@
                 defer { defaults.removePersistentDomain(forName: suite) }
                 let first = DebugDrawer(defaults: defaults)
                 let second = DebugDrawer(defaults: defaults)
-                let sut = AccessibilityPlugin()
-                first.registerGlobal(sut)
-                second.registerGlobal(sut)
-                AccessibilityOverrides.shared.colorScheme = .dark
+                let overrides = AccessibilityOverrides(localizations: [])
+                // A plugin of its own in each drawer, over the same overrides, as two plugins made
+                // with init() share the shared ones.
+                first.registerGlobal(AccessibilityPlugin(model: AccessibilityModel(overrides: overrides, system: _AccessibilitySystemSettings())))
+                second.registerGlobal(AccessibilityPlugin(model: AccessibilityModel(overrides: overrides, system: _AccessibilitySystemSettings())))
+                overrides.colorScheme = .dark
 
-                first.unregisterGlobal(id: sut.id)
-                let afterFirst = AccessibilityOverrides.shared.colorScheme
-                second.unregisterGlobal(id: sut.id)
-                let actual = AccessibilityOverrides.shared.colorScheme
+                first.unregisterGlobal(id: AccessibilityPlugin().id)
+                let afterFirst = overrides.colorScheme
+                second.unregisterGlobal(id: AccessibilityPlugin().id)
+                let actual = overrides.colorScheme
 
                 #expect(afterFirst == .dark)
                 #expect(actual == nil)
@@ -73,19 +76,20 @@
                 let defaults = try #require(UserDefaults(suiteName: suite))
                 defer { defaults.removePersistentDomain(forName: suite) }
                 let drawer = DebugDrawer(defaults: defaults)
-                let sut = AccessibilityPlugin()
+                let overrides = AccessibilityOverrides(localizations: [])
+                let sut = AccessibilityPlugin(model: AccessibilityModel(overrides: overrides, system: _AccessibilitySystemSettings()))
                 drawer.registerGlobal(sut)
                 drawer.unregisterGlobal(id: sut.id)
                 drawer.unregisterGlobal(id: sut.id)
 
-                drawer.installAccessibility()
-                AccessibilityOverrides.shared.boldText = true
-                let whileReinstalled = AccessibilityOverrides.shared.boldText
+                drawer.registerGlobal(sut)
+                overrides.boldText = true
+                let whileReinstalled = overrides.boldText
                 drawer.unregisterGlobal(id: sut.id)
 
                 #expect(whileReinstalled == true)
                 #expect(drawer.globalPlugins.isEmpty)
-                #expect(!AccessibilityOverrides.shared.hasOverrides)
+                #expect(!overrides.hasOverrides)
             }
         }
     }

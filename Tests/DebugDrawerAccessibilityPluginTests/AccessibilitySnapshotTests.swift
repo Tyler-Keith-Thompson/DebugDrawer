@@ -11,14 +11,15 @@
     // shown and draws it into a bitmap at a fixed 2x scale, in the appearance the test asks for:
     // the snapshot doesn't depend on the Mac's own appearance or display. Views without one use
     // ImageRenderer. macOS doesn't scale text with Dynamic Type, so the Mac pins light and dark only.
-    // The section follows AccessibilityOverrides.shared, which the suites beside it set.
+    // The section follows overrides of its own, none of them set.
     extension SharedAccessibilityOverrides {
         @MainActor
         @Suite(.timeLimit(.minutes(1)))
         struct AccessibilitySnapshotTests {
             @Test("The settings section lists each setting with the system's value and an override picker", arguments: [ColorScheme.light, .dark])
             func settingsSection(colorScheme: ColorScheme) throws {
-                let sut = AccessibilitySettingsSection(system: .init(reduceMotion: true, increaseContrast: true))
+                let model = AccessibilityModel(overrides: AccessibilityOverrides(localizations: []), system: _AccessibilitySystemSettings())
+                let sut = AccessibilitySettingsSection(system: .init(reduceMotion: true, increaseContrast: true), transport: .direct(to: model))
                 let host = NSHostingView(rootView: sut
                     .frame(width: 320, alignment: .leading)
                     .padding()

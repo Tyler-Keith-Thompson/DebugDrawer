@@ -9,14 +9,15 @@
     // ImageRenderer draws UIKit-backed controls (text fields, pickers, switches) as placeholders,
     // so each view is hosted in a window that is never shown and its layer rendered, at a fixed
     // width and scale, so the reference doesn't depend on which simulator runs it.
-    // The section follows AccessibilityOverrides.shared, which the suites beside it set.
+    // The section follows overrides of its own, none of them set.
     extension SharedAccessibilityOverrides {
         @MainActor
         @Suite(.timeLimit(.minutes(1)))
         struct AccessibilityDynamicTypeSnapshotTests {
             @Test("The settings section stays readable at a large accessibility text size")
             func settingsSection() throws {
-                let sut = AccessibilitySettingsSection(system: .init(reduceMotion: true, increaseContrast: true))
+                let model = AccessibilityModel(overrides: AccessibilityOverrides(localizations: []), system: _AccessibilitySystemSettings())
+                let sut = AccessibilitySettingsSection(system: .init(reduceMotion: true, increaseContrast: true), transport: .direct(to: model))
                 let controller = UIHostingController(rootView: sut
                     .frame(width: 320, alignment: .leading)
                     // No height proposed, as the drawer's scroll view proposes none.

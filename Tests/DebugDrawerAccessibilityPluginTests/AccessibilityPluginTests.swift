@@ -42,7 +42,7 @@
         struct AccessibilityPluginTests {
             @Test("With nothing set, no override has a value and none is reported")
             func overridesDefault() {
-                let overrides = AccessibilityOverrides.shared
+                let overrides = AccessibilityOverrides(localizations: [])
                 #expect(overrides.colorScheme == nil)
                 #expect(overrides.dynamicTypeSize == nil)
                 #expect(overrides.layoutDirection == nil)
@@ -52,7 +52,7 @@
 
             @Test("Reset clears the color scheme and Dynamic Type overrides, and no override is reported after it")
             func overridesReset() {
-                let overrides = AccessibilityOverrides.shared
+                let overrides = AccessibilityOverrides(localizations: [])
                 overrides.colorScheme = .dark
                 overrides.dynamicTypeSize = .xLarge
                 #expect(overrides.hasOverrides)
@@ -63,12 +63,13 @@
                 #expect(overrides.dynamicTypeSize == nil)
             }
 
-            @Test("The available locales can be read, even when the test bundle has no localizations")
+            @Test("The available locales are the bundle's localizations, sorted, without Base")
             func availableLocales() {
-                let overrides = AccessibilityOverrides.shared
-                // At minimum, the app's base localization should be present
-                // (may be empty in test target, which is fine)
-                _ = overrides.availableLocales
+                let expected = ["de", "fr"]
+
+                let actual = AccessibilityOverrides(localizations: ["fr", "Base", "de"]).availableLocales.map(\.identifier)
+
+                #expect(actual == expected)
             }
 
             @Test("The plugin is titled Accessibility, with the accessibility icon")

@@ -10,7 +10,8 @@
     /// turn, once per turn however many bodies recorded in it.
     @MainActor
     final class RenderTracker: ObservableObject {
-        /// The tracker `.trackRenders(_:)` records into and the plugin shows.
+        /// The tracker the plugin `installViewInspector()` registers shows, which
+        /// `.trackRenders(_:)` records into while that plugin is installed (``RenderTracking``).
         static let shared = RenderTracker()
 
         /// A tracked name and how many times its body was evaluated.
@@ -76,10 +77,6 @@
             names = []
             entries = []
         }
-
-        /// Whether `.trackRenders(_:)` counts: from the View Inspector plugin's install to its
-        /// uninstall, so an app that never installs it counts nothing and keeps no names.
-        var isTracking = false
 
         private func evictPastCapacity() {
             // Only a name past the capacity evicts, so the array's O(n) removal stays off the path

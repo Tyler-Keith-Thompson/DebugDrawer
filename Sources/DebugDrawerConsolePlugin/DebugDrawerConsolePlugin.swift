@@ -10,8 +10,8 @@ import OSLogClient
     /// Captures stdout, stderr, and os_log output into a bounded `CaptureBuffer`.
     @MainActor
     public final class ConsoleLogStore: ObservableObject {
-        /// The store `installConsole()` fills and the plugin shows, its mutes in the app's
-        /// Application Support folder.
+        /// The store the plugin `installConsole()` registers fills and shows, which also keeps the
+        /// lines sent before any install; its mutes are in the app's Application Support folder.
         public static let shared = ConsoleLogStore(muteStorage: _ConsoleMuteStorage(directory: _ConsoleMuteStorage.defaultDirectory))
 
         /// The captured lines, oldest first, within ``capacity`` and ``byteCapacity``.
@@ -154,20 +154,8 @@ import OSLogClient
         private(set) var recorder: ConsoleSessionRecorder?
 
         /// Whether the store captures: not before the first install, while installed, and no
-        /// longer once the last install is undone.
+        /// longer once the last install is undone (``ConsoleCapture``).
         var capture = ConsoleCaptureState.notStarted
-        /// Whether the app asked for capture with ``install()`` and hasn't undone it.
-        var isInstalledByApp = false
-        /// The drawers the Console plugin is installed in.
-        var installedDrawers: Set<ObjectIdentifier> = []
-        let driver = ConsoleLogDriver()
-        /// The OSLogClient calls made last, which the next ones wait for: they are asynchronous,
-        /// and an uninstall must not overtake the install before it.
-        var osLogWork: Task<Void, Never>?
-        /// Original stdout fd, used to write diagnostics without triggering capture loop.
-        var originalStdoutFd: Int32 = -1
-        /// stdout and stderr, each redirected into a pipe, while the store captures them.
-        var streamCaptures: [ConsoleStreamCapture] = []
         /// Subject that receives individual log lines, throttled before publishing to `lines`.
         private let lineSubject = PassthroughSubject<LogLine, Never>()
         private var cancellable: AnyCancellable?

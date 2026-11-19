@@ -4,11 +4,21 @@
     import ObjectiveC
     import os
 
+    // URL loading makes the URL protocol by its class and the replaced methods run in the app's own
+    // calls, so neither knows which drawer installed the plugin; they read the route here, as installs
+    // come and go. The drawer that installed the plugin last gets the requests and sets the mocks and
+    // conditions they meet: a drawer of a test's own, installed while the app's drawer holds the
+    // plugin too, sees its own requests, and the app's drawer gets them again once that drawer removes
+    // the plugin. Rejected: the first install keeping the route (a drawer installed later would never
+    // see a request), and every installed store logging each request (each request kept twice, and
+    // two drawers' mock rules and conditions with no order between them).
+
     /// What capturing changes in the process, started by `NetworkStore.install()` and put back
     /// by `NetworkStore.uninstall()`: the URL protocol registered for `URLSession.shared`, the
     /// `URLSessionConfiguration.protocolClasses` getter that adds it to every other session, the
     /// session factory that notes each session the app makes (``NetworkAppSessions``), and the
-    /// WebSocket methods that record their traffic (``NetworkWebSocketInterception``).
+    /// WebSocket methods that record their traffic (``NetworkWebSocketInterception``). It also
+    /// holds the route they all capture into (``route``).
     @MainActor
     enum NetworkInterception {
         // Behind a lock rather than main-actor state: URL loading and the replaced methods read it
@@ -22,19 +32,41 @@
             state.withLock { $0 == .uninstalled }
         }
 
-        /// The drawers holding the Network plugin; capturing runs while there is one.
-        private static var drawers: Set<ObjectIdentifier> = []
-
-        /// Counts `drawer` as holding the plugin; the first one starts capturing.
-        static func install(for drawer: DebugDrawer) {
-            drawers.insert(ObjectIdentifier(drawer))
-            NetworkStore.shared.install()
+        /// Where a request starting now is logged and finds its mocks and conditions: the stores of
+        /// the drawer that installed the plugin last, or the shared ones while none holds it.
+        nonisolated static var route: NetworkRoute {
+            boundRoute.withLock { $0 }
         }
 
-        /// Uncounts `drawer`; once no drawer holds the plugin, capturing stops.
+        /// The drawers holding the Network plugin, in the order they installed it, each with its
+        /// plugin's route; capturing runs while there is one.
+        private static var installations: [(drawer: ObjectIdentifier, route: NetworkRoute)] = []
+        private nonisolated static let boundRoute = OSAllocatedUnfairLock(initialState: NetworkRoute.shared)
+
+        /// Counts `drawer` as holding the plugin over `model`, whose stores capture from now on;
+        /// the first install starts capturing. A drawer that holds it already changes nothing.
+        static func install(_ model: NetworkModel, for drawer: DebugDrawer) {
+            let id = ObjectIdentifier(drawer)
+            guard !installations.contains(where: { $0.drawer == id }) else { return }
+            let route = NetworkRoute(model)
+            installations.append((id, route))
+            boundRoute.withLock { $0 = route }
+            model.store.install()
+        }
+
+        /// Uncounts `drawer`; the drawer that installed the plugin before it captures again. A
+        /// store no drawer holds any more forgets what it captured, and once no drawer holds the
+        /// plugin, capturing stops.
         static func uninstall(for drawer: DebugDrawer) {
-            guard drawers.remove(ObjectIdentifier(drawer)) != nil, drawers.isEmpty else { return }
-            NetworkStore.shared.uninstall()
+            guard let index = installations.firstIndex(where: { $0.drawer == ObjectIdentifier(drawer) }) else { return }
+            let store = installations.remove(at: index).route.store
+            let latest = installations.last?.route ?? .shared
+            boundRoute.withLock { $0 = latest }
+            if installations.isEmpty {
+                store.uninstall()
+            } else if !installations.contains(where: { $0.route.store === store }) {
+                store.uninstall(stoppingCapture: false)
+            }
         }
 
         private enum State {
@@ -44,7 +76,9 @@
         private nonisolated static let state = OSAllocatedUnfairLock(initialState: State.neverInstalled)
         private static let replacements = MethodReplacements()
 
+        /// Starts capturing, unless it runs already.
         static func start() {
+            guard state.withLock({ $0 }) != .capturing else { return }
             state.withLock { $0 = .capturing }
             URLProtocol.registerClass(DebugNetworkProtocol.self)
             if let methods = URLSessionConfiguration.protocolClassesMethods {
@@ -56,7 +90,9 @@
             NetworkWebSocketInterception.install()
         }
 
+        /// Puts back what ``start()`` changed, unless capturing isn't running.
         static func stop() {
+            guard state.withLock({ $0 }) == .capturing else { return }
             state.withLock { $0 = .uninstalled }
             URLProtocol.unregisterClass(DebugNetworkProtocol.self)
             replacements.restore()

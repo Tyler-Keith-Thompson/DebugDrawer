@@ -31,8 +31,9 @@
     /// `.debugAccessibilityOverrides()`. Each is `nil` while the system's value applies.
     @MainActor
     public final class AccessibilityOverrides: ObservableObject {
-        /// The overrides the plugin edits and `.debugAccessibilityOverrides()` applies.
-        public static let shared = AccessibilityOverrides()
+        /// The overrides the plugin edits and `.debugAccessibilityOverrides()` applies, with the
+        /// locales the app bundle is localized into.
+        public static let shared = AccessibilityOverrides(localizations: Bundle.main.localizations)
 
         /// The color scheme, light or dark.
         @Published public var colorScheme: ColorScheme?
@@ -58,8 +59,12 @@
         /// Available localizations discovered from the app bundle.
         public let availableLocales: [Locale]
 
-        private init() {
-            let ids = Bundle.main.localizations
+        /// Overrides with none set, offering the locales of `localizations`.
+        ///
+        /// - Parameter localizations: The identifiers of the localizations to offer, as a bundle
+        ///   lists them; `Base` is left out.
+        init(localizations: [String]) {
+            let ids = localizations
                 .filter { $0 != "Base" }
                 .sorted()
             availableLocales = ids.map { Locale(identifier: $0) }
@@ -92,10 +97,17 @@
 
     /// Applies ``AccessibilityOverrides/shared`` to the content's environment.
     public struct AccessibilityOverridesModifier: ViewModifier {
-        @ObservedObject private var overrides = AccessibilityOverrides.shared
+        @ObservedObject private var overrides: AccessibilityOverrides
 
         /// A modifier that follows ``AccessibilityOverrides/shared``.
-        public init() {}
+        public init() {
+            self.init(overrides: .shared)
+        }
+
+        /// - Parameter overrides: The overrides to apply.
+        init(overrides: AccessibilityOverrides) {
+            self.overrides = overrides
+        }
 
         /// The content, with each value that is overridden set in its environment.
         public func body(content: Content) -> some View {

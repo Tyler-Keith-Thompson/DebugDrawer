@@ -55,15 +55,15 @@
                     let isRedirected = identity(of: STDOUT_FILENO) != expectedOut && identity(of: STDERR_FILENO) != expectedErr
                     FileHandle.standardOutput.write(Data("Captured before\n".utf8))
                     await waitForLine("Captured before")
-                    await store.osLogSettled()
-                    let isDriverRegistered = await OSLogClient.isDriverRegistered(withId: store.driver.id)
+                    await ConsoleCapture.osLogSettled()
+                    let isDriverRegistered = await OSLogClient.isDriverRegistered(withId: ConsoleCapture.driver.id)
 
                     DebugDrawer.shared.unregisterGlobal(id: "ConsolePlugin")
                     DebugDrawer.shared.unregisterGlobal(id: "ConsolePlugin")
                     let isRestored = identity(of: STDOUT_FILENO) == expectedOut && identity(of: STDERR_FILENO) == expectedErr
                     let isDropped = store.lines.isEmpty && store.capture == .stopped
-                    await store.osLogSettled()
-                    let isDriverRemoved = await !OSLogClient.isDriverRegistered(withId: store.driver.id)
+                    await ConsoleCapture.osLogSettled()
+                    let isDriverRemoved = await !OSLogClient.isDriverRegistered(withId: ConsoleCapture.driver.id)
                     FileHandle.standardOutput.write(Data("Written after\n".utf8))
                     FileHandle.standardError.write(Data("Errored after\n".utf8))
                     ConsoleLogSink.log(level: .info, message: "Sunk after")
@@ -74,8 +74,8 @@
                     DebugDrawer.shared.installConsole(sessions: .off)
                     FileHandle.standardOutput.write(Data("Captured again\n".utf8))
                     await waitForLine("Captured again")
-                    await store.osLogSettled()
-                    let isDriverBack = await OSLogClient.isDriverRegistered(withId: store.driver.id)
+                    await ConsoleCapture.osLogSettled()
+                    let isDriverBack = await OSLogClient.isDriverRegistered(withId: ConsoleCapture.driver.id)
                     let isRecaptured = identity(of: STDOUT_FILENO) != expectedOut
                         && !store.lines.contains { ["Written after", "Errored after", "Sunk after"].contains($0.text) }
 

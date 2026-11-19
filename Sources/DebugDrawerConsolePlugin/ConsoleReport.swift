@@ -8,10 +8,11 @@ extension ConsolePlugin: DebugDrawerReportContributor {
     /// after a crash, the lines that led up to it. In release builds it adds nothing.
     public func contribute(to report: inout DebugDrawerReport, redaction: DebugDrawerRedaction) {
         #if DEBUG
-            Self.contribute(ConsoleLogStore.shared.filteredLines, to: &report)
+            let store = (model ?? .shared).store
+            Self.contribute(store.filteredLines, to: &report)
             // Read here, on the main actor, as the report is built now: a session is at most the
             // size limit, 20 MB unless the app set another.
-            Self.contribute(previous: ConsoleLogStore.shared.recorder?.newestPreviousSession(), to: &report)
+            Self.contribute(previous: store.recorder?.newestPreviousSession(), to: &report)
         #endif
     }
 }

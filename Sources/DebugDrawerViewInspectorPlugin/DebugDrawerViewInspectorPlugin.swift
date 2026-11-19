@@ -19,32 +19,52 @@ public struct ViewInspectorPlugin: DebugDrawerPlugin {
     public var category = "Interface"
     public var icon = "rectangle.dashed"
 
-    public init() {}
+    #if DEBUG
+        /// The model the plugin shows, or `nil` for the shared one.
+        private let model: ViewInspectorModel?
+
+        /// The plugin over ``ViewInspectorModel/shared``.
+        public init() {
+            model = nil
+        }
+
+        /// - Parameter model: The model to show and install in place of the shared one.
+        init(model: ViewInspectorModel) {
+            self.model = model
+        }
+    #else
+        public init() {}
+    #endif
 
     public var body: some View {
         #if DEBUG
-            ViewInspectorPluginView(transport: .direct(to: ViewInspectorModel.shared))
+            ViewInspectorPluginView(transport: .direct(to: model ?? .shared))
         #else
             EmptyView()
         #endif
     }
 
-    /// Counts renders with `.trackRenders(_:)` and, on iOS, swaps `UIWindow.sendEvent(_:)` so the
-    /// click indicators switch can show touches, as `drawer` adds the plugin. Release builds do
+    /// Counts renders with `.trackRenders(_:)` into this plugin's model while `drawer` is the
+    /// latest drawer to have installed the plugin, and, on iOS, swaps `UIWindow.sendEvent(_:)` so
+    /// the click indicators switch can show touches, as `drawer` adds the plugin. Release builds do
     /// nothing.
     @MainActor public func install(in drawer: DebugDrawer) {
         #if DEBUG
-            ViewInspectorModel.shared.install(in: ObjectIdentifier(drawer))
+            let model = model ?? .shared
+            model.install(in: ObjectIdentifier(drawer))
+            RenderTracking.install(model.renderTracker, for: ObjectIdentifier(drawer))
         #endif
     }
 
-    /// Once no drawer holds the plugin, turns the borders, grid, click indicators, render flashes
-    /// and slowed animations off, removes the overlay windows, forgets the render counts and the
-    /// hierarchy snapshot and stops counting, and on iOS gives `UIWindow.sendEvent(_:)` UIKit's
-    /// implementation back.
+    /// Stops counting renders into this plugin's model; the drawer that installed the plugin before
+    /// `drawer` gets the counts again. Once no drawer holds the plugin, turns the borders, grid,
+    /// click indicators, render flashes and slowed animations off, removes the overlay windows,
+    /// forgets the render counts and the hierarchy snapshot, and on iOS gives
+    /// `UIWindow.sendEvent(_:)` UIKit's implementation back.
     @MainActor public func uninstall(from drawer: DebugDrawer) {
         #if DEBUG
-            ViewInspectorModel.shared.uninstall(from: ObjectIdentifier(drawer))
+            RenderTracking.uninstall(for: ObjectIdentifier(drawer))
+            (model ?? .shared).uninstall(from: ObjectIdentifier(drawer))
         #endif
     }
 }

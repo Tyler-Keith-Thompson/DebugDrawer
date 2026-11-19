@@ -5,8 +5,9 @@ import Foundation
 #if DEBUG
     // The model composes the overlay controller, the render tracker and the flash setting rather
     // than replacing them: `.debugGrid()`, `.trackRenders(_:)` and the iOS touch swap run in the
-    // app's own views and windows, where no plugin is at hand, so they keep reaching the process's
-    // one controller and tracker. The live UI (windows, views, layers, the overlay windows) stays
+    // app's own views and windows, where no plugin is at hand, so they reach the process's one
+    // controller, and the tracker of the drawer that installed the plugin last (`RenderTracking`).
+    // The live UI (windows, views, layers, the overlay windows) stays
     // behind `ViewInspectorOverlayService` and `ViewHierarchyReader`; the model holds values only.
 
     /// The View Inspector plugin's state and behavior, without its views: the overlay switches,
@@ -76,22 +77,20 @@ import Foundation
             }
         }
 
-        /// Starts counting renders and, on iOS, swaps in the touch observer, as `drawer` adds the
-        /// plugin.
+        /// On iOS, swaps in the touch observer, as `drawer` adds the plugin. The plugin sends the
+        /// render counts to ``renderTracker`` meanwhile (``RenderTracking``).
         func install(in drawer: ObjectIdentifier) {
             drawers.insert(drawer)
-            renderTracker.isTracking = true
             overlays.install()
         }
 
         /// Once no drawer holds the plugin, turns every overlay, the slowed animations and the
-        /// render flashes off, puts back what install changed, stops counting and forgets the
-        /// counts and the hierarchy read.
+        /// render flashes off, puts back what install changed, and forgets the counts and the
+        /// hierarchy read.
         func uninstall(from drawer: ObjectIdentifier) {
             guard drawers.remove(drawer) != nil, drawers.isEmpty else { return }
             overlays.uninstall()
             renderFlash.isOn = false
-            renderTracker.isTracking = false
             renderTracker.reset()
             hierarchy = nil
         }

@@ -10,31 +10,21 @@
     /// behind a lock rather than in an actor: a frame is recorded before the app's completion
     /// handler runs, and a hop to an actor would leave it unrecorded when the handler looks.
     final class NetworkWebSocketRecorder: Sendable {
-        /// The recorder `installNetwork()`'s interception writes to; the plugin shows what it holds.
-        static let shared: NetworkWebSocketRecorder = {
-            // A change schedules a read of the latest state on the main actor, unless one is
-            // scheduled already: a busy socket then costs the store one update per turn of the
-            // main actor, not one per frame, and the store never shows an earlier state after a
-            // later one. The flag is cleared before the read, so a change after it schedules
-            // another.
-            let isScheduled = OSAllocatedUnfairLock(initialState: false)
-            return NetworkWebSocketRecorder(connectionCapacity: 50, frameCapacity: 500) {
-                let schedules = isScheduled.withLock { scheduled in
-                    defer { scheduled = true }
-                    return !scheduled
-                }
-                guard schedules else { return }
-                Task { @MainActor in
-                    isScheduled.withLock { $0 = false }
-                    NetworkStore.shared.showWebSockets(shared.connections)
-                }
-            }
-        }()
+        /// The recorder of ``NetworkStore/shared``, which the interception writes to before any
+        /// install and while the plugin `installNetwork()` registers captures.
+        static let shared = NetworkWebSocketRecorder(connectionCapacity: 50, frameCapacity: 500)
 
         let connectionCapacity: Int
         let frameCapacity: Int
         private let log = OSAllocatedUnfairLock<[NetworkWebSocketConnection]>(initialState: [])
         private let onChange: @Sendable () -> Void
+        private let delivery = OSAllocatedUnfairLock(initialState: Delivery())
+
+        /// The store a change is shown in, and whether a read for it is scheduled.
+        private struct Delivery: Sendable {
+            weak var store: NetworkStore?
+            var isScheduled = false
+        }
 
         /// - Parameters:
         ///   - connectionCapacity: The most connections kept.
@@ -59,7 +49,7 @@
                     connections.removeLast(connections.count - max(connectionCapacity, 0))
                 }
             }
-            onChange()
+            changed()
         }
 
         /// Records `frame` on the connection with the id; one no longer kept records nothing.
@@ -78,10 +68,15 @@
             change(id) { $0.end(state) }
         }
 
+        /// Shows every change from now on in `store`'s connections, on the main actor.
+        func showChanges(in store: NetworkStore) {
+            delivery.withLock { $0.store = store }
+        }
+
         /// Lets go of every connection; frames on one still open record nothing from then on.
         func clear() {
             log.withLock { $0.removeAll() }
-            onChange()
+            changed()
         }
 
         private func change(_ id: NetworkWebSocketConnection.ID, _ body: @Sendable (inout NetworkWebSocketConnection) -> Void) {
@@ -90,7 +85,28 @@
                 body(&connections[index])
                 return true
             }
-            if changed { onChange() }
+            if changed { self.changed() }
+        }
+
+        /// Tells `onChange`, and schedules a read of the latest state for the store, on the main
+        /// actor, unless one is scheduled already: a busy socket then costs the store one update
+        /// per turn of the main actor, not one per frame, and the store never shows an earlier
+        /// state after a later one. The flag is cleared before the read, so a change after it
+        /// schedules another.
+        private func changed() {
+            onChange()
+            let schedules = delivery.withLock { delivery in
+                defer { delivery.isScheduled = delivery.store != nil }
+                return delivery.store != nil && !delivery.isScheduled
+            }
+            guard schedules else { return }
+            Task { @MainActor in
+                let store = delivery.withLock { delivery in
+                    delivery.isScheduled = false
+                    return delivery.store
+                }
+                store?.showWebSockets(connections)
+            }
         }
     }
 #endif

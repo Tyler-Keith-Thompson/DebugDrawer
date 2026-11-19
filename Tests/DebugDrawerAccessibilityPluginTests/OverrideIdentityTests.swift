@@ -40,7 +40,7 @@
         @MainActor
         @Suite(.timeLimit(.minutes(1)))
         final class OverrideIdentityTests {
-            private let overrides = AccessibilityOverrides.shared
+            private let overrides = AccessibilityOverrides(localizations: [])
             private let reports = PassthroughSubject<(token: UUID, environment: String), Never>()
             private var tokens: [UUID] = []
             private var latest = ""
@@ -73,7 +73,7 @@
                 @Test("Changing and resetting overrides keeps the host's @State and @StateObject: its tree is never rebuilt")
                 func togglingOverridesKeepsHostState() async throws {
                     await change({
-                        ViewHosting.host(view: StatefulHost(reports: reports).debugAccessibilityOverrides())
+                        ViewHosting.host(view: StatefulHost(reports: reports).modifier(AccessibilityOverridesModifier(overrides: overrides)))
                     }, until: "size=")
                     defer { ViewHosting.expel() }
                     let first = try #require(tokens.first)
@@ -120,7 +120,8 @@
                             sourceLocation: sourceLocation)
                 }
 
-                let view = try AccessibilityPluginView().inspect()
+                let model = AccessibilityModel(overrides: overrides, system: _AccessibilitySystemSettings())
+                let view = try AccessibilityPluginView(transport: .direct(to: model)).inspect()
                 // Pickers in order: color scheme, layout direction (macOS), then the six settings.
                 // The locale picker only exists when the bundle has localizations, so it's set directly.
                 try view.find(button: "System").tap()

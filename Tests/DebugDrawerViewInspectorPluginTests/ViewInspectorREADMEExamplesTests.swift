@@ -23,22 +23,26 @@
         }
     }
 
-    @MainActor
-    @Suite("README examples: View Inspector")
-    struct ViewInspectorREADMEExamplesTests {
-        @Test("View Inspector: a tracked row shows its title and total, and its body is counted under OrderRow")
-        func trackRenders() throws {
-            // The README's app installs the plugin at launch, which starts the counting.
-            DebugDrawer.shared.installViewInspector()
-            let sut = OrderRow(title: "Coffee beans", total: "$18.00")
-            let before = RenderTracker.shared.counts["OrderRow", default: 0]
-            let expectedTexts = ["Coffee beans", "$18.00"]
+    // In the suite that takes turns installing the plugin: the counts go to the tracker of the
+    // drawer that installed it last, which another test's drawer of its own would otherwise be.
+    extension RenderTrackingInstalls {
+        @MainActor
+        @Suite("README examples: View Inspector")
+        struct ViewInspectorREADMEExamplesTests {
+            @Test("View Inspector: a tracked row shows its title and total, and its body is counted under OrderRow")
+            func trackRenders() throws {
+                // The README's app installs the plugin at launch, which starts the counting.
+                DebugDrawer.shared.installViewInspector()
+                let sut = OrderRow(title: "Coffee beans", total: "$18.00")
+                let before = RenderTracker.shared.counts["OrderRow", default: 0]
+                let expectedTexts = ["Coffee beans", "$18.00"]
 
-            let actualTexts = try sut.inspect().findAll(ViewType.Text.self).map { try $0.string() }
-            let actual = RenderTracker.shared.counts["OrderRow", default: 0]
+                let actualTexts = try sut.inspect().findAll(ViewType.Text.self).map { try $0.string() }
+                let actual = RenderTracker.shared.counts["OrderRow", default: 0]
 
-            #expect(actualTexts == expectedTexts)
-            #expect(actual > before)
+                #expect(actualTexts == expectedTexts)
+                #expect(actual > before)
+            }
         }
     }
 #endif

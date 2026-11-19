@@ -32,9 +32,9 @@ public extension View {
 
         func body(content: Content) -> some View {
             // The overlay stays while uninstalled, at a trigger that never changes, so the view
-            // keeps its identity and nothing flashes.
-            let tracker = RenderTracker.shared
-            let count = tracker.isTracking ? tracker.record(name) : 0
+            // keeps its identity and nothing flashes. Counted only while a drawer holds the plugin,
+            // so an app that never installs it counts nothing and keeps no names.
+            let count = RenderTracking.tracker?.record(name) ?? 0
             return content.overlay { RenderFlash(trigger: count) }
         }
     }

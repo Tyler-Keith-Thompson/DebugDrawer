@@ -230,6 +230,11 @@ drawer.unregisterGlobal(id: SocketPlugin(monitor: monitor).id) // uninstall(from
 
 In release builds a drawer of your own is a stand-in too: it holds nothing and calls no hook.
 
+A shipped plugin made with its public initializer works over the shared stores, the ones
+`install*()` fills. The Network, Console, View Inspector, Accessibility and Tweaks plugins also
+take a model, or a store, of their own through an internal initializer, so their own tests can
+build one over hand-written fakes and install it in a drawer of their own.
+
 ### A model apart from the view
 
 A plugin whose data should be read, or driven, without its view (by a test, by another tool, or
@@ -490,6 +495,14 @@ keep it, and a plugin of your own that intercepts should too:
 
 Interception starts in ``DebugDrawerPlugin/install(in:)``, not when the app's `install*()` call
 runs or when the module loads, so nothing is intercepted, or kept, before a drawer adds the plugin.
+
+What the plugin captures goes to the store of the drawer that installed it last. The app's calls
+carry no drawer, so a plugin can't tell which drawer one belongs to; it keeps the drawers holding
+it in the order they installed it, and its interception reads the latest one's store. When that
+drawer removes the plugin, the one before it captures again, and a store no drawer holds any more
+forgets what it kept. A test that installs the plugin in a drawer of its own, over a store of its
+own, sees the app's calls there while the app's drawer still holds the plugin, and nothing reaches
+the shared store until it removes it. Network, Console and View Inspector bind this way.
 
 The shipped plugins' test targets check the contract with shared checks: installing twice and in a
 second drawer, uninstalling and installing again, the app's results with the plugin and without,

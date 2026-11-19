@@ -209,6 +209,11 @@ counted by drawer: it stops once the last drawer holding the plugin removes it. 
 swizzled again on top of the plugin's can't be put back without breaking that code, so it is left
 in place and calls straight through, recording nothing, until the plugin is installed again.
 
+When two drawers hold Network, Console or View Inspector, the one that installed it last gets
+what it captures (requests, log lines, render counts), and Network's mock rules and conditions
+come from that drawer's plugin; once that drawer removes the plugin, the one before it captures
+again. An app that uses only the shared drawer sees no difference.
+
 ### Grouping, pinning and ordering
 
 The drawer lists global plugins by `category`, a string a plugin may declare; one that declares

@@ -5,7 +5,7 @@
     extension TweaksPlugin: DebugDrawerReportContributor {
         /// Adds each tweak's current value as `tweaks.json`, so a report says which settings were on.
         public func contribute(to report: inout DebugDrawerReport, redaction: DebugDrawerRedaction) {
-            Self.contribute(sections, stored: TweakStore.shared.storedValue(forKey:), to: &report, redaction: redaction)
+            Self.contribute(sections, stored: store.storedValue(forKey:), to: &report, redaction: redaction)
         }
 
         /// Adds `sections`' tweaks as `tweaks.json`: an object of each key's title, the value it

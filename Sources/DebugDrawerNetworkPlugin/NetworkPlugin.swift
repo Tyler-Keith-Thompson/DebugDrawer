@@ -15,11 +15,28 @@ public struct NetworkPlugin: DebugDrawerPlugin {
     public var category = "Logs & Network"
     public var icon = "network"
 
-    public init() {}
+    #if DEBUG
+        /// The model the plugin shows, or `nil` for the shared one.
+        let model: NetworkModel?
+
+        /// The plugin over ``NetworkModel/shared``, whose stores `installNetwork()` sets up.
+        public init() {
+            model = nil
+        }
+
+        /// - Parameter model: The model to show, in place of the shared one; its stores capture
+        ///   requests, and answer and condition them, while a drawer holding this plugin is the
+        ///   latest to have installed it.
+        init(model: NetworkModel) {
+            self.model = model
+        }
+    #else
+        public init() {}
+    #endif
 
     public var body: some View {
         #if DEBUG
-            NetworkPluginView(transport: .direct(to: NetworkModel.shared))
+            NetworkPluginView(transport: .direct(to: model ?? .shared))
         #else
             EmptyView()
         #endif
@@ -29,7 +46,7 @@ public struct NetworkPlugin: DebugDrawerPlugin {
     /// on, when any are.
     public var headerAccessory: some View {
         #if DEBUG
-            NetworkHeaderAccessoryView(transport: .direct(to: NetworkModel.shared))
+            NetworkHeaderAccessoryView(transport: .direct(to: model ?? .shared))
         #else
             EmptyView()
         #endif
@@ -39,23 +56,26 @@ public struct NetworkPlugin: DebugDrawerPlugin {
     /// release builds.
     @MainActor public var hud: NetworkConditionsHUD? {
         #if DEBUG
-            NetworkConditionsHUD(transport: .direct(to: NetworkModel.shared))
+            NetworkConditionsHUD(transport: .direct(to: model ?? .shared))
         #else
             nil
         #endif
     }
 
-    /// Starts capturing (``NetworkStore/install()``) as `drawer` adds the plugin. Release
-    /// builds capture nothing.
+    /// Starts capturing (``NetworkStore/install()``) as `drawer` adds the plugin. Requests are
+    /// logged in this plugin's store, and meet its mock rules and conditions (the shared ones for
+    /// the plugin `installNetwork()` registers), until another drawer installs the Network plugin,
+    /// and again once that one removes it. Release builds capture nothing.
     @MainActor public func install(in drawer: DebugDrawer) {
         #if DEBUG
-            NetworkInterception.install(for: drawer)
+            NetworkInterception.install(model ?? .shared, for: drawer)
         #endif
     }
 
-    /// Stops capturing and forgets the captured requests (``NetworkStore/uninstall()``) once
-    /// no drawer holds the plugin: the URL protocol is unregistered and every replaced method
-    /// gets its original implementation back.
+    /// Hands capturing back to the drawer that installed the Network plugin before `drawer`, and
+    /// forgets this plugin's captured requests once no drawer holds its store. Once no drawer
+    /// holds the plugin, stops capturing (``NetworkStore/uninstall()``): the URL protocol is
+    /// unregistered and every replaced method gets its original implementation back.
     @MainActor public func uninstall(from drawer: DebugDrawer) {
         #if DEBUG
             NetworkInterception.uninstall(for: drawer)

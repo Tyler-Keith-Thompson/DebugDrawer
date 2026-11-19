@@ -37,102 +37,106 @@
         override var allTouches: Set<UITouch>? { [touch] }
     }
 
-    @MainActor
-    @Suite(.serialized)
-    struct ClickIndicatorSwizzleTests {
-        @Test("installViewInspector() swaps in dd_sendEvent(_:) once; a second call or the switch swaps nothing")
-        func installSwizzlesOnce() throws {
-            let sendEvent = try #require(class_getInstanceMethod(UIWindow.self, #selector(UIWindow.sendEvent(_:))))
-            let ddSendEvent = try #require(class_getInstanceMethod(UIWindow.self, #selector(UIWindow.dd_sendEvent(_:))))
-            let controller = ViewBorderController.shared
-            DebugDrawer.shared.installViewInspector()
-            let installed = method_getImplementation(sendEvent)
-            let original = method_getImplementation(ddSendEvent)
-            // dd_sendEvent(_:)'s body is the plugin's code, while UIKit's sendEvent(_:) is
-            // UIKitCore's, so the image an implementation lives in says which one it is, whether
-            // or not an earlier test installed the swizzle first.
-            var pluginImage = Dl_info()
-            var installedImage = Dl_info()
-            var originalImage = Dl_info()
-            dladdr(unsafeBitCast(ViewBorderController.self, to: UnsafeRawPointer.self), &pluginImage)
-            dladdr(UnsafeRawPointer(installed), &installedImage)
-            dladdr(UnsafeRawPointer(original), &originalImage)
-
-            DebugDrawer.shared.installViewInspector()
-            let afterSecondInstall = method_getImplementation(sendEvent)
-            controller.isClickIndicatorEnabled = true
-            let afterTurningOn = method_getImplementation(sendEvent)
-            controller.isClickIndicatorEnabled = false
-            let actual = method_getImplementation(sendEvent)
-
-            #expect(installedImage.dli_fbase == pluginImage.dli_fbase)
-            #expect(originalImage.dli_fbase != pluginImage.dli_fbase)
-            #expect(afterSecondInstall == installed)
-            #expect(afterTurningOn == installed)
-            #expect(actual == installed)
-            #expect(method_getImplementation(ddSendEvent) == original)
-        }
-
-        // UIKit can't make a window in xctest, which runs package tests on Mac Catalyst without an
-        // NSApplication.
-        #if !targetEnvironment(macCatalyst)
-            @Test("With click indicators off, the swapped-in sendEvent(_:) forwards the event once and draws nothing")
-            func indicatorsOffForwardAndDrawNothing() {
-                DebugDrawer.shared.installViewInspector()
-                ViewBorderController.shared.isClickIndicatorEnabled = false
-                let sut = ForwardingProbeWindow()
-                let event = BeganTouchEvent()
-
-                sut.sendEvent(event)
-
-                #expect(sut.forwarded.count == 1)
-                #expect(sut.forwarded.first === event)
-                #expect(sut.subviews.isEmpty)
-            }
-
-            // The ripple goes in the overlay window over the window's scene; the SwiftPM test runner
-            // connects no scene, so this pins what the app's window sees: the event, once, and no view.
-            @Test("With click indicators on, the swapped-in sendEvent(_:) forwards the event once and adds nothing to the app's window")
-            func indicatorsOnForwardAndAddNothing() {
-                DebugDrawer.shared.installViewInspector()
+    // In the suite that takes turns installing the plugin: removing it from the shared drawer and
+    // adding it again here would take the render counts from another test's drawer of its own.
+    extension RenderTrackingInstalls {
+        @MainActor
+        @Suite(.serialized)
+        struct ClickIndicatorSwizzleTests {
+            @Test("installViewInspector() swaps in dd_sendEvent(_:) once; a second call or the switch swaps nothing")
+            func installSwizzlesOnce() throws {
+                let sendEvent = try #require(class_getInstanceMethod(UIWindow.self, #selector(UIWindow.sendEvent(_:))))
+                let ddSendEvent = try #require(class_getInstanceMethod(UIWindow.self, #selector(UIWindow.dd_sendEvent(_:))))
                 let controller = ViewBorderController.shared
-                let sut = ForwardingProbeWindow()
-                let event = BeganTouchEvent()
+                DebugDrawer.shared.installViewInspector()
+                let installed = method_getImplementation(sendEvent)
+                let original = method_getImplementation(ddSendEvent)
+                // dd_sendEvent(_:)'s body is the plugin's code, while UIKit's sendEvent(_:) is
+                // UIKitCore's, so the image an implementation lives in says which one it is, whether
+                // or not an earlier test installed the swizzle first.
+                var pluginImage = Dl_info()
+                var installedImage = Dl_info()
+                var originalImage = Dl_info()
+                dladdr(unsafeBitCast(ViewBorderController.self, to: UnsafeRawPointer.self), &pluginImage)
+                dladdr(UnsafeRawPointer(installed), &installedImage)
+                dladdr(UnsafeRawPointer(original), &originalImage)
 
+                DebugDrawer.shared.installViewInspector()
+                let afterSecondInstall = method_getImplementation(sendEvent)
                 controller.isClickIndicatorEnabled = true
-                sut.sendEvent(event)
+                let afterTurningOn = method_getImplementation(sendEvent)
                 controller.isClickIndicatorEnabled = false
+                let actual = method_getImplementation(sendEvent)
 
-                #expect(sut.forwarded.count == 1)
-                #expect(sut.forwarded.first === event)
-                #expect(sut.subviews.isEmpty)
+                #expect(installedImage.dli_fbase == pluginImage.dli_fbase)
+                #expect(originalImage.dli_fbase != pluginImage.dli_fbase)
+                #expect(afterSecondInstall == installed)
+                #expect(afterTurningOn == installed)
+                #expect(actual == installed)
+                #expect(method_getImplementation(ddSendEvent) == original)
             }
-        #endif
 
-        @Test("Removing the plugin gives sendEvent(_:) UIKit's implementation and dd_sendEvent(_:) its own back; adding it swaps again")
-        func uninstallRestoresSendEvent() throws {
-            let sendEvent = try #require(class_getInstanceMethod(UIWindow.self, #selector(UIWindow.sendEvent(_:))))
-            let ddSendEvent = try #require(class_getInstanceMethod(UIWindow.self, #selector(UIWindow.dd_sendEvent(_:))))
-            let drawer = DebugDrawer.shared
-            drawer.installViewInspector()
-            let installed = method_getImplementation(sendEvent)
-            // While swapped, dd_sendEvent(_:) names UIKit's original.
-            let expected = method_getImplementation(ddSendEvent)
+            // UIKit can't make a window in xctest, which runs package tests on Mac Catalyst without an
+            // NSApplication.
+            #if !targetEnvironment(macCatalyst)
+                @Test("With click indicators off, the swapped-in sendEvent(_:) forwards the event once and draws nothing")
+                func indicatorsOffForwardAndDrawNothing() {
+                    DebugDrawer.shared.installViewInspector()
+                    ViewBorderController.shared.isClickIndicatorEnabled = false
+                    let sut = ForwardingProbeWindow()
+                    let event = BeganTouchEvent()
 
-            drawer.unregisterGlobal(id: ViewInspectorPlugin().id)
-            let actual = method_getImplementation(sendEvent)
-            let ownAfterUninstall = method_getImplementation(ddSendEvent)
-            drawer.unregisterGlobal(id: ViewInspectorPlugin().id)
-            let afterSecondUninstall = method_getImplementation(sendEvent)
-            // Installed again, as the other tests here and the app expect it.
-            drawer.installViewInspector()
-            let reinstalled = method_getImplementation(sendEvent)
+                    sut.sendEvent(event)
 
-            #expect(actual == expected)
-            #expect(ownAfterUninstall == installed)
-            #expect(afterSecondUninstall == expected)
-            #expect(reinstalled == installed)
-            #expect(!ViewBorderController.shared.isClickIndicatorEnabled)
+                    #expect(sut.forwarded.count == 1)
+                    #expect(sut.forwarded.first === event)
+                    #expect(sut.subviews.isEmpty)
+                }
+
+                // The ripple goes in the overlay window over the window's scene; the SwiftPM test runner
+                // connects no scene, so this pins what the app's window sees: the event, once, and no view.
+                @Test("With click indicators on, the swapped-in sendEvent(_:) forwards the event once and adds nothing to the app's window")
+                func indicatorsOnForwardAndAddNothing() {
+                    DebugDrawer.shared.installViewInspector()
+                    let controller = ViewBorderController.shared
+                    let sut = ForwardingProbeWindow()
+                    let event = BeganTouchEvent()
+
+                    controller.isClickIndicatorEnabled = true
+                    sut.sendEvent(event)
+                    controller.isClickIndicatorEnabled = false
+
+                    #expect(sut.forwarded.count == 1)
+                    #expect(sut.forwarded.first === event)
+                    #expect(sut.subviews.isEmpty)
+                }
+            #endif
+
+            @Test("Removing the plugin gives sendEvent(_:) UIKit's implementation and dd_sendEvent(_:) its own back; adding it swaps again")
+            func uninstallRestoresSendEvent() throws {
+                let sendEvent = try #require(class_getInstanceMethod(UIWindow.self, #selector(UIWindow.sendEvent(_:))))
+                let ddSendEvent = try #require(class_getInstanceMethod(UIWindow.self, #selector(UIWindow.dd_sendEvent(_:))))
+                let drawer = DebugDrawer.shared
+                drawer.installViewInspector()
+                let installed = method_getImplementation(sendEvent)
+                // While swapped, dd_sendEvent(_:) names UIKit's original.
+                let expected = method_getImplementation(ddSendEvent)
+
+                drawer.unregisterGlobal(id: ViewInspectorPlugin().id)
+                let actual = method_getImplementation(sendEvent)
+                let ownAfterUninstall = method_getImplementation(ddSendEvent)
+                drawer.unregisterGlobal(id: ViewInspectorPlugin().id)
+                let afterSecondUninstall = method_getImplementation(sendEvent)
+                // Installed again, as the other tests here and the app expect it.
+                drawer.installViewInspector()
+                let reinstalled = method_getImplementation(sendEvent)
+
+                #expect(actual == expected)
+                #expect(ownAfterUninstall == installed)
+                #expect(afterSecondUninstall == expected)
+                #expect(reinstalled == installed)
+                #expect(!ViewBorderController.shared.isClickIndicatorEnabled)
+            }
         }
     }
 #endif

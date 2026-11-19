@@ -3,7 +3,8 @@
     import os
     import OSLogClient
 
-    /// Receives os_log entries and pushes them into the shared ConsoleLogStore.
+    /// Receives os_log entries and pushes them into the store capture goes to
+    /// (`ConsoleCapture.store`).
     final class ConsoleLogDriver: LogDriver, @unchecked Sendable {
         /// Entries logged before it are dropped; `nil` keeps every entry. OSLogClient calls the
         /// driver from its own actor, so it sits behind a lock. `OSAllocatedUnfairLock` rather
@@ -46,7 +47,7 @@
             guard earliestDate.withLock({ $0.map { date >= $0 } ?? true }) else { return }
             let line = Self.line(level: level, subsystem: subsystem, category: category, date: date, message: message)
             Task { @MainActor in
-                ConsoleLogStore.shared.ingest(line)
+                ConsoleCapture.store.ingest(line)
             }
         }
 

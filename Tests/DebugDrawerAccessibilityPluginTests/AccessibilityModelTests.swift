@@ -143,9 +143,9 @@
         @MainActor
         @Suite(.timeLimit(.minutes(1)))
         struct AccessibilityOverridesStoreTests {
-            @Test("The shared overrides read as the model's values, case for case")
+            @Test("The overrides read as the model's values, case for case")
             func sharedOverridesReadAsValues() {
-                let overrides = AccessibilityOverrides.shared
+                let overrides = AccessibilityOverrides(localizations: [])
                 overrides.colorScheme = .dark
                 overrides.dynamicTypeSize = .accessibility5
                 overrides.layoutDirection = .leftToRight
@@ -182,7 +182,7 @@
 
             @Test("Every Dynamic Type size survives the trip from SwiftUI's value to the model's and back")
             func everyDynamicTypeSizeMaps() {
-                let overrides = AccessibilityOverrides.shared
+                let overrides = AccessibilityOverrides(localizations: [])
                 for size in AccessibilityOverrideValues.DynamicTypeSize.allCases {
                     overrides.values.dynamicTypeSize = size
 

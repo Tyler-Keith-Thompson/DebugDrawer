@@ -97,6 +97,21 @@
             #expect(String(bytes: file.data, encoding: .utf8) == expected)
         }
 
+        @Test("A plugin over a store of its own reports that store's values, and the shared store holds none of them")
+        func storeOfItsOwn() throws {
+            let key = "tweaks.test.own.\(UUID().uuidString)"
+            let store = TweakStore(storage: FakeTweakStorage([key: .bool(true)]))
+            let sut = TweaksPlugin(sections: [TweakSection("Own") { Tweak.toggle("Own store", key: key, default: false) }], store: store)
+            var report = DebugDrawerReport()
+
+            sut.contribute(to: &report, redaction: .standard)
+
+            let file = try #require(report.files.first)
+            let actual = try #require(String(bytes: file.data, encoding: .utf8))
+            #expect(actual.contains(#""value" : "true""#))
+            #expect(TweakStore.shared.storedValue(forKey: key) == nil)
+        }
+
         @Test("Sections with no tweaks add nothing to the report")
         func reportEmpty() {
             let sections = [TweakSection("Session") { TweakAction("Expire token") {} }]

@@ -14,11 +14,27 @@ public struct ConsolePlugin: DebugDrawerPlugin {
     public var category = "Logs & Network"
     public var icon = "terminal"
 
-    public init() {}
+    #if DEBUG
+        /// The model the plugin shows, or `nil` for the shared one.
+        let model: ConsoleModel?
+
+        /// The plugin over ``ConsoleModel/shared``, whose store `installConsole()` sets up.
+        public init() {
+            model = nil
+        }
+
+        /// - Parameter model: The model to show, in place of the shared one; its store gets the
+        ///   captured lines while a drawer holding this plugin is the latest to have installed it.
+        init(model: ConsoleModel) {
+            self.model = model
+        }
+    #else
+        public init() {}
+    #endif
 
     public var body: some View {
         #if DEBUG
-            ConsolePluginView(transport: .direct(to: ConsoleModel.shared))
+            ConsolePluginView(transport: .direct(to: model ?? .shared))
         #else
             EmptyView()
         #endif
@@ -27,27 +43,30 @@ public struct ConsolePlugin: DebugDrawerPlugin {
     /// How many lines the console holds.
     public var headerAccessory: some View {
         #if DEBUG
-            ConsoleHeaderAccessoryView(transport: .direct(to: ConsoleModel.shared))
+            ConsoleHeaderAccessoryView(transport: .direct(to: model ?? .shared))
         #else
             EmptyView()
         #endif
     }
 
-    /// Starts capture into ``ConsoleLogStore/shared``, if nothing has: the process's os_log
-    /// entries and, on macOS, stdout and stderr. Release builds capture nothing.
+    /// Starts capture, if nothing has: the process's os_log entries and, on macOS, stdout and
+    /// stderr. They go to this plugin's store (``ConsoleLogStore/shared`` for the plugin
+    /// `installConsole()` registers) until another drawer installs the Console plugin, and again
+    /// once that one removes it. Release builds capture nothing.
     @MainActor public func install(in drawer: DebugDrawer) {
         #if DEBUG
-            ConsoleLogStore.shared.install(in: ObjectIdentifier(drawer))
+            (model ?? .shared).store.install(in: ObjectIdentifier(drawer))
         #endif
     }
 
-    /// Once no drawer has the plugin and the app hasn't called ``ConsoleLogStore/install()``,
-    /// stops capture: stdout and stderr write to where they did before, the console's os_log
-    /// driver is removed, and the captured lines are dropped. Earlier sessions on disk and the
-    /// mutes stay.
+    /// Hands capture back to the drawer that installed the Console plugin before `drawer`, and
+    /// drops the lines of this plugin's store once nothing captures into it. Once no drawer has
+    /// the plugin and the app hasn't called ``ConsoleLogStore/install()``, stops capture: stdout
+    /// and stderr write to where they did before and the console's os_log driver is removed.
+    /// Earlier sessions on disk and the mutes stay.
     @MainActor public func uninstall(from drawer: DebugDrawer) {
         #if DEBUG
-            ConsoleLogStore.shared.uninstall(from: ObjectIdentifier(drawer))
+            (model ?? .shared).store.uninstall(from: ObjectIdentifier(drawer))
         #endif
     }
 }

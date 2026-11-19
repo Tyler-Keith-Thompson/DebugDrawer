@@ -50,7 +50,12 @@
         @MainActor
         @Suite(.timeLimit(.minutes(1)))
         struct AccessibilitySettingOverrideTests {
-            private let overrides = AccessibilityOverrides.shared
+            private let overrides = AccessibilityOverrides(localizations: [])
+
+            /// A model over `overrides`, for the views under test.
+            private var model: AccessibilityModel {
+                AccessibilityModel(overrides: overrides, system: _AccessibilitySystemSettings())
+            }
 
             private let settings: [Setting] = [
                 Setting(name: "Reduce Motion", override: \.reduceMotion,
@@ -80,7 +85,8 @@
                 let probe = Probe()
                 let read = setting.read
                 let description = "\(setting.name), system \(systemValue): \(message)"
-                try await ViewHosting.host(setting.system(AnyView(probe.debugAccessibilityOverrides()), systemValue)) {
+                let overridden = AnyView(probe.modifier(AccessibilityOverridesModifier(overrides: overrides)))
+                try await ViewHosting.host(setting.system(overridden, systemValue)) {
                     try await probe.inspection.inspect { view in
                         let actual = try read(view.actualView())
                         #expect(actual == expected, "\(description)", sourceLocation: sourceLocation)
@@ -126,7 +132,7 @@
 
             @Test("The settings section lists every setting with the system's value, On or Off")
             func settingsSectionListsEverySettingWithItsSystemValue() throws {
-                let section = AccessibilitySettingsSection(system: .init(reduceMotion: true, increaseContrast: true))
+                let section = AccessibilitySettingsSection(system: .init(reduceMotion: true, increaseContrast: true), transport: .direct(to: model))
                 let texts = try section.inspect().findAll(ViewType.Text.self).map { try $0.string() }
                 for setting in settings {
                     #expect(texts.contains(setting.name), "missing \(setting.name) in \(texts)")
@@ -137,7 +143,7 @@
 
             @Test("A setting's picker sets the override On or Off, and System clears it")
             func settingsSectionPickerSetsAndClearsTheOverride() throws {
-                let section = AccessibilitySettingsSection(system: .init())
+                let section = AccessibilitySettingsSection(system: .init(), transport: .direct(to: model))
                 let pickers = try section.inspect().findAll(ViewType.Picker.self)
                 #expect(pickers.count == settings.count)
                 try pickers[0].select(value: 1)
@@ -150,11 +156,13 @@
 
             @Test("The plugin shows the settings section, offers Reset All only while an override is set, and Reset All clears them")
             func pluginShowsSectionAndResetAllClearsOverrides() throws {
-                #expect(throws: Never.self) { try AccessibilityPluginView().inspect().find(AccessibilitySettingsSection.self) }
-                #expect(throws: (any Error).self) { try AccessibilityPluginView().inspect().find(button: "Reset All") }
+                let model = model
+                let atRest = AccessibilityPluginView(transport: .direct(to: model))
+                #expect(throws: Never.self) { try atRest.inspect().find(AccessibilitySettingsSection.self) }
+                #expect(throws: (any Error).self) { try atRest.inspect().find(button: "Reset All") }
                 overrides.reduceMotion = true
                 overrides.invertColors = false
-                let view = AccessibilityPluginView()
+                let view = AccessibilityPluginView(transport: .direct(to: model))
                 #expect(throws: Never.self) { try view.inspect().find(text: "Motion") }
                 #expect(throws: Never.self) { try view.inspect().find(text: "Invert") }
                 try view.inspect().find(button: "Reset All").tap()

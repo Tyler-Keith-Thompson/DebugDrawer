@@ -20,10 +20,21 @@ public struct AccessibilityPlugin: DebugDrawerPlugin {
 
     #if DEBUG
         /// The plugin's own model, which its view and hooks reach.
-        private let box = AccessibilityModelBox()
-    #endif
+        private let box: AccessibilityModelBox
 
-    public init() {}
+        /// The plugin over ``AccessibilityOverrides/shared``, which `.debugAccessibilityOverrides()`
+        /// applies.
+        public init() {
+            box = AccessibilityModelBox()
+        }
+
+        /// - Parameter model: The model to show and drive, over overrides of its own.
+        init(model: AccessibilityModel) {
+            box = AccessibilityModelBox(model: model)
+        }
+    #else
+        public init() {}
+    #endif
 
     public var body: some View {
         #if DEBUG
@@ -37,7 +48,7 @@ public struct AccessibilityPlugin: DebugDrawerPlugin {
     /// it. Release builds override nothing.
     @MainActor public func install(in drawer: DebugDrawer) {
         #if DEBUG
-            AccessibilityInstallation.drawers.insert(ObjectIdentifier(drawer))
+            AccessibilityInstallation.install(box.model.overrides, in: drawer)
         #endif
     }
 
@@ -45,19 +56,38 @@ public struct AccessibilityPlugin: DebugDrawerPlugin {
     /// so the views under `.debugAccessibilityOverrides()` get the system's values again.
     @MainActor public func uninstall(from drawer: DebugDrawer) {
         #if DEBUG
-            guard AccessibilityInstallation.drawers.remove(ObjectIdentifier(drawer)) != nil,
-                  AccessibilityInstallation.drawers.isEmpty
-            else { return }
+            guard AccessibilityInstallation.uninstall(box.model.overrides, from: drawer) else { return }
             box.model.perform(AccessibilityCommand(.reset))
         #endif
     }
 }
 
 #if DEBUG
-    /// The drawers holding the Accessibility plugin; its overrides apply while there is one.
+    // Counted by the overrides rather than by the plugin's model: every plugin made with `init()`
+    // has a model of its own, all over `AccessibilityOverrides.shared`, so a drawer removing one
+    // must not clear what another drawer's plugin still shows.
+
+    /// The drawers holding an Accessibility plugin, by the overrides it edits; each set of
+    /// overrides applies while a drawer holds a plugin over it.
     @MainActor
     enum AccessibilityInstallation {
-        static var drawers: Set<ObjectIdentifier> = []
+        private static var drawers: [ObjectIdentifier: Set<ObjectIdentifier>] = [:]
+
+        /// Counts `drawer` as holding a plugin over `overrides`.
+        static func install(_ overrides: any AccessibilityOverrideStore, in drawer: DebugDrawer) {
+            drawers[ObjectIdentifier(overrides), default: []].insert(ObjectIdentifier(drawer))
+        }
+
+        /// Uncounts `drawer`.
+        ///
+        /// - Returns: Whether `drawer` held a plugin over `overrides` and no other drawer does now.
+        static func uninstall(_ overrides: any AccessibilityOverrideStore, from drawer: DebugDrawer) -> Bool {
+            let key = ObjectIdentifier(overrides)
+            guard drawers[key]?.remove(ObjectIdentifier(drawer)) != nil else { return false }
+            guard drawers[key]?.isEmpty == true else { return false }
+            drawers[key] = nil
+            return true
+        }
     }
 
     // The plugin's initializer isn't isolated (a host may make the plugin anywhere) and the model
@@ -69,10 +99,22 @@ public struct AccessibilityPlugin: DebugDrawerPlugin {
     /// Holds the Accessibility plugin's model, made when first asked for.
     @MainActor
     final class AccessibilityModelBox {
-        nonisolated init() {}
+        /// The model given at init, if any.
+        private let given: AccessibilityModel?
 
-        /// The plugin's model, over ``AccessibilityOverrides/shared`` and the device's settings.
-        private(set) lazy var model = AccessibilityModel()
+        /// A box that makes a model over ``AccessibilityOverrides/shared`` when first asked.
+        nonisolated init() {
+            given = nil
+        }
+
+        /// A box holding `model`.
+        init(model: AccessibilityModel) {
+            given = model
+        }
+
+        /// The plugin's model: the one given, or one over ``AccessibilityOverrides/shared`` and
+        /// the device's settings.
+        private(set) lazy var model = given ?? AccessibilityModel()
     }
 #endif
 

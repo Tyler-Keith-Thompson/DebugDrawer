@@ -200,7 +200,6 @@
 
             sut.install(in: ObjectIdentifier(first))
             sut.install(in: ObjectIdentifier(second))
-            let trackingWhileInstalled = tracker.isTracking
             sut.perform(ViewInspectorCommand(.overlays(.setBordersEnabled(true))))
             sut.perform(ViewInspectorCommand(.renders(.setFlashing(true))))
             sut.perform(ViewInspectorCommand(.hierarchy(.snapshot)))
@@ -216,12 +215,10 @@
             let actual = sut.snapshot
 
             #expect(overlays.installCount == 2)
-            #expect(trackingWhileInstalled)
             #expect(uninstallsAfterFirst == 0)
             #expect(afterFirstUninstall.overlays.isBordersEnabled)
             #expect(afterFirstUninstall.hierarchy != nil)
             #expect(overlays.uninstallCount == 1)
-            #expect(!tracker.isTracking)
             #expect(tracker.counts.isEmpty)
             #expect(actual == ViewInspectorSnapshot())
         }

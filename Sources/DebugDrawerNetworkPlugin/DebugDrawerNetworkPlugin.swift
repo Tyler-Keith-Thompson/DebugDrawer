@@ -18,9 +18,12 @@ public extension NetworkStore {
     /// log's filters, its mock rules, conditioning profiles, ignore list and earlier sessions.
     @MainActor
     public final class NetworkStore: ObservableObject {
-        /// The store `installNetwork()` fills and the plugin shows, its ignore list in the app's
-        /// storage beside the mock rules.
-        public static let shared = NetworkStore(ignoreStorage: _NetworkIgnoreListStorage(directory: _NetworkMockStorage.defaultDirectory))
+        /// The store the plugin `installNetwork()` registers fills and shows, its ignore list in the
+        /// app's storage beside the mock rules.
+        public static let shared = NetworkStore(
+            ignoreStorage: _NetworkIgnoreListStorage(directory: _NetworkMockStorage.defaultDirectory),
+            webSocketRecorder: .shared
+        )
 
         /// The captured requests, newest first: at most ``capacity`` of them, whose bodies add up
         /// to at most ``byteCapacity``.
@@ -177,22 +180,23 @@ public extension NetworkStore {
 
         private var installed = false
 
-        /// The WebSocket recorder `clear()` empties: the app's shared one, or a test's own, so a
-        /// test clearing a store of its own leaves other tests' connections alone.
-        private let webSocketRecorder: NetworkWebSocketRecorder
+        /// Records the WebSocket connections this store shows; `clear()` empties it.
+        let webSocketRecorder: NetworkWebSocketRecorder
 
         /// - Parameters:
         ///   - ignoreStorage: Where the ignore list is kept between launches; nothing is read
         ///     until `loadIgnoreList(adding:)`.
-        ///   - webSocketRecorder: The recorder whose connections `clear()` empties.
-        init(ignoreStorage: any NetworkIgnoreListStorage, webSocketRecorder: NetworkWebSocketRecorder = .shared) {
+        ///   - webSocketRecorder: Records the WebSocket connections the store shows; its own unless given.
+        init(ignoreStorage: any NetworkIgnoreListStorage, webSocketRecorder: NetworkWebSocketRecorder? = nil) {
             self.ignoreStorage = ignoreStorage
-            self.webSocketRecorder = webSocketRecorder
+            self.webSocketRecorder = webSocketRecorder ?? NetworkWebSocketRecorder(connectionCapacity: 50, frameCapacity: 500)
+            self.webSocketRecorder.showChanges(in: self)
         }
 
         /// Starts capturing: registers the plugin's URL protocol for `URLSession.shared`, adds it
         /// to every `URLSessionConfiguration` read from then on, and records WebSocket tasks. A
-        /// drawer that adds the Network plugin calls it; a second call does nothing.
+        /// drawer that adds the Network plugin calls it; a second call does nothing. What is
+        /// captured goes to the store of the drawer that installed the plugin last.
         public func install() {
             guard !installed else { return }
             installed = true
@@ -206,9 +210,16 @@ public extension NetworkStore {
         /// earlier sessions stay saved for the next install. A drawer that removes the Network
         /// plugin, and holds it in no other drawer, calls it; a second call does nothing.
         public func uninstall() {
+            uninstall(stoppingCapture: true)
+        }
+
+        /// Forgets what was captured, and stops capturing when `stoppingCapture`.
+        func uninstall(stoppingCapture: Bool) {
             guard installed else { return }
             installed = false
-            NetworkInterception.stop()
+            if stoppingCapture {
+                NetworkInterception.stop()
+            }
             clear()
         }
 

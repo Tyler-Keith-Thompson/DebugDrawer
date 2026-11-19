@@ -4,8 +4,6 @@
     import Foundation
     import Testing
 
-    // The store tests clear the shared store and read it back without suspending, on the main
-    // actor, so no other suite's line lands between the two.
     @MainActor
     @Suite(.timeLimit(.minutes(1)))
     struct ConsolePluginTests {
@@ -35,17 +33,17 @@
 
         @Test("Clearing the store leaves no lines")
         func consoleLogStoreCapacity() {
-            let store = ConsoleLogStore.shared
+            let store = ConsoleLogStore(muteStorage: FakeConsoleMuteStorage())
+            store.ingest(LogLine(timestamp: Date(), text: "Cleared", source: .stdout, level: .info))
             store.clear()
             #expect(store.lines.isEmpty)
         }
 
         @Test("A cleared store filtered to errors shows no lines")
         func consoleLogStoreFilterLevel() {
-            let store = ConsoleLogStore.shared
+            let store = ConsoleLogStore(muteStorage: FakeConsoleMuteStorage())
             store.clear()
             store.filterLevel = .error
-            defer { store.filterLevel = .debug }
             // filteredLines should only include error+ level
             #expect(store.filteredLines.isEmpty)
         }

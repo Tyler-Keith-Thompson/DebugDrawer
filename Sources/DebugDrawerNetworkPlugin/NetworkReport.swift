@@ -7,10 +7,11 @@ extension NetworkPlugin: DebugDrawerReportContributor {
     /// that led up to it. Release builds capture nothing, so it adds nothing there.
     public func contribute(to report: inout DebugDrawerReport, redaction: DebugDrawerRedaction) {
         #if DEBUG
-            Self.contribute(NetworkStore.shared.entries, webSockets: NetworkStore.shared.webSockets, to: &report, redaction: redaction)
+            let store = (model ?? .shared).store
+            Self.contribute(store.entries, webSockets: store.webSockets, to: &report, redaction: redaction)
             // Read here, on the main actor, as the report is built now: a session is at most the
             // size limit, 20 MB unless the app set another.
-            Self.contribute(previous: NetworkStore.shared.recorder?.newestPreviousSession(), to: &report)
+            Self.contribute(previous: store.recorder?.newestPreviousSession(), to: &report)
         #endif
     }
 }
