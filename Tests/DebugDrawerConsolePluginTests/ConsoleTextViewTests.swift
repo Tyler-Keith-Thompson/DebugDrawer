@@ -155,6 +155,61 @@
             #expect(texts(in: searched) == ["feed loaded", "feed failed", "feed retried"])
         }
 
+        // The Mac doesn't scale text, so large text is played by what it does to the well: lines
+        // wrapped onto several rows each in a narrow well, which then grows taller, as the scaled
+        // cap makes it on iOS.
+        @Test("While following, wrapped lines in a well that grows after its first layout still end on the newest line, and the lines keep following")
+        func followsThroughWrappingAndGrowth() async throws {
+            func textView(in view: NSView) -> NSTextView? {
+                view as? NSTextView ?? view.subviews.lazy.compactMap(textView(in:)).first
+            }
+            /// The text of the line drawn at the visible area's bottom edge.
+            func bottomLine(of textView: NSTextView) -> String {
+                let visible = textView.visibleRect
+                let index = textView.characterIndexForInsertion(at: NSPoint(x: 1, y: visible.maxY - 1))
+                let text = textView.string as NSString
+                return text.substring(with: text.lineRange(for: NSRange(location: min(index, text.length - 1), length: 0)))
+            }
+            final class Following {
+                var value = true
+            }
+            let following = Following()
+            let isFollowing = Binding(get: { following.value }, set: { following.value = $0 })
+            let lines = (0 ..< 40).map { index in
+                LogLine(
+                    timestamp: Date(timeIntervalSince1970: 1_800_000_000 + Double(index)), text: "Request \(index) finished",
+                    source: .stdout, level: .info
+                )
+            }
+            let host = NSHostingView(rootView: ConsoleTextView(lines: lines, isFollowing: isFollowing).frame(width: 120))
+            let window = NSWindow(contentRect: CGRect(x: 0, y: 0, width: 120, height: 120), styleMask: .borderless, backing: .buffered, defer: true)
+            window.contentView = host
+            host.layoutSubtreeIfNeeded()
+            // The text view scrolls to its end in a block it queues on the main queue after each
+            // update; this waits for the blocks queued before it, without a delay.
+            await withCheckedContinuation { continuation in DispatchQueue.main.async { continuation.resume() } }
+            let text = try #require(textView(in: host))
+            let firstBottom = bottomLine(of: text)
+            let firstHeight = text.visibleRect.height
+            let rowHeight = NSLayoutManager().defaultLineHeight(for: ConsoleTextView.codeFont)
+
+            window.setContentSize(CGSize(width: 120, height: 282))
+            host.layoutSubtreeIfNeeded()
+            await withCheckedContinuation { continuation in DispatchQueue.main.async { continuation.resume() } }
+            let grownBottom = bottomLine(of: text)
+            let gap = text.frame.height - text.visibleRect.maxY
+            let grownHeight = text.visibleRect.height
+
+            // Each line takes more than one row, as at a large text size.
+            #expect(text.frame.height / CGFloat(lines.count) > 1.5 * rowHeight)
+            #expect(firstHeight == 120)
+            #expect(grownHeight == 282)
+            #expect(firstBottom.hasSuffix("Request 39 finished"))
+            #expect(grownBottom.hasSuffix("Request 39 finished"))
+            #expect(abs(gap) < 1)
+            #expect(following.value)
+        }
+
         @Test("A line's context menu offers Mute Subsystem, Mute Category and Show Since This Line, and runs the one picked")
         func contextMenu() throws {
             func textView(in view: NSView) -> NSTextView? {

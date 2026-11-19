@@ -230,8 +230,8 @@
                 Coordinator(isFollowing: $isFollowing)
             }
 
-            func makeUIView(context: Context) -> UITextView {
-                let textView = UITextView()
+            func makeUIView(context: Context) -> ConsoleFollowingTextView {
+                let textView = ConsoleFollowingTextView()
                 textView.isEditable = false
                 textView.isSelectable = true
                 textView.backgroundColor = .clear
@@ -243,7 +243,7 @@
                 return textView
             }
 
-            func updateUIView(_ textView: UITextView, context: Context) {
+            func updateUIView(_ textView: ConsoleFollowingTextView, context: Context) {
                 let storage = textView.textStorage
                 let coordinator = context.coordinator
                 coordinator.perform = perform
@@ -284,12 +284,9 @@
                     coordinator.rendered.extended(dropping: dropping, appended: appended, appendedStarts: text.starts)
                 }
 
-                if isFollowing, storage.length > 0 {
-                    coordinator.isProgrammaticScroll = true
-                    let range = NSRange(location: storage.length - 1, length: 1)
-                    textView.scrollRangeToVisible(range)
-                    coordinator.isProgrammaticScroll = false
-                }
+                // The text view pins its end on each layout and new content size while it
+                // follows, so the end stays in view once the new text and frame are laid out.
+                textView.followsEnd = isFollowing
             }
 
             private static let dateFormatter: DateFormatter = {
@@ -357,22 +354,13 @@
                 /// The appearance the glyphs were drawn for; nil before the first render.
                 var renderedColorScheme: ColorScheme?
                 var glyphs: ConsoleGlyphs?
-                var isProgrammaticScroll = false
                 var isFollowing: Binding<Bool>
                 /// Runs what a line's edit menu offers.
                 var perform: (ConsoleLineAction) -> Void = { _ in }
-                weak var textView: UITextView?
+                weak var textView: ConsoleFollowingTextView?
 
                 init(isFollowing: Binding<Bool>) {
                     self.isFollowing = isFollowing
-                }
-
-                func scrollViewDidScroll(_ scrollView: UIScrollView) {
-                    guard !isProgrammaticScroll else { return }
-                    let contentHeight = scrollView.contentSize.height
-                    let scrollOffset = scrollView.contentOffset.y + scrollView.bounds.height
-                    let atBottom = contentHeight - scrollOffset < 20
-                    isFollowing.wrappedValue = atBottom
                 }
 
                 /// The edit menu, with the actions of the line the selection starts in first.
