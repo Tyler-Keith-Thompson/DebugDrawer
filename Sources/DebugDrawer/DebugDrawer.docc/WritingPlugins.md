@@ -301,6 +301,94 @@ are built this way (`NetworkModel`, `ConsoleModel`, `ViewInspectorModel`, `Acces
 keeps its windows and views behind a service the model takes at init and puts only values read
 from them in its snapshot.
 
+### Reaching a model from another process
+
+A model can be read and driven from outside the drawer too: by another app of yours that shares
+an app group with this one (a sidecar), or by a viewer on another machine. The app offers its
+models in a ``DebugDrawerModelRegistry``, each under its plugin's ID, and serves the registry
+over the transports a viewer may use. A viewer holds any ``DebugDrawerTransport`` and asks it
+for a plugin; what comes back is the same ``DebugDrawerPluginTransport`` the plugin's view
+already draws from, so neither the model nor the view knows which transport it is on.
+
+| Transport | App's side | Viewer's side | When |
+|---|---|---|---|
+| In the process | (the registry itself) | ``DebugDrawerInProcessTransport`` | The drawer, or a test, in the app's own process; a command lands before `send` returns |
+| Unix domain socket | ``DebugDrawerSocketServer`` | ``DebugDrawerSocketTransport`` | Both apps run; snapshots arrive as they change, commands land at once |
+| App-group store | ``DebugDrawerAppGroupStoreServer`` | ``DebugDrawerAppGroupStoreTransport`` | Either app may be suspended; the viewer reads the last snapshots, and commands wait for the app |
+
+```swift
+@MainActor
+final class CounterSharing {
+    let registry = DebugDrawerModelRegistry()
+    let socketServer: DebugDrawerSocketServer
+    let storeServer: DebugDrawerAppGroupStoreServer
+
+    init(model: CounterModel, container: URL) throws {
+        registry.register(model, id: "MyApp.CounterPlugin")
+        socketServer = DebugDrawerSocketServer(registry: registry, socketPath: container.appending(path: "drawer.sock").path)
+        storeServer = DebugDrawerAppGroupStoreServer(registry: registry, directory: container.appending(path: "DebugDrawer"))
+        try socketServer.start()
+        try storeServer.start()
+    }
+}
+```
+
+The viewer picks a transport per connection, at run time, and can hold several at once, to one
+model or to many: here, the socket while the app answers on it, and the store when it doesn't.
+
+```swift
+@MainActor
+func counterTransport(container: URL) async throws -> DebugDrawerPluginTransport<CounterModel.Snapshot, CounterModel.Command> {
+    let connection: any DebugDrawerTransport
+    do {
+        connection = try DebugDrawerSocketTransport(socketPath: container.appending(path: "drawer.sock").path)
+    } catch {
+        connection = try DebugDrawerAppGroupStoreTransport(directory: container.appending(path: "DebugDrawer"))
+    }
+    return try await connection.connect(toPlugin: "MyApp.CounterPlugin", snapshot: CounterModel.Snapshot.self, command: CounterModel.Command.self)
+}
+```
+
+`connect` returns once the plugin's first snapshot is in, waiting while the app hasn't
+registered the model yet; it throws ``DebugDrawerTransportError/mismatchedTypes`` when the model
+under that ID has other types. A transport it returns holds its connection open. When the app
+stops serving the socket, the transport keeps its last snapshot, drops later commands, and the
+socket transport's ``DebugDrawerSocketTransport/isConnected`` turns `false`.
+
+**Platforms.** Each transport builds wherever core does: macOS, iOS, Mac Catalyst, visionOS,
+tvOS and watchOS. App groups and Unix domain sockets in the group's container work between two
+apps of one team on iOS, macOS and visionOS, which is where a sidecar runs; tvOS and watchOS
+build the same code for an app talking to its own extensions. A socket's path holds at most 103
+bytes, which a group container's path leaves room for. Everything here is for debug builds:
+release builds get stand-ins whose connections throw ``DebugDrawerTransportError/unreachable``
+and whose servers serve nothing.
+
+**The wire.** Whatever leaves the process is one message: a JSON object with the format's
+`version` (1), its `kind` (`subscribe`, `snapshot` or `command`), the `pluginID`, and the
+`payload`, the plugin's own snapshot or command encoded as JSON (keys sorted) and carried as
+base64. A receiver drops a message of another version. On a byte stream, the socket's or a
+network connection's, each message is a frame: a 4-byte big-endian length, then that many bytes
+of JSON, at most 64 MiB. A viewer sends `subscribe` for each plugin it connects to and gets that
+plugin's current snapshot, then one after each change, each different from the one before; it
+sends `command`s back. The store keeps one message per file, written atomically:
+`snapshots/<plugin ID>.json` holds each plugin's newest snapshot (the ID percent-encoded), and
+`commands/<time>-<count>-<UUID>.json` holds each command until the app performs it, oldest
+first, and removes it. Both sides learn of a change from a dispatch source on the directory, so
+nothing polls.
+
+**Why it is built this way.** The protocol hands out ``DebugDrawerPluginTransport``s rather than
+raw messages, so a view never changes and the in-process transport keeps `direct(to:)`'s
+synchronous commands; a protocol rather than a compile-time choice, so a viewer can hold two
+transports at once and switch when the app goes to the background. Registration is explicit,
+not done by plugins as they install, so an app offers only what it chooses. The socket is POSIX
+`AF_UNIX` with dispatch sources rather than Network.framework, whose listener documents no
+Unix-domain support, and its connection code doesn't know the address family, so a network
+transport can reuse it with the framing. The store is files and a directory's dispatch source
+rather than `NSFilePresenter` (file coordination across processes would bind both apps to it for
+every write) or a Darwin notification (a name to agree on and a second step to read what
+changed). JSON rather than a binary property list, so a capture can be read and a viewer on any
+platform can write it.
+
 ### Capturing what the app does
 
 A plugin that records events as the app makes them (log lines, requests, file calls) keeps them

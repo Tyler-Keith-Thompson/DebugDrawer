@@ -170,9 +170,65 @@
         }
     }
 
+    // WritingPlugins.md
+    @MainActor
+    final class CounterSharing {
+        let registry = DebugDrawerModelRegistry()
+        let socketServer: DebugDrawerSocketServer
+        let storeServer: DebugDrawerAppGroupStoreServer
+
+        init(model: CounterModel, container: URL) throws {
+            registry.register(model, id: "MyApp.CounterPlugin")
+            socketServer = DebugDrawerSocketServer(registry: registry, socketPath: container.appending(path: "drawer.sock").path)
+            storeServer = DebugDrawerAppGroupStoreServer(registry: registry, directory: container.appending(path: "DebugDrawer"))
+            try socketServer.start()
+            try storeServer.start()
+        }
+    }
+
+    // WritingPlugins.md
+    @MainActor
+    func counterTransport(container: URL) async throws -> DebugDrawerPluginTransport<CounterModel.Snapshot, CounterModel.Command> {
+        let connection: any DebugDrawerTransport
+        do {
+            connection = try DebugDrawerSocketTransport(socketPath: container.appending(path: "drawer.sock").path)
+        } catch {
+            connection = try DebugDrawerAppGroupStoreTransport(directory: container.appending(path: "DebugDrawer"))
+        }
+        return try await connection.connect(toPlugin: "MyApp.CounterPlugin", snapshot: CounterModel.Snapshot.self, command: CounterModel.Command.self)
+    }
+
     @MainActor
     @Suite("Documentation examples")
     struct DocumentationExamplesTests {
+        // The container stands in for an app group's: a short path in /tmp, as a socket's address
+        // holds 103 bytes and the test's temporary directory can be longer.
+        @Test(
+            "Writing plugins: a viewer reaches a shared model over the socket while the app serves it, and through the store after",
+            .timeLimit(.minutes(1))
+        )
+        func modelFromAnotherProcess() async throws {
+            let container = URL(filePath: "/tmp/dd-\(UUID().uuidString.prefix(8))", directoryHint: .isDirectory)
+            try FileManager.default.createDirectory(at: container, withIntermediateDirectories: true)
+            let model = CounterModel()
+            let sharing = try CounterSharing(model: model, container: container)
+
+            let live = try await counterTransport(container: container)
+            live.send(.increment)
+            for await snapshot in live.snapshots() where snapshot.count == 1 {
+                break
+            }
+            sharing.socketServer.stop()
+            let fromStore = try await counterTransport(container: container)
+            fromStore.send(.increment)
+            for await snapshot in fromStore.snapshots() where snapshot.count == 2 {
+                break
+            }
+
+            #expect(model.snapshot.count == 2)
+            sharing.storeServer.stop()
+        }
+
         @Test("Writing plugins: commands sent through a direct transport change the model, and its snapshot round-trips through JSON")
         func modelApartFromTheView() throws {
             let model = CounterModel()

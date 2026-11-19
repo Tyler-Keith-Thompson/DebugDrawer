@@ -1,0 +1,142 @@
+import Darwin
+import Foundation
+import os
+
+// The app's end of the socket transport: it listens on a Unix domain socket, and serves each
+// viewer that connects through a `RegistrySession` of its own, so each viewer gets the plugins it
+// asked for. For a sidecar app the socket lives in the app group's container, which both apps can
+// reach; a socket file left by an earlier run that nothing answers on is replaced, and one a live
+// server answers on is not.
+
+#if DEBUG
+    /// Serves a ``DebugDrawerModelRegistry``'s models over a Unix domain socket, to each
+    /// ``DebugDrawerSocketTransport`` that connects while it runs.
+    ///
+    /// ```swift
+    /// let container = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: "group.com.example.debug")!
+    /// let server = DebugDrawerSocketServer(registry: registry, socketPath: container.appending(path: "drawer.sock").path)
+    /// try server.start()
+    /// ```
+    ///
+    /// A socket's path holds at most 103 bytes. Release builds get a stand-in that serves nothing.
+    @MainActor
+    public final class DebugDrawerSocketServer {
+        private static let logger = Logger(subsystem: "DebugDrawer", category: "DebugDrawerSocketServer")
+
+        private let registry: DebugDrawerModelRegistry
+        /// Where the socket is.
+        public let socketPath: String
+        private var listener: SocketListener?
+        /// Each connected viewer, until it disconnects.
+        private var viewers: [ObjectIdentifier: (connection: SocketConnection, session: RegistrySession)] = [:]
+
+        /// A server of `registry`'s models at `socketPath`; it listens once started.
+        ///
+        /// - Parameters:
+        ///   - registry: The models to serve.
+        ///   - socketPath: Where to make the socket.
+        public init(registry: DebugDrawerModelRegistry, socketPath: String) {
+            self.registry = registry
+            self.socketPath = socketPath
+        }
+
+        /// Whether the server is listening.
+        public var isRunning: Bool {
+            listener != nil
+        }
+
+        /// Makes the socket and listens on it. Does nothing while the server runs.
+        ///
+        /// - Throws: ``DebugDrawerTransportError/socketPathTooLong`` when the path doesn't fit a
+        ///   socket's address, and ``DebugDrawerTransportError/cannotServe`` when something else
+        ///   is at the path or the socket can't be made.
+        public func start() throws(DebugDrawerTransportError) {
+            guard listener == nil else { return }
+            guard UnixSocketAddress.make(socketPath) != nil else { throw .socketPathTooLong }
+            try removeStaleSocket()
+            let listener = try SocketListener(path: socketPath)
+            self.listener = listener
+            let accepted = listener.accepted
+            // The loop runs until the listener's stream finishes, after `stop()`, so a connection
+            // accepted just before is closed rather than left open with nothing serving it.
+            Task { [weak self] in
+                for await client in accepted {
+                    guard let self, self.listener === listener else {
+                        Darwin.close(client)
+                        continue
+                    }
+                    serve(client)
+                }
+            }
+        }
+
+        /// Stops listening, disconnects every viewer and removes the socket. The server can start
+        /// again.
+        public func stop() {
+            listener?.cancel()
+            listener = nil
+            for viewer in viewers.values {
+                viewer.session.close()
+                viewer.connection.close()
+            }
+            viewers = [:]
+        }
+
+        /// Serves the viewer connected on `descriptor` until it disconnects.
+        private func serve(_ descriptor: Int32) {
+            let connection = SocketConnection(descriptor: descriptor)
+            let session = RegistrySession(registry: registry) { connection.send($0) }
+            let key = ObjectIdentifier(connection)
+            viewers[key] = (connection, session)
+            Task { [weak self] in
+                for await message in connection.messages {
+                    session.receive(message)
+                }
+                session.close()
+                self?.viewers[key] = nil
+            }
+        }
+
+        /// Removes a socket file nothing answers on, left by a run that ended without stopping.
+        private func removeStaleSocket() throws(DebugDrawerTransportError) {
+            var status = stat()
+            guard lstat(socketPath, &status) == 0 else { return }
+            guard status.st_mode & S_IFMT == S_IFSOCK else { throw .cannotServe }
+            if let live = UnixSocketAddress.connect(to: socketPath) {
+                Darwin.close(live)
+                throw .cannotServe
+            }
+            Self.logger.debug("Replaced a stale socket at \(self.socketPath, privacy: .private)")
+            unlink(socketPath)
+        }
+    }
+#else
+    // The release stand-in: the same members, serving nothing.
+
+    /// Release builds serve nothing: this stand-in never listens.
+    @MainActor
+    public final class DebugDrawerSocketServer {
+        /// Where the socket would be.
+        public let socketPath: String
+
+        /// A server that never listens.
+        ///
+        /// - Parameters:
+        ///   - registry: Ignored.
+        ///   - socketPath: Kept, and never made.
+        public init(registry: DebugDrawerModelRegistry, socketPath: String) {
+            self.socketPath = socketPath
+        }
+
+        /// Always `false`.
+        public var isRunning: Bool {
+            false
+        }
+
+        /// Does nothing.
+        public func start() throws(DebugDrawerTransportError) {}
+
+        /// Does nothing.
+        public func stop() {}
+    }
+#endif

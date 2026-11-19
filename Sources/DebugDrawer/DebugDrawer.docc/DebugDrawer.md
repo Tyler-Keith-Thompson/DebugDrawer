@@ -40,6 +40,17 @@ and the API a host calls compiles to stand-ins that do nothing.
 - ``DebugDrawerPluginModel``
 - ``DebugDrawerPluginTransport``
 
+### Reaching Models from Another Process
+
+- ``DebugDrawerTransport``
+- ``DebugDrawerModelRegistry``
+- ``DebugDrawerInProcessTransport``
+- ``DebugDrawerSocketServer``
+- ``DebugDrawerSocketTransport``
+- ``DebugDrawerAppGroupStoreServer``
+- ``DebugDrawerAppGroupStoreTransport``
+- ``DebugDrawerTransportError``
+
 ### Building a Plugin's View
 
 - <doc:BuildingPluginViews>
