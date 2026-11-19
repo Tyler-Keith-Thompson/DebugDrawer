@@ -3,42 +3,60 @@
     @testable import DebugDrawerPerformancePlugin
     import Testing
 
+    /// A `task_vm_info` reading the test sets, so nothing else the process does moves it.
+    private struct FakeTaskVMInfoSource: TaskVMInfoSource {
+        let info: task_vm_info_data_t?
+
+        func taskVMInfo() -> task_vm_info_data_t? { info }
+    }
+
     @Suite("Performance memory footprint")
     struct MemoryFootprintTests {
-        @Test("The footprint Performance samples is the process's phys_footprint, within 5%")
-        func memoryIsThePhysicalFootprint() throws {
+        @Test("The footprint is phys_footprint and the peak is the ledger's peak, not resident size")
+        func footprintIsPhysicalFootprintAndPeakIsLedgerPeak() {
+            let megabyte: UInt64 = 1024 * 1024
             var info = task_vm_info_data_t()
-            var count = mach_msg_type_number_t(MemoryLayout<task_vm_info_data_t>.size / MemoryLayout<integer_t>.size)
-            let result = withUnsafeMutablePointer(to: &info) { pointer in
-                pointer.withMemoryRebound(to: integer_t.self, capacity: Int(count)) {
-                    task_info(mach_task_self_, task_flavor_t(TASK_VM_INFO), $0, &count)
-                }
-            }
-            try #require(result == KERN_SUCCESS)
-            let expected = Double(info.phys_footprint) / (1024 * 1024)
-            let tolerance = expected * 0.05
+            info.phys_footprint = 300 * megabyte
+            info.resident_size = 900 * megabyte
+            info.ledger_phys_footprint_peak = Int64(450 * megabyte)
+            let source = FakeTaskVMInfoSource(info: info)
+            let expected = MemoryFootprint(megabytes: 300, peakMegabytes: 450)
 
-            let actual = MemoryFootprint.current().megabytes
+            let actual = MemoryFootprint.current(from: source)
 
-            #expect(abs(actual - expected) <= tolerance, "\(actual) MB against phys_footprint \(expected) MB")
+            #expect(actual == expected)
         }
 
-        @Test("The peak is the kernel's lifetime phys_footprint peak, within 5%, and never below the footprint")
-        func peakIsTheLedgerPeak() throws {
+        @Test("A ledger peak below the footprint, as an older kernel leaves it, reads as the footprint")
+        func peakIsNeverBelowTheFootprint() {
+            let megabyte: UInt64 = 1024 * 1024
             var info = task_vm_info_data_t()
-            var count = mach_msg_type_number_t(MemoryLayout<task_vm_info_data_t>.size / MemoryLayout<integer_t>.size)
-            let result = withUnsafeMutablePointer(to: &info) { pointer in
-                pointer.withMemoryRebound(to: integer_t.self, capacity: Int(count)) {
-                    task_info(mach_task_self_, task_flavor_t(TASK_VM_INFO), $0, &count)
-                }
-            }
-            try #require(result == KERN_SUCCESS)
-            let expected = Double(info.ledger_phys_footprint_peak) / (1024 * 1024)
-            let tolerance = expected * 0.05
+            info.phys_footprint = 300 * megabyte
+            info.resident_size = 900 * megabyte
+            info.ledger_phys_footprint_peak = 0
+            let source = FakeTaskVMInfoSource(info: info)
+            let expected = MemoryFootprint(megabytes: 300, peakMegabytes: 300)
 
+            let actual = MemoryFootprint.current(from: source)
+
+            #expect(actual == expected)
+        }
+
+        @Test("When the kernel won't report task_vm_info, the footprint and its peak are zero")
+        func noReadingIsZero() {
+            let source = FakeTaskVMInfoSource(info: nil)
+            let expected = MemoryFootprint(megabytes: 0, peakMegabytes: 0)
+
+            let actual = MemoryFootprint.current(from: source)
+
+            #expect(actual == expected)
+        }
+
+        @Test("The kernel reports a footprint above zero, and a peak no lower than it")
+        func kernelReadingIsNonZero() {
             let actual = MemoryFootprint.current()
 
-            #expect(abs(actual.peakMegabytes - expected) <= tolerance, "\(actual.peakMegabytes) MB against the ledger's \(expected) MB")
+            #expect(actual.megabytes > 0)
             #expect(actual.peakMegabytes >= actual.megabytes)
         }
 

@@ -12,6 +12,7 @@ the entry becomes the GitHub release's notes.
 
 - DD-198: the test that checks a row's icon sits level with its title no longer crashes the whole iOS test process on an iPhone simulator. On a 3x screen the row's fitting height ends a third of a point into the test's 2x bitmap, whose partly clear last row read as ink across the full width; the bitmap is now whole pixels on white, and its scan reports a bitmap it can't read through `#require` instead of trapping.
 - DD-230: the Deep Link user-info editor's width tests pass on a 3x iPhone simulator. SwiftUI sizes the editor in whole pixels, so the 272.5-point width, 817.5 px at 3x, measured 818 px; the editor itself fits, as it measures 817 px at 817. The tests now compare widths in pixels at the screen's scale, the limit rounded up to a whole pixel.
+- DD-207: the Performance and App Info memory-footprint tests no longer fail when other tests allocate while they run. They compared a live `task_info` reading with a second one within 5%, which a concurrent allocation could move past; the reading now comes through a source the tests replace with a fixed `task_vm_info`, whose footprint, resident size and peak differ, so they check the exact megabytes shown.
 
 ## [0.1.3] - 2026-11-18
 

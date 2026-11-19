@@ -3,24 +3,45 @@
     @testable import DebugDrawerAppInfoPlugin
     import Testing
 
+    /// A `task_vm_info` reading the test sets, so nothing else the process does moves it.
+    private struct FakeTaskVMInfoSource: TaskVMInfoSource {
+        let info: task_vm_info_data_t?
+
+        func taskVMInfo() -> task_vm_info_data_t? { info }
+    }
+
     @Suite("App Info memory footprint")
     struct MemoryFootprintTests {
-        @Test("The memory shown is the process's phys_footprint, within 5%")
-        func memoryIsThePhysicalFootprint() throws {
+        @Test("The memory shown is phys_footprint, not resident size or the ledger's peak")
+        func memoryIsThePhysicalFootprint() {
+            let megabyte: UInt64 = 1024 * 1024
             var info = task_vm_info_data_t()
-            var count = mach_msg_type_number_t(MemoryLayout<task_vm_info_data_t>.size / MemoryLayout<integer_t>.size)
-            let result = withUnsafeMutablePointer(to: &info) { pointer in
-                pointer.withMemoryRebound(to: integer_t.self, capacity: Int(count)) {
-                    task_info(mach_task_self_, task_flavor_t(TASK_VM_INFO), $0, &count)
-                }
-            }
-            try #require(result == KERN_SUCCESS)
-            let expected = Double(info.phys_footprint) / (1024 * 1024)
-            let tolerance = expected * 0.05
+            info.phys_footprint = 300 * megabyte
+            info.resident_size = 900 * megabyte
+            info.ledger_phys_footprint_peak = Int64(450 * megabyte)
+            let source = FakeTaskVMInfoSource(info: info)
+            let expected: Double = 300
 
+            let actual = MemoryFootprint.currentMB(from: source)
+
+            #expect(actual == expected)
+        }
+
+        @Test("When the kernel won't report task_vm_info, the memory shown is zero")
+        func noReadingIsZero() {
+            let source = FakeTaskVMInfoSource(info: nil)
+            let expected: Double = 0
+
+            let actual = MemoryFootprint.currentMB(from: source)
+
+            #expect(actual == expected)
+        }
+
+        @Test("The kernel reports a footprint above zero")
+        func kernelReadingIsNonZero() {
             let actual = MemoryFootprint.currentMB()
 
-            #expect(abs(actual - expected) <= tolerance, "\(actual) MB against phys_footprint \(expected) MB")
+            #expect(actual > 0)
         }
     }
 #endif
