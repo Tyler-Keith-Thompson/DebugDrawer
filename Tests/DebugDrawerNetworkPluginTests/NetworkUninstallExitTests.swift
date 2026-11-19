@@ -4,6 +4,7 @@
 #if os(macOS) && DEBUG
     @testable import DebugDrawer
     @testable import DebugDrawerNetworkPlugin
+    import DebugDrawerTestSupport
     import Foundation
     import ObjectiveC
     import Testing
@@ -20,6 +21,7 @@
         @Test("Removing the plugin gives every replaced method its original implementation back, unregisters the URL protocol and forgets the log")
         func uninstallRestoresOriginals() async {
             await #expect(processExitsWith: .success) {
+                useHomeFolderOfItsOwn()
                 @MainActor
                 func implementations() throws -> [IMP] {
                     // The class the session's WebSocket tasks are, which the plugin replaces on.
@@ -107,6 +109,7 @@
         @Test("A getter other code swapped in on top stays after the uninstall, and the plugin's code under it adds nothing then")
         func swizzleOnTopIsLeftInPlace() async {
             await #expect(processExitsWith: .success) {
+                useHomeFolderOfItsOwn()
                 @MainActor
                 func swapOnTop() throws -> IMP {
                     let getter = try #require(

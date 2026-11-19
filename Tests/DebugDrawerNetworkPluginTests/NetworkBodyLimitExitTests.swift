@@ -4,6 +4,7 @@
 #if os(macOS) && DEBUG
     import DebugDrawer
     @testable import DebugDrawerNetworkPlugin
+    import DebugDrawerTestSupport
     import Foundation
     import Testing
 
@@ -12,6 +13,7 @@
         @Test("A response larger than the limit reaches the app whole; the log keeps its first bytes, marked truncated, with its full size")
         func capsCapturedBody() async {
             await #expect(processExitsWith: .success) {
+                useHomeFolderOfItsOwn()
                 await MainActor.run {
                     DebugDrawer.shared.installNetwork(sessions: .off, bodyLimit: 4)
                 }
@@ -41,6 +43,7 @@
         @Test("A streamed request body past the limit reaches the server whole; the log keeps its first bytes, marked truncated, with its size")
         func capsCapturedStreamedRequestBody() async {
             await #expect(processExitsWith: .success) {
+                useHomeFolderOfItsOwn()
                 await MainActor.run {
                     DebugDrawer.shared.installNetwork(sessions: .off, bodyLimit: 4)
                 }
@@ -76,6 +79,7 @@
         @Test("A negative body limit traps")
         func negativeLimitTraps() async {
             await #expect(processExitsWith: .failure) {
+                useHomeFolderOfItsOwn()
                 await MainActor.run {
                     DebugDrawer.shared.installNetwork(sessions: .off, bodyLimit: -1)
                 }

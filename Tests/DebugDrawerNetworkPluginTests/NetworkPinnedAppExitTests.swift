@@ -5,6 +5,7 @@
 #if os(macOS) && DEBUG
     import DebugDrawer
     @testable import DebugDrawerNetworkPlugin
+    import DebugDrawerTestSupport
     import Foundation
     import os
     import Testing
@@ -14,6 +15,7 @@
         @Test("A session made before installNetwork() still sends its TLS challenge to the app's delegate, which decides it; both are captured")
         func sessionMadeBeforeInstall() async {
             await #expect(processExitsWith: .success) {
+                useHomeFolderOfItsOwn()
                 @MainActor
                 func waitUntilLogged(_ urls: Set<String>) async -> [String: NetworkEntry] {
                     for await entries in NetworkStore.shared.$entries.values {
@@ -67,6 +69,7 @@
         @Test("A bypassed host and its subdomains skip the URL protocol: only the app's delegate decides, and nothing is logged or recorded")
         func bypassedHostPassesStraightThrough() async {
             await #expect(processExitsWith: .success) {
+                useHomeFolderOfItsOwn()
                 @MainActor
                 func waitUntilLogged(_ url: String) async -> [NetworkEntry] {
                     for await entries in NetworkStore.shared.$entries.values where entries.contains(where: { $0.url == url && $0.isComplete }) {
@@ -125,6 +128,7 @@
         @Test("installNetwork(bypassing:) traps on text that isn't a host")
         func bypassingMalformedHostTraps() async {
             await #expect(processExitsWith: .failure) {
+                useHomeFolderOfItsOwn()
                 await MainActor.run {
                     DebugDrawer.shared.installNetwork(bypassing: ["*.example.com"], sessions: .off)
                 }
@@ -134,6 +138,7 @@
         @Test("An SSE stream held open reaches the app event by event through the forwarding path; the log keeps its first bodyLimit bytes")
         func eventStreamHeldOpen() async {
             await #expect(processExitsWith: .success) {
+                useHomeFolderOfItsOwn()
                 @MainActor
                 func waitUntilLogged(_ url: String, complete: Bool) async -> NetworkEntry? {
                     for await entries in NetworkStore.shared.$entries.values {

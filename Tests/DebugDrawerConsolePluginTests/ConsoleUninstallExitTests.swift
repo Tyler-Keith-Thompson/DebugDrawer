@@ -4,6 +4,7 @@
 #if os(macOS) && DEBUG
     @testable import DebugDrawer
     @testable import DebugDrawerConsolePlugin
+    import DebugDrawerTestSupport
     import Foundation
     import OSLogClient
     import Testing
@@ -25,6 +26,7 @@
         @Test("Unregistering points stdout and stderr back at their files, removes the os_log driver and drops the lines; installing again captures")
         func uninstallRestoresTheStreams() async {
             await #expect(processExitsWith: .success) {
+                useHomeFolderOfItsOwn()
                 /// The file a descriptor is open on, as its device and inode.
                 func identity(of fd: Int32) -> String {
                     var info = stat()
@@ -90,6 +92,7 @@
         @Test("The app's install() keeps capturing after the plugin is unregistered, until its uninstall()")
         func appInstallOutlivesThePlugin() async {
             await #expect(processExitsWith: .success) {
+                useHomeFolderOfItsOwn()
                 let isExpected = await MainActor.run {
                     let store = ConsoleLogStore.shared
                     store.install()

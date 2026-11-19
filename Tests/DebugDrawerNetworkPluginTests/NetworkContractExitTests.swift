@@ -5,6 +5,7 @@
     @testable import DebugDrawer
     import DebugDrawerInterceptionContract
     @testable import DebugDrawerNetworkPlugin
+    import DebugDrawerTestSupport
     import Foundation
     import ObjectiveC
     import Testing
@@ -31,7 +32,10 @@
         let server: ScriptedServer
         let port: UInt16
 
+        /// Starts the server in a home folder of the child's own, as installing with
+        /// `sessions: .off` deletes every session file it finds.
         static func started() async throws -> Self {
+            useHomeFolderOfItsOwn()
             let body = "contract"
             let server = try ScriptedServer { _ in
                 "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nX-Probe: kept\r\nContent-Length: \(body.utf8.count)\r\n"
