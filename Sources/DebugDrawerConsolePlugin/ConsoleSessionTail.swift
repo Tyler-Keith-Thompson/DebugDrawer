@@ -60,5 +60,14 @@
             // Fixed-width ISO 8601 in UTC, so the strings order as the times do.
             return time > lastTime || (time == lastTime && !textsAtLastTime.contains(line.text))
         }
+
+        /// Whether `lines`, a read of the system's log from `since`, hold the os_log lines the
+        /// session kept at its last time, which the store holds as the process read them from it;
+        /// `true` when the session kept no os_log line, as there is then nothing to look for.
+        func holdsLastLine(_ lines: [LogLine]) -> Bool {
+            guard let lastTime else { return true }
+            let texts = Set(lines.lazy.filter { ConsoleSessionHeader.dateStyle.format($0.timestamp) == lastTime }.map(\.text))
+            return textsAtLastTime.isSubset(of: texts)
+        }
     }
 #endif

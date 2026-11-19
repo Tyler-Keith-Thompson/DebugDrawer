@@ -16,7 +16,8 @@
         ///   - date: The time of the last os_log line its session kept, or when the session
         ///     started.
         /// - Returns: ``ConsoleEarlierProcess/running`` while that process still runs, as another
-        ///   instance of the app; otherwise its lines, none where the system's log can't be read.
+        ///   instance of the app; ``ConsoleEarlierProcess/unreadable`` where the system's log
+        ///   can't be read; otherwise its lines.
         func lines(loggedBy processIdentifier: Int32, since date: Date) -> ConsoleEarlierProcess
     }
 
@@ -26,6 +27,8 @@
         case running
         /// It ended, having logged these lines after its session's last os_log line.
         case ended([LogLine])
+        /// It ended, and the system's log can't be read here, so reading again finds nothing more.
+        case unreadable
     }
 
     /// The system's log through `OSLogStore`: on macOS, the store of the whole system, which an
@@ -45,14 +48,14 @@
                 do {
                     return try .ended(Self.read(processIdentifier, since: date))
                 } catch {
-                    // At most once a launch, as each launch reads the log once.
+                    // At most once a launch: the recorder reads no further once a read fails.
                     Self.logger.notice("The last os_log lines of the earlier launch weren't read: \(error.localizedDescription, privacy: .public)")
-                    return .ended([])
+                    return .unreadable
                 }
             #else
                 // iOS, Mac Catalyst included, and the other platforms offer only the current
                 // process's store.
-                return .ended([])
+                return .unreadable
             #endif
         }
 

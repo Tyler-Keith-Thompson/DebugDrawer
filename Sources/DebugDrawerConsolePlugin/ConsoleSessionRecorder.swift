@@ -18,7 +18,7 @@
     /// A launch also completes the session of the launch before it: the os_log lines that process
     /// logged after its session's last one, which it hadn't read from its log yet when it crashed
     /// or was killed, are added from the system's log (``ConsoleSystemLog``), where one can be
-    /// read.
+    /// read, merging reads until they settle (``ConsoleSystemLogReads``).
     final class ConsoleSessionRecorder: Sendable {
         /// A failure the recorder logs once a session at most: the Console captures the app's own
         /// os_log, so a failure logged each time it happens would be captured, written, and logged
@@ -195,13 +195,23 @@
             // sessions wait for it: at utility the system throttles the read's CPU and disk while
             // the Mac is busy, and the same read took 8.6 to 31 seconds under a full build and
             // test run against 1.8 to 3.9 at user-initiated (1.2 to 1.6 for either when idle).
-            let outcome = await withCheckedContinuation { [systemLog] continuation in
-                DispatchQueue.global(qos: .userInitiated).async {
-                    continuation.resume(returning: systemLog.lines(loggedBy: tail.processIdentifier, since: since))
+            // Read again, at most `maxReads` times, until the reads settle: under load one read can
+            // miss a line the store holds (ConsoleSystemLogReads).
+            // A log that can't be read ends the reads with what earlier ones found.
+            var reads = ConsoleSystemLogReads(tail)
+            reading: repeat {
+                let outcome = await withCheckedContinuation { [systemLog] continuation in
+                    DispatchQueue.global(qos: .userInitiated).async {
+                        continuation.resume(returning: systemLog.lines(loggedBy: tail.processIdentifier, since: since))
+                    }
                 }
-            }
-            guard case let .ended(lines) = outcome else { return }
-            let missed = lines.filter { tail.missed($0) && ingestFilter.keeps($0) }
+                switch outcome {
+                case .running: return
+                case .unreadable: break reading
+                case let .ended(lines): reads.add(lines)
+                }
+            } while reads.needsAnother
+            let missed = reads.lines.filter { tail.missed($0) && ingestFilter.keeps($0) }
             await onQueue { [self] in finish(tail, adding: missed) }
         }
 

@@ -585,9 +585,13 @@ The console reads the app's os_log lines from its unified log every two seconds,
 kill can come before it has read the last ones. On macOS, where the app may read the system's log
 (`OSLogStore(scope: .system)`; an app outside the App Sandbox, run by an administrator, may), the
 next launch reads those lines from it and adds them to the end of the earlier session (a launch
-that starts before the system has taken in a crashed process's last lines misses them). Elsewhere
-a session keeps what its launch read. A session that kept no line and missed none is deleted at
-the next launch.
+that starts before the system has taken in a crashed process's last lines misses them). While the
+Mac is busy, one read of the system's log can miss a line it holds, so the next launch reads it
+again, up to four times, until a read holds the session's own last os_log line and finds nothing
+the reads before it lacked; it keeps every line any read found. That takes one or two seconds a
+read, which listing the earlier sessions waits for, and a line every read missed is still lost.
+Elsewhere a session keeps what its launch read. A session that kept no line and missed none is
+deleted at the next launch.
 
 In an app signed with the App Sandbox the system's log doesn't open: `OSLogStore(scope: .system)`
 throws "Connection to logd failed" (`OSLogError` 10), so the lines are lost as on iOS. A sandboxed

@@ -23,7 +23,11 @@
                     subsystem: "com.example.shop", category: "Checkout"
                 )
             ]))
-            let expectedReads = [FakeConsoleSystemLog.Read(processIdentifier: 4242, since: started.addingTimeInterval(1).addingTimeInterval(-0.001))]
+            // Two reads that agree and hold the session's last os_log line settle it.
+            let expectedReads = Array(
+                repeating: FakeConsoleSystemLog.Read(processIdentifier: 4242, since: started.addingTimeInterval(1).addingTimeInterval(-0.001)),
+                count: 2
+            )
 
             let sut = ConsoleSessionsModel(recorder: ConsoleSessionRecorder(
                 ConsoleSessionPersistence(storage: storage), started: started.addingTimeInterval(60), systemLog: systemLog
@@ -70,7 +74,7 @@
             earlier.record(LogLine(timestamp: started.addingTimeInterval(1), text: "Tapped Buy", source: .stdout, level: .debug))
             _ = await earlier.previousSessions()
             let systemLog = FakeConsoleSystemLog(.ended([]))
-            let expected = [FakeConsoleSystemLog.Read(processIdentifier: 4242, since: started.addingTimeInterval(-0.001))]
+            let expected = Array(repeating: FakeConsoleSystemLog.Read(processIdentifier: 4242, since: started.addingTimeInterval(-0.001)), count: 2)
 
             let sut = ConsoleSessionRecorder(
                 ConsoleSessionPersistence(storage: storage), started: started.addingTimeInterval(60), systemLog: systemLog
