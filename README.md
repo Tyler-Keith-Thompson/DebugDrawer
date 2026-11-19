@@ -455,7 +455,9 @@ These need only their install call:
   view hierarchy with each view's class and accessibility label. The outlines, grid and ripples are
   drawn in a window of the drawer's own over the app's, which takes no clicks or touches, so they
   change no view or layer of the app's and don't appear in the app's own snapshots or screenshots
-  of its windows. Slow Animations divides the speed of each window's root layer and gives back the
+  of its windows. A view's outline stops where something the app shows covers it: a sheet, form
+  sheet or popover presented over it, an opaque child window, or an opaque window above its own.
+  Slow Animations divides the speed of each window's root layer and gives back the
   speed it had at Normal. Its render counts follow below (View Inspector).
 
 ### Deep links: URLs, universal links and user activities

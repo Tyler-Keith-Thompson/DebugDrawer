@@ -61,7 +61,8 @@ macos_unit_test(
 # `bazel test` / `just test` on iOS: the bundle, run in a new iOS simulator by
 # //tools:ios_test_runner (TESTED_PLATFORMS in scripts/modules.py). Booting one takes
 # much of a minute on its own.
-# Hosted by //tools/test_host, whose entitlements give the tests a keychain.
+# Hosted by //tools/test_host, whose entitlements give the tests a keychain and whose
+# window scene lets them present view controllers.
 ios_unit_test(
     name = "DebugDrawerAppStateResetPluginTests_iOS",
     size = "medium",

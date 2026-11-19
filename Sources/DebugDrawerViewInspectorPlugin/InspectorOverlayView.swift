@@ -86,9 +86,16 @@
                     for hue in 0 ..< Self.hueCount {
                         var path = Path()
                         for outline in outlines where outline.depth % Self.hueCount == hue {
-                            // Inset by half the line, so the line lies inside the view, as a
-                            // layer's border does.
-                            path.addRect(outline.frame.insetBy(dx: 0.5, dy: 0.5))
+                            if outline.covers.isEmpty {
+                                // Inset by half the line, so the line lies inside the view, as a
+                                // layer's border does.
+                                path.addRect(outline.frame.insetBy(dx: 0.5, dy: 0.5))
+                            } else {
+                                for edge in outline.visibleEdges {
+                                    path.move(to: edge.start)
+                                    path.addLine(to: edge.end)
+                                }
+                            }
                         }
                         guard !path.isEmpty else { continue }
                         context.stroke(path, with: .color(Self.color(forDepth: hue)), lineWidth: 1)

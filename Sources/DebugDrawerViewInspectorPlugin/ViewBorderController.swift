@@ -183,7 +183,7 @@
                 for scene in scenes {
                     let overlay = overlays.overlay(over: scene)
                     let sceneWindows = windows.filter { $0.windowScene === scene }
-                    let outlines = isBordersEnabled ? sceneWindows.flatMap { ViewOutline.read(from: $0, in: overlay.window) } : []
+                    let outlines = isBordersEnabled ? ViewOutline.read(from: sceneWindows, in: overlay.window) : []
                     let grids: [CGRect] = isGridEnabled ? gridProbes.allObjects.compactMap { probe in
                         guard let window = probe.window, window.windowScene === scene, !probe.isHidden else { return nil }
                         return window.convert(probe.convert(probe.bounds, to: nil), to: overlay.window)

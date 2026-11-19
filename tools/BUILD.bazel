@@ -32,8 +32,9 @@ python_test(
 ios_xctestrun_runner(
     name = "ios_test_runner",
     create_simulator_action = ":create_simulator",
-    # Any device the newest runtime supports; the tests size their own views.
-    device_type = "iPhone 17",
+    # An iPad, where a form sheet leaves the screen around it uncovered (the View Inspector's
+    # covered-outline tests); the other tests size their own views.
+    device_type = "iPad Pro 13-inch (M5)",
     reuse_simulator = False,
     visibility = ["//visibility:public"],
 )

@@ -185,8 +185,16 @@
 
         @Test("A window's views are outlined in another window's coordinates, the window first, hidden views left out")
         func outlinesAreRead() {
-            let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 320, height: 200))
-            let overlay = UIWindow(frame: CGRect(x: 0, y: 0, width: 320, height: 200))
+            // Inside the test host (Bazel) both windows join its scene, since there UIKit converts
+            // nothing between windows that have none; SwiftPM's runner connects no scene.
+            func makeWindow() -> UIWindow {
+                let scene = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first
+                let window = scene.map { UIWindow(windowScene: $0) } ?? UIWindow()
+                window.frame = CGRect(x: 0, y: 0, width: 320, height: 200)
+                return window
+            }
+            let window = makeWindow()
+            let overlay = makeWindow()
             let card = UIView(frame: CGRect(x: 20, y: 30, width: 120, height: 80))
             let hidden = UIView(frame: CGRect(x: 180, y: 20, width: 120, height: 80))
             hidden.isHidden = true
@@ -197,7 +205,7 @@
                 ViewOutline(frame: CGRect(x: 20, y: 30, width: 120, height: 80), depth: 1)
             ]
 
-            let actual = ViewOutline.read(from: window, in: overlay)
+            let actual = ViewOutline.read(from: [window], in: overlay)
 
             #expect(actual == expected)
         }

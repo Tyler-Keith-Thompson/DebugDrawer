@@ -145,8 +145,10 @@ TESTED_PLATFORMS = {
     # The data protection keychain answers only a process with an application identifier, which
     # the Mac's test runners lack (errSecMissingEntitlement), and the login keychain is the user's,
     # which no test touches. So the real keychain is exercised in the iOS simulator, inside a test
-    # host whose entitlements give it a keychain of its own.
-    "iOS": ["DebugDrawerAppStateResetPluginTests", "DebugDrawerKeychainPluginTests"],
+    # host whose entitlements give it a keychain of its own. UIKit presents a view controller only
+    # in a window of a connected scene, which SwiftPM's runner never has, so the View Inspector's
+    # tests of outlines under sheets run inside the test host too.
+    "iOS": ["DebugDrawerAppStateResetPluginTests", "DebugDrawerKeychainPluginTests", "DebugDrawerViewInspectorPluginTests"],
     "visionOS": ["DebugDrawerTests"],
 }
 
@@ -869,8 +871,10 @@ def tested_platforms(name):
 def platform_test_bazel(name, platform, minimum, tags):
     """The unit test that runs test target `name`'s library in `platform`'s simulator."""
     tags_attr = f"    tags = {tags},\n".replace("'", '"') if tags else ""
-    # The test host gives an iOS run an application identifier, and with it a keychain.
-    host = ("# Hosted by //tools/test_host, whose entitlements give the tests a keychain.\n",
+    # The test host gives an iOS run an application identifier, and with it a keychain, and a
+    # connected window scene.
+    host = ("# Hosted by //tools/test_host, whose entitlements give the tests a keychain and whose\n"
+            "# window scene lets them present view controllers.\n",
             '    test_host = "//tools/test_host",\n') if platform == "iOS" else ("", "")
     return (
         f"\n# `bazel test` / `just test` on {platform}: the bundle, run in a new {platform} simulator by\n"
