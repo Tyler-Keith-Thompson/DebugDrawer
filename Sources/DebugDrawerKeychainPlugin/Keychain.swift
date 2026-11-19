@@ -1,20 +1,8 @@
 #if DEBUG
     import Foundation
-    import Security
 
-    /// A keychain call that failed, with the `OSStatus` it returned.
-    struct KeychainError: Error, Hashable, Sendable {
-        let status: OSStatus
-
-        /// Security's own words for the status, with its code ("A required entitlement isn't
-        /// present. (-34018)").
-        var message: String {
-            let text = SecCopyErrorMessageString(status, nil).map { $0 as String } ?? "Keychain error"
-            return "\(text) (\(status))"
-        }
-    }
-
-    /// The keychain items the app can see: listed, read, added, updated and deleted.
+    /// The keychain items the app can see: listed, read, added, updated and deleted. The Security
+    /// framework's `SecItem` calls are `_Keychain`; tests pass a fake.
     @MainActor
     protocol Keychain {
         /// Every item of every class the app can read, by its attributes, in class order.

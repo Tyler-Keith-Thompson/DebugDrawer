@@ -19,14 +19,16 @@ public struct KeychainPlugin: DebugDrawerPlugin {
     public var icon = "key"
 
     #if DEBUG
-        let model: KeychainModel
+        /// The model the plugin shows, or `nil` for the shared one.
+        private let model: KeychainModel?
 
         /// The plugin over the app's own keychain: on the Mac, the data protection keychain.
         @MainActor
         public init() {
-            self.init(model: KeychainModel(keychain: _Keychain()))
+            model = nil
         }
 
+        /// - Parameter model: The model to show in place of the shared one.
         init(model: KeychainModel) {
             self.model = model
         }
@@ -38,7 +40,7 @@ public struct KeychainPlugin: DebugDrawerPlugin {
 
     public var body: some View {
         #if DEBUG
-            KeychainPluginView(model: model)
+            KeychainPluginView(transport: .direct(to: model ?? .shared))
         #else
             EmptyView()
         #endif
@@ -47,7 +49,7 @@ public struct KeychainPlugin: DebugDrawerPlugin {
     /// Counts `drawer` as one that holds the plugin; nothing is read until it is shown.
     @MainActor public func install(in drawer: DebugDrawer) {
         #if DEBUG
-            model.install(in: ObjectIdentifier(drawer))
+            (model ?? .shared).install(in: ObjectIdentifier(drawer))
         #endif
     }
 
@@ -55,14 +57,14 @@ public struct KeychainPlugin: DebugDrawerPlugin {
     /// password of the open item and any form's draft. The keychain itself is untouched.
     @MainActor public func uninstall(from drawer: DebugDrawer) {
         #if DEBUG
-            model.uninstall(from: ObjectIdentifier(drawer))
+            (model ?? .shared).uninstall(from: ObjectIdentifier(drawer))
         #endif
     }
 
     /// How many items the keychain holds, once read.
     public var headerAccessory: some View {
         #if DEBUG
-            KeychainHeaderAccessory(model: model)
+            KeychainHeaderAccessory(transport: .direct(to: model ?? .shared))
         #else
             EmptyView()
         #endif
@@ -83,13 +85,17 @@ public extension DebugDrawer {
 #if DEBUG
     /// "12 items" once the keychain has been read; nothing before.
     struct KeychainHeaderAccessory: View {
-        @ObservedObject var model: KeychainModel
+        @StateObject private var transport: DebugDrawerPluginTransport<KeychainSnapshot, KeychainCommand>
+
+        /// - Parameter transport: Joins the view to the model; made once, for the view's lifetime.
+        init(transport: @escaping @autoclosure () -> DebugDrawerPluginTransport<KeychainSnapshot, KeychainCommand>) {
+            _transport = StateObject(wrappedValue: transport())
+        }
 
         var body: some View {
-            if case let .items(items) = model.contents {
+            if case let .items(items) = transport.snapshot.contents {
                 Text(items.count == 1 ? "1 item" : "\(items.count) items")
             }
         }
     }
-
 #endif

@@ -5,7 +5,7 @@
 
     /// A keychain item the app can read, by its attributes alone: the value of a password is read
     /// only when its detail is opened, and a key's or certificate's never.
-    struct KeychainItem: Identifiable, Hashable, Sendable {
+    struct KeychainItem: Identifiable, Codable, Hashable, Sendable {
         /// Which of the keychain's classes it is.
         let itemClass: KeychainItemClass
         /// The keychain's handle on this one item, which reads, updates and deletes it and nothing
@@ -13,6 +13,24 @@
         let persistentReference: Data
         /// Every attribute the keychain returned worth showing, in the detail's order.
         let attributes: [KeychainAttribute]
+        /// When the item was added (`kSecAttrCreationDate`), if the keychain said.
+        let created: Date?
+        /// When the item last changed (`kSecAttrModificationDate`), if the keychain said.
+        let modified: Date?
+
+        init(
+            itemClass: KeychainItemClass,
+            persistentReference: Data,
+            attributes: [KeychainAttribute],
+            created: Date? = nil,
+            modified: Date? = nil
+        ) {
+            self.itemClass = itemClass
+            self.persistentReference = persistentReference
+            self.attributes = attributes
+            self.created = created
+            self.modified = modified
+        }
 
         var id: Data {
             persistentReference
@@ -83,7 +101,9 @@
             self.init(
                 itemClass: itemClass,
                 persistentReference: reference,
-                attributes: KeychainAttribute.list(from: result, itemClass: itemClass)
+                attributes: KeychainAttribute.list(from: result, itemClass: itemClass),
+                created: result[kSecAttrCreationDate as String] as? Date,
+                modified: result[kSecAttrModificationDate as String] as? Date
             )
         }
     }

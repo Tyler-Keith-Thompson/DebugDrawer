@@ -2,7 +2,7 @@
     import Foundation
 
     /// A generic password as the add and edit form writes it.
-    struct GenericPassword: Hashable, Sendable {
+    struct GenericPassword: Codable, Hashable, Sendable {
         var service = ""
         var account = ""
         /// The item's label; empty for none.

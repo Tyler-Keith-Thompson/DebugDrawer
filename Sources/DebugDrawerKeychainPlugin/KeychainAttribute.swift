@@ -3,7 +3,7 @@
     import Security
 
     /// One attribute of a keychain item as the detail shows it: its name and its value in words.
-    struct KeychainAttribute: Hashable, Sendable {
+    struct KeychainAttribute: Codable, Hashable, Sendable {
         /// The attribute's key in a `SecItemCopyMatching` result (`pdmn`, `cdat`).
         let key: String
         /// What the detail calls it: a word label ("Accessible", "Created") for an attribute with a

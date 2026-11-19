@@ -4,7 +4,7 @@
     // Identities are left out: each is a certificate and a private key that are listed as items of
     // their own, so listing it too would show the same two items twice.
     /// The keychain's item classes the plugin lists, each queried on its own.
-    enum KeychainItemClass: CaseIterable, Hashable, Sendable {
+    enum KeychainItemClass: CaseIterable, Codable, Hashable, Sendable {
         case genericPassword
         case internetPassword
         case certificate

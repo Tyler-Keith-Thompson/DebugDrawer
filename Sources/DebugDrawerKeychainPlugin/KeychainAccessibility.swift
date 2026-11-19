@@ -2,7 +2,7 @@
     import Security
 
     /// When an item can be read (`kSecAttrAccessible`), as the add and edit form offers it.
-    enum KeychainAccessibility: CaseIterable, Hashable, Identifiable, Sendable {
+    enum KeychainAccessibility: CaseIterable, Codable, Hashable, Identifiable, Sendable {
         case whenUnlocked
         case afterFirstUnlock
         case whenUnlockedThisDeviceOnly

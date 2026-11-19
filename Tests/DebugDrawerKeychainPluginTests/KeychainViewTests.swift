@@ -235,10 +235,10 @@
             keychain.seed(.certificate, [kSecAttrLabel as String: "Example Root CA"])
             keychain.seed(.key, [kSecAttrLabel as String: "Signing"])
             let model = KeychainModel(keychain: keychain)
-            let before = try? KeychainHeaderAccessory(model: model).inspect().find(ViewType.Text.self)
+            let before = try? KeychainHeaderAccessory(transport: .direct(to: model)).inspect().find(ViewType.Text.self)
 
             model.reload()
-            let actual = try KeychainHeaderAccessory(model: model).inspect().find(ViewType.Text.self).string()
+            let actual = try KeychainHeaderAccessory(transport: .direct(to: model)).inspect().find(ViewType.Text.self).string()
 
             #expect(before == nil)
             #expect(actual == "2 items")

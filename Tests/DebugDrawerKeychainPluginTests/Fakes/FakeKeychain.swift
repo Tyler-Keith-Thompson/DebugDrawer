@@ -27,7 +27,23 @@
         var now: Date
         /// The persistent references whose value has been read.
         private(set) var valueReads: [Data] = []
+        /// What a delete of the item with each persistent reference throws, the rest answering.
+        var deleteRefusals: [Data: KeychainError] = [:]
+        /// Whether listing returns the items in the order they were stored, every class mixed, as a
+        /// keychain that doesn't group them would; by class otherwise, as the real one is asked.
+        var listsInStoredOrder = false
+        /// Every call the plugin made, in order.
+        private(set) var calls: [Call] = []
         private var nextReference = 0
+
+        /// A call the plugin made, by what it named.
+        enum Call: Equatable {
+            case items
+            case value(Data)
+            case add(GenericPassword)
+            case update(Data, GenericPassword)
+            case delete(Data)
+        }
 
         init(defaultGroup: String = "TEAMID.com.example.app", now: Date = Date(timeIntervalSinceReferenceDate: 800_000_000)) {
             self.defaultGroup = defaultGroup
@@ -45,18 +61,21 @@
         }
 
         func items() throws(KeychainError) -> [KeychainItem] {
+            calls.append(.items)
             if let refusal { throw refusal }
-            return KeychainItemClass.allCases.flatMap { itemClass in
-                records.filter { $0.itemClass == itemClass }.compactMap { record in
-                    var result = record.attributes
-                    result[kSecClass as String] = itemClass.secClass as String
-                    result[kSecValuePersistentRef as String] = record.reference
-                    return KeychainItem(itemClass: itemClass, result: result)
-                }
+            let listed = listsInStoredOrder
+                ? records
+                : KeychainItemClass.allCases.flatMap { itemClass in records.filter { $0.itemClass == itemClass } }
+            return listed.compactMap { record in
+                var result = record.attributes
+                result[kSecClass as String] = record.itemClass.secClass as String
+                result[kSecValuePersistentRef as String] = record.reference
+                return KeychainItem(itemClass: record.itemClass, result: result)
             }
         }
 
         func value(of item: KeychainItem) throws(KeychainError) -> Data? {
+            calls.append(.value(item.persistentReference))
             if let refusal { throw refusal }
             valueReads.append(item.persistentReference)
             guard let record = records.first(where: { $0.reference == item.persistentReference }) else {
@@ -66,6 +85,7 @@
         }
 
         func add(_ password: GenericPassword) throws(KeychainError) {
+            calls.append(.add(password))
             if let refusal { throw refusal }
             let group = password.accessGroup ?? defaultGroup
             let duplicate = records.contains {
@@ -83,6 +103,7 @@
         }
 
         func update(_ item: KeychainItem, to password: GenericPassword) throws(KeychainError) {
+            calls.append(.update(item.persistentReference, password))
             if let refusal { throw refusal }
             guard let index = records.firstIndex(where: { $0.reference == item.persistentReference }) else {
                 throw KeychainError(status: errSecItemNotFound)
@@ -93,7 +114,9 @@
         }
 
         func delete(_ item: KeychainItem) throws(KeychainError) {
+            calls.append(.delete(item.persistentReference))
             if let refusal { throw refusal }
+            if let refused = deleteRefusals[item.persistentReference] { throw refused }
             records.removeAll { $0.reference == item.persistentReference }
         }
 
