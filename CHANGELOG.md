@@ -8,6 +8,8 @@ the entry becomes the GitHub release's notes.
 
 ## [Unreleased]
 
+## [0.1.3] - 2026-11-18
+
 ### Added
 
 - DD-153: `DebugDrawer.setNoticesMuted(_:forPlugin:)` and `isNoticesMuted(forPlugin:)` silence a plugin's badges and toasts, keyed by its ID and saved in `UserDefaults` across launches. Silencing removes the badge and toast it shows and drops what it posts until it is allowed again. Each section header's context menu offers Silence Notices and Allow Notices, and a silenced header shows a crossed-out bell.
