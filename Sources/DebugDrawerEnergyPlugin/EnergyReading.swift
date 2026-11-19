@@ -2,7 +2,8 @@
     import DebugDrawer
     import Foundation
 
-    /// What the Energy monitor sampled last, and how each value reads.
+    /// What the Energy monitor sampled last, and how each value reads: the view's side of an
+    /// ``EnergySnapshot``, with its labels and severities.
     struct EnergyReading: Equatable {
         /// This process's CPU, in percent of one core.
         let cpuUsage: Double
@@ -14,32 +15,26 @@
         let batteryHistory: [Int]
         let isCharging: Bool
         let powerSource: String
-        let thermalState: ProcessInfo.ThermalState
+        let thermalState: EnergyThermalState
 
         /// The thermal state in a word.
         var thermalLabel: String {
-            switch thermalState {
-            case .nominal: "Nominal"
-            case .fair: "Fair"
-            case .serious: "Serious"
-            case .critical: "Critical"
-            @unknown default: "Unknown"
-            }
+            thermalState.label
         }
 
         /// The CPU use, bucketed.
         var cpuLoad: String {
-            if cpuUsage < 5 { return "Low" }
-            if cpuUsage < 20 { return "Moderate" }
-            if cpuUsage < 50 { return "High" }
-            return "Very High"
+            CPULoad(cpuUsage: cpuUsage).label
         }
 
         /// How heavy the CPU load is: `nil` (the accent) while low or moderate, a warning while
         /// high, an error while very high.
         var cpuLoadSeverity: DebugDrawerIssueGlyph.Severity? {
-            if cpuUsage < 20 { return nil }
-            return cpuUsage < 50 ? .warning : .error
+            switch CPULoad(cpuUsage: cpuUsage) {
+            case .low, .moderate: nil
+            case .high: .warning
+            case .veryHigh: .error
+            }
         }
 
         /// How low the battery is: `nil` while charging or above 20%, a warning to 10%, an error
@@ -56,8 +51,25 @@
             case .nominal: .ok
             case .fair, .serious: .warning
             case .critical: .error
-            @unknown default: .neutral
+            case .unknown: .neutral
             }
+        }
+    }
+
+    extension EnergyReading {
+        /// The reading of what `snapshot` holds.
+        ///
+        /// - Parameter snapshot: What the monitor sampled.
+        init(_ snapshot: EnergySnapshot) {
+            self.init(
+                cpuUsage: snapshot.cpuUsage,
+                cpuHistory: snapshot.cpuHistory,
+                batteryLevel: snapshot.batteryLevel,
+                batteryHistory: snapshot.batteryHistory.map(\.level),
+                isCharging: snapshot.isCharging,
+                powerSource: snapshot.powerSource,
+                thermalState: snapshot.thermalState
+            )
         }
     }
 #endif

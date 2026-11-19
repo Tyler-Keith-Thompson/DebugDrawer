@@ -70,7 +70,7 @@
             let monitor = EnergyMonitor(batteryMonitoring: nil)
             monitor.start()
             defer { monitor.stop() }
-            let texts = try EnergyPluginView(monitor: monitor).inspect()
+            let texts = try EnergyPluginView(transport: .direct(to: monitor)).inspect()
                 .findAll(ViewType.Text.self).map { try $0.string() }
             #expect(texts.contains("CPU Load"), "\(texts)")
             #expect(!texts.contains("Energy Impact"), "\(texts)")

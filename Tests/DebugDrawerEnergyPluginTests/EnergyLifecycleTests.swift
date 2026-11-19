@@ -103,7 +103,7 @@
                     styleMask: .borderless, backing: .buffered, defer: false
                 )
                 window.isReleasedWhenClosed = false
-                let host = NSHostingView(rootView: EnergyPluginView(monitor: monitor))
+                let host = NSHostingView(rootView: EnergyPluginView(transport: .direct(to: monitor)))
                 window.contentView = host
                 window.orderFront(nil)
                 defer { window.close() }
