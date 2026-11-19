@@ -239,11 +239,17 @@ public extension DebugDrawer {
         }
 
         private func coordinateField(_ name: String, text: Binding<String>) -> some View {
-            HStack(spacing: 8) {
+            // At accessibility text sizes the name goes above the field, as the presets' coordinates
+            // go under their names, so the field gets the full width and shows a whole coordinate.
+            let isAccessibilitySize = dynamicTypeSize.isAccessibilitySize
+            let layout = isAccessibilitySize
+                ? AnyLayout(VStackLayout(alignment: .leading, spacing: 4))
+                : AnyLayout(HStackLayout(spacing: 8))
+            return layout {
                 Text(name)
                     .debugDrawerFont(.label)
                     .debugDrawerForegroundStyle(.secondary)
-                    .frame(width: labelWidth, alignment: .trailing)
+                    .frame(width: isAccessibilitySize ? nil : labelWidth, alignment: isAccessibilitySize ? .leading : .trailing)
                 TextField(name, text: text)
                     .debugDrawerFont(.code)
                     .debugDrawerTextFieldStyle()
