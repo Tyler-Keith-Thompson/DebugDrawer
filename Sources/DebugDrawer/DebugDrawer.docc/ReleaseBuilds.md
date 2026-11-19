@@ -27,7 +27,8 @@ plugins call, as stand-ins, so the same code compiles in both configurations wit
 | The rows, buttons and code views, such as ``DebugDrawerSection`` and ``DebugDrawerKeyValueRow`` | Draw nothing |
 | `debugDrawerButtonStyle(_:)`, `debugDrawerFont(_:)` and the other style modifiers | Return the view unchanged |
 | ``DebugDrawerReportContributor``, ``DebugDrawerReportUploader``, ``DebugDrawerReport``, ``DebugDrawerRedaction`` | Compile; there is no report and nothing calls them |
-| ``DebugDrawer/DebugDrawer`` and its ``DebugDrawer/DebugDrawer/shared`` instance | Registering drops the plugin, toggling opens nothing, and every property keeps its starting value |
+| ``DebugDrawer/DebugDrawer``, its ``DebugDrawer/DebugDrawer/shared`` instance and the drawers ``DebugDrawer/DebugDrawer/init()`` and ``DebugDrawer/DebugDrawer/init(defaults:)`` make | Registering drops the plugin, toggling opens nothing, and every property keeps its starting value |
+| ``DebugDrawerPlugin/install(in:)``, ``DebugDrawerPlugin/uninstall(from:)``, ``DebugDrawerPlugin/didBecomeVisible(in:)``, ``DebugDrawerPlugin/didBecomeHidden(in:)`` | Compile; no drawer calls them |
 | ``DebugDrawer/DebugDrawer/createReport(in:)`` | Throws ``DebugDrawerReport/WriteFailed`` |
 | ``AnyDebugDrawerPlugin``, ``HUDLayout``, ``DebugDrawerToast`` | Compile; the drawer holds none |
 | ``RedactedText`` | Draws nothing |

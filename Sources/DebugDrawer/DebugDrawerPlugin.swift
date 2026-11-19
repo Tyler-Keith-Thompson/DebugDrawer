@@ -23,6 +23,10 @@ import SwiftUI
 /// - **Global**: registered once with `DebugDrawer.shared.registerGlobal(_:)`, always present.
 /// - **Local**: attached to a view with `debugLocalPlugin(_:)`, present only while that view is.
 ///
+/// A plugin that starts work of its own adopts the lifecycle hooks: the drawer calls
+/// ``install(in:)`` as it adds the plugin, ``didBecomeVisible(in:)`` and ``didBecomeHidden(in:)``
+/// as its content comes on and leaves the screen, and ``uninstall(from:)`` as it removes it.
+///
 /// ``id`` defaults to the type's fully qualified name (`MyApp.CachePlugin`), so two modules'
 /// plugins of one name are told apart. The drawer saves whether each plugin's section is
 /// collapsed, and where it is pinned, under its ``id``, in a `UserDefaults` suite of its own
@@ -89,6 +93,44 @@ public protocol DebugDrawerPlugin: Identifiable {
     /// A plugin with an accessory has no numeric badge in its header: the accessory replaces it,
     /// and the dot on its navigator tab still marks what's new.
     @ViewBuilder @MainActor var headerAccessory: HeaderAccessory { get }
+
+    // Lifecycle. "Visible" is the plugin's content on screen (its section's body in an open
+    // drawer, shown alone, or its HUD readout), not the drawer being open: a monitor can then run
+    // only while someone can see what it measures, and a collapsed section costs nothing.
+    // Rejected: visible while any drawer is open (a collapsed or scrolled-past plugin would keep
+    // working) and one `lifecycle(_ event:)` method taking an enum (a plugin would switch over
+    // cases it ignores, and a new case would break every exhaustive switch).
+
+    /// Called once when `drawer` adds the plugin, after it is listed: start what the plugin needs
+    /// while it is in the drawer, such as a monitor or an interception. Defaults to nothing.
+    ///
+    /// A drawer calls it once per registration: ``DebugDrawer/registerGlobal(_:)`` for a global
+    /// plugin, the first appearance of its view for a local one. Every call is matched by one
+    /// ``uninstall(from:)``.
+    ///
+    /// - Parameter drawer: The drawer that now holds the plugin.
+    @MainActor func install(in drawer: DebugDrawer)
+
+    /// Called once when `drawer` removes the plugin, after it is no longer listed and after
+    /// ``didBecomeHidden(in:)`` if it was on screen: stop what ``install(in:)`` started.
+    /// Defaults to nothing.
+    ///
+    /// - Parameter drawer: The drawer that held the plugin.
+    @MainActor func uninstall(from drawer: DebugDrawer)
+
+    /// Called when the plugin's content comes on screen in `drawer`: its section's body in an open
+    /// drawer, the plugin shown alone, or its readout on the HUD. Called once however many windows
+    /// show it, and again only after ``didBecomeHidden(in:)``. Defaults to nothing.
+    ///
+    /// - Parameter drawer: The drawer showing the plugin.
+    @MainActor func didBecomeVisible(in drawer: DebugDrawer)
+
+    /// Called when the last of the plugin's content leaves the screen in `drawer` (the drawer
+    /// closed, the section collapsed, the readout unpinned), or when the drawer removes the plugin
+    /// while it is on screen. Defaults to nothing.
+    ///
+    /// - Parameter drawer: The drawer that showed the plugin.
+    @MainActor func didBecomeHidden(in drawer: DebugDrawer)
 }
 
 public extension DebugDrawerPlugin {
@@ -112,6 +154,18 @@ public extension DebugDrawerPlugin {
     var actions: [DebugDrawerAction] {
         []
     }
+
+    /// Does nothing: the plugin starts nothing when a drawer adds it.
+    @MainActor func install(in drawer: DebugDrawer) {}
+
+    /// Does nothing: the plugin has nothing to stop when a drawer removes it.
+    @MainActor func uninstall(from drawer: DebugDrawer) {}
+
+    /// Does nothing.
+    @MainActor func didBecomeVisible(in drawer: DebugDrawer) {}
+
+    /// Does nothing.
+    @MainActor func didBecomeHidden(in drawer: DebugDrawer) {}
 }
 
 public extension DebugDrawerPlugin where HUD == EmptyView {
@@ -166,6 +220,8 @@ public struct AnyDebugDrawerPlugin: Identifiable {
     let makeHUD: (@MainActor () -> AnyView)?
     let makeHeaderAccessory: (@MainActor () -> AnyView)?
     let contributeToReport: (@MainActor (inout DebugDrawerReport, DebugDrawerRedaction) -> Void)?
+    /// The plugin's install, uninstall and visibility hooks, which the drawer calls.
+    let lifecycle: DrawerPluginLifecycle
 
     /// Wraps `plugin`, reading its properties now and keeping it to build its views later.
     ///
@@ -194,6 +250,7 @@ public struct AnyDebugDrawerPlugin: Identifiable {
         } else {
             contributeToReport = nil
         }
+        lifecycle = DrawerPluginLifecycle(plugin)
     }
 
     /// Whether the plugin adopts ``DebugDrawerReportContributor``, and so adds files to the

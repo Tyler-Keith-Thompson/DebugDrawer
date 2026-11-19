@@ -47,6 +47,7 @@
             // A plugin registered later may have moved its saved pin and order to its ID.
             .onChange(of: (drawer.localPlugins + drawer.globalPlugins).map(\.id)) { layout = DrawerLayout(from: drawer.defaults) }
             .onChange(of: presentation.revealRequest) { reveal() }
+            .environment(\.showingDrawer, drawer)
         }
 
         /// Opens the plugin a toast asked for.
@@ -106,6 +107,7 @@
                 VStack(alignment: .leading, spacing: 8) {
                     plugin.body
                 }
+                .reportsVisibility(ofPlugin: plugin.id)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 // The system's margins keep the rows off the screen's rounded corners.
                 .scenePadding(.horizontal)

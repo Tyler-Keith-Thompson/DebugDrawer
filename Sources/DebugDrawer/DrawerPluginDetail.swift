@@ -24,6 +24,7 @@
                     VStack(alignment: .leading, spacing: 0) {
                         plugin.body
                     }
+                    .reportsVisibility(ofPlugin: plugin.id)
                     .debugDrawerFont(.body)
                     .foregroundStyle(DrawerPalette.text)
                     .frame(maxWidth: .infinity, alignment: .leading)

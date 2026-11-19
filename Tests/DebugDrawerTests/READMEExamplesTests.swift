@@ -47,6 +47,30 @@
         }
     }
 
+    @MainActor
+    final class SocketMonitor {
+        private(set) var isRunning = false
+        var isSampling = false
+
+        func start() { isRunning = true }
+        func stop() { isRunning = false }
+    }
+
+    struct SocketPlugin: DebugDrawerPlugin {
+        let monitor: SocketMonitor
+        var title = "Sockets"
+        var icon = "network"
+
+        var body: some View {
+            Text(monitor.isRunning ? "Watching sockets" : "Stopped")
+        }
+
+        func install(in drawer: DebugDrawer) { monitor.start() }
+        func uninstall(from drawer: DebugDrawer) { monitor.stop() }
+        func didBecomeVisible(in drawer: DebugDrawer) { monitor.isSampling = true }
+        func didBecomeHidden(in drawer: DebugDrawer) { monitor.isSampling = false }
+    }
+
     struct UploadsPlugin: DebugDrawerPlugin {
         var title = "Uploads"
         var icon = "arrow.up.circle"
@@ -148,6 +172,21 @@
             // Leave the shared drawer as the other suites expect it, within this one main-actor turn.
             DebugDrawer.shared.toggle()
             DebugDrawer.shared.unregisterGlobal(id: CachePlugin().id)
+        }
+
+        @Test("A plugin's lifecycle, and drawers of your own")
+        func lifecycleAndDrawersOfYourOwn() {
+            let monitor = SocketMonitor()
+            let drawer = DebugDrawer()
+
+            drawer.registerGlobal(SocketPlugin(monitor: monitor)) // install(in:): the monitor starts
+            drawer.unregisterGlobal(id: SocketPlugin(monitor: monitor).id) // uninstall(from:): it stops
+
+            #expect(!monitor.isRunning)
+            #expect(drawer.globalPlugins.isEmpty)
+            drawer.registerGlobal(SocketPlugin(monitor: monitor))
+            #expect(monitor.isRunning)
+            #expect(!DebugDrawer.shared.globalPlugins.contains { $0.title == "Sockets" })
         }
 
         @Test("Floating HUD")

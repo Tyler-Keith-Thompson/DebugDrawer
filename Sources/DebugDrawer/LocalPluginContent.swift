@@ -44,6 +44,12 @@
             makeHUD = plugin.hasHUD ? Self.latestHUD(of: content) : nil
             makeHeaderAccessory = plugin.hasHeaderAccessory ? Self.latestHeaderAccessory(of: content) : nil
             contributeToReport = plugin.contributesToReport ? Self.latestContribution(of: content) : nil
+            lifecycle = DrawerPluginLifecycle(
+                install: { content.plugin.lifecycle.install($0) },
+                uninstall: { content.plugin.lifecycle.uninstall($0) },
+                didBecomeVisible: { content.plugin.lifecycle.didBecomeVisible($0) },
+                didBecomeHidden: { content.plugin.lifecycle.didBecomeHidden($0) }
+            )
         }
 
         private static func latestHUD(of content: LocalPluginContent) -> @MainActor () -> AnyView {

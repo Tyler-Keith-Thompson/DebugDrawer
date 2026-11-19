@@ -15,8 +15,9 @@ uses only API that does (<doc:ReleaseBuilds>).
 
 ### Global plugins
 
-A global plugin stays in the drawer for the app's lifetime. Register it once, at launch, with
-``DebugDrawer/DebugDrawer/registerGlobal(_:)``:
+A global plugin stays in the drawer until
+``DebugDrawer/DebugDrawer/unregisterGlobal(id:)`` removes it, usually for the app's lifetime.
+Register it once, at launch, with ``DebugDrawer/DebugDrawer/registerGlobal(_:)``:
 
 ```swift
 DebugDrawer.shared.registerGlobal(CachePlugin())
@@ -154,6 +155,75 @@ A plugin is a value the drawer reads, not a view, so it holds no `@State`. Keep 
 state in a view its body returns, or in an observable store the plugin and the app share, and
 pass the services it uses (storage, a clock, the network) in through its initializer, so a test
 can hand it fakes.
+
+### Lifecycle
+
+A plugin can start work as a drawer adds it, stop it as the drawer removes it, and do the costly
+part only while its content is on screen. Each hook is optional, called on the main actor, and
+does nothing by default, so a plugin that adopts none compiles unchanged:
+
+- ``DebugDrawerPlugin/install(in:)``, once, as the drawer adds the plugin: when
+  ``DebugDrawer/DebugDrawer/registerGlobal(_:)`` lists it, or when a local plugin's view first
+  appears. Registering an ID already registered installs nothing again.
+- ``DebugDrawerPlugin/didBecomeVisible(in:)``, as its content comes on screen: its section's body
+  in an open drawer, the plugin shown alone, or its readout on the HUD. However many windows show
+  it, the plugin hears it once.
+- ``DebugDrawerPlugin/didBecomeHidden(in:)``, as the last of its content leaves the screen: the
+  drawer closed, the section collapsed or the readout unpinned. A plugin removed while it is
+  shown hears this first.
+- ``DebugDrawerPlugin/uninstall(from:)``, once, as the drawer removes the plugin: through
+  ``DebugDrawer/DebugDrawer/unregisterGlobal(id:)``, or as a local plugin's view disappears.
+
+A plugin is a value, so the hooks start and stop something the plugin holds a reference to, such
+as a monitor:
+
+```swift
+@MainActor
+final class SocketMonitor {
+    private(set) var isRunning = false
+    var isSampling = false
+
+    func start() { isRunning = true }
+    func stop() { isRunning = false }
+}
+
+struct SocketPlugin: DebugDrawerPlugin {
+    let monitor: SocketMonitor
+    var title = "Sockets"
+    var icon = "network"
+
+    var body: some View {
+        Text(monitor.isRunning ? "Watching sockets" : "Stopped")
+    }
+
+    func install(in drawer: DebugDrawer) { monitor.start() }
+    func uninstall(from drawer: DebugDrawer) { monitor.stop() }
+    func didBecomeVisible(in drawer: DebugDrawer) { monitor.isSampling = true }
+    func didBecomeHidden(in drawer: DebugDrawer) { monitor.isSampling = false }
+}
+```
+
+A local plugin's view hands the drawer a new value each time it updates; the hooks of the latest
+value are the ones called, and a new value is not installed again.
+
+### Drawers of your own
+
+Each drawer owns the plugins registered with it and calls their hooks. ``DebugDrawer/DebugDrawer/shared``
+is the app's: `debugDrawer()`, `attach(to:)` and the shipped plugins' `install*()` calls use it.
+``DebugDrawer/DebugDrawer/init()`` makes another drawer with no plugins, which shares none of the
+shared drawer's, so a test can register the plugin it checks with a drawer of its own and see its
+hooks run; ``DebugDrawer/DebugDrawer/init(defaults:)`` also keeps what the drawer saves (pins,
+order, the HUD) in a `UserDefaults` suite of its own.
+
+```swift
+let monitor = SocketMonitor()
+let drawer = DebugDrawer()
+
+drawer.registerGlobal(SocketPlugin(monitor: monitor)) // install(in:): the monitor starts
+drawer.unregisterGlobal(id: SocketPlugin(monitor: monitor).id) // uninstall(from:): it stops
+```
+
+In release builds a drawer of your own is a stand-in too: it holds nothing and calls no hook.
 
 ### Capturing what the app does
 

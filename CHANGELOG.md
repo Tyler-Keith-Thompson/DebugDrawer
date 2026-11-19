@@ -11,6 +11,7 @@ the entry becomes the GitHub release's notes.
 ### Added
 
 - DD-209: `DebugDrawer.registerLocal(_:in:)` ties a local plugin to one `NSWindow` (macOS) or `UIWindowScene` (iOS, Mac Catalyst and visionOS), so a UIKit- or AppKit-only app can list a plugin in only that window's drawer, as `debugLocalPlugin(_:)` does for a SwiftUI view. It returns the token `unregisterLocal(id:token:)` takes, closing the window or disconnecting the scene removes the registration, and release builds get a stand-in that drops the plugin.
+- DD-210: plugins get an optional lifecycle, and drawers can be made apart from `DebugDrawer.shared`. `DebugDrawerPlugin` adds `install(in:)`, `uninstall(from:)`, `didBecomeVisible(in:)` and `didBecomeHidden(in:)`, each doing nothing by default: a drawer installs a plugin as it registers it, uninstalls it as `unregisterGlobal(id:)` or its view's disappearance removes it, and reports it visible while its section's body, its view shown alone or its HUD readout is on screen. `DebugDrawer()` and `DebugDrawer(defaults:)` make a drawer that owns plugins of its own, so two coexist in one process; release builds get stand-ins of both.
 
 ### Fixed
 

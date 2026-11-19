@@ -36,6 +36,7 @@
                     unpin: { drawer.toggleHUD(forPlugin: $0) }
                 )
                 .opacity(drawer.isHUDHidden ? 0 : 1)
+                .environment(\.showingDrawer, drawer)
             }
         }
     }

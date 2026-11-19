@@ -45,8 +45,10 @@
                     // through DebugDrawer.toggleHUD(forPlugin:).
                     #if os(watchOS)
                         plugin.hud
+                            .reportsVisibility(ofPlugin: plugin.id)
                     #else
                         plugin.hud
+                            .reportsVisibility(ofPlugin: plugin.id)
                             .contextMenu {
                                 Button("Remove \(plugin.title) from HUD") { unpin(plugin.id) }
                             }

@@ -11,10 +11,17 @@
     /// The drawer: the registry of its plugins, whether it is open, and the state it shares with
     /// them (badges, toasts, the HUD, redaction rules and the report uploader).
     ///
-    /// There is one, ``shared``. **Global plugins** live for the app's lifetime: register them
-    /// once at startup with ``registerGlobal(_:)``. **Local plugins** follow a view's lifetime:
-    /// attach them with `debugLocalPlugin(_:)`, which registers on appear and unregisters on
-    /// disappear.
+    /// The app's is ``shared``, which `debugDrawer()` shows and the plugins' `install*()` calls
+    /// register with. **Global plugins** live until they are unregistered: register them once at
+    /// startup with ``registerGlobal(_:)``. **Local plugins** follow a view's lifetime: attach them
+    /// with `debugLocalPlugin(_:)`, which registers on appear and unregisters on disappear.
+    ///
+    /// Each drawer owns its plugins: it calls a plugin's ``DebugDrawerPlugin/install(in:)`` as it
+    /// adds the plugin and ``DebugDrawerPlugin/uninstall(from:)`` as it removes it, and
+    /// ``DebugDrawerPlugin/didBecomeVisible(in:)`` and ``DebugDrawerPlugin/didBecomeHidden(in:)``
+    /// as the plugin's content comes on and leaves the screen. A drawer made with ``init()`` or
+    /// ``init(defaults:)`` holds plugins of its own, apart from ``shared``'s, as a test that
+    /// registers its plugin with a drawer of its own does.
     ///
     /// ```swift
     /// DebugDrawer.shared.registerGlobal(BuildInfoPlugin())
@@ -72,8 +79,16 @@
         @Published public private(set) var localPlugins: [AnyDebugDrawerPlugin] = []
 
         /// Every local plugin's registration: its token and the window whose views registered it.
+        ///
+        /// A registration whose token joins the list is installed, and one whose token leaves it
+        /// is uninstalled; one moving to another window, or listed anew, keeps its token.
         var localRegistrations: [DrawerLocalRegistration] = [] {
-            didSet { localPlugins = localRegistrations.map(\.plugin) }
+            didSet {
+                localPlugins = localRegistrations.map(\.plugin)
+                let removed = oldValue.filter { old in !localRegistrations.contains { $0.token == old.token } }
+                let added = localRegistrations.filter { new in !oldValue.contains { $0.token == new.token } }
+                pluginsDidChange(removed: removed.map(\.plugin), added: added.map(\.plugin))
+            }
         }
 
         /// What watches each window (on iOS and visionOS, scene) given to `registerLocal(_:in:)`
@@ -84,10 +99,24 @@
         /// notices are silenced, and each window's collapsed sections, pins and order.
         let defaults: UserDefaults
 
-        /// Makes a drawer that saves to `defaults`; the app's is ``shared``, saving to the drawer's
-        /// own suite (`UserDefaults.debugDrawer`) so none of it shows among the app's defaults.
-        /// Tests pass a suite of their own so nothing they save reaches another test or the app.
-        init(defaults: UserDefaults = .debugDrawer) {
+        /// How many of each plugin's views are on screen (its section's body, its view shown
+        /// alone, its HUD readout), by plugin ID; a plugin with none has no entry.
+        var visibleContentCounts: [String: Int] = [:]
+
+        /// Makes a drawer with no plugins, saving what it keeps across launches (the HUD's layout,
+        /// silenced notices, collapsed sections, pins and order) where ``shared`` does: the
+        /// drawer's own suite, so none of it shows among the app's defaults.
+        public convenience init() {
+            self.init(defaults: .debugDrawer)
+        }
+
+        /// Makes a drawer with no plugins that saves what it keeps across launches to `defaults`.
+        ///
+        /// Pass a suite of the drawer's own: a test's, so nothing it saves reaches another test or
+        /// the app, or a second drawer's, so its layout stays apart from ``shared``'s.
+        ///
+        /// - Parameter defaults: Where the drawer saves its state.
+        public init(defaults: UserDefaults) {
             self.defaults = defaults
             hudLayout = HUDLayout(from: defaults)
             noticesMutedPlugins = Set(defaults.stringArray(forKey: Self.noticesMutedDefaultsKey) ?? [])
@@ -95,11 +124,13 @@
 
         // MARK: - Global
 
-        /// Registers a plugin that stays in the drawer for the app's lifetime.
+        /// Registers a plugin that stays in the drawer until ``unregisterGlobal(id:)`` removes it,
+        /// and calls its ``DebugDrawerPlugin/install(in:)`` once it is listed.
         ///
-        /// A plugin whose ``DebugDrawerPlugin/id`` is already registered as global is ignored; when
-        /// the plugin registered under that ID is of another type, the drawer also logs an error
-        /// naming both types, since one of them needs an ``DebugDrawerPlugin/id`` of its own.
+        /// A plugin whose ``DebugDrawerPlugin/id`` is already registered as global is ignored, and
+        /// not installed again; when the plugin registered under that ID is of another type, the
+        /// drawer also logs an error naming both types, since one of them needs an
+        /// ``DebugDrawerPlugin/id`` of its own.
         ///
         /// - Parameter plugin: The plugin to add.
         public func registerGlobal<P: DebugDrawerPlugin>(_ plugin: P) {
@@ -108,6 +139,7 @@
             case .added:
                 adoptSavedState(of: wrapped)
                 globalPlugins.append(wrapped)
+                pluginsDidChange(removed: [], added: [wrapped])
             case .alreadyRegistered:
                 break
             case let .collision(registered):
@@ -119,11 +151,15 @@
             }
         }
 
-        /// Removes the global plugin with this ID; does nothing if there is none.
+        /// Removes the global plugin with this ID, then calls its
+        /// ``DebugDrawerPlugin/didBecomeHidden(in:)`` if it was on screen and its
+        /// ``DebugDrawerPlugin/uninstall(from:)``; does nothing if there is none.
         ///
         /// - Parameter id: The plugin's ``DebugDrawerPlugin/id``.
         public func unregisterGlobal(id: String) {
-            globalPlugins.removeAll { $0.id == id }
+            guard let index = globalPlugins.firstIndex(where: { $0.id == id }) else { return }
+            let removed = globalPlugins.remove(at: index)
+            pluginsDidChange(removed: [removed], added: [])
         }
 
         // MARK: - Local
@@ -198,7 +234,9 @@
             localRegistrations.plugins(listedIn: scope)
         }
 
-        /// Removes a local plugin if `token` is its current registration's.
+        /// Removes a local plugin if `token` is its current registration's, then calls its
+        /// ``DebugDrawerPlugin/didBecomeHidden(in:)`` if it was on screen and its
+        /// ``DebugDrawerPlugin/uninstall(from:)``.
         ///
         /// A view that disappears after a newer view registered the same plugin holds a stale
         /// token, so the newer registration stays.
@@ -282,116 +320,5 @@
 
         /// The IDs of the plugins whose badges and toasts are silenced, saved in ``defaults``.
         @Published var noticesMutedPlugins: Set<String>
-    }
-#else
-    import SwiftUI
-
-    // The release stand-in: the same members, so the host's code compiles unchanged, and no drawer
-    // behind them. It registers nothing, opens nothing and keeps every value at its start.
-
-    /// Release builds have no drawer: this stand-in keeps the debug build's members and does nothing.
-    @MainActor
-    public final class DebugDrawer: ObservableObject {
-        /// The stand-in drawer.
-        public static let shared = DebugDrawer()
-
-        /// Always false: release builds have no drawer to open.
-        @Published public var isOpen = false
-
-        /// Always empty: registering drops the plugin.
-        @Published public private(set) var globalPlugins: [AnyDebugDrawerPlugin] = []
-
-        /// Always empty: registering drops the plugin.
-        @Published public private(set) var localPlugins: [AnyDebugDrawerPlugin] = []
-
-        private init() {}
-
-        /// Drops the plugin: release builds have no drawer.
-        ///
-        /// - Parameter plugin: Ignored.
-        public func registerGlobal<P: DebugDrawerPlugin>(_ plugin: P) {}
-
-        /// Does nothing.
-        ///
-        /// - Parameter id: Ignored.
-        public func unregisterGlobal(id: String) {}
-
-        /// Drops the plugin: release builds have no drawer.
-        ///
-        /// - Parameter plugin: Ignored.
-        /// - Returns: A token that unregisters nothing.
-        @discardableResult
-        public func registerLocal<P: DebugDrawerPlugin>(_ plugin: P) -> UUID {
-            UUID()
-        }
-
-        /// Does nothing.
-        ///
-        /// - Parameters:
-        ///   - id: Ignored.
-        ///   - token: Ignored.
-        public func unregisterLocal(id: String, token: UUID) {}
-
-        /// Does nothing: release builds have no drawer to open.
-        public func toggle() {}
-
-        /// Runs `action`: there is no drawer or HUD to hide.
-        ///
-        /// - Parameters:
-        ///   - hidesDrawer: Ignored.
-        ///   - action: The work to do.
-        public func performWhileHidden(drawer hidesDrawer: Bool = true, _ action: @escaping @MainActor () async -> Void) {
-            Task { await action() }
-        }
-
-        /// Always false.
-        public var hasPlugins: Bool {
-            false
-        }
-
-        /// The rules plugins would mask with; nothing reads them in release.
-        @Published public var redaction = DebugDrawerRedaction.standard
-
-        /// Does nothing: nothing in release masks anything.
-        ///
-        /// - Parameters:
-        ///   - headers: Ignored.
-        ///   - keys: Ignored.
-        ///   - jsonPaths: Ignored.
-        public func redact(
-            headers: some Sequence<String> = [String](),
-            keys: some Sequence<String> = [String](),
-            jsonPaths: some Sequence<String> = [String]()
-        ) {}
-
-        /// Kept, never called: release builds make no reports.
-        @Published public var reportUploader: (any DebugDrawerReportUploader)?
-
-        /// Always empty: release builds have no HUD.
-        @Published public internal(set) var hudLayout = HUDLayout()
-
-        /// Always false.
-        @Published public internal(set) var isHUDHidden = false
-
-        /// Does nothing.
-        ///
-        /// - Parameter id: Ignored.
-        public func toggleHUD(forPlugin id: String) {}
-
-        /// Does nothing.
-        ///
-        /// - Parameter origin: Ignored.
-        public func moveHUD(to origin: CGPoint) {}
-
-        /// Always empty.
-        public var hudPlugins: [AnyDebugDrawerPlugin] {
-            []
-        }
-
-        /// Always empty.
-        @Published public private(set) var badges: [String: Int] = [:]
-
-        /// Always nil.
-        @Published public private(set) var toast: DebugDrawerToast?
     }
 #endif

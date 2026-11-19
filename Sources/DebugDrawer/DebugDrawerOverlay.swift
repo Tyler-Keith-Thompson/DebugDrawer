@@ -201,6 +201,7 @@
                     }
                 }
                 .frame(maxHeight: .infinity, alignment: .top)
+                .environment(\.showingDrawer, drawer)
                 DrawerFilterBar(field: { searchField }, showsOnlyOwnCode: $showsOnlyOwnCode, showsOnlyUnread: $showsOnlyUnread)
             }
             // The shortcuts exist only inside the open drawer, so none of them opens it (N2).

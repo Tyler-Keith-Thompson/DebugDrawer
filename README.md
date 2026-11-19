@@ -145,6 +145,58 @@ at the trailing edge of its header row, shown while the plugin is closed too.
 Each lays itself out for accessibility text sizes and labels itself for VoiceOver. They exist in
 every configuration, so a plugin's body compiles in release, where they draw nothing.
 
+### A plugin's lifecycle, and drawers of your own
+
+A plugin can start work when a drawer adds it and stop it when the drawer removes it, and do the
+costly part only while someone can see it. Each hook is optional and does nothing by default:
+
+| Hook | Called |
+|---|---|
+| `install(in:)` | Once, as the drawer adds the plugin: `registerGlobal(_:)`, or a local plugin's view appearing |
+| `didBecomeVisible(in:)` | As its content comes on screen: its section's body in an open drawer, the plugin shown alone, or its HUD readout; once, however many windows show it |
+| `didBecomeHidden(in:)` | As the last of it leaves the screen (the drawer closed, the section collapsed, the readout unpinned), or as the drawer removes it while it is shown |
+| `uninstall(from:)` | Once, as the drawer removes the plugin: `unregisterGlobal(id:)`, or a local plugin's view disappearing |
+
+```swift
+@MainActor
+final class SocketMonitor {
+    private(set) var isRunning = false
+    var isSampling = false
+
+    func start() { isRunning = true }
+    func stop() { isRunning = false }
+}
+
+struct SocketPlugin: DebugDrawerPlugin {
+    let monitor: SocketMonitor
+    var title = "Sockets"
+    var icon = "network"
+
+    var body: some View {
+        Text(monitor.isRunning ? "Watching sockets" : "Stopped")
+    }
+
+    func install(in drawer: DebugDrawer) { monitor.start() }
+    func uninstall(from drawer: DebugDrawer) { monitor.stop() }
+    func didBecomeVisible(in drawer: DebugDrawer) { monitor.isSampling = true }
+    func didBecomeHidden(in drawer: DebugDrawer) { monitor.isSampling = false }
+}
+```
+
+Each drawer owns the plugins registered with it. `DebugDrawer.shared` is the app's, which
+`.debugDrawer()`, `attach(to:)` and the plugins' `install*()` calls use; `DebugDrawer()` makes
+another with no plugins, apart from it, as a test does to check a plugin without touching the
+shared drawer. `DebugDrawer(defaults:)` also keeps what it saves (pins, order, the HUD) in a
+`UserDefaults` suite of its own.
+
+```swift
+let monitor = SocketMonitor()
+let drawer = DebugDrawer()
+
+drawer.registerGlobal(SocketPlugin(monitor: monitor)) // install(in:): the monitor starts
+drawer.unregisterGlobal(id: SocketPlugin(monitor: monitor).id) // uninstall(from:): it stops
+```
+
 ### Grouping, pinning and ordering
 
 The drawer lists global plugins by `category`, a string a plugin may declare; one that declares
