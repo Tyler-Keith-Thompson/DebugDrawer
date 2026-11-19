@@ -194,6 +194,30 @@
 
                 #expect(throws: Never.self) { try inspected.find(text: "42 FPS") }
             }
+
+            // A drawer of its own over a UserDefaults suite of its own, so the pins it saves reach
+            // no other test and not the shared drawer.
+            @Test("Unpin in a readout's context menu takes that readout off the HUD and leaves the others")
+            func unpinTakesTheReadoutOff() throws {
+                let name = "HUDTests.\(UUID().uuidString)"
+                let suite = try #require(UserDefaults(suiteName: name))
+                defer { suite.removePersistentDomain(forName: name) }
+                let drawer = DebugDrawer(defaults: suite)
+                drawer.registerGlobal(ReadoutPlugin())
+                drawer.registerGlobal(ReadoutPlugin(id: "SecondReadout", title: "Second"))
+                drawer.toggleHUD(forPlugin: "ReadoutPlugin")
+                drawer.toggleHUD(forPlugin: "SecondReadout")
+                let card = DrawerHUDCard(readouts: drawer.hudPlugins) { drawer.toggleHUD(forPlugin: $0) }
+                // ViewInspector can't open a context menu, so the test inspects the menu each
+                // readout's `contextMenu` shows.
+                let sut = card.menu(for: AnyDebugDrawerPlugin(ReadoutPlugin()))
+                let expected = ["SecondReadout"]
+
+                try sut.inspect().find(button: "Unpin Readout").tap()
+
+                #expect(drawer.hudPlugins.map(\.id) == expected)
+                #expect(HUDLayout(from: suite).pinned == expected)
+            }
         #endif
     }
 #endif

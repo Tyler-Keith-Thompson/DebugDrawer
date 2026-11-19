@@ -48,6 +48,7 @@ the entry becomes the GitHub release's notes.
 
 ### Fixed
 
+- DD-232: on iOS a pinned HUD readout's context menu works: touching and holding a readout opens it, its item, now Unpin with the plugin's name, takes the readout off the HUD, and a tap beside the menu closes it. Before, the menu showed but its item couldn't be chosen, and a tap beside it reached the app and left it open: UIKit draws the menu in the HUD's window, which passed every touch outside the card to the app's windows.
 - DD-234: on macOS an earlier launch's last os_log lines are no longer lost when one read of the system's log misses them while the Mac is busy: the next launch reads the log again, up to four times, until a read holds the session's own last os_log line and finds nothing the reads before it lacked, and adds every line any read found to the Previous session.
 - DD-251: a drawer made with `DebugDrawer()` or `DebugDrawer(defaults:)` follows its own windows' drawers: its `isOpen` and `$isOpen` change as `toggle()`, `toggle(in:)`, `open()`, `close()`, `performWhileHidden` or a tap outside the compact panel opens or closes one of them, and `DebugDrawer.shared` is no longer told of (or republishes for) another drawer's changes.
 - DD-82: `installDeepLink(presets:continueUserActivity:openURL:)` keeps the Deep Link Tester's history of opened URLs and continued activities in the defaults of the drawer it is called on, so a drawer made with `DebugDrawer(defaults:)` no longer writes it into `DebugDrawer.shared`'s suite. `DebugDrawer.shared` keeps it where it always has.

@@ -273,10 +273,11 @@ uploads.clearBadge()
 
 ### Floating HUD
 
-A plugin can offer a compact readout for the floating HUD, which stays on screen while the drawer
-is closed. Choose Show in HUD from a plugin's context menu in the drawer to pin its readout; drag
-the HUD anywhere in the window. Only the HUD itself takes touches; the rest of the window reaches
-the app. The pinned readouts and the HUD's position are remembered across launches, and the
+A plugin can offer a compact readout for the floating HUD, which stays on screen while the drawer is
+closed. Choose Show in HUD from a plugin's context menu in the drawer to pin its readout, and Unpin
+from the readout's own context menu (touch and hold it, or Control-click it on the Mac) to take it
+off; drag the HUD anywhere in the window. Only the HUD itself takes touches; the rest of the window
+reaches the app. The pinned readouts and the HUD's position are remembered across launches, and the
 Screenshot plugin leaves the HUD out of its captures. Performance offers its frame rate and memory,
 Network its active conditioning profiles, Screen Recording a Record button that becomes the elapsed
 time and Stop, and Design Overlay and Color Vision a switch of their own.

@@ -1,7 +1,8 @@
 #if DEBUG
     import SwiftUI
 
-    /// The HUD's card: the pinned plugins' readouts, each with a context menu that removes it.
+    /// The HUD's card: the pinned plugins' readouts, each with a context menu whose Unpin removes
+    /// it.
     ///
     /// `DrawerHUDView` places it in the window and drags it there; on the Mac it fills a panel of
     /// its own (DrawerChromePanel), which moves as it is dragged.
@@ -22,9 +23,7 @@
                     #else
                         plugin.hud
                             .reportsVisibility(ofPlugin: plugin.id)
-                            .contextMenu {
-                                Button("Remove \(plugin.title) from HUD") { unpin(plugin.id) }
-                            }
+                            .contextMenu { menu(for: plugin) }
                     #endif
                 }
             }
@@ -34,6 +33,12 @@
             .fixedSize()
             .accessibilityElement(children: .contain)
             .accessibilityLabel("Debug HUD")
+        }
+
+        /// A readout's context menu: Unpin, which takes the plugin's readout off the HUD.
+        @ViewBuilder
+        func menu(for plugin: AnyDebugDrawerPlugin) -> some View {
+            Button("Unpin \(plugin.title)", systemImage: "pin.slash") { unpin(plugin.id) }
         }
     }
 #endif

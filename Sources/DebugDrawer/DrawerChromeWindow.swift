@@ -11,11 +11,13 @@
     // orientations while it shows, so it shows only while the drawer is open, and the HUD shows
     // while it is closed. This one hosts its view as a plain subview, as DrawerOverlayWindow does,
     // so the app's windows keep deciding those, and it stays on screen, so SwiftUI keeps it up to
-    // date. It takes a touch only on the HUD's card and the toast; every other touch falls through
-    // to the app's windows below.
+    // date. It takes a touch only on the HUD's card and the toast, or anywhere while a readout's
+    // context menu shows (UIKit draws the menu in this window, past the card, and closes it on a
+    // tap this window gets); every other touch falls through to the app's windows below.
 
     /// The drawer's HUD and toast in one scene: a window at a level above alerts and under the
-    /// drawer's panel, taking touches only where the HUD's card or the toast is drawn.
+    /// drawer's panel, taking touches only where the HUD's card or the toast is drawn, or anywhere
+    /// while a readout's context menu shows.
     final class DrawerChromeWindow: UIWindow {
         /// Above the plugins' overlay (DrawerOverlayWindow) and alerts, under the drawer's panel.
         static let level = UIWindow.Level(rawValue: UIWindow.Level.alert.rawValue + 0.75)
@@ -52,16 +54,24 @@
             fatalError("The drawer's HUD window is made in code.")
         }
 
+        /// Whether a readout's context menu shows: UIKit then adds views of its own to this window
+        /// beside the hosted content (the menu, past the card's frame, and what closes it on a tap
+        /// anywhere else in the window), and removes them once the menu has closed.
+        private var isShowingContextMenu: Bool {
+            subviews.contains { $0 !== hosting.view }
+        }
+
         /// Never key, so a tap on the HUD or the toast leaves the app's window key, with its
         /// keyboard shortcuts and its text fields' focus.
         override var canBecomeKey: Bool {
             false
         }
 
-        /// Takes a touch on the HUD's card or the toast; everywhere else `nil`, so UIKit offers it
-        /// to the app's windows below.
+        /// Takes a touch on the HUD's card or the toast, and every touch while a readout's context
+        /// menu shows, so its items can be chosen and a tap beside it closes it; otherwise `nil`,
+        /// so UIKit offers the touch to the app's windows below.
         override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
-            guard frames.contains(point) else { return nil }
+            guard frames.contains(point) || isShowingContextMenu else { return nil }
             return super.hitTest(point, with: event)
         }
     }

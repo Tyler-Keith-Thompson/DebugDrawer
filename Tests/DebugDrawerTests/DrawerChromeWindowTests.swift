@@ -351,6 +351,37 @@
                 #expect(nextToHUD == nil)
             }
 
+            // UIKit shows a readout's context menu in views it adds to the HUD window beside the
+            // hosted content, and closes it on a tap the window gets; a plain view added the same
+            // way stands in for them, as opening a real menu takes a touch.
+            @Test("While an added view, such as an open context menu's, is in the HUD window it takes every touch; once it's gone, the app gets them")
+            func addedViewTakesEveryTouch() throws {
+                let suite = "DrawerChromeWindowTests.\(UUID().uuidString)"
+                let defaults = try #require(UserDefaults(suiteName: suite))
+                defer { defaults.removePersistentDomain(forName: suite) }
+                let drawer = DebugDrawer(defaults: defaults)
+                drawer.registerGlobal(ChromeReadoutPlugin())
+                drawer.hudLayout.pinned = ["ChromeReadoutPlugin"]
+                let sut = DrawerChromeWindow(scene: nil, drawer: drawer)
+                sut.frame = CGRect(x: 0, y: 0, width: 1024, height: 768)
+                defer { sut.isHidden = true }
+                sut.layoutIfNeeded()
+                let hud = try #require(sut.frames.hud)
+                let menu = UIView(frame: CGRect(x: hud.minX, y: hud.maxY + 8, width: 224, height: 40))
+                let onMenuPoint = CGPoint(x: menu.frame.midX, y: menu.frame.midY)
+                let middle = CGPoint(x: 512, y: 500)
+                sut.addSubview(menu)
+
+                let onMenu = sut.hitTest(onMenuPoint, with: nil)
+                let inMiddleWithMenu = sut.hitTest(middle, with: nil)
+                menu.removeFromSuperview()
+                let afterMenu = [onMenuPoint, middle].map { sut.hitTest($0, with: nil) }
+
+                #expect(onMenu === menu)
+                #expect(inMiddleWithMenu != nil)
+                #expect(afterMenu.allSatisfy { $0 == nil })
+            }
+
             @Test("With nothing pinned and no toast, the drawer's HUD window takes no touch")
             func emptyWindowTakesNoTouch() throws {
                 let suite = "DrawerChromeWindowTests.\(UUID().uuidString)"
