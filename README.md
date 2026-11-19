@@ -84,8 +84,8 @@ window's drawer opens and closes on its own; `toggle()` and `isOpen` act on the 
 on the `NSWindow` or `UIWindowScene` it is given, attaching it first if it isn't yet. The plugin
 registry is shared, but each window's drawer lists only the local plugins of its own views. A
 UIKit or AppKit app without `debugDrawer()` attaches it with `DebugDrawer.shared.attach(to:)`,
-passing each `UIWindowScene` or `NSWindow`, and gets the same drawer with every global plugin (the
-HUD and the toasts are drawn by `debugDrawer()`, so such a window shows neither). A section header's chevron, or the jump bar's menu, shows
+passing each `UIWindowScene` or `NSWindow`, and gets the same drawer with every global plugin,
+the HUD and the toasts. A section header's chevron, or the jump bar's menu, shows
 one plugin alone at the panel's full height, and the back button returns to the list.
 
 Such an app has no SwiftUI view for `.debugLocalPlugin()` to find its window from, so it ties a
@@ -1633,8 +1633,7 @@ ScreenRecording.install(capacity: 10)
 windows into each frame, up to 30 a second, rather than recording the screen, so it asks for no
 permission: on iOS every window of the scene in front, sheets and alerts included, and on macOS the
 content of the main window. The drawer is open while it records without appearing in the movie: its
-window is left out, and the HUD and toasts `.debugDrawer()` draws above the app are hidden for the
-moment a frame is drawn and shown again before the screen updates. Pin it to the HUD (Show in HUD)
+windows, the HUD's and the toasts' among them, are left out. Pin it to the HUD (Show in HUD)
 to start and stop it with the drawer closed. On iOS and Mac Catalyst, Show touches draws a circle
 where each finger is, in the movie only; it is off until turned on, and remembered.
 

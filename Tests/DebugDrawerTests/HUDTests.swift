@@ -139,24 +139,47 @@
 
         #if !os(visionOS)
             // Synchronous for the same reason as the HUD list test.
-            @Test("While the HUD is hidden, the app's drawer modifier draws it fully transparent, so a capture leaves it out")
-            func theModifierDrawsNoHUDWhileHidden() {
-                let sut = DebugDrawer.shared
-                let previous = sut.hudLayout
-                sut.registerGlobal(ReadoutPlugin())
-                sut.hudLayout.pinned = ["ReadoutPlugin"]
-                let app = Text("App").debugDrawer()
+            @Test("While the HUD is hidden, its layer draws it fully transparent, so a capture leaves it out")
+            func theLayerDrawsNoHUDWhileHidden() throws {
+                let suite = "HUDTests.\(UUID().uuidString)"
+                let defaults = try #require(UserDefaults(suiteName: suite))
+                defer { defaults.removePersistentDomain(forName: suite) }
+                let drawer = DebugDrawer(defaults: defaults)
+                drawer.registerGlobal(ReadoutPlugin())
+                drawer.hudLayout.pinned = ["ReadoutPlugin"]
+                let sut = DrawerHUDLayer(drawer: drawer)
 
-                let shownOpacity = try? app.inspect().find(DrawerHUDView.self).opacity()
-                sut.isHUDHidden = true
-                let hiddenOpacity = try? app.inspect().find(DrawerHUDView.self).opacity()
+                let shownOpacity = try? sut.inspect().find(DrawerHUDView.self).opacity()
+                drawer.isHUDHidden = true
+                let hiddenOpacity = try? sut.inspect().find(DrawerHUDView.self).opacity()
 
-                sut.isHUDHidden = false
-                sut.hudLayout = previous
-                sut.unregisterGlobal(id: "ReadoutPlugin")
                 #expect(shownOpacity == 1)
                 #expect(hiddenOpacity == 0)
             }
+
+            #if os(macOS) || os(iOS)
+                // Synchronous for the same reason as the HUD list test.
+                @Test("On the Mac and iOS the drawer modifier draws neither the HUD nor the toast: the drawer's own windows do, once")
+                func theModifierDrawsNoHUDOrToast() {
+                    let sut = DebugDrawer.shared
+                    let previous = sut.hudLayout
+                    sut.registerGlobal(ReadoutPlugin())
+                    sut.hudLayout.pinned = ["ReadoutPlugin"]
+                    sut.postToast("Saved", fromPlugin: "ReadoutPlugin")
+                    let posted = sut.toast != nil && !sut.hudPlugins.isEmpty
+                    let app = Text("App").debugDrawer()
+
+                    let hud = try? app.inspect().find(DrawerHUDView.self)
+                    let toast = try? app.inspect().find(DrawerToastView.self)
+
+                    sut.dismissToast()
+                    sut.hudLayout = previous
+                    sut.unregisterGlobal(id: "ReadoutPlugin")
+                    #expect(posted)
+                    #expect(hud == nil)
+                    #expect(toast == nil)
+                }
+            #endif
 
             @Test("The HUD card shows each pinned plugin's readout")
             func theCardShowsReadouts() throws {

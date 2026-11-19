@@ -44,49 +44,78 @@
             assertSnapshot(of: actual, as: .image(perceptualPrecision: 0.98), named: "\(colorScheme)")
         }
 
-        // The drawer's overlay holds an NSViewRepresentable, which ImageRenderer draws as a
-        // placeholder, so this hosts the app in a window that is never shown and draws it at 2x.
-        // Synchronous: the shared drawer is changed and restored in one main-actor turn.
-        @Test("With the drawer closed, the app's drawer modifier draws the pinned HUD over the app", arguments: [ColorScheme.light, .dark])
+        // An AppKit window with no SwiftUI view: the HUD is drawn in a panel of the drawer's own
+        // over it (DrawerChromePanel). Neither is ever shown; each is drawn at 2x and the panel
+        // laid over the window where it sits.
+        @Test("Over an AppKit window, the HUD's panel draws the pinned readouts at the top leading corner", arguments: [ColorScheme.light, .dark])
         func hudOverTheApp(colorScheme: ColorScheme) throws {
-            let drawer = DebugDrawer.shared
-            let previous = drawer.hudLayout
-            let wasOpen = drawer.isOpen
-            drawer.isOpen = false
+            let suite = "HUDSnapshotTests.\(UUID().uuidString)"
+            let defaults = try #require(UserDefaults(suiteName: suite))
+            defer { defaults.removePersistentDomain(forName: suite) }
+            let drawer = DebugDrawer(defaults: defaults)
             drawer.registerGlobal(SnapshotFramesPlugin())
-            drawer.hudLayout = HUDLayout()
             drawer.hudLayout.pinned = ["DebugDrawerTests.SnapshotFramesPlugin"]
-            let app = VStack(spacing: 12) {
-                Text("Orders").font(.title)
-                Button("Refresh") {}
-            }
-            .frame(width: 320, height: 160)
-            .background(.background)
-            .debugDrawer()
+            let appearance = try #require(NSAppearance(named: colorScheme == .dark ? .darkAqua : .aqua))
+            let title = NSTextField(labelWithString: "Orders")
+            title.font = .preferredFont(forTextStyle: .title1)
+            let app = NSStackView(views: [title, NSButton(title: "Refresh", target: nil, action: nil)])
+            app.orientation = .vertical
+            app.alignment = .centerX
+            app.translatesAutoresizingMaskIntoConstraints = false
+            let content = NSView(frame: NSRect(x: 0, y: 0, width: 320, height: 160))
+            content.addSubview(app)
+            NSLayoutConstraint.activate([
+                app.centerXAnchor.constraint(equalTo: content.centerXAnchor),
+                app.centerYAnchor.constraint(equalTo: content.centerYAnchor)
+            ])
             let window = NSWindow(
                 contentRect: NSRect(x: 0, y: 0, width: 320, height: 160),
                 styleMask: [.borderless],
                 backing: .buffered,
                 defer: false
             )
-            window.appearance = NSAppearance(named: colorScheme == .dark ? .darkAqua : .aqua)
-            let host = NSHostingView(rootView: app)
-            host.frame = NSRect(x: 0, y: 0, width: 320, height: 160)
-            window.contentView = host
-            host.layoutSubtreeIfNeeded()
-            let bitmap = try #require(NSBitmapImageRep(
-                bitmapDataPlanes: nil, pixelsWide: 640, pixelsHigh: 320, bitsPerSample: 8,
-                samplesPerPixel: 4, hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB,
-                bytesPerRow: 0, bitsPerPixel: 0
-            ))
-            bitmap.size = host.bounds.size
-            host.cacheDisplay(in: host.bounds, to: bitmap)
-            let actual = NSImage(size: host.bounds.size)
-            actual.addRepresentation(bitmap)
+            window.appearance = appearance
+            window.contentView = content
+            content.layoutSubtreeIfNeeded()
+            let panel = DrawerChromePanel(role: .hud, host: window, drawer: drawer)
+            panel.appearance = appearance
+            defer { window.removeChildWindow(panel) }
+            let card = try #require(panel.contentView)
+            card.subviews.first?.layoutSubtreeIfNeeded()
 
-            drawer.hudLayout = previous
-            drawer.unregisterGlobal(id: "DebugDrawerTests.SnapshotFramesPlugin")
-            drawer.isOpen = wasOpen
+            func drawn(_ view: NSView) throws -> NSBitmapImageRep {
+                let bitmap = try #require(NSBitmapImageRep(
+                    bitmapDataPlanes: nil, pixelsWide: Int(view.bounds.width * 2), pixelsHigh: Int(view.bounds.height * 2),
+                    bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB,
+                    bytesPerRow: 0, bitsPerPixel: 0
+                ))
+                bitmap.size = view.bounds.size
+                view.cacheDisplay(in: view.bounds, to: bitmap)
+                return bitmap
+            }
+            let windowImage = try drawn(content)
+            let cardImage = try drawn(card)
+            let actual = NSImage(size: content.bounds.size)
+            actual.lockFocus()
+            appearance.performAsCurrentDrawingAppearance {
+                NSColor.windowBackgroundColor.setFill()
+                content.bounds.fill()
+            }
+            // Laid over what is drawn already: an image rep's plain draw(in:) copies its clear
+            // pixels too.
+            windowImage.draw(
+                in: content.bounds, from: .zero, operation: .sourceOver, fraction: 1, respectFlipped: true, hints: nil
+            )
+            cardImage.draw(
+                in: CGRect(
+                    origin: CGPoint(x: panel.frame.minX - window.frame.minX, y: panel.frame.minY - window.frame.minY),
+                    size: panel.frame.size
+                ),
+                from: .zero, operation: .sourceOver, fraction: 1, respectFlipped: true, hints: nil
+            )
+            actual.unlockFocus()
+
+            #expect(panel.contentSize.width > 0)
             assertSnapshot(of: actual, as: .image(perceptualPrecision: 0.98), named: "\(colorScheme)")
         }
     }

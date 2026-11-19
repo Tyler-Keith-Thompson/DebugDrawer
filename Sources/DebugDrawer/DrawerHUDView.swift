@@ -12,6 +12,8 @@
         let move: (CGPoint) -> Void
         /// Called with a plugin's ID when the developer removes its readout.
         let unpin: (String) -> Void
+        /// Called with the card's frame, in global coordinates, as it is laid out and dragged.
+        var cardFrameDidChange: (CGRect?) -> Void = { _ in }
 
         @State private var drag = CGSize.zero
         @State private var cardSize = CGSize.zero
@@ -20,9 +22,15 @@
             // GeometryReader draws nothing of its own, so it takes no touches outside the card.
             GeometryReader { container in
                 let corner = (origin ?? Self.defaultOrigin).kept(showing: cardSize, in: container.size)
+                let offset = CGSize(width: corner.x + drag.width, height: corner.y + drag.height)
                 card
                     .onGeometryChange(for: CGSize.self, of: \.size) { cardSize = $0 }
-                    .offset(x: corner.x + drag.width, y: corner.y + drag.height)
+                    .offset(offset)
+                    // Where the card is drawn, for the hit testing of the window it is in
+                    // (DrawerChromeWindow): the offset moves what is drawn, not the frame.
+                    .onGeometryChange(for: CGRect.self) { proxy in
+                        proxy.frame(in: .global).offsetBy(dx: offset.width, dy: offset.height)
+                    } action: { cardFrameDidChange($0) }
                 // tvOS has no drag gesture, so there the card stays at its corner.
                 #if !os(tvOS)
                     .gesture(
@@ -39,28 +47,7 @@
         }
 
         private var card: some View {
-            VStack(alignment: .leading, spacing: 6) {
-                ForEach(readouts) { plugin in
-                    // watchOS deprecates context menus, so there a readout leaves the HUD only
-                    // through DebugDrawer.toggleHUD(forPlugin:).
-                    #if os(watchOS)
-                        plugin.hud
-                            .reportsVisibility(ofPlugin: plugin.id)
-                    #else
-                        plugin.hud
-                            .reportsVisibility(ofPlugin: plugin.id)
-                            .contextMenu {
-                                Button("Remove \(plugin.title) from HUD") { unpin(plugin.id) }
-                            }
-                    #endif
-                }
-            }
-            .padding(8)
-            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
-            .shadow(color: .black.opacity(0.2), radius: 4, y: 1)
-            .fixedSize()
-            .accessibilityElement(children: .contain)
-            .accessibilityLabel("Debug HUD")
+            DrawerHUDCard(readouts: readouts, unpin: unpin)
         }
 
         /// Where the card sits until it is first moved: the top-leading corner, inset.
@@ -69,7 +56,7 @@
 
     extension CGPoint {
         /// This corner moved, if need be, so a card of `size` stays inside `container`.
-        fileprivate func kept(showing size: CGSize, in container: CGSize) -> CGPoint {
+        func kept(showing size: CGSize, in container: CGSize) -> CGPoint {
             CGPoint(
                 x: min(max(x, 0), max(container.width - size.width, 0)),
                 y: min(max(y, 0), max(container.height - size.height, 0))

@@ -5,7 +5,8 @@
         import UIKit
     #endif
 
-    /// A window's drawer: its state and, on the Mac and iOS, the window it is drawn in.
+    /// A window's drawer: its state and, on the Mac and iOS, the windows it, its HUD and its toast
+    /// are drawn in.
     @MainActor
     struct DrawerAttachment {
         let presentation: DrawerPresentation
@@ -13,17 +14,23 @@
             /// The window the drawer is attached to.
             weak var window: NSWindow?
             let panel: DrawerChildPanel
+            /// The HUD's card, over the window.
+            let hud: DrawerChromePanel
+            /// The toast, over the window.
+            let toast: DrawerChromePanel
         #elseif os(iOS)
             /// The scene the drawer is attached to.
             weak var scene: UIWindowScene?
             let window: DrawerSceneWindow
+            /// The HUD and the toast, over the scene's windows.
+            let chrome: DrawerChromeWindow
         #endif
     }
 
     extension DebugDrawer {
         #if os(macOS)
             /// Shows the drawer over `window`, in a panel of its own along the window's trailing
-            /// edge, above its sheets and alerts.
+            /// edge, above its sheets and alerts, with the HUD and the toasts over the window.
             ///
             /// `debugDrawer()` calls this for the window its view is in; call it yourself from an
             /// AppKit app, once the window exists. Attaching a window twice does nothing; a sheet
@@ -40,7 +47,13 @@
                 let presentation = adoptDetachedState()
                 presentation.scope = Self.scope(of: host)
                 let panel = DrawerChildPanel(host: host, drawer: self, presentation: presentation)
-                attachments.append(DrawerAttachment(presentation: presentation, window: host, panel: panel))
+                attachments.append(DrawerAttachment(
+                    presentation: presentation,
+                    window: host,
+                    panel: panel,
+                    hud: DrawerChromePanel(role: .hud, host: host, drawer: self),
+                    toast: DrawerChromePanel(role: .toast, host: host, drawer: self)
+                ))
                 if presentation.isOpen { panel.drawerWillShow() }
                 presentationDidChange()
             }
@@ -68,13 +81,15 @@
             /// panel or overlay belongs to.
             static func appWindow(for window: NSWindow) -> NSWindow {
                 if let panel = window as? DrawerChildPanel, let host = panel.host { return appWindow(for: host) }
+                if let chrome = window as? DrawerChromePanel, let host = chrome.host { return appWindow(for: host) }
                 if let overlay = window as? DrawerOverlayWindow, let host = overlay.host { return appWindow(for: host) }
                 if let parent = window.sheetParent { return appWindow(for: parent) }
                 return window
             }
         #elseif os(iOS)
             /// Shows the drawer in `scene`, in a window of its own above the scene's windows, its
-            /// sheets and its alerts; touches outside the open panel reach the app's windows.
+            /// sheets and its alerts, with the HUD and the toasts; touches outside the open panel,
+            /// the HUD and the toast reach the app's windows.
             ///
             /// `debugDrawer()` calls this for the scene its view is in; call it yourself from a
             /// UIKit app's scene delegate, once the scene has connected. Attaching a scene twice
@@ -90,7 +105,12 @@
                 let presentation = adoptDetachedState()
                 presentation.scope = Self.scope(of: scene)
                 let window = DrawerSceneWindow(scene: scene, drawer: self, presentation: presentation)
-                attachments.append(DrawerAttachment(presentation: presentation, scene: scene, window: window))
+                attachments.append(DrawerAttachment(
+                    presentation: presentation,
+                    scene: scene,
+                    window: window,
+                    chrome: DrawerChromeWindow(scene: scene, drawer: self)
+                ))
                 if presentation.isOpen { window.drawerWillShow() }
                 presentationDidChange()
             }
@@ -118,6 +138,7 @@
             private func sceneDidDisconnect(_ scene: UIScene) {
                 guard let attachment = attachments.first(where: { $0.scene === scene }) else { return }
                 attachment.window.isHidden = true
+                attachment.chrome.isHidden = true
                 detach(attachment.presentation)
             }
         #endif
@@ -257,10 +278,10 @@
                 ?? appWindows.filter { !$0.isHidden }.max { $0.windowLevel < $1.windowLevel }
         }
 
-        /// Whether `window` is the drawer's own (its window or an overlay), which a plugin that
-        /// draws or inspects the app's windows leaves out.
+        /// Whether `window` is the drawer's own (its window, its HUD's or an overlay), which a
+        /// plugin that draws or inspects the app's windows leaves out.
         @MainActor package func isDebugDrawerWindow(_ window: UIWindow) -> Bool {
-            window is DrawerSceneWindow || window is DrawerOverlayWindow
+            window is DrawerSceneWindow || window is DrawerChromeWindow || window is DrawerOverlayWindow
         }
     #endif
 #else

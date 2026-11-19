@@ -6,61 +6,28 @@
     // The modifier applies no animation to the app's content: each layer it adds animates itself
     // (the HUD's fade, the toast's slide, the panel's transition in its own window), so a change
     // to the drawer never animates a change of the app's.
+    //
+    // On the Mac and iOS the HUD and the toast are not drawn here: the window `attach(to:)` gives
+    // the drawer draws them (DrawerChromePanel, DrawerChromeWindow), above the app's sheets and
+    // alerts, the same for a window with no SwiftUI view under it, and once for a window that
+    // has both this modifier and `attach(to:)`.
     struct DebugDrawerModifier: ViewModifier {
         @ObservedObject var drawer = DebugDrawer.shared
 
         func body(content: Content) -> some View {
             content
-                // The chrome boundary's first layer: the HUD, the panel and the toast come after it
-                // (DrawerChromeBoundary).
+                // The chrome boundary's first layer: whatever of the drawer is drawn in the app's
+                // window comes after it (DrawerChromeBoundary).
                 .overlay { DrawerChromeBoundaryMarker(layerName: debugDrawerChromeStartLayerName) }
+            #if os(macOS) || os(iOS)
+                .drawerPresentation(drawer: drawer)
+            #else
                 // Under the drawer, which takes no touches while closed, so the HUD keeps working.
                 .overlay { DrawerHUDLayer(drawer: drawer) }
                 .drawerPresentation(drawer: drawer)
                 .overlay(alignment: .topTrailing) { DrawerToastLayer(drawer: drawer) }
+            #endif
                 .overlay { DrawerChromeBoundaryMarker(layerName: debugDrawerChromeEndLayerName) }
-        }
-    }
-
-    /// The pinned plugins' HUD, if any are pinned, faded out while a capture hides it.
-    private struct DrawerHUDLayer: View {
-        @ObservedObject var drawer: DebugDrawer
-
-        var body: some View {
-            let readouts = drawer.hudPlugins
-            if !readouts.isEmpty {
-                DrawerHUDView(
-                    readouts: readouts,
-                    origin: drawer.hudLayout.origin,
-                    move: { drawer.moveHUD(to: $0) },
-                    unpin: { drawer.toggleHUD(forPlugin: $0) }
-                )
-                .opacity(drawer.isHUDHidden ? 0 : 1)
-                .environment(\.showingDrawer, drawer)
-            }
-        }
-    }
-
-    /// The toast, sliding in from the top, while the key window's drawer is closed: opening the
-    /// drawer is the toast's job.
-    private struct DrawerToastLayer: View {
-        @ObservedObject var drawer: DebugDrawer
-        @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-        var body: some View {
-            ZStack {
-                if !drawer.isOpen, let toast = drawer.toast {
-                    DrawerToastView(
-                        toast: toast,
-                        plugin: (drawer.localPlugins + drawer.globalPlugins).first { $0.id == toast.pluginID },
-                        open: { drawer.openToast() },
-                        dismiss: { drawer.dismissToast() }
-                    )
-                    .transition(.move(edge: .top).combined(with: .opacity))
-                }
-            }
-            .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: drawer.toast)
-            .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: drawer.isOpen)
         }
     }
 

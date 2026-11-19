@@ -50,10 +50,16 @@
                 .accessibilityLabel("Dismiss")
             }
             .padding(10)
-            .frame(maxWidth: 320, alignment: .leading)
+            .frame(maxWidth: Self.maxWidth, alignment: .leading)
             .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 10))
             .shadow(color: .black.opacity(0.2), radius: 6, y: 2)
-            .padding(12)
+            .padding(Self.margin)
         }
+
+        /// The clear space around the toast, from the window's edges.
+        nonisolated static let margin: CGFloat = 12
+
+        /// The widest the toast is drawn, its margin left out.
+        nonisolated static let maxWidth: CGFloat = 320
     }
 #endif

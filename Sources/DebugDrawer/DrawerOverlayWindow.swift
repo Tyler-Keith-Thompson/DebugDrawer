@@ -54,8 +54,12 @@
                 if self.frame != frame { setFrame(frame, display: false) }
                 guard host.isVisible, parent == nil else { return }
                 host.addChildWindow(self, ordered: .above)
-                // The drawer's panel, a child of the same window, stays above what plugins draw.
-                for panel in host.childWindows ?? [] where panel is DrawerChildPanel {
+                // The drawer's HUD, toast and panel, children of the same window, stay above what
+                // plugins draw, the panel over the HUD: each is ordered just above this window, so
+                // the panel goes first.
+                let children = host.childWindows ?? []
+                let drawerWindows = children.filter { $0 is DrawerChildPanel } + children.filter { $0 is DrawerChromePanel }
+                for panel in drawerWindows {
                     panel.order(.above, relativeTo: windowNumber)
                 }
             }
@@ -91,10 +95,10 @@
             }
         }
 
-        /// Whether `window` is the drawer's own (its panel or an overlay), which a plugin that
-        /// draws or inspects the app's windows leaves out.
+        /// Whether `window` is the drawer's own (its panel, its HUD, its toast or an overlay),
+        /// which a plugin that draws or inspects the app's windows leaves out.
         @MainActor package func isDebugDrawerWindow(_ window: NSWindow) -> Bool {
-            window is DrawerChildPanel || window is DrawerOverlayWindow
+            window is DrawerChildPanel || window is DrawerChromePanel || window is DrawerOverlayWindow
         }
     #else
         // Mac Catalyst too: a Catalyst scene's windows share its Mac window, so a window of the

@@ -6,8 +6,9 @@ open the drawer from a trigger the app chooses.
 ## Overview
 
 The drawer is a view modifier, `debugDrawer()`, attached once at the root of the view hierarchy.
-It draws the floating HUD and the toasts over the view it modifies, attaches the drawer's panel
-to the window the view is in, and does nothing in release builds.
+It attaches the drawer to the window the view is in: the drawer's panel, the floating HUD and the
+toasts, each drawn in a window of the drawer's own above the app's sheets and alerts. It does
+nothing in release builds.
 
 ### Attach the drawer and register plugins
 
@@ -38,9 +39,8 @@ An app whose windows aren't SwiftUI's attaches the drawer itself: to each `UIWin
 has connected, with `DebugDrawer.shared.attach(to: windowScene)`, or to each `NSWindow` with
 `DebugDrawer.shared.attach(to: window)`. Attaching twice does nothing, so a SwiftUI view under
 `debugDrawer()` in the same window is harmless. The drawer detaches when the scene disconnects or
-the window closes. It is the same drawer `debugDrawer()` attaches, with every global plugin; the
-floating HUD and the toasts are drawn by `debugDrawer()` over its view, so a window with no
-SwiftUI view under it shows the drawer without them.
+the window closes. It is the same drawer `debugDrawer()` attaches, with every global plugin, the
+floating HUD and the toasts.
 
 ```swift
 func scene(_ scene: UIScene, willConnectTo _: UISceneSession, options _: UIScene.ConnectionOptions) {
