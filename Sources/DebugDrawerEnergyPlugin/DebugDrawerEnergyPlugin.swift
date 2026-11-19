@@ -20,13 +20,44 @@ public struct EnergyPlugin: DebugDrawerPlugin {
     public var category = "Performance"
     public var icon = "bolt.fill"
 
-    public init() {}
+    #if DEBUG
+        /// The monitor the plugin shows and samples with, or `nil` for ``EnergyMonitor/shared``,
+        /// which is made only once something reads it.
+        private let monitor: EnergyMonitor?
+
+        public init() {
+            monitor = nil
+        }
+
+        /// - Parameter monitor: The monitor to show and sample with in place of the shared one.
+        init(monitor: EnergyMonitor) {
+            self.monitor = monitor
+        }
+    #else
+        public init() {}
+    #endif
 
     public var body: some View {
         #if DEBUG
-            EnergyPluginView()
+            EnergyPluginView(monitor: monitor ?? .shared)
         #else
             EmptyView()
+        #endif
+    }
+
+    /// Starts sampling once a second: the plugin's view is on screen in `drawer`. Release builds
+    /// sample nothing.
+    @MainActor public func didBecomeVisible(in drawer: DebugDrawer) {
+        #if DEBUG
+            (monitor ?? .shared).addViewer()
+        #endif
+    }
+
+    /// Stops the sampling ``didBecomeVisible(in:)`` started, once no drawer shows the plugin,
+    /// unless the app asked for it with ``EnergyMonitor/start()``.
+    @MainActor public func didBecomeHidden(in drawer: DebugDrawer) {
+        #if DEBUG
+            (monitor ?? .shared).removeViewer()
         #endif
     }
 }
@@ -34,7 +65,7 @@ public struct EnergyPlugin: DebugDrawerPlugin {
 // MARK: - Convenience installer
 
 public extension DebugDrawer {
-    /// Registers the Energy plugin. It samples only while its view is on screen, or between the
+    /// Registers the Energy plugin. It samples only while a drawer shows its view, or between the
     /// app's own ``EnergyMonitor/start()`` and ``EnergyMonitor/stop()``.
     func installEnergy() {
         #if DEBUG
@@ -87,7 +118,11 @@ public extension EnergyMonitor {
     // MARK: - Energy monitor
 
     /// The battery, the power source, the thermal state and this process's CPU use, sampled once a
-    /// second while the Energy view is on screen or between ``start()`` and ``stop()``.
+    /// second while a drawer shows the Energy plugin or between ``start()`` and ``stop()``.
+    ///
+    /// Nothing is recorded from launch unless the app calls ``start()``: the CPU and battery
+    /// history keep their last samples while no drawer shows the plugin and carry on from them
+    /// when it is shown again.
     @MainActor
     public final class EnergyMonitor: ObservableObject {
         /// The monitor the Energy plugin shows.
@@ -114,7 +149,8 @@ public extension EnergyMonitor {
 
         private let timer: any SamplingTimer
         private let historySize = 120 // 2 minutes at 1s intervals
-        /// The Energy views on screen; sampling runs while there is one, or the app asked for it.
+        /// The drawers showing the Energy plugin; sampling runs while there is one, or the app
+        /// asked for it.
         private var viewers = 0
         private var isStartedByApp = false
 
@@ -135,26 +171,27 @@ public extension EnergyMonitor {
             self.timer = timer
         }
 
-        /// Samples once a second until ``stop()``, whether or not the Energy view is on screen.
-        /// The drawer needs no call: its view samples while it is shown.
+        /// Samples once a second until ``stop()``, whether or not a drawer shows the Energy plugin.
+        /// The drawer needs no call: the plugin samples while a drawer shows it.
         public func start() {
             isStartedByApp = true
             updateSampling()
         }
 
-        /// Ends what ``start()`` began. Sampling goes on while the Energy view is on screen.
+        /// Ends what ``start()`` began. Sampling goes on while a drawer shows the Energy plugin.
         public func stop() {
             isStartedByApp = false
             updateSampling()
         }
 
-        /// Counts an Energy view on screen; the first one starts sampling.
+        /// Counts a drawer showing the Energy plugin; the first one starts sampling.
         func addViewer() {
             viewers += 1
             updateSampling()
         }
 
-        /// Uncounts an Energy view; the last one stops sampling unless the app started it.
+        /// Uncounts a drawer that showed the Energy plugin; the last one stops sampling unless the
+        /// app started it.
         func removeViewer() {
             guard viewers > 0 else { return }
             viewers -= 1
@@ -328,6 +365,8 @@ public extension EnergyMonitor {
 #endif
 
 #if DEBUG
+    /// The monitor's reading. Showing it samples nothing by itself: the drawer that shows it
+    /// starts the monitor through the plugin's lifecycle hooks.
     struct EnergyPluginView: View {
         @ObservedObject var monitor = EnergyMonitor.shared
         /// The cores CPU use is measured against: the process's threads together can use each.
@@ -335,10 +374,6 @@ public extension EnergyMonitor {
 
         var body: some View {
             EnergyReadout(reading: monitor.reading, processorCount: processorCount)
-                // Sampling runs while the drawer shows this view: closing the drawer, collapsing
-                // the section or scrolling it away removes it, which stops it.
-                .onAppear { monitor.addViewer() }
-                .onDisappear { monitor.removeViewer() }
         }
     }
 #endif

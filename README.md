@@ -413,11 +413,12 @@ These need only their install call:
   for the process's life, CPU use per thread (the busiest eight until Show All) and a graph of the
   last 60 samples, one a second. On iOS, Simulate Memory Warning posts
   `UIApplication.didReceiveMemoryWarningNotification` to the app's observers. It samples only while
-  its view or its HUD readout is on screen.
+  a drawer shows its view or its HUD readout, from the plugin's `didBecomeVisible(in:)` to its
+  `didBecomeHidden(in:)`; the graphs keep their samples while it is hidden and carry on from them.
 - **Energy** shows the battery's level, whether it is charging, the power source, the thermal
   state and this process's CPU load (not Xcode's Energy Impact, which also weighs the GPU, network,
-  location and wakeups), with two minutes of history. It samples once a second while its view is on
-  screen, or between the app's own `EnergyMonitor.shared.start()` and `stop()`. A Mac without a
+  location and wakeups), with two minutes of history. It samples once a second while a drawer shows
+  its view, or between the app's own `EnergyMonitor.shared.start()` and `stop()`. A Mac without a
   battery shows no Battery section.
 - **Screenshot** captures the app's key window: on macOS its content, To Desktop as a PNG named
   after the app and the time, or To Clipboard; on iOS the window with its sheets and alerts, to the
@@ -529,7 +530,10 @@ DebugDrawer.shared.installAppInfo(buildMetadata: AppInfoBuildMetadata(gitCommit:
 The Build section also shows the bundle identifier. Runtime follows, with the memory footprint,
 uptime, process ID, architecture and argument count, then Environment: the OS, the sandbox (on the
 Mac), whether a debugger is attached, the active processors, physical memory, the screen, the
-network path (Wi-Fi, cellular, Ethernet or offline) and when the process started.
+network path (Wi-Fi, cellular, Ethernet or offline) and when the process started. The footprint
+and uptime are read again every 2 seconds while a drawer shows the plugin, and not at all while
+none does; the network path is watched from the plugin's first use, so Copy Info and the bug report
+know it with the drawer closed.
 Provisioning then shows the embedded profile (`embedded.mobileprovision` on iOS,
 `embedded.provisionprofile` on the Mac): its name, team, creation and expiry dates, with a warning
 once it has expired, and how many devices it names. A simulator, App Store or unprovisioned Mac
@@ -1996,8 +2000,8 @@ ContentView()
 | `DebugDrawerConsolePlugin` | `os_log` entries (stdout and stderr on macOS) and an app logger's lines through `ConsoleLogSink`, with metadata: level filter, text or regular-expression search, subsystem and category mutes, time range, auto-follow, copy, lines kept across launches |
 | `DebugDrawerViewInspectorPlugin` | View borders by depth, alignment grid, click indicators, animation speed, render counts of the views an app tracks with `.trackRenders(_:)`, hierarchy snapshot |
 | `DebugDrawerAccessibilityPlugin` | Runtime overrides of color scheme, Dynamic Type, layout direction, locale and the system accessibility settings SwiftUI exposes, the accessibility settings each beside the system's value |
-| `DebugDrawerPerformancePlugin` | Live FPS, dropped frames and memory footprint with its peak, sparkline graphs, CPU per thread, and on iOS a simulated memory warning, sampled only while its view or HUD readout shows |
-| `DebugDrawerEnergyPlugin` | Battery level and charging, power source, CPU load and thermal state, sampled while its view shows or between `EnergyMonitor.shared.start()` and `stop()` |
+| `DebugDrawerPerformancePlugin` | Live FPS, dropped frames and memory footprint with its peak, sparkline graphs, CPU per thread, and on iOS a simulated memory warning, sampled only while a drawer shows its view or HUD readout |
+| `DebugDrawerEnergyPlugin` | Battery level and charging, power source, CPU load and thermal state, sampled while a drawer shows its view or between `EnergyMonitor.shared.start()` and `stop()` |
 | `DebugDrawerNetworkPlugin` | URLProtocol HTTP interception: method, URL, status, timing, headers, body, cURL export, mock responses by rule, slow and failing networks per host, replay and edit-and-resend, HAR export and import, WebSocket frames, requests kept across launches, ignored hosts, GraphQL operation names |
 | `DebugDrawerDiskIOPlugin` | FileManager, NSData and FileHandle file calls, flagging main-thread I/O and failures |
 | `DebugDrawerDiskIOInterposer` | A dynamic library, linked only to opt in: dyld interposing tuples for `read`, `write`, `pread` and `pwrite`, which `unsafeInstallDiskIOWithInterposing()` turns on so Disk I/O records Swift's `Data` and `FileHandle` calls |

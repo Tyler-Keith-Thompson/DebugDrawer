@@ -83,34 +83,4 @@
             #expect(!EnergyMonitor.shared.isMonitoring)
         }
     }
-
-    #if os(macOS)
-        import SwiftUI
-        import ViewInspector
-
-        @MainActor
-        @Suite("Energy sampling follows its view", .timeLimit(.minutes(1)))
-        struct EnergyViewSamplingTests {
-            @Test("The plugin's view starts sampling when it appears and stops it when it goes")
-            func pluginView() async {
-                let timer = FakeSamplingTimer()
-                let monitor = EnergyMonitor(batteryMonitoring: nil, timer: timer)
-                let sut = EnergyPluginView(monitor: monitor)
-
-                ViewHosting.host(view: sut)
-                for await isMonitoring in monitor.$isMonitoring.values where isMonitoring {
-                    break
-                }
-                let startsWhileShown = timer.starts
-                ViewHosting.expel()
-                for await isMonitoring in monitor.$isMonitoring.values where !isMonitoring {
-                    break
-                }
-
-                #expect(startsWhileShown == 1)
-                #expect(timer.stops == 1)
-                #expect(!timer.isRunning)
-            }
-        }
-    #endif
 #endif

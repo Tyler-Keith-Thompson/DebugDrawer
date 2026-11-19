@@ -17,7 +17,8 @@
     /// actor. Performance has its own sampler: plugins share no helper target.
     @MainActor
     final class RunLoopSamplingTimer: SamplingTimer {
-        private var cancellable: AnyCancellable?
+        /// The timer's subscription while it ticks; `nil` once stopped.
+        private(set) var cancellable: AnyCancellable?
 
         func start(_ tick: @escaping @MainActor () -> Void) {
             cancellable = Timer.publish(every: 1, on: .main, in: .common)

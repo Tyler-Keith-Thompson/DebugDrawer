@@ -13,6 +13,10 @@ the entry becomes the GitHub release's notes.
 - DD-209: `DebugDrawer.registerLocal(_:in:)` ties a local plugin to one `NSWindow` (macOS) or `UIWindowScene` (iOS, Mac Catalyst and visionOS), so a UIKit- or AppKit-only app can list a plugin in only that window's drawer, as `debugLocalPlugin(_:)` does for a SwiftUI view. It returns the token `unregisterLocal(id:token:)` takes, closing the window or disconnecting the scene removes the registration, and release builds get a stand-in that drops the plugin.
 - DD-210: plugins get an optional lifecycle, and drawers can be made apart from `DebugDrawer.shared`. `DebugDrawerPlugin` adds `install(in:)`, `uninstall(from:)`, `didBecomeVisible(in:)` and `didBecomeHidden(in:)`, each doing nothing by default: a drawer installs a plugin as it registers it, uninstalls it as `unregisterGlobal(id:)` or its view's disappearance removes it, and reports it visible while its section's body, its view shown alone or its HUD readout is on screen. `DebugDrawer()` and `DebugDrawer(defaults:)` make a drawer that owns plugins of its own, so two coexist in one process; release builds get stand-ins of both.
 
+### Changed
+
+- DD-211: Performance, Energy and App Info sample only while a drawer shows them, started by their `didBecomeVisible(in:)` and stopped by `didBecomeHidden(in:)`: App Info no longer reads the memory footprint and uptime every 2 seconds from launch, and Performance's display link and timer and Energy's timer follow the drawer's hooks rather than their views' appearance, so the views shown outside a drawer sample nothing.
+
 ### Fixed
 
 - DD-205: a window attached with `DebugDrawer.shared.attach(to:)`, in a UIKit or AppKit app with no SwiftUI view, now shows the floating HUD and plugins' toasts as a `.debugDrawer()` window does. They are drawn in windows of the drawer's own above the app's sheets and alerts, once per window even when it has both, and only the HUD and the toast take taps and clicks; the rest reach the app.

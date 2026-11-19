@@ -22,6 +22,9 @@ public struct AppInfoPlugin: DebugDrawerPlugin {
 
     #if DEBUG
         let signing: AppSigningStore
+        /// The metrics the plugin shows and refreshes, or `nil` for ``AppMetrics/shared``, which
+        /// is made only once something reads it.
+        private let metrics: AppMetrics?
 
         /// - Parameter buildMetadata: The commit, branch and CI build to show; each one `nil` is
         ///   read from the main bundle's Info.plist (``AppInfoBuildMetadata``).
@@ -29,9 +32,14 @@ public struct AppInfoPlugin: DebugDrawerPlugin {
             self.init(buildMetadata: buildMetadata, signing: .shared)
         }
 
-        init(buildMetadata: AppInfoBuildMetadata, signing: AppSigningStore) {
+        /// - Parameters:
+        ///   - buildMetadata: The commit, branch and CI build to show.
+        ///   - signing: The provisioning profile and entitlements to show.
+        ///   - metrics: The metrics to show and refresh in place of the shared ones.
+        init(buildMetadata: AppInfoBuildMetadata, signing: AppSigningStore, metrics: AppMetrics? = nil) {
             self.buildMetadata = buildMetadata
             self.signing = signing
+            self.metrics = metrics
         }
     #else
         /// - Parameter buildMetadata: The commit, branch and CI build to show; each one `nil` is
@@ -43,9 +51,24 @@ public struct AppInfoPlugin: DebugDrawerPlugin {
 
     public var body: some View {
         #if DEBUG
-            AppInfoPluginView(buildMetadata: buildMetadata, signing: signing)
+            AppInfoPluginView(metrics: metrics ?? .shared, buildMetadata: buildMetadata, signing: signing)
         #else
             EmptyView()
+        #endif
+    }
+
+    /// Reads the memory footprint and uptime now and every 2 seconds after: the plugin's view is
+    /// on screen in `drawer`. Release builds read nothing.
+    @MainActor public func didBecomeVisible(in drawer: DebugDrawer) {
+        #if DEBUG
+            (metrics ?? .shared).addViewer()
+        #endif
+    }
+
+    /// Stops the refreshing ``didBecomeVisible(in:)`` started, once no drawer shows the plugin.
+    @MainActor public func didBecomeHidden(in drawer: DebugDrawer) {
+        #if DEBUG
+            (metrics ?? .shared).removeViewer()
         #endif
     }
 }
@@ -104,6 +127,13 @@ public extension DebugDrawer {
 
     // MARK: - App metrics
 
+    /// The memory footprint and uptime, refreshed every 2 seconds while a drawer shows the plugin,
+    /// and the network's reachability.
+    ///
+    /// The refresh timer runs from the first drawer showing the plugin to the last. The network
+    /// path monitor runs from the shared metrics' first use: it costs nothing between changes,
+    /// and the bug report and Copy Info read the network status while the drawer may be closed,
+    /// which a monitor started only then would not yet know.
     @MainActor
     final class AppMetrics: ObservableObject {
         static let shared = AppMetrics()
@@ -117,24 +147,40 @@ public extension DebugDrawer {
         let processStart: ProcessStart?
 
         private let now: () -> Date
-        private var cancellable: AnyCancellable?
+        private let timer: any SamplingTimer
+        /// The drawers showing the plugin; the timer runs while there is one.
+        private var viewers = 0
         private let pathMonitor = NWPathMonitor()
 
         private convenience init() {
-            self.init(processStart: .current(), now: Date.init)
-            cancellable = Timer.publish(every: 2, on: .main, in: .common)
-                .autoconnect()
-                .sink { [weak self] _ in self?.refresh() }
+            self.init(processStart: .current(), now: Date.init, timer: RunLoopSamplingTimer(interval: 2))
             startNetworkMonitoring()
         }
 
         /// - Parameters:
         ///   - processStart: the process's start, from `ProcessStart.current()`.
         ///   - now: the wall clock. Injected in tests.
-        init(processStart: ProcessStart?, now: @escaping () -> Date) {
+        ///   - timer: what calls ``refresh()`` while a drawer shows the plugin. Injected in tests.
+        init(processStart: ProcessStart?, now: @escaping () -> Date, timer: any SamplingTimer = RunLoopSamplingTimer(interval: 2)) {
             self.processStart = processStart
             self.now = now
+            self.timer = timer
             refresh()
+        }
+
+        /// Counts a drawer showing the plugin; the first one refreshes now and starts the timer.
+        func addViewer() {
+            viewers += 1
+            guard viewers == 1 else { return }
+            refresh()
+            timer.start { [weak self] in self?.refresh() }
+        }
+
+        /// Uncounts a drawer that showed the plugin; the last one stops the timer.
+        func removeViewer() {
+            guard viewers > 0 else { return }
+            viewers -= 1
+            if viewers == 0 { timer.stop() }
         }
 
         func refresh() {
@@ -167,8 +213,10 @@ public extension DebugDrawer {
 
     }
 
+    /// The facts. Showing it refreshes nothing by itself: the drawer that shows it starts the
+    /// metrics' timer through the plugin's lifecycle hooks.
     struct AppInfoPluginView: View {
-        @ObservedObject var metrics = AppMetrics.shared
+        @ObservedObject var metrics: AppMetrics
         let buildMetadata: AppInfoBuildMetadata
         let signing: AppSigningStore
 

@@ -18,11 +18,26 @@ public struct PerformancePlugin: DebugDrawerPlugin {
     public var category = "Performance"
     public var icon = "gauge.with.dots.needle.33percent"
 
-    public init() {}
+    #if DEBUG
+        /// The monitor the plugin shows and samples with, or `nil` for ``PerformanceMonitor/shared``,
+        /// which is made only once something reads it.
+        private let monitor: PerformanceMonitor?
+
+        public init() {
+            monitor = nil
+        }
+
+        /// - Parameter monitor: The monitor to show and sample with in place of the shared one.
+        init(monitor: PerformanceMonitor) {
+            self.monitor = monitor
+        }
+    #else
+        public init() {}
+    #endif
 
     public var body: some View {
         #if DEBUG
-            PerformancePluginView()
+            PerformancePluginView(monitor: monitor ?? .shared)
         #else
             EmptyView()
         #endif
@@ -31,9 +46,24 @@ public struct PerformancePlugin: DebugDrawerPlugin {
     /// The frame rate and memory, for the floating HUD; none in release builds.
     public var hud: PerformanceHUD? {
         #if DEBUG
-            PerformanceHUD()
+            PerformanceHUD(monitor: monitor ?? .shared)
         #else
             nil
+        #endif
+    }
+
+    /// Starts sampling the frame rate, memory and threads: the plugin's view or its HUD readout is
+    /// on screen in `drawer`. Release builds sample nothing.
+    @MainActor public func didBecomeVisible(in drawer: DebugDrawer) {
+        #if DEBUG
+            (monitor ?? .shared).addViewer()
+        #endif
+    }
+
+    /// Stops the sampling ``didBecomeVisible(in:)`` started, once no drawer shows the plugin.
+    @MainActor public func didBecomeHidden(in drawer: DebugDrawer) {
+        #if DEBUG
+            (monitor ?? .shared).removeViewer()
         #endif
     }
 }
@@ -53,9 +83,15 @@ public extension DebugDrawer {
 #if DEBUG
     // MARK: - Performance metrics
 
-    /// The frame rate, memory and threads, sampled while something shows them: the plugin's view
-    /// or its HUD readout. Each one that appears adds a viewer and removes it when it disappears;
-    /// sampling runs from the first viewer to the last, so nothing samples while both are closed.
+    /// The frame rate, memory and threads, sampled while a drawer shows them: the plugin's view or
+    /// its HUD readout. Each drawer showing the plugin adds a viewer through
+    /// ``PerformancePlugin/didBecomeVisible(in:)`` and removes it through
+    /// ``PerformancePlugin/didBecomeHidden(in:)``; sampling runs from the first viewer to the
+    /// last, so neither the display link nor the timer runs while no drawer shows the plugin.
+    ///
+    /// Nothing is recorded from launch: the peak footprint is the kernel's lifetime peak, so it
+    /// misses nothing while hidden, and the frame and memory history keep their last samples
+    /// and carry on from them when the plugin is shown again.
     @MainActor
     final class PerformanceMonitor: ObservableObject {
         static let shared = PerformanceMonitor()
@@ -69,7 +105,7 @@ public extension DebugDrawer {
         @Published private(set) var peakFootprintMB: Double = 0
         @Published private(set) var footprintHistory: [Double] = []
         @Published private(set) var fpsHistory: [Int] = []
-        /// Whether the sampler is running: while at least one view shows the numbers.
+        /// Whether the sampler is running: while at least one drawer shows the numbers.
         @Published private(set) var isMonitoring = false
         /// The display link's frame rate, which a smooth frame rate reaches.
         @Published private(set) var maximumFPS = 60
@@ -99,13 +135,13 @@ public extension DebugDrawer {
             self.threadSampler = threadSampler
         }
 
-        /// Counts a view that shows the numbers; the first one starts sampling.
+        /// Counts a drawer that shows the numbers; the first one starts sampling.
         func addViewer() {
             viewers += 1
             if viewers == 1 { start() }
         }
 
-        /// Uncounts a view that showed the numbers; the last one stops sampling.
+        /// Uncounts a drawer that showed the numbers; the last one stops sampling.
         func removeViewer() {
             guard viewers > 0 else { return }
             viewers -= 1
@@ -163,6 +199,8 @@ public extension DebugDrawer {
         }
     }
 
+    /// The monitor's numbers. Showing it samples nothing by itself: the drawer that shows it
+    /// starts the monitor through the plugin's lifecycle hooks.
     struct PerformancePluginView: View {
         @ObservedObject var monitor = PerformanceMonitor.shared
 
@@ -184,10 +222,6 @@ public extension DebugDrawer {
                     MemoryWarningSection { MemoryWarningSimulator().post() }
                 #endif
             }
-            // Sampling runs while the drawer shows this view: closing the drawer, collapsing the
-            // section or scrolling it away removes it, which stops it.
-            .onAppear { monitor.addViewer() }
-            .onDisappear { monitor.removeViewer() }
         }
     }
 

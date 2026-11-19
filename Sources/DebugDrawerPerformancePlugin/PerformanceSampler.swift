@@ -30,8 +30,10 @@
     /// actor.
     @MainActor
     final class DisplayLinkSampler: PerformanceSampler {
-        private var displayLink: CADisplayLink?
-        private var timer: AnyCancellable?
+        /// The frames' display link while sampling; `nil` once stopped.
+        private(set) var displayLink: CADisplayLink?
+        /// The 1 s timer's subscription while sampling; `nil` once stopped.
+        private(set) var timer: AnyCancellable?
 
         func start(
             frame: @escaping @MainActor (_ timestamp: TimeInterval, _ frameDuration: TimeInterval) -> Void,
