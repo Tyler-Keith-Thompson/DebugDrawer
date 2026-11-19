@@ -5,7 +5,7 @@
     ///
     /// A number keeps the `NSNumber` UserDefaults returned, so an integer stays an integer and a
     /// real a real when it is written back.
-    enum PropertyListValue: Equatable {
+    enum PropertyListValue: Equatable, Sendable {
         case string(String)
         case number(NSNumber)
         case bool(Bool)

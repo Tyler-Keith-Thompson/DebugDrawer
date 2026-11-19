@@ -14,9 +14,9 @@
         func install() async {
             await #expect(processExitsWith: .success) {
                 let isExpected = await MainActor.run {
-                    let model = UserDefaultsBrowserInstallation.install(suites: ["group.b", "group.a"])
+                    UserDefaultsBrowser.install(suites: ["group.b", "group.a"])
                     return DebugDrawer.shared.globalPlugins.contains { $0.title == "UserDefaults" }
-                        && model.suites == [.standard, .named("group.b"), .named("group.a")]
+                        && UserDefaultsModel.shared.snapshot.suites == [.standard, .named("group.b"), .named("group.a")]
                 }
                 exit(isExpected ? EXIT_SUCCESS : EXIT_FAILURE)
             }
@@ -29,6 +29,7 @@
                     UserDefaultsBrowser.install()
                     UserDefaultsBrowser.install(suites: ["group.a"])
                     return DebugDrawer.shared.globalPlugins.filter { $0.title == "UserDefaults" }.count == 1
+                        && UserDefaultsModel.shared.snapshot.suites == [.standard, .named("group.a")]
                 }
                 exit(isExpected ? EXIT_SUCCESS : EXIT_FAILURE)
             }

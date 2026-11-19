@@ -1,6 +1,6 @@
 #if DEBUG
     /// Where a suite finds a key's value, named as `UserDefaults` names its domains.
-    enum DefaultsDomain: CaseIterable {
+    enum DefaultsDomain: CaseIterable, Codable, Sendable {
         /// What the app wrote: the standard defaults' domain, named by the bundle identifier, or a
         /// named suite's own. The only domain the plugin edits.
         case persistent

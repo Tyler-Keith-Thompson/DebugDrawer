@@ -1,7 +1,7 @@
 #if DEBUG
     /// A UserDefaults suite the plugin shows: the app's standard defaults, or a suite by name, such
     /// as an app group's.
-    enum UserDefaultsSuite: Hashable, Identifiable {
+    enum UserDefaultsSuite: Codable, Hashable, Identifiable, Sendable {
         case standard
         case named(String)
 

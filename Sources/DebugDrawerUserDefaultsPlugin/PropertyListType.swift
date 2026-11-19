@@ -3,7 +3,7 @@
 
     /// The seven kinds of value a property list holds, named as Xcode's property list editor names
     /// them.
-    enum PropertyListType: String, CaseIterable, Identifiable {
+    enum PropertyListType: String, CaseIterable, Codable, Identifiable, Sendable {
         case string = "String"
         case number = "Number"
         case boolean = "Boolean"

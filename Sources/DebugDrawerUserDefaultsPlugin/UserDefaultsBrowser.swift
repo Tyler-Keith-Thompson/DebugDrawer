@@ -20,7 +20,7 @@ public enum UserDefaultsBrowser {
     @MainActor
     public static func install(suites: [String] = []) {
         #if DEBUG
-            UserDefaultsBrowserInstallation.install(suites: suites)
+            UserDefaultsBrowserInstallation.install(suites: suites, model: .shared)
         #endif
     }
 }
