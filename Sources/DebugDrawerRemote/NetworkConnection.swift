@@ -81,17 +81,19 @@ import os
         ) {
             connection.receive(minimumIncompleteLength: 1, maximumLength: 64 * 1024) { data, _, isComplete, error in
                 if let data, !data.isEmpty {
-                    do {
-                        let bodies = try decoder.withLock { decoder throws(TransportFrameDecoder.FrameTooLong) in
-                            try decoder.append(data)
-                        }
-                        for body in bodies {
-                            received.yield(body)
-                        }
-                    } catch {
+                    // A Result rather than a do/catch around `withLock`: built -O, that crashed
+                    // swift-frontend's CopyPropagation pass ("Found a leaked owned value": the
+                    // error's `any Error` box) in Swift 6.4.0 and 6.4.2 (DD-249).
+                    let decoded = decoder.withLock { decoder in
+                        Result { () throws(TransportFrameDecoder.FrameTooLong) in try decoder.append(data) }
+                    }
+                    guard case let .success(bodies) = decoded else {
                         logger.error("Closed a connection that sent a frame longer than the format allows")
                         connection.cancel()
                         return
+                    }
+                    for body in bodies {
+                        received.yield(body)
                     }
                 }
                 guard !isComplete, error == nil else {

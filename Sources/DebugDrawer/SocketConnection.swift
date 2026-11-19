@@ -88,16 +88,20 @@ import os
                 return
             }
             let bytes = Data(buffer[0 ..< count])
-            do {
-                let bodies = try state.withLock { state throws(TransportFrameDecoder.FrameTooLong) in
-                    try state.decoder.append(bytes)
-                }
-                for message in bodies.compactMap(TransportMessage.decoded(from:)) {
-                    received.yield(message)
-                }
-            } catch {
+            // The decoder's error comes back as a Result rather than thrown out of `withLock` and
+            // caught here: built -O, that do/catch crashed swift-frontend's CopyPropagation pass
+            // ("Found a leaked owned value": the error's `any Error` box) in Swift 6.4.0 and
+            // 6.4.2 (Xcode 27.1 beta, 27.2), which stopped every `just bench*` recipe (DD-249).
+            let decoded = state.withLock { state in
+                Result { () throws(TransportFrameDecoder.FrameTooLong) in try state.decoder.append(bytes) }
+            }
+            guard case let .success(bodies) = decoded else {
                 Self.logger.error("Closed a socket that sent a frame longer than the format allows")
                 source.cancel()
+                return
+            }
+            for message in bodies.compactMap(TransportMessage.decoded(from:)) {
+                received.yield(message)
             }
         }
 
