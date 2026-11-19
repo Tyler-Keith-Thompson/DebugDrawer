@@ -19,6 +19,10 @@
                     task.resume()
                     try await task.send(.string("hello"))
                     _ = try await task.receive()
+                    // A receive stays pending through the ping (the cancel below ends it):
+                    // URLSession reads the socket only for a pending receive, so without one the
+                    // pong can go unread and the ping's handler never run.
+                    task.receive { _ in }
                     try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, any Error>) in
                         task.sendPing { error in
                             if let error { continuation.resume(throwing: error) } else { continuation.resume() }
@@ -82,11 +86,21 @@
                     seen.append(await withCheckedContinuation { continuation in
                         task.receive { continuation.resume(returning: describe($0)) }
                     })
+                    // The receive that gets the server's close is pending through the ping:
+                    // URLSession reads the socket only for a pending receive, so without one the
+                    // pong can go unread and the ping's handler never run.
+                    let (closeReceived, closeReceivedContinuation) = AsyncStream.makeStream(of: String.self)
+                    task.receive { result in
+                        closeReceivedContinuation.yield(describe(result))
+                        closeReceivedContinuation.finish()
+                    }
                     seen.append(await withCheckedContinuation { continuation in
                         task.sendPing { continuation.resume(returning: "pong \(describe($0))") }
                     })
                     do { try await task.send(.string("close 4000 bye")); seen.append("sent ok") } catch { seen.append(describe(error)) }
-                    do { seen.append(describe(.success(try await task.receive()))) } catch { seen.append(describe(.failure(error))) }
+                    for await received in closeReceived {
+                        seen.append(received)
+                    }
                     seen.append("close \(task.closeCode.rawValue) \(task.closeReason.flatMap { String(bytes: $0, encoding: .utf8) } ?? "none")")
 
                     let other = URLSession.shared.webSocketTask(with: cancelled)

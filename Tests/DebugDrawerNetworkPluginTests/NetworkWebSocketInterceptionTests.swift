@@ -189,6 +189,10 @@
             task.resume()
             defer { task.cancel(with: .normalClosure, reason: nil) }
 
+            // A receive stays pending through the ping (the cancel ends it): URLSession reads the
+            // socket only for a pending receive, so without one the pong can go unread and the
+            // ping's handler never run.
+            task.receive { _ in }
             try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, any Error>) in
                 task.sendPing { error in
                     if let error { continuation.resume(throwing: error) } else { continuation.resume() }
