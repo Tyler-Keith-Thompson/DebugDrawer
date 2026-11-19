@@ -172,18 +172,38 @@
             var received: [URL] = []
             let presets = try [DeepLinkPreset("Order 42", url: #require(URL(string: "myapp://orders/42")))]
             let url = try #require(URL(string: "myapp://orders/42"))
+            let suite = "DeepLinkViewTests.\(UUID().uuidString)"
+            let defaults = try #require(UserDefaults(suiteName: suite))
+            defer { defaults.removePersistentDomain(forName: suite) }
+            let drawer = DebugDrawer(defaults: defaults)
 
-            DebugDrawer.shared.installDeepLink(presets: presets, openURL: { received.append($0); return true })
+            drawer.installDeepLink(presets: presets, openURL: { received.append($0); return true })
 
-            let plugin = DebugDrawer.shared.globalPlugins.first { $0.id == "DeepLinkPlugin" }
-            DebugDrawer.shared.unregisterGlobal(id: "DeepLinkPlugin")
+            let plugin = drawer.globalPlugins.first { $0.id == "DeepLinkPlugin" }
+            drawer.unregisterGlobal(id: "DeepLinkPlugin")
             let model = try #require(plugin).body.inspect().find(DeepLinkPluginView.self).actualView().model
-            UserDefaults.standard.removeObject(forKey: DeepLinkModel.historyKey)
-            defer { UserDefaults.standard.removeObject(forKey: DeepLinkModel.historyKey) }
             await model.open(url)
             #expect(model.presets == presets)
             #expect(received == [url])
             #expect(model.outcome == .handled("myapp://orders/42"))
+        }
+
+        @Test("installDeepLink keeps the history in the drawer's own defaults, not the shared drawer's suite")
+        func installKeepsHistoryInTheDrawersDefaults() async throws {
+            let url = try #require(URL(string: "myapp://orders/43"))
+            let suite = "DeepLinkViewTests.\(UUID().uuidString)"
+            let defaults = try #require(UserDefaults(suiteName: suite))
+            defer { defaults.removePersistentDomain(forName: suite) }
+            let drawer = DebugDrawer(defaults: defaults)
+            drawer.installDeepLink(presets: [], openURL: { _ in true })
+            let plugin = drawer.globalPlugins.first { $0.id == "DeepLinkPlugin" }
+            drawer.unregisterGlobal(id: "DeepLinkPlugin")
+            let sut = try #require(plugin).body.inspect().find(DeepLinkPluginView.self).actualView().model
+            let expected = ["myapp://orders/43"]
+
+            await sut.open(url)
+
+            #expect(defaults.stringArray(forKey: DeepLinkModel.historyKey) == expected)
         }
 
         @Test("With no presets, Presets says how to declare URL schemes or pass presets:")

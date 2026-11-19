@@ -32,6 +32,7 @@ the entry becomes the GitHub release's notes.
 
 ### Fixed
 
+- DD-82: `installDeepLink(presets:continueUserActivity:openURL:)` keeps the Deep Link Tester's history of opened URLs and continued activities in the defaults of the drawer it is called on, so a drawer made with `DebugDrawer(defaults:)` no longer writes it into `DebugDrawer.shared`'s suite. `DebugDrawer.shared` keeps it where it always has.
 - DD-239: at accessibility text sizes the HTTP Cookies list grows with its rows instead of stopping at 300 points, so it shows two whole cookies before it scrolls rather than less than two; at the default size it is as tall as before.
 - DD-217: `just generate` writes the Xcode project to `xcode/DebugDrawer.xcodeproj` instead of the repository's root, where xcodebuild picked it over `Package.swift` and `just test-ios`, `just spm-platform`, `just spm-visionos-test`, `just spm-catalyst` and `just spm-catalyst-test` failed for want of the package's schemes. It warns when an older project is still at the root.
 - DD-213: View Inspector's view borders no longer show through a sheet. On iOS the outlines of the views a sheet, form sheet, popover or alert is presented over (and of an earlier sheet under a stacked one) stop at its edge, as do those under an opaque window above theirs, while every part outside it is still drawn; an over-full-screen presentation with a see-through background hides nothing. On the Mac a sheet already covered its window's outlines, and an opaque child window of the app's now does too.

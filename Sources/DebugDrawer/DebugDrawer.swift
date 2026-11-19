@@ -96,8 +96,10 @@
         var localScopeObservers: [ObjectIdentifier: any NSObjectProtocol] = [:]
 
         /// Where the drawer saves what it keeps across launches: the HUD's layout, which plugins'
-        /// notices are silenced, and each window's collapsed sections, pins and order.
-        let defaults: UserDefaults
+        /// notices are silenced, and each window's collapsed sections, pins and order. A plugin's
+        /// installer keeps what the plugin saves here too, so a drawer made for a test keeps it
+        /// apart from ``shared``'s.
+        package let defaults: UserDefaults
 
         /// How many of each plugin's views are on screen (its section's body, its view shown
         /// alone, its HUD readout), by plugin ID; a plugin with none has no entry.

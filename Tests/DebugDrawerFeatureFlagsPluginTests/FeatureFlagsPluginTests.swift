@@ -17,8 +17,11 @@
         }
 
         @Test("Installing registers one Feature Flags plugin, with no other plugin installed, and installing again replaces it")
-        func install() {
-            let drawer = DebugDrawer.shared
+        func install() throws {
+            let suite = "FeatureFlagsPluginTests.\(UUID().uuidString)"
+            let defaults = try #require(UserDefaults(suiteName: suite))
+            defer { defaults.removePersistentDomain(forName: suite) }
+            let drawer = DebugDrawer(defaults: defaults)
             let storage = FakeFeatureFlagOverrideStorage()
 
             drawer.installFeatureFlags(provider: FakeFeatureFlagProvider(), storage: storage)
@@ -31,14 +34,18 @@
         }
 
         @Test("Installing applies every stored override to the provider before returning")
-        func installApplies() {
+        func installApplies() throws {
+            let suite = "FeatureFlagsPluginTests.\(UUID().uuidString)"
+            let defaults = try #require(UserDefaults(suiteName: suite))
+            defer { defaults.removePersistentDomain(forName: suite) }
+            let drawer = DebugDrawer(defaults: defaults)
             let storage = FakeFeatureFlagOverrideStorage(["newCheckout": .bool(true)])
             let provider = FakeFeatureFlagProvider([FeatureFlag(key: "newCheckout", liveValue: .bool(false))])
 
-            DebugDrawer.shared.installFeatureFlags(provider: provider, storage: storage)
+            drawer.installFeatureFlags(provider: provider, storage: storage)
 
             let actual = provider.currentValue(forKey: "newCheckout")
-            DebugDrawer.shared.unregisterGlobal(id: "FeatureFlagsPlugin")
+            drawer.unregisterGlobal(id: "FeatureFlagsPlugin")
             #expect(actual == .bool(true))
         }
 

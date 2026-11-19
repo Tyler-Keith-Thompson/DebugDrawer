@@ -1,6 +1,7 @@
 #if DEBUG
     @testable import DebugDrawer
     @testable import DebugDrawerEnergyPlugin
+    import Foundation
     import Testing
 
     /// Stands in for the 1 s timer: records starts and stops, and ticks when the test says.
@@ -75,8 +76,11 @@
         }
 
         @Test("Installing the plugin samples nothing until its view shows")
-        func installStartsNothing() {
-            let sut = DebugDrawer.shared
+        func installStartsNothing() throws {
+            let suite = "EnergyViewerTests.\(UUID().uuidString)"
+            let defaults = try #require(UserDefaults(suiteName: suite))
+            defer { defaults.removePersistentDomain(forName: suite) }
+            let sut = DebugDrawer(defaults: defaults)
 
             sut.installEnergy()
 

@@ -38,8 +38,11 @@
         }
 
         @Test("Installing registers one Tweaks plugin, and installing again replaces it")
-        func install() {
-            let drawer = DebugDrawer.shared
+        func install() throws {
+            let suite = "TweaksPluginTests.\(UUID().uuidString)"
+            let defaults = try #require(UserDefaults(suiteName: suite))
+            defer { defaults.removePersistentDomain(forName: suite) }
+            let drawer = DebugDrawer(defaults: defaults)
             let storage = FakeTweakStorage()
 
             drawer.installTweaks(storage: storage) {

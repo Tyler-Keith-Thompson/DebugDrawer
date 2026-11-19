@@ -85,6 +85,10 @@ public extension DebugDrawer {
     /// delegate's `application(_:continue:restorationHandler:)`; with neither, the plugin
     /// says so.
     ///
+    /// The URLs opened and activities continued are kept in this drawer's defaults, so a drawer
+    /// made with ``DebugDrawer/DebugDrawer/init(defaults:)`` keeps its history apart from
+    /// ``DebugDrawer/DebugDrawer/shared``'s.
+    ///
     /// Calling it again replaces the plugin and its handlers.
     ///
     /// - Parameters:
@@ -103,7 +107,7 @@ public extension DebugDrawer {
     ) {
         #if DEBUG
             let model = DeepLinkModel(
-                presets: presets, delivery: _UserActivityDelivering(handler: continueUserActivity), openURL: openURL
+                presets: presets, delivery: _UserActivityDelivering(handler: continueUserActivity), openURL: openURL, defaults: defaults
             )
             let plugin = DeepLinkPlugin(model: model)
             unregisterGlobal(id: plugin.id)
