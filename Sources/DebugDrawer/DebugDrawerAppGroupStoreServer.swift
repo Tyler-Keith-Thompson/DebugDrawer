@@ -59,8 +59,8 @@ import os
             guard session == nil else { return }
             guard layout.create(), let watcher = DirectoryWatcher(directory: layout.commands) else { throw .cannotServe }
             let layout = layout
-            let session = RegistrySession(registry: registry) { message in
-                Self.write(message, to: layout.snapshotFile(for: message.pluginID))
+            let session = RegistrySession(registry: registry, link: .store) { message in
+                Self.write(StoreDocument(message), to: layout.snapshotFile(for: message.pluginID))
             }
             self.session = session
             self.watcher = watcher
@@ -95,19 +95,28 @@ import os
                     Self.logger.error("Couldn't remove a command file, so it wasn't performed: \(error.localizedDescription, privacy: .public)")
                     continue
                 }
-                guard let data, let message = TransportMessage.decoded(from: data), message.kind == .command else {
+                guard let data, let document = StoreDocument.decoded(from: data) else {
                     Self.logger.notice("Dropped a command file this build can't read")
                     continue
                 }
-                session.receive(message)
+                guard document.isReadable else {
+                    let version = document.writer.version
+                    Self.logger.notice("Dropped a command file from protocol version \(version, privacy: .public), which this build doesn't speak")
+                    continue
+                }
+                // The writer's hello first, so the session knows what that viewer has; then the
+                // message, which the session acts on if it is a command and drops otherwise.
+                session.receive(.hello(document.writer))
+                session.receive(document.message)
             }
         }
 
-        private static func write(_ message: TransportMessage, to file: URL) {
+        private static func write(_ document: StoreDocument, to file: URL) {
             do {
-                try message.encoded().write(to: file, options: .atomic)
+                try document.encoded().write(to: file, options: .atomic)
             } catch {
-                logger.error("Couldn't write \(message.pluginID, privacy: .public)'s snapshot: \(error.localizedDescription, privacy: .public)")
+                let pluginID = document.message.pluginID
+                logger.error("Couldn't write \(pluginID, privacy: .public)'s snapshot: \(error.localizedDescription, privacy: .public)")
             }
         }
     }

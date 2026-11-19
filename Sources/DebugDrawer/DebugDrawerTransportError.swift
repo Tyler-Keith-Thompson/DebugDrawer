@@ -18,4 +18,7 @@ public enum DebugDrawerTransportError: Error, Equatable, Sendable {
     case mismatchedTypes
     /// The task waiting for the plugin's first snapshot was cancelled.
     case cancelled
+    /// The other side speaks a protocol version this build no longer speaks, or doesn't speak
+    /// yet: builds one major version apart connect, and two apart don't. The connection is closed.
+    case incompatibleVersion
 }

@@ -71,6 +71,14 @@ import os
             }
         }
 
+        /// Closes the connection once every message sent before this call is written, so the
+        /// peer reads them before the end of the stream.
+        func closeAfterSending() {
+            writeQueue.async { [self] in
+                close()
+            }
+        }
+
         /// Closes the connection: ``messages`` finishes, and nothing more is sent.
         func close() {
             markClosed()

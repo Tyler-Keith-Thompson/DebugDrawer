@@ -84,7 +84,7 @@
             }
         }
 
-        @Test("A body that isn't a message, or is another version's, decodes to nil")
+        @Test("A body that isn't a message, or is in another envelope format, decodes to nil; an unknown kind decodes as unknown")
         func unreadableBodies() throws {
             var otherVersion = TransportMessage(kind: .subscribe, pluginID: "Tally")
             otherVersion.version = TransportMessage.currentVersion + 1
@@ -96,7 +96,7 @@
 
             #expect(malformed == nil)
             #expect(newer == nil)
-            #expect(unknown == nil)
+            #expect(unknown?.kind == .unknown("shout"))
         }
 
         @Test("A payload encodes with its keys sorted, so an unchanged value encodes to the same bytes")

@@ -9,30 +9,87 @@ import Foundation
 // write it. Rejected: one Codable enum of every plugin's messages (core would name every plugin),
 // and the payload nested as a JSON value rather than bytes (the envelope would have to decode
 // payloads it can't type).
+//
+// Two versions, kept apart on purpose. `version` is the envelope's format: where the kind, plugin
+// and payload are. Every protocol version so far writes format 1, so a version 1 build, which
+// drops any other format, still reads what a newer one sends.
+// The protocol's version, what each side speaks and which features it has, travels in the `hello`
+// each side sends as it connects (`TransportHello`). A kind this build doesn't know decodes as
+// `unknown`, so a newer peer's message reaches the receiver, which drops and logs it
+// (`TransportPeer`), rather than failing to decode where nothing would notice.
 
 #if DEBUG
     /// One message between the process holding plugin models and a viewer of them.
     package struct TransportMessage: Codable, Equatable, Sendable {
         /// What a message asks or carries.
-        package enum Kind: String, Codable, Sendable {
+        package enum Kind: Codable, Equatable, Sendable {
+            /// Either side, first on a stream: the protocol version and capabilities it speaks,
+            /// its ``TransportHello`` as JSON.
+            case hello
             /// Viewer to models: send this plugin's snapshots, the current one first.
             case subscribe
+            /// Viewer to models: stop sending this plugin's snapshots, sent only to a peer with
+            /// ``TransportCapability/unsubscribe``.
+            case unsubscribe
             /// Models to viewer: the plugin's state now, its `Snapshot` as JSON.
             case snapshot
             /// Viewer to models: do this, the plugin's `Command` as JSON.
             case command
+            /// A kind this build doesn't know, by its name: a newer peer's. Receivers drop it.
+            case unknown(String)
+
+            /// The kind its name on the wire names.
+            init(name: String) {
+                switch name {
+                case "hello": self = .hello
+                case "subscribe": self = .subscribe
+                case "unsubscribe": self = .unsubscribe
+                case "snapshot": self = .snapshot
+                case "command": self = .command
+                default: self = .unknown(name)
+                }
+            }
+
+            /// The kind's name on the wire.
+            var name: String {
+                switch self {
+                case .hello: "hello"
+                case .subscribe: "subscribe"
+                case .unsubscribe: "unsubscribe"
+                case .snapshot: "snapshot"
+                case .command: "command"
+                case let .unknown(name): name
+                }
+            }
+
+            package init(from decoder: any Decoder) throws {
+                try self.init(name: decoder.singleValueContainer().decode(String.self))
+            }
+
+            package func encode(to encoder: any Encoder) throws {
+                var container = encoder.singleValueContainer()
+                try container.encode(name)
+            }
         }
 
-        /// The format this build writes. A receiver drops a message of another version, so a
-        /// viewer and an app built from different releases ignore each other rather than misread.
+        /// The envelope's format this build writes. A receiver drops a message of another format,
+        /// as it can't know where the kind and plugin are; the protocol's version is the hello's.
         static let currentVersion = 1
 
         var version = TransportMessage.currentVersion
         package var kind: Kind
-        /// The plugin's ``DebugDrawerPlugin/id``, or whatever ID its model was registered under.
+        /// The plugin's ``DebugDrawerPlugin/id``, or whatever ID its model was registered under;
+        /// empty for ``Kind/hello``.
         package var pluginID: String
-        /// The plugin's snapshot or command, encoded as JSON; empty for ``Kind/subscribe``.
+        /// The plugin's snapshot or command, or the hello, encoded as JSON; empty for
+        /// ``Kind/subscribe`` and ``Kind/unsubscribe``.
         var payload = Data()
+
+        /// A hello saying `hello`.
+        static func hello(_ hello: TransportHello) -> TransportMessage {
+            // A hello holds integers and strings only, so encoding it can't fail.
+            TransportMessage(kind: .hello, pluginID: "", payload: (try? payload(hello)) ?? Data())
+        }
 
         /// The message as JSON, its keys sorted, so the same message is always the same bytes.
         func encoded() throws -> Data {
@@ -40,7 +97,8 @@ import Foundation
         }
 
         /// The message `data` holds, or `nil` when it holds none this build reads (malformed, or
-        /// another version).
+        /// another envelope format). A kind this build doesn't know reads as
+        /// ``Kind/unknown(_:)``.
         package static func decoded(from data: Data) -> TransportMessage? {
             guard let message = try? JSONDecoder().decode(TransportMessage.self, from: data),
                   message.version == currentVersion else { return nil }

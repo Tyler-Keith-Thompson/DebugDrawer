@@ -1,7 +1,8 @@
 import Foundation
 
 // The app-group store's files, which both its server and its transport read and write. Each file
-// holds one `TransportMessage` as JSON (no frame: the file is the frame), written atomically, so a
+// holds one `StoreDocument` as JSON, a message with its schema version and writer (no frame: the
+// file is the frame), written atomically, so a
 // reader in another process sees the old file or the new one, never part of one.
 //
 //     <directory>/snapshots/<plugin ID>.json   each plugin's newest snapshot, replaced as it changes

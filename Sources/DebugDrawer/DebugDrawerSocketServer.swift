@@ -85,7 +85,11 @@ import os
         /// Serves the viewer connected on `descriptor` until it disconnects.
         private func serve(_ descriptor: Int32) {
             let connection = SocketConnection(descriptor: descriptor)
-            let session = RegistrySession(registry: registry) { connection.send($0) }
+            let session = RegistrySession(registry: registry, link: .stream) {
+                connection.send($0)
+            } disconnect: {
+                connection.closeAfterSending()
+            }
             let key = ObjectIdentifier(connection)
             viewers[key] = (connection, session)
             Task { [weak self] in

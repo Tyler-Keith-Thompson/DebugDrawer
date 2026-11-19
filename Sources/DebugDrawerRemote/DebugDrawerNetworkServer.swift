@@ -192,9 +192,15 @@ import os
                     return drop(id)
                 }
                 let connection = viewer.connection
-                viewer.stage = .paired(RegistrySession(registry: registry) { connection.send($0) })
-                pairedViewers.append(DebugDrawerPairedViewer(id: id, name: request.viewerName))
+                // Accepted first: the session says hello as it starts, and a viewer reads every
+                // frame before this one as pairing.
                 connection.send(PairingMessage(pairing: .accepted).encoded())
+                viewer.stage = .paired(RegistrySession(registry: registry, link: .stream) {
+                    connection.send($0)
+                } disconnect: {
+                    connection.closeAfterSending()
+                })
+                pairedViewers.append(DebugDrawerPairedViewer(id: id, name: request.viewerName))
                 Self.logger.info("Paired with a viewer")
             case let .paired(session):
                 guard let message = TransportMessage.decoded(from: body) else { return }

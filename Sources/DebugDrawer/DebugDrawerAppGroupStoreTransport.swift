@@ -5,7 +5,9 @@ import os
 // time the snapshots directory changes, handing the ones that changed to `RemoteModels`, and
 // leaves each command as a file of its own for the app to perform. Command files are named by the
 // wall clock in nanoseconds, then a count, then a UUID, so the app performs one viewer's commands
-// in the order sent, and two viewers' never collide.
+// in the order sent, and two viewers' never collide. A file a build this one shares no protocol
+// version with wrote is skipped rather than closing the store, as a stale file can outlive the app
+// that wrote it.
 
 #if DEBUG
     /// A ``DebugDrawerTransport`` to the snapshots an app's ``DebugDrawerAppGroupStoreServer``
@@ -39,9 +41,9 @@ import os
             self.layout = layout
             self.watcher = watcher
             var sequence = 0
-            models = RemoteModels(subscribesOnConnect: false) { message in
+            models = RemoteModels(link: .store) { message in
                 sequence += 1
-                Self.leave(message, in: layout, sequence: sequence)
+                Self.leave(StoreDocument(message), in: layout, sequence: sequence)
             }
             readSnapshots()
             Task { [weak self] in
@@ -78,19 +80,27 @@ import os
             for file in layout.messageFiles(in: layout.snapshots) {
                 guard let data = try? Data(contentsOf: file), read[file] != data else { continue }
                 read[file] = data
-                guard let message = TransportMessage.decoded(from: data) else { continue }
-                models.receive(message)
+                guard let document = StoreDocument.decoded(from: data) else { continue }
+                guard document.isReadable else {
+                    let version = document.writer.version
+                    Self.logger.notice("Skipped a snapshot file from protocol version \(version, privacy: .public), which this build doesn't speak")
+                    continue
+                }
+                // The writer's hello first, so a command goes only to an app that takes them.
+                models.receive(.hello(document.writer))
+                models.receive(document.message)
             }
         }
 
-        private static func leave(_ message: TransportMessage, in layout: AppGroupStoreLayout, sequence: Int) {
+        private static func leave(_ document: StoreDocument, in layout: AppGroupStoreLayout, sequence: Int) {
             let time = String(format: "%020llu", clock_gettime_nsec_np(CLOCK_REALTIME))
             let count = String(format: "%010ld", sequence)
             let file = layout.commands.appending(path: "\(time)-\(count)-\(UUID().uuidString).json", directoryHint: .notDirectory)
             do {
-                try message.encoded().write(to: file, options: .atomic)
+                try document.encoded().write(to: file, options: .atomic)
             } catch {
-                logger.error("Couldn't leave a command for \(message.pluginID, privacy: .public): \(error.localizedDescription, privacy: .public)")
+                let pluginID = document.message.pluginID
+                logger.error("Couldn't leave a command for \(pluginID, privacy: .public): \(error.localizedDescription, privacy: .public)")
             }
         }
     }

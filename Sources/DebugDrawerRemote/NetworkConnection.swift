@@ -67,6 +67,15 @@ import os
             })
         }
 
+        /// Closes the connection once every frame sent before this call is sent, so the peer
+        /// reads them before the end of the stream.
+        func closeAfterSending() {
+            let connection = connection
+            connection.send(content: nil, contentContext: .finalMessage, isComplete: true, completion: .contentProcessed { _ in
+                connection.cancel()
+            })
+        }
+
         /// Closes the connection: ``frames`` finishes, and nothing more is sent.
         func close() {
             connection.cancel()

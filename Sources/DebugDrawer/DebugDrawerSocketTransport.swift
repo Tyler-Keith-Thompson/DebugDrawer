@@ -34,7 +34,11 @@ import Foundation
             guard UnixSocketAddress.make(socketPath) != nil else { throw .socketPathTooLong }
             guard let descriptor = UnixSocketAddress.connect(to: socketPath) else { throw .unreachable }
             let connection = SocketConnection(descriptor: descriptor)
-            let models = RemoteModels(subscribesOnConnect: true) { connection.send($0) }
+            let models = RemoteModels(link: .stream) {
+                connection.send($0)
+            } disconnect: {
+                connection.close()
+            }
             self.connection = connection
             self.models = models
             Task { [weak self] in
@@ -59,7 +63,9 @@ import Foundation
         /// - Returns: A transport showing the model's snapshots as they arrive and sending its
         ///   commands to the app.
         /// - Throws: ``DebugDrawerTransportError/mismatchedTypes``,
-        ///   ``DebugDrawerTransportError/disconnected`` or ``DebugDrawerTransportError/cancelled``.
+        ///   ``DebugDrawerTransportError/disconnected``, ``DebugDrawerTransportError/cancelled``, or
+        ///   ``DebugDrawerTransportError/incompatibleVersion`` when the app's protocol version is
+        ///   two or more major versions from this build's.
         public func connect<Snapshot: Codable & Equatable & Sendable, Command: Codable & Sendable>(
             toPlugin pluginID: String,
             snapshot: Snapshot.Type,

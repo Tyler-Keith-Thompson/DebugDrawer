@@ -376,18 +376,35 @@ bytes, which a group container's path leaves room for. Everything here is for de
 release builds get stand-ins whose connections throw ``DebugDrawerTransportError/unreachable``
 and whose servers serve nothing.
 
-**The wire.** Whatever leaves the process is one message: a JSON object with the format's
-`version` (1), its `kind` (`subscribe`, `snapshot` or `command`), the `pluginID`, and the
-`payload`, the plugin's own snapshot or command encoded as JSON (keys sorted) and carried as
-base64. A receiver drops a message of another version. On a byte stream, the socket's or a
-network connection's, each message is a frame: a 4-byte big-endian length, then that many bytes
-of JSON, at most 64 MiB. A viewer sends `subscribe` for each plugin it connects to and gets that
+**The wire.** Whatever leaves the process is one message: a JSON object with the envelope's
+format `version` (1), its `kind` (`hello`, `subscribe`, `unsubscribe`, `snapshot` or `command`),
+the `pluginID`, and the `payload`, the plugin's own snapshot or command encoded as JSON (keys
+sorted) and carried as base64. A receiver drops a message in another envelope format, and drops a
+kind it doesn't know, logging that kind the first time a connection sends it, then reads on. On a
+byte stream, the socket's or a network connection's, each message is a frame: a 4-byte
+big-endian length, then that many bytes of JSON, at most 64 MiB. Each side of a stream sends a
+`hello` first (below). A viewer sends `subscribe` for each plugin it connects to and gets that
 plugin's current snapshot, then one after each change, each different from the one before; it
-sends `command`s back. The store keeps one message per file, written atomically:
-`snapshots/<plugin ID>.json` holds each plugin's newest snapshot (the ID percent-encoded), and
-`commands/<time>-<count>-<UUID>.json` holds each command until the app performs it, oldest
-first, and removes it. Both sides learn of a change from a dispatch source on the directory, so
-nothing polls.
+sends `command`s back, and `unsubscribe` once the last transport to a plugin is released. The
+store keeps one document per file, written atomically: `snapshots/<plugin ID>.json` holds each
+plugin's newest snapshot (the ID percent-encoded), and `commands/<time>-<count>-<UUID>.json`
+holds each command until the app performs it, oldest first, and removes it. Both sides learn of a
+change from a dispatch source on the directory, so nothing polls.
+
+**Versions.** The app and a viewer, a sidecar especially, ship on different schedules, so a
+pairing of any two builds either works or fails clearly. On a stream, each side's `hello` names
+the protocol's major version it speaks (2), the oldest it still speaks (1), and its capabilities:
+`commands` (the viewer sends commands and the app performs them) and `unsubscribe` (the app stops
+sending a plugin's snapshots when the viewer releases it). Both sides agree on the lower of the
+two versions when each still speaks it, and use only the capabilities both list, so builds one
+major version apart connect and use what they share. Two major versions apart they don't: the
+app closes the connection and the viewer's connects throw
+``DebugDrawerTransportError/incompatibleVersion``. A side that never says hello is taken to speak
+version 1, which had no hello and took commands. Each store document carries the store's
+`schemaVersion` (2) and the `writer`'s hello beside the message's keys: a reader skips a document
+whose writer it shares no version with, migrates an older schema forward as it reads it (schema
+1, a bare message, was written by version 1), and reads a newer one for the keys it knows. A
+reader of bare messages still reads every document, as the message's keys are where they were.
 
 **Why it is built this way.** The protocol hands out ``DebugDrawerPluginTransport``s rather than
 raw messages, so a view never changes and the in-process transport keeps `direct(to:)`'s

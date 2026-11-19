@@ -2041,6 +2041,17 @@ one try, and each try shows on the device. Pairing is remembered nowhere, so a v
 after either app relaunches. Traffic is not encrypted: use it on a network you trust, in debug
 builds.
 
+**Versions.** The device's app and the viewer can come from different releases. Once paired, each
+sends a hello naming the protocol's major version it speaks, the oldest it still speaks, and what
+it can do (`commands`, `unsubscribe`). Builds one major version apart connect and use only what
+both have; two apart don't: the device closes the connection, and the viewer's `connect` throws
+`DebugDrawerTransportError.incompatibleVersion`. A message of a kind a build doesn't know is
+dropped and logged once per kind, and the connection stays up. Nothing about the device moves
+before pairing, the hello included. The same rules hold for a sidecar app over the socket and the
+app-group store, whose files also carry a schema version and the writer's version, and are
+migrated forward as they are read ("Reaching a model from another process" in Writing Global and
+Local Plugins).
+
 On the Mac, `DebugDrawerNetworkBrowser` lists the devices advertising, and a
 `DebugDrawerNetworkTransport` connects to one. It is a `DebugDrawerTransport`, so once paired it
 hands out the same transports the plugins' views draw from:

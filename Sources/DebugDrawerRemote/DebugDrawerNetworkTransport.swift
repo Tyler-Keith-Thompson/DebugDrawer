@@ -38,9 +38,10 @@ import Network
         }
 
         private let connection: NetworkConnection
-        private let models: RemoteModels
-        /// Messages for the device held until it accepts.
-        private var held: [TransportMessage] = []
+        /// The device's snapshots as they arrive, and what this build agreed with it.
+        let models: RemoteModels
+        /// Core's messages for the device, held until it accepts.
+        private let outbox: PairedOutbox
         /// How far pairing has got.
         @Published public private(set) var pairingState = PairingState.connecting
 
@@ -53,12 +54,16 @@ import Network
         public init(endpoint: NWEndpoint, viewerName: String) {
             let connection = NetworkConnection(NWConnection(to: endpoint, using: .tcp))
             self.connection = connection
-            // The models send through this transport, which holds them: a relay set once both
-            // exist breaks the cycle.
-            let relay = MessageRelay()
-            models = RemoteModels(subscribesOnConnect: true) { relay.send?($0) }
-            relay.send = { [weak self] message in self?.deliver(message) }
+            // The pairing request goes first: the models' hello, sent as they're made, waits in
+            // the outbox for the device to accept.
             connection.send(PairingMessage(pairing: .request, viewerName: viewerName).encoded())
+            let outbox = PairedOutbox(connection: connection)
+            self.outbox = outbox
+            models = RemoteModels(link: .stream) {
+                outbox.send($0)
+            } disconnect: {
+                connection.close()
+            }
             Task { [weak self, models] in
                 for await body in connection.frames {
                     self?.receive(body)
@@ -103,8 +108,10 @@ import Network
         /// - Returns: A transport showing the model's snapshots as they arrive and sending its
         ///   commands to the device.
         /// - Throws: `DebugDrawerTransportError.mismatchedTypes`,
-        ///   `DebugDrawerTransportError.disconnected` (also when pairing fails) or
-        ///   `DebugDrawerTransportError.cancelled`.
+        ///   `DebugDrawerTransportError.disconnected` (also when pairing fails),
+        ///   `DebugDrawerTransportError.cancelled`, or
+        ///   `DebugDrawerTransportError.incompatibleVersion` when the device's protocol version is
+        ///   two or more major versions from this build's.
         public func connect<Snapshot: Codable & Equatable & Sendable, Command: Codable & Sendable>(
             toPlugin pluginID: String,
             snapshot: Snapshot.Type,
@@ -116,15 +123,6 @@ import Network
         /// Disconnects from the device. The transports this handed out keep their last snapshot.
         public func close() {
             connection.close()
-        }
-
-        /// Sends `message` to the device now if paired, or once it is.
-        private func deliver(_ message: TransportMessage) {
-            if pairingState == .paired {
-                connection.send(message)
-            } else {
-                held.append(message)
-            }
         }
 
         /// Takes in a frame: a pairing message until the device accepts, core's messages after.
@@ -139,10 +137,7 @@ import Network
                 pairingState = .waitingForCode
             case .accepted:
                 pairingState = .paired
-                for message in held {
-                    connection.send(message)
-                }
-                held = []
+                outbox.open()
             case .rejected:
                 pairingState = .failed(message.rejection == .wrongCode ? .wrongCode : .rejected)
             case .request, .code:
@@ -152,7 +147,7 @@ import Network
 
         /// The connection closed: pairing, if not over, failed.
         private func connectionEnded() {
-            held = []
+            outbox.discard()
             switch pairingState {
             case .connecting: pairingState = .failed(.unreachable)
             case .waitingForCode, .paired: pairingState = .failed(.disconnected)
@@ -161,10 +156,46 @@ import Network
         }
     }
 
-    /// Where the models' messages go, set once the transport exists.
+    /// Core's messages for the device: held until it accepts, sent at once after. Apart from the
+    /// transport, so the models it holds can send through it without holding the transport.
     @MainActor
-    private final class MessageRelay {
-        var send: (@MainActor (TransportMessage) -> Void)?
+    private final class PairedOutbox {
+        private enum State {
+            /// The device hasn't accepted: these wait, oldest first.
+            case holding([TransportMessage])
+            /// The device accepted: each message goes at once.
+            case open
+        }
+
+        private let connection: NetworkConnection
+        private var state = State.holding([])
+
+        init(connection: NetworkConnection) {
+            self.connection = connection
+        }
+
+        /// Sends `message` now if the device has accepted, or once it does.
+        func send(_ message: TransportMessage) {
+            switch state {
+            case let .holding(held): state = .holding(held + [message])
+            case .open: connection.send(message)
+            }
+        }
+
+        /// The device accepted: sends what was held, then each message as it comes.
+        func open() {
+            if case let .holding(held) = state {
+                for message in held {
+                    connection.send(message)
+                }
+            }
+            state = .open
+        }
+
+        /// The connection ended: drops what was held.
+        func discard() {
+            if case .holding = state { state = .holding([]) }
+        }
     }
 #else
     // The release stand-in: the same members, never connecting.
