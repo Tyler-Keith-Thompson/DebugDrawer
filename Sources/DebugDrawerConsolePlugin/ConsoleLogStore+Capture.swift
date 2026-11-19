@@ -153,25 +153,29 @@
                     close(originalFd)
                     try? pipe.fileHandleForReading.close()
                 } else {
-                    // Forward to original destination.
-                    if originalFd >= 0 {
-                        data.withUnsafeBytes { buf in
-                            if let ptr = buf.baseAddress {
-                                _ = write(originalFd, ptr, data.count)
-                            }
-                        }
-                    }
                     texts = assembler.withLock { $0.lines(in: data) }
                 }
                 let logLines = texts
                     .filter { !$0.isEmpty }
                     .map { LogLine(timestamp: Date(), text: $0, source: source, level: source == .stderr ? .error : .info) }
-                guard !logLines.isEmpty else { return }
+                if !logLines.isEmpty {
+                    Task { @MainActor [weak self] in
+                        guard let self else { return }
+                        for line in logLines {
+                            self.ingest(line)
+                        }
+                    }
+                }
 
-                Task { @MainActor [weak self] in
-                    guard let self else { return }
-                    for line in logLines {
-                        self.ingest(line)
+                // Forwarded to the original destination last, so once a read comes out there the
+                // reader is done with it. The Console benchmarks write a line only after the one
+                // before came out, so the reader always finishes and waits between lines, and
+                // their instruction counts repeat.
+                if !data.isEmpty, originalFd >= 0 {
+                    data.withUnsafeBytes { buf in
+                        if let ptr = buf.baseAddress {
+                            _ = write(originalFd, ptr, data.count)
+                        }
                     }
                 }
             }

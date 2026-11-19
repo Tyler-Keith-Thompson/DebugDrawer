@@ -22,7 +22,7 @@ it imports. Add a target there, then `just modules`.
 |---|---|
 | `DebugDrawerNetworkPluginBenchmarks` | A `URLSession` data task (GET, small JSON body) to a server on the loopback interface, in-process |
 | `DebugDrawerDiskIOPluginBenchmarks` | `FileManager` `createFile` + `removeItem`, `contents(atPath:)`, `attributesOfItem(atPath:)`, `contentsOfDirectory(atPath:)` in a temporary directory, and `Data` `write(to:)` + `init(contentsOf:)`, which the plugin doesn't intercept |
-| `DebugDrawerConsolePluginBenchmarks` | A line written with `FileHandle.standardOutput.write` and with `print`, and logged with `Logger.notice`; the installed `Logger` arm ends each iteration with the plugin's log-store read, forced |
+| `DebugDrawerConsolePluginBenchmarks` | A line written with `FileHandle.standardOutput.write` and with `print`, each read back out of a pipe of the benchmark's own before the next is written (installed, after the plugin forwards it; its main-actor share runs between iterations), and logged with `Logger.notice`; the installed `Logger` arm ends each iteration with the plugin's log-store read, forced |
 
 The overhead of a path is its installed result minus its `BASELINE`. The DiskIO and Console
 benchmarks make a thousand calls an iteration and report per call (`Instructions (K)` is
