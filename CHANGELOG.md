@@ -26,6 +26,7 @@ the entry becomes the GitHub release's notes.
 
 ### Fixed
 
+- DD-229: `just spm-test`, `just test-spm` and `just spm-test-mac` run with no arguments no longer hand `swift test` an empty argument ("Unexpected argument ''"), which also stopped `just deploy` at its verify step.
 - DD-174: Crash Reports and Hang Detector show each Swift frame's symbol demangled, as Xcode does (`static ExampleApp_iOS.ExampleCrash.crash() -> Swift.Never` rather than its mangled `$s…` name), with the Swift runtime's own demangler; Copy Report still copies the stack as it was recorded.
 - DD-225: File Browser's actions fit on one line at the drawer's 316 pt width, light and dark and at every Dynamic Type size: a folder shows Refresh and a file Share…, beside an icon-only More menu holding Import…, Copy Path, Copy Text, Reveal in Finder, Rename… and Delete (destructive, still confirmed in place under the row).
 - DD-196: Disk I/O costs a recorded file call about as much as it did before DD-72 when the app's main thread is idle, where each call is delivered on its own: `DiskIOStore.events` changes in place rather than as a whole new list each delivery, the wake-up is a plain block on the main queue, and `attributesOfItem(atPath:)` reads the size without bridging the attributes. `DiskIOStore.events` is now backed by `NewestFirst`, a new property wrapper; reading it and `$events` work as before.

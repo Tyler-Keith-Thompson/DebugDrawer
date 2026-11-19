@@ -194,7 +194,7 @@ spm-catalyst-test:
 # not in a debug build beside every other test. Further --skip arguments add to that one.
 [doc('Run the SwiftPM tests on the Mac but the performance ones, in a temporary home folder (arguments go to swift test)')]
 [positional-arguments]
-spm-test-mac *args="":
+spm-test-mac *args:
     #!/usr/bin/env bash
     set -euo pipefail
     {{SWIFT}} build --build-tests
@@ -205,7 +205,7 @@ spm-test-mac *args="":
 
 [doc('Run the tests via SwiftPM but the performance ones: on the Mac (arguments go to swift test), then the visionOS ones in its simulator and the rest for Mac Catalyst')]
 [positional-arguments]
-spm-test *args="":
+spm-test *args:
     just spm-test-mac "$@"
     just spm-visionos-test
     just spm-catalyst-test
