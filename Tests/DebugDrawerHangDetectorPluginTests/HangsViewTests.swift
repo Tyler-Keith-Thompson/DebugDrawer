@@ -265,12 +265,58 @@
             )
             let expectedOwn = [false, true, true]
             let expectedSelected = [false, true, false]
-            let expectedSymbols = ["__semwait_signal", "$s7Example5blockyyF", "main"]
+            let expectedSymbols = ["__semwait_signal", "Example.block() -> ()", "main"]
 
             let rows = try sut.inspect().findAll(DebugDrawerStackFrameRow.self).map { try $0.actualView() }
 
             #expect(rows.map(\.isOwnCode) == expectedOwn)
             #expect(rows.map(\.isSelected) == expectedSelected)
+            #expect(rows.map(\.symbol) == expectedSymbols)
+        }
+
+        @Test("Copy Report copies the stack as recorded, mangled symbols and offsets included, though the frames show them demangled")
+        func copyReportKeepsRecordedStack() throws {
+            let mangledLine = "1 Example 0x0000000100004a1c $s7Example12ExampleHangsO5blockyyFZ + 36"
+            let event = HangEvent(
+                id: UUID(), date: Date(timeIntervalSince1970: 1), duration: .milliseconds(612),
+                frames: ["0 libsystem_kernel.dylib 0x00000001842b5f30 __semwait_signal + 8", mangledLine],
+                source: .detected, isSeen: true
+            )
+            let sut = HangsView(
+                events: [event], threshold: .constant(.milliseconds(250)), expanded: .constant(event.id), ownImage: "Example",
+                onOpen: { _ in }, onMarkAllSeen: {}, onClear: {}
+            )
+            let expectedCopy = event.text()
+            let expectedSymbols = ["__semwait_signal", "static Example.ExampleHangs.block() -> ()"]
+
+            let copied = try sut.inspect().find(DebugDrawerCopyButton.self).actualView().value()
+            let rows = try sut.inspect().findAll(DebugDrawerStackFrameRow.self).map { try $0.actualView() }
+
+            #expect(copied == expectedCopy)
+            #expect(copied?.contains(mangledLine) == true)
+            #expect(rows.map(\.symbol) == expectedSymbols)
+        }
+
+        @Test("When Swift's demangler can't be found, frames show their symbols as recorded")
+        func unresolvedDemangler() throws {
+            struct UnresolvedDemangler: SymbolDemangler {
+                func demangle(_ symbol: String) -> String? {
+                    nil
+                }
+            }
+            let event = HangEvent(
+                id: UUID(), date: Date(timeIntervalSince1970: 1), duration: .milliseconds(612),
+                frames: ["0 Example 0x0000000100004a1c $s7Example5blockyyF + 48", "1 Example 0x0000000100004b00 main + 8"],
+                source: .detected, isSeen: true
+            )
+            let sut = HangsView(
+                events: [event], threshold: .constant(.milliseconds(250)), expanded: .constant(event.id), ownImage: "Example",
+                demangler: UnresolvedDemangler(), onOpen: { _ in }, onMarkAllSeen: {}, onClear: {}
+            )
+            let expectedSymbols = ["$s7Example5blockyyF", "main"]
+
+            let rows = try sut.inspect().findAll(DebugDrawerStackFrameRow.self).map { try $0.actualView() }
+
             #expect(rows.map(\.symbol) == expectedSymbols)
         }
 

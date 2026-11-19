@@ -214,6 +214,62 @@
             #expect(rows.map(\.image) == expectedImages)
         }
 
+        @Test("Frames show Swift symbols demangled and C symbols as they are, while Copy Report copies the stack as recorded")
+        func demangledFrames() throws {
+            let lines = [
+                "0   libswiftCore.dylib   0x000000018f2b1a40 $ss17_assertionFailure__4file4line5flagss5NeverOs12StaticStringV_A2HSus6UInt32VtF + 172",
+                "1   Example              0x0000000100004a1c $s7Example11ContentViewV5crashyyF + 48",
+                "2   Example              0x0000000100004b00 main + 8"
+            ]
+            let report = CrashReport(
+                id: UUID(), date: Date(timeIntervalSince1970: 1), title: "SIGTRAP", reason: nil, appVersion: nil,
+                frames: lines, source: .captured, isSeen: true
+            )
+            let sut = CrashReportsView(
+                reports: [report], expanded: .constant(report.id), ownImage: "Example",
+                onOpen: { _ in }, onDelete: { _ in }, onMarkAllSeen: {}, onDeleteAll: {}
+            )
+            let expectedSymbols = [
+                "Swift._assertionFailure(_: Swift.StaticString, _: Swift.StaticString, file: Swift.StaticString, "
+                    + "line: Swift.UInt, flags: Swift.UInt32) -> Swift.Never",
+                "Example.ContentView.crash() -> ()",
+                "main"
+            ]
+            let expectedCopy = "SIGTRAP\nDate: 1970-01-01T00:00:01Z\nSource: Captured\n\n" + lines.joined(separator: "\n") + "\n"
+
+            let rows = try sut.inspect().findAll(DebugDrawerStackFrameRow.self).map { try $0.actualView() }
+            let copied = try sut.inspect().find(DebugDrawerCopyButton.self).actualView().value()
+
+            #expect(rows.map(\.symbol) == expectedSymbols)
+            #expect(copied == expectedCopy)
+        }
+
+        @Test("When Swift's demangler can't be found, frames show their symbols as recorded")
+        func unresolvedDemangler() throws {
+            struct UnresolvedDemangler: SymbolDemangler {
+                func demangle(_ symbol: String) -> String? {
+                    nil
+                }
+            }
+            let report = CrashReport(
+                id: UUID(), date: Date(timeIntervalSince1970: 1), title: "SIGTRAP", reason: nil, appVersion: nil,
+                frames: [
+                    "0   Example              0x0000000100004a1c $s7Example11ContentViewV5crashyyF + 48",
+                    "1   Example              0x0000000100004b00 main + 8"
+                ],
+                source: .captured, isSeen: true
+            )
+            let sut = CrashReportsView(
+                reports: [report], expanded: .constant(report.id), ownImage: "Example", demangler: UnresolvedDemangler(),
+                onOpen: { _ in }, onDelete: { _ in }, onMarkAllSeen: {}, onDeleteAll: {}
+            )
+            let expectedSymbols = ["$s7Example11ContentViewV5crashyyF", "main"]
+
+            let rows = try sut.inspect().findAll(DebugDrawerStackFrameRow.self).map { try $0.actualView() }
+
+            #expect(rows.map(\.symbol) == expectedSymbols)
+        }
+
         @Test("The header counts the reports with an error glyph, following the store, and shows nothing without one")
         func headerAccessory() throws {
             let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)

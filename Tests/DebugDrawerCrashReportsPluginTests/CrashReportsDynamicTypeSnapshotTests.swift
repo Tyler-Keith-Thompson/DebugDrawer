@@ -15,7 +15,7 @@
                 id: UUID(), date: Date(timeIntervalSince1970: 1_763_290_000), title: "SIGTRAP",
                 reason: "Trap: a Swift runtime failure, such as unwrapping nil or an index out of range", appVersion: "1.2 (34)",
                 frames: [
-                    "0   libswiftCore.dylib   0x000000018f2b1a40 $ss17_assertionFailure + 172",
+                    "0 libswiftCore.dylib 0x000000018f2b1a40 $ss17_assertionFailure__4file4line5flagss5NeverOs12StaticStringV_A2HSus6UInt32VtF + 172",
                     "1   Example              0x0000000100004a1c $s7Example11ContentViewV5crashyyF + 48"
                 ],
                 source: .captured, isSeen: false

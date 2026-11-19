@@ -24,7 +24,7 @@
                     "0 libsystem_kernel.dylib 0x00000001842b5f30 __semwait_signal + 8",
                     "1 libsystem_c.dylib 0x0000000184192e64 nanosleep + 220",
                     "2 libsystem_c.dylib 0x0000000184192d58 usleep + 68",
-                    "3 Example 0x0000000100004a1c $s7Example13ExampleHangsO5blockyyFZ + 36",
+                    "3 Example 0x0000000100004a1c $s7Example12ExampleHangsO5blockyyFZ + 36",
                     "4 SwiftUI 0x00000001c2e1f2b4 $s7SwiftUI6ButtonV6actionyycvg + 28"
                 ],
                 source: .detected, isSeen: false

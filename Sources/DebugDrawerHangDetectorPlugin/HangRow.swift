@@ -10,6 +10,8 @@
         let isExpanded: Bool
         /// The app's executable's file name, which marks the app's own frames.
         var ownImage: String?
+        /// Names the frames' Swift symbols as Xcode does; Copy Report still copies them as recorded.
+        let demangler: any SymbolDemangler
         let onToggle: () -> Void
         @Environment(\.locale) private var locale
         @Environment(\.timeZone) private var timeZone
@@ -51,7 +53,7 @@
         }
 
         @ViewBuilder private var stack: some View {
-            let frames = StackFrame.frames(event.frames)
+            let frames = StackFrame.frames(event.frames).map { $0.demangled(by: demangler) }
             let selected = frames.firstIndex { $0.isOwnCode(ownImage) }
             if frames.isEmpty {
                 Text(HangEvent.noStack)

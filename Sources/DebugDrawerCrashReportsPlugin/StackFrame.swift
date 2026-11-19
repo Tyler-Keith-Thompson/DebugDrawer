@@ -52,6 +52,13 @@
             lines.enumerated().map { StackFrame(line: $1, position: $0) }
         }
 
+        /// The frame with its symbol named as Xcode names it, when `demangler` reads it as a
+        /// mangled Swift symbol; otherwise the frame as it is, so a C or Objective-C symbol, an
+        /// address, or any symbol when there is no demangler, shows as the line had it.
+        func demangled(by demangler: some SymbolDemangler) -> StackFrame {
+            demangler.demangle(symbol).map { StackFrame(index: index, image: image, symbol: $0) } ?? self
+        }
+
         /// Whether the frame is in the app's own executable, named `ownImage`.
         func isOwnCode(_ ownImage: String?) -> Bool {
             image == ownImage

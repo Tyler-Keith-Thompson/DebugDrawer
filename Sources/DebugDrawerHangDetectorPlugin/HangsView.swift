@@ -14,6 +14,8 @@
         @Binding var expanded: HangEvent.ID?
         /// The app's executable's file name, which marks the app's own frames.
         var ownImage: String?
+        /// Names the frames' Swift symbols as Xcode does.
+        var demangler: any SymbolDemangler = _SymbolDemangler()
         /// Called when a hang is opened: it is then seen.
         let onOpen: (HangEvent.ID) -> Void
         let onMarkAllSeen: () -> Void
@@ -31,7 +33,9 @@
                     .accessibilityHint("The shortest time the main thread must be stuck to count as a hang")
                 }
                 ForEach(events) { event in
-                    HangRow(event: event, isExpanded: expanded == event.id, ownImage: ownImage) { toggle(event.id) }
+                    HangRow(event: event, isExpanded: expanded == event.id, ownImage: ownImage, demangler: demangler) {
+                        toggle(event.id)
+                    }
                 }
             } footer: {
                 if events.isEmpty {

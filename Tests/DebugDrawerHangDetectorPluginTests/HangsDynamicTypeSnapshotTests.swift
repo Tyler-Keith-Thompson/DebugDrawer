@@ -15,7 +15,7 @@
                 id: UUID(), date: Date(timeIntervalSince1970: 1_763_290_000), duration: .milliseconds(612),
                 frames: [
                     "0 libsystem_kernel.dylib 0x00000001842b5f30 __semwait_signal + 8",
-                    "1 Example 0x0000000100004a1c $s7Example13ExampleHangsO5blockyyFZ + 36"
+                    "1 Example 0x0000000100004a1c $s7Example12ExampleHangsO5blockyyFZ + 36"
                 ],
                 source: .detected, isSeen: false
             )

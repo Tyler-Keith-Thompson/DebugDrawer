@@ -9,7 +9,8 @@
         ///
         /// Every address after the first is a return address, just past its call, which may be
         /// the last instruction of a function; it is looked up one byte earlier, so it names the
-        /// caller. Symbols stay mangled; a symbol the image doesn't export is named by the nearest
+        /// caller. Symbols stay mangled, as Copy Report copies them; the drawer demangles them as
+        /// it draws the frames (`StackFrame.demangled(by:)`). A symbol the image doesn't export is named by the nearest
         /// one it does, or `???`.
         static func lines(for addresses: [UInt]) -> [String] {
             addresses.enumerated().map { index, address in

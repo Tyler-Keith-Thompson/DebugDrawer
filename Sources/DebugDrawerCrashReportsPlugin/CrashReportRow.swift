@@ -10,6 +10,8 @@
         let isExpanded: Bool
         /// The app's executable's file name, which marks the app's own frames.
         let ownImage: String?
+        /// Names the frames' Swift symbols as Xcode does; Copy Report still copies them as recorded.
+        let demangler: any SymbolDemangler
         let onToggle: () -> Void
         let onDelete: () -> Void
         @Environment(\.locale) private var locale
@@ -54,7 +56,7 @@
         }
 
         @ViewBuilder private var stackTrace: some View {
-            let frames = StackFrame.frames(report.frames)
+            let frames = StackFrame.frames(report.frames).map { $0.demangled(by: demangler) }
             let selected = frames.firstIndex { $0.isOwnCode(ownImage) }
             if frames.isEmpty {
                 Text("No stack trace was recorded.")

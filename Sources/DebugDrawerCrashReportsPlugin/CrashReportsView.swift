@@ -10,6 +10,8 @@
         @Binding var expanded: CrashReport.ID?
         /// The app's executable's file name, which marks the app's own frames.
         var ownImage: String?
+        /// Names the frames' Swift symbols as Xcode does.
+        var demangler: any SymbolDemangler = _SymbolDemangler()
         /// Called when a report is opened: it is then seen.
         let onOpen: (CrashReport.ID) -> Void
         let onDelete: (CrashReport.ID) -> Void
@@ -30,6 +32,7 @@
                             report: report,
                             isExpanded: expanded == report.id,
                             ownImage: ownImage,
+                            demangler: demangler,
                             onToggle: { toggle(report.id) },
                             onDelete: { onDelete(report.id) }
                         )
