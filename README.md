@@ -1481,7 +1481,8 @@ carries the standard defaults' keys as `user-defaults.json`.
 operation, path, bytes, duration and thread, and the error of one that failed. Calls on the main
 thread carry a warning, and the totals (reads, writes, the bytes of each, main-thread calls and
 failures) count every call since Clear, not only the 500 the list keeps. Calls reach the drawer in
-batches, one per turn of the main queue, however many the app makes. The Disk section shows how
+batches, one per turn of the main queue, however many the app makes. Pause drops the calls made
+until Resume, neither listing nor counting them. The Disk section shows how
 full the home volume is and its free space, read when the plugin appears and on Refresh. The list
 keeps the newest 500 calls; set `DiskIOStore.shared.capacity` for another number.
 

@@ -1,6 +1,6 @@
 /// Counts of every call the Disk I/O plugin recorded since the last clear, including the calls
 /// the list no longer keeps.
-public struct DiskIOTotals: Equatable, Sendable {
+public struct DiskIOTotals: Codable, Equatable, Sendable {
     /// Every recorded call.
     public private(set) var calls = 0
     /// Reads: `.read` calls.

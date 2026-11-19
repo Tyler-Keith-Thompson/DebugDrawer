@@ -2,21 +2,27 @@
     import DebugDrawer
     import SwiftUI
 
+    /// The plugin's body: the totals, the filter, the calls it lists, the volume, and Refresh,
+    /// Pause and Clear. Reads the volume each time it appears.
+    ///
+    /// It draws ``DiskIOModel``'s snapshots from its transport and sends it what the user does.
     struct DiskIOPluginView: View {
-        @ObservedObject private var store = DiskIOStore.shared
-        /// The home volume, sampled off the main actor when the plugin appears and on Refresh;
-        /// `nil` until the first sample.
-        @State private var diskSpace: DiskSpace?
-        /// Bumped by Refresh, which samples the volume again.
-        @State private var diskSpaceRequest = 0
+        @StateObject private var transport: DebugDrawerPluginTransport<DiskIOSnapshot, DiskIOCommand>
+
+        /// - Parameter transport: Joins the view to the model; made once, for the view's lifetime.
+        init(transport: @escaping @autoclosure () -> DebugDrawerPluginTransport<DiskIOSnapshot, DiskIOCommand>) {
+            _transport = StateObject(wrappedValue: transport())
+        }
 
         var body: some View {
+            let snapshot = transport.snapshot
+            let shown = snapshot.filteredEvents
             VStack(alignment: .leading, spacing: 0) {
-                DiskIOTotalsRows(totals: store.totals)
+                DiskIOTotalsRows(totals: snapshot.totals)
 
                 DebugDrawerSection("Calls") {
                     DebugDrawerRow("Operation") {
-                        Picker("Operation", selection: $store.filterOp) {
+                        Picker("Operation", selection: operation) {
                             Text("All").tag(IOEvent.Operation?.none)
                             ForEach(IOEvent.Operation.filterable, id: \.rawValue) { operation in
                                 Text(operation.name).tag(IOEvent.Operation?.some(operation))
@@ -24,33 +30,59 @@
                         }
                         .pickerStyle(.menu)
                     }
-                    DebugDrawerRow("Main thread only", isOn: $store.mainThreadOnly)
+                    DebugDrawerRow("Main thread only", isOn: mainThreadOnly)
                     // With nothing to list, a sentence says why rather than an empty well.
-                    if store.filteredEvents.isEmpty {
-                        Text(store.events.isEmpty ? "No calls yet." : "No calls match the filter.")
+                    if shown.isEmpty {
+                        Text(snapshot.emptyListText)
                             .debugDrawerFont(.secondary)
                             .debugDrawerForegroundStyle(.secondary)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .debugDrawerRowPadding()
                     } else {
-                        DiskIOCallList(events: store.filteredEvents)
+                        DiskIOCallList(events: shown)
                     }
                 }
 
-                DiskSpaceRows(volume: diskSpace)
+                DiskSpaceRows(volume: snapshot.volume)
 
                 DebugDrawerActionRow {
-                    Button("Refresh") { diskSpaceRequest += 1 }
+                    Button("Refresh") { transport.send(DiskIOCommand(.refreshVolume)) }
                         .accessibilityLabel("Refresh disk space")
+                    Button(snapshot.isPaused ? "Resume" : "Pause") {
+                        transport.send(DiskIOCommand(.setPaused(!snapshot.isPaused)))
+                    }
+                    .accessibilityLabel(snapshot.isPaused ? "Resume recording" : "Pause recording")
                 } trailing: {
-                    Button("Clear", role: .destructive) { store.clear() }
+                    Button("Clear", role: .destructive) { transport.send(DiskIOCommand(.clear)) }
                         .debugDrawerButtonStyle(.destructive)
                         .accessibilityLabel("Clear recorded calls")
                 }
             }
-            .task(id: diskSpaceRequest) {
-                diskSpace = await DiskSpace.sample()
-            }
+            .onAppear { transport.send(DiskIOCommand(.refreshVolume)) }
+        }
+
+        /// The operation filter, read from the snapshot and changed through the model.
+        private var operation: Binding<IOEvent.Operation?> {
+            Binding(
+                get: { transport.snapshot.operation },
+                set: { transport.send(DiskIOCommand(.setOperation($0))) }
+            )
+        }
+
+        /// The main-thread switch, read from the snapshot and changed through the model.
+        private var mainThreadOnly: Binding<Bool> {
+            Binding(
+                get: { transport.snapshot.mainThreadOnly },
+                set: { transport.send(DiskIOCommand(.setMainThreadOnly($0))) }
+            )
+        }
+    }
+
+    extension DiskIOSnapshot {
+        /// Why the list is empty: nothing recorded, recording paused, or nothing passes the filter.
+        fileprivate var emptyListText: String {
+            if !events.isEmpty { return "No calls match the filter." }
+            return isPaused ? "Recording paused." : "No calls yet."
         }
     }
 
