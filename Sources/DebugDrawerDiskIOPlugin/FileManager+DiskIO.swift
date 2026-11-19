@@ -104,7 +104,7 @@
             guard let call = DiskIOCall.begin() else { return try dd_attributesOfItem(atPath: path) }
             do {
                 let result = try dd_attributesOfItem(atPath: path)
-                call.end(.stat, path: path, size: (result[FileAttributeKey.size] as? NSNumber)?.int64Value ?? 0)
+                call.end(.stat, path: path, size: result.recordedSize)
                 return result
             } catch {
                 call.end(.stat, path: path, error: error)
@@ -154,6 +154,18 @@
                 call.end(.move, path: source.path(percentEncoded: false), destination: destination.path(percentEncoded: false), error: error)
                 throw error
             }
+        }
+    }
+
+    extension NSDictionary {
+        /// The size in a dictionary of file attributes, or 0 when it holds none.
+        ///
+        /// Read through the Swift dictionary that Foundation's own dictionary wraps, which
+        /// bridging back unwraps: asking the `NSDictionary` for a key would bridge the key and,
+        /// the first time, every value in it.
+        fileprivate var recordedSize: Int64 {
+            guard let attributes = self as? [FileAttributeKey: Any] else { return 0 }
+            return (attributes[.size] as? NSNumber)?.int64Value ?? 0
         }
     }
 #endif

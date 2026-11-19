@@ -17,9 +17,9 @@
     /// Collects file calls from any thread and hands them to the main thread in batches.
     ///
     /// A call appends its event to a `CaptureBuffer`, which keeps the newest `limit`, and counts
-    /// it into the totals under a lock, then returns. The first event after a delivery sends one
-    /// signal through a Combine subject; ``batches`` receives it on the main queue and takes the
-    /// calls the buffer gained and the totals by then. So a burst of calls costs one main-queue hop, not
+    /// it into the totals under a lock, then returns. The first event after a delivery schedules
+    /// one block on the main queue, which takes the calls the buffer gained and the totals by
+    /// then and sends them through ``batches``. So a burst of calls costs one main-queue hop, not
     /// one per call, and no timer runs.
     ///
     /// The totals sit behind a lock rather than in an actor: a swizzled call is synchronous and
@@ -40,9 +40,8 @@
         /// The newest calls, bounded by the limit and by their paths' bytes.
         private let buffer: CaptureBuffer<IOEvent>
         private let state = OSAllocatedUnfairLock(initialState: State())
-        // Sent only by the record that sets `isDeliveryScheduled`, and no other record sends
-        // until the delivery that clears it, so no two sends overlap.
-        private nonisolated(unsafe) let signal = PassthroughSubject<Void, Never>()
+        // Sent only on the main queue, by the delivery a record schedules, so no two sends overlap.
+        private nonisolated(unsafe) let delivered = PassthroughSubject<DiskIOBatch, Never>()
 
         /// A recorder that keeps at most `limit` events, whose paths add up to at most
         /// `byteLimit` bytes.
@@ -56,13 +55,10 @@
 
         /// Each batch, on the main queue, once per turn of it that follows a record.
         ///
-        /// Subscribe once: each subscription takes the totals counted when the signal reaches it,
-        /// so a second would see the totals the first left, zero.
+        /// Every subscriber gets the same batches; a batch sent before a subscription isn't sent
+        /// to it.
         var batches: AnyPublisher<DiskIOBatch, Never> {
-            signal
-                .receive(on: DispatchQueue.main)
-                .map { [self] in takePending() }
-                .eraseToAnyPublisher()
+            delivered.eraseToAnyPublisher()
         }
 
         /// How many events the recorder keeps.
@@ -98,7 +94,14 @@
                 state.isDeliveryScheduled = true
                 return true
             }
-            if schedulesDelivery { signal.send() }
+            if schedulesDelivery {
+                // A bare block on the main queue rather than a Combine signal received on it: with
+                // the main thread idle every call is a delivery of its own, and the subject and
+                // `receive(on:)` added allocations to each. A run-loop source or observer would
+                // still wake the main thread once per delivery, and never fires where the main
+                // thread serves only the main queue (`dispatchMain()`).
+                DispatchQueue.main.async { [self] in delivered.send(takePending()) }
+            }
         }
 
         private func takePending() -> DiskIOBatch {

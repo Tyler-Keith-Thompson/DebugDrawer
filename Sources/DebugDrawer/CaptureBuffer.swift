@@ -284,9 +284,16 @@ public final class CaptureBuffer<Element: Sendable>: Sendable {
             let oldestID = state.nextID - UInt64(state.count)
             let firstID = min(max(id.rawValue, oldestID), state.nextID)
             let start = state.head + Int(firstID - oldestID)
-            return Snapshot(
+            // Indexed rather than `slots[start...].map`: reading a generic element through the
+            // slice's `read` coroutine allocates, once per element.
+            var elements: [Element] = []
+            elements.reserveCapacity(state.slots.count - start)
+            for index in start ..< state.slots.count {
                 // A live slot always holds its element (see `State`).
-                elements: state.slots[start...].map { $0.element! },
+                elements.append(state.slots[index].element!)
+            }
+            return Snapshot(
+                elements: elements,
                 firstID: ElementID(rawValue: firstID),
                 oldestID: ElementID(rawValue: oldestID),
                 generation: state.generation,

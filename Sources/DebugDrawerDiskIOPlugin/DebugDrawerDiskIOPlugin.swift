@@ -83,7 +83,7 @@ public extension DebugDrawer {
         public static let shared = DiskIOStore(recorder: .shared)
 
         /// The newest calls, at most ``capacity``, newest first.
-        @Published public private(set) var events: [IOEvent] = []
+        @NewestFirst public var events: [IOEvent]
         /// Every call since the last clear, including the ones ``events`` no longer keeps.
         @Published public private(set) var totals = DiskIOTotals()
         /// The operation the list shows alone, or `nil` for every operation.
@@ -96,6 +96,7 @@ public extension DebugDrawer {
             get { recorder.limit }
             set {
                 recorder.limit = newValue
+                objectWillChange.send()
                 show(recorder.snapshot(from: shownEnd))
             }
         }
@@ -106,6 +107,7 @@ public extension DebugDrawer {
             get { recorder.byteLimit }
             set {
                 recorder.byteLimit = newValue
+                objectWillChange.send()
                 show(recorder.snapshot(from: shownEnd))
             }
         }
@@ -183,26 +185,31 @@ public extension DebugDrawer {
         /// Forgets the recorded calls and starts the totals over.
         public func clear() {
             recorder.clear()
-            show(recorder.snapshot(from: shownEnd))
             totals = DiskIOTotals()
+            show(recorder.snapshot(from: shownEnd))
         }
 
         private func receive(_ batch: DiskIOBatch) {
-            totals += batch.totals
+            // Setting the totals sends `objectWillChange`, for the list too: a batch always holds
+            // a call, and a second send would walk the store's properties again. Set rather than
+            // `+=`, whose `modify` through `@Published` allocates for its coroutine and key path.
+            var updated = totals
+            updated += batch.totals
+            totals = updated
             show(batch.events)
         }
 
-        /// Brings the list up to `change`, newest first: the calls the buffer evicted leave its
-        /// end and the new ones join its start, so a delivery copies the list once rather than
-        /// the buffer whole as well.
+        /// Brings the list up to `change`: the calls the buffer evicted leave it and the new ones
+        /// join it, in place, so a delivery copies only the new calls. The caller sends
+        /// `objectWillChange` first.
         private func show(_ change: CaptureBuffer<IOEvent>.Snapshot) {
             // `events` holds the buffer's IDs below `shownEnd`; a change can start before it when
             // the store asked for one itself since the recorder's last delivery.
             let shownAlready = shownEnd.rawValue - min(change.firstID.rawValue, shownEnd.rawValue)
             let new = change.elements.dropFirst(Int(min(shownAlready, UInt64(change.elements.count))))
-            let kept = change.keptCount(of: events.count, before: shownEnd)
-            if kept < events.count || !new.isEmpty {
-                events = new.reversed() + events.prefix(kept)
+            let kept = change.keptCount(of: _events.count, before: shownEnd)
+            if kept < _events.count || !new.isEmpty {
+                _events.update(keepingNewest: kept, appending: new)
             }
             shownEnd = max(shownEnd, change.endID)
         }
