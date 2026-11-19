@@ -326,7 +326,9 @@
                 #expect(reverse == actual, "\(peer.hello)")
             }
             #expect(sut.agreement(with: sut)?.capabilities == [.commands, .unsubscribe])
-            #expect(TransportHello.current == sut)
+            #expect(TransportHello.current == TransportHello(
+                version: 2, oldestVersion: 1, capabilities: [.commands, .unsubscribe, .acknowledgements]
+            ))
             #expect(TransportHello.firstVersion == TransportHello(version: 1, oldestVersion: 1, capabilities: [.commands]))
         }
     }

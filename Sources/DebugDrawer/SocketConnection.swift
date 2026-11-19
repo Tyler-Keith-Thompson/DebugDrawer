@@ -141,42 +141,4 @@ import os
             }
         }
     }
-
-    /// A Unix domain socket's address for a path.
-    enum UnixSocketAddress {
-        /// The address of `path`, or `nil` when the path is longer than an address holds (103
-        /// bytes and a terminating zero).
-        static func make(_ path: String) -> sockaddr_un? {
-            var address = sockaddr_un()
-            let bytes = Array(path.utf8)
-            guard bytes.count < MemoryLayout.size(ofValue: address.sun_path) else { return nil }
-            address.sun_len = UInt8(MemoryLayout<sockaddr_un>.size)
-            address.sun_family = sa_family_t(AF_UNIX)
-            withUnsafeMutableBytes(of: &address.sun_path) { $0.copyBytes(from: bytes) }
-            return address
-        }
-
-        /// Calls `body` with `address` as the generic socket address the socket calls take.
-        static func withSocketAddress<Result>(
-            _ address: sockaddr_un,
-            _ body: (UnsafePointer<sockaddr>, socklen_t) -> Result
-        ) -> Result {
-            withUnsafePointer(to: address) { pointer in
-                pointer.withMemoryRebound(to: sockaddr.self, capacity: 1) { body($0, socklen_t(MemoryLayout<sockaddr_un>.size)) }
-            }
-        }
-
-        /// A new stream socket connected to `path`, or `nil` when nothing listens there.
-        static func connect(to path: String) -> Int32? {
-            guard let address = make(path) else { return nil }
-            let descriptor = socket(AF_UNIX, SOCK_STREAM, 0)
-            guard descriptor >= 0 else { return nil }
-            let result = withSocketAddress(address) { Darwin.connect(descriptor, $0, $1) }
-            guard result == 0 else {
-                Darwin.close(descriptor)
-                return nil
-            }
-            return descriptor
-        }
-    }
 #endif

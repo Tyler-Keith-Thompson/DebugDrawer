@@ -332,6 +332,7 @@ already draws from, so neither the model nor the view knows which transport it i
 | In the process | (the registry itself) | ``DebugDrawerInProcessTransport`` | The drawer, or a test, in the app's own process; a command lands before `send` returns |
 | Unix domain socket | ``DebugDrawerSocketServer`` | ``DebugDrawerSocketTransport`` | Both apps run; snapshots arrive as they change, commands land at once |
 | App-group store | ``DebugDrawerAppGroupStoreServer`` | ``DebugDrawerAppGroupStoreTransport`` | Either app may be suspended; the viewer reads the last snapshots, and commands wait for the app |
+| Socket, else store | Both servers above | ``DebugDrawerSidecarTransport`` | A sidecar app: the socket while the app answers on it, the store while it doesn't, switching on its own |
 | Local network (the `DebugDrawerRemote` library) | `DebugDrawerNetworkServer` | `DebugDrawerNetworkTransport` | A viewer on another device, such as a Mac showing a phone's logs; nothing listens until the app starts the server, and each viewer pairs with a code the device shows |
 
 ```swift
@@ -352,45 +353,61 @@ final class CounterSharing {
 ```
 
 The viewer picks a transport per connection, at run time, and can hold several at once, to one
-model or to many: here, the socket while the app answers on it, and the store when it doesn't.
+model or to many. A sidecar holds a ``DebugDrawerSidecarTransport``: it reads the app over the
+socket while the app answers on it and through the store while it doesn't, and switches each way
+on its own, so the transport it hands out keeps drawing as the app goes to the background, quits
+or comes back.
 
 ```swift
 @MainActor
 func counterTransport(container: URL) async throws -> DebugDrawerPluginTransport<CounterModel.Snapshot, CounterModel.Command> {
-    let connection: any DebugDrawerTransport
-    do {
-        connection = try DebugDrawerSocketTransport(socketPath: container.appending(path: "drawer.sock").path)
-    } catch {
-        connection = try DebugDrawerAppGroupStoreTransport(directory: container.appending(path: "DebugDrawer"))
-    }
-    return try await connection.connect(toPlugin: "MyApp.CounterPlugin", snapshot: CounterModel.Snapshot.self, command: CounterModel.Command.self)
+    let sidecar = try DebugDrawerSidecarTransport(
+        socketPath: container.appending(path: "drawer.sock").path,
+        storeDirectory: container.appending(path: "DebugDrawer")
+    )
+    return try await sidecar.connect(toPlugin: "MyApp.CounterPlugin", snapshot: CounterModel.Snapshot.self, command: CounterModel.Command.self)
 }
 ```
 
 `connect` returns once the plugin's first snapshot is in, waiting while the app hasn't
 registered the model yet; it throws ``DebugDrawerTransportError/mismatchedTypes`` when the model
 under that ID has other types. A transport it returns holds its connection open. When the app
-stops serving the socket, the transport keeps its last snapshot, drops later commands, and the
-socket transport's ``DebugDrawerSocketTransport/isConnected`` turns `false`.
+stops serving the socket, a socket transport's plugin transports keep their last snapshot and drop
+later commands, and ``DebugDrawerSocketTransport/isConnected`` turns `false`. The sidecar transport
+reads the store instead (its ``DebugDrawerSidecarTransport/channel`` turns
+``DebugDrawerSidecarTransport/Channel/store``), and goes back to the socket once the app makes it
+again, which it learns from a dispatch source on the socket's directory. No command is lost or
+performed twice across either switch: a command sent over the socket is kept until the app
+acknowledges it, and those not acknowledged when the socket goes are left in the store, oldest
+first; the app performs a command whose ID it has already performed no more. When the socket comes
+back, each command still waiting in the store that the sidecar can take back (its file is still
+there) goes over the socket first, so the commands land in the order sent. This needs both builds
+to list the `acknowledgements` capability; with an app that doesn't, commands in flight when its
+socket goes may be lost.
 
 **Platforms.** Each transport builds wherever core does: macOS, iOS, Mac Catalyst, visionOS,
 tvOS and watchOS. App groups and Unix domain sockets in the group's container work between two
 apps of one team on iOS, macOS and visionOS, which is where a sidecar runs; tvOS and watchOS
-build the same code for an app talking to its own extensions. A socket's path holds at most 103
-bytes, which a group container's path leaves room for. Everything here is for debug builds:
+build the same code for an app talking to its own extensions. A socket's address holds at most
+103 bytes of path, and a group container's path can be longer (in the iOS simulator it is about
+170 bytes before the socket's name): a longer path is reached by its file name, relative to its
+directory, so only the file name must fit. Everything here is for debug builds:
 release builds get stand-ins whose connections throw ``DebugDrawerTransportError/unreachable``
 and whose servers serve nothing.
 
 **The wire.** Whatever leaves the process is one message: a JSON object with the envelope's
-format `version` (1), its `kind` (`hello`, `subscribe`, `unsubscribe`, `snapshot` or `command`),
-the `pluginID`, and the `payload`, the plugin's own snapshot or command encoded as JSON (keys
-sorted) and carried as base64. A receiver drops a message in another envelope format, and drops a
+format `version` (1), its `kind` (`hello`, `subscribe`, `unsubscribe`, `snapshot`, `command` or
+`acknowledgement`), the `pluginID`, and the `payload`, the plugin's own snapshot or command encoded
+as JSON (keys sorted) and carried as base64; a command, and its acknowledgement, also carry its
+`commandID`, a UUID. A receiver drops a message in another envelope format, and drops a
 kind it doesn't know, logging that kind the first time a connection sends it, then reads on. On a
 byte stream, the socket's or a network connection's, each message is a frame: a 4-byte
 big-endian length, then that many bytes of JSON, at most 64 MiB. Each side of a stream sends a
 `hello` first (below). A viewer sends `subscribe` for each plugin it connects to and gets that
 plugin's current snapshot, then one after each change, each different from the one before; it
 sends `command`s back, and `unsubscribe` once the last transport to a plugin is released. The
+app sends an `acknowledgement` naming each command once it has performed it (or dropped it, with
+no model to take it). The
 store keeps one document per file: `snapshots/<plugin ID>.json` holds each plugin's newest
 snapshot (the ID percent-encoded), and `commands/<time>-<count>-<UUID>.json` holds each command
 until the app performs it, oldest first, and removes it. Both sides learn of a change from a
@@ -406,7 +423,9 @@ removes the oldest past either after leaving a command and leaves none larger.
 pairing of any two builds either works or fails clearly. On a stream, each side's `hello` names
 the protocol's major version it speaks (2), the oldest it still speaks (1), and its capabilities:
 `commands` (the viewer sends commands and the app performs them) and `unsubscribe` (the app stops
-sending a plugin's snapshots when the viewer releases it). Both sides agree on the lower of the
+sending a plugin's snapshots when the viewer releases it), and `acknowledgements` (the app
+acknowledges each command it performs, and performs a command ID once). Both sides agree on the
+lower of the
 two versions when each still speaks it, and use only the capabilities both list, so builds one
 major version apart connect and use what they share. Two major versions apart they don't: the
 app closes the connection and the viewer's connects throw
@@ -423,7 +442,10 @@ synchronous commands; a protocol rather than a compile-time choice, so a viewer 
 transports at once and switch when the app goes to the background. Registration is explicit,
 not done by plugins as they install, so an app offers only what it chooses. The socket is POSIX
 `AF_UNIX` with dispatch sources rather than Network.framework, whose listener documents no
-Unix-domain support; the network transport frames the same messages over Network.framework
+Unix-domain support; a path too long for its address is bound and connected by its file name from
+its directory, as no public call takes a directory beside the address (`bindat` and `connectat`
+are in no SDK header). The sidecar transport acknowledges commands rather than sending each both
+ways, so the store holds only what the socket couldn't carry; the network transport frames the same messages over Network.framework
 instead, which it needs for Bonjour. The store is files and a directory's dispatch source
 rather than `NSFilePresenter` (file coordination across processes would bind both apps to it for
 every write) or a Darwin notification (a name to agree on and a second step to read what

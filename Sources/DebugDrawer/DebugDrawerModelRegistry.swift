@@ -9,6 +9,13 @@ import Foundation
 // when the app says so. Rejected: plugins registering their models on install (an app would
 // expose what it never chose to), and a registry keyed by model type (two plugins can share a
 // model type; the plugin ID is what a viewer knows).
+//
+// It also remembers the IDs of the commands performed lately, across every server serving it, so a
+// command a sidecar sent over the socket and sent again through the store, once the socket went
+// before its acknowledgement arrived, is performed once. The newest `rememberedCommands` are kept:
+// what a viewer sends again is what it sent last, unacknowledged. Rejected: remembering them in
+// each session (the socket's and the store's are different sessions), and on disk (a command
+// performed in a process since killed acted on models that went with it).
 
 #if DEBUG
     /// The plugin models an app offers to viewers outside its drawer, each under its plugin's ID.
@@ -32,6 +39,11 @@ import Foundation
         private(set) var models: [String: RegisteredModel] = [:]
         /// What to tell when a model is registered or unregistered, by the token that removes it.
         private var observers: [UUID: @MainActor (String) -> Void] = [:]
+        /// The IDs of the commands performed lately, and the order they came in, oldest first.
+        private var performedCommands: Set<UUID> = []
+        private var performedOrder: [UUID] = []
+        /// How many command IDs are remembered.
+        static let rememberedCommands = 4096
 
         /// An empty registry.
         public init() {}
@@ -66,6 +78,18 @@ import Foundation
 
         func removeObserver(_ token: UUID) {
             observers[token] = nil
+        }
+
+        /// Whether the command `id` names arrives for the first time, which it then no longer
+        /// does: `false` when it was performed, by any server of this registry, among the last
+        /// ``rememberedCommands``.
+        func isFirstDelivery(of id: UUID) -> Bool {
+            guard performedCommands.insert(id).inserted else { return false }
+            performedOrder.append(id)
+            if performedOrder.count > Self.rememberedCommands {
+                performedCommands.remove(performedOrder.removeFirst())
+            }
+            return true
         }
 
         private func notify(_ id: String) {

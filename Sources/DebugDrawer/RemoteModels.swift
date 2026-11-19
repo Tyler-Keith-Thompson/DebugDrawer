@@ -12,6 +12,11 @@ import os
 // a command only to an app that takes them, and an unsubscribe, once a plugin's last transport is
 // released, only to an app that has the capability. An app it shares no protocol version with
 // closes the connection, and every connect waiting or made after it throws `incompatibleVersion`.
+//
+// Each command goes with an ID. To an app that acknowledges commands, it is kept until its
+// acknowledgement arrives, in the order sent, so a sidecar whose stream ends can send what wasn't
+// acknowledged through the store (`DebugDrawerSidecarTransport`); the app performs an ID once,
+// however it arrives. To an app that doesn't, nothing is kept, as nothing would ever take it off.
 
 #if DEBUG
     /// The snapshots a connection has received, by plugin ID, and the transports reading them.
@@ -37,6 +42,14 @@ import os
         package private(set) var peer = TransportPeer()
         /// Why the connection closed, once it has: what a connect throws from then on.
         private var closedBecause: DebugDrawerTransportError?
+        /// The commands sent to an app that acknowledges them and not yet acknowledged, oldest
+        /// first.
+        private(set) var unacknowledgedCommands: [TransportMessage] = []
+        /// Whether the app has said a hello this build agrees with.
+        private var hasAgreed = false
+        /// Who waits for ``handshake()``: each hears whether the app said a hello this build
+        /// agrees with before the connection closed.
+        private var handshakeWaiters: [AsyncStream<Bool>.Continuation] = []
 
         /// The viewer's side of a connection over `link`; on a stream it says hello at once.
         ///
@@ -67,11 +80,16 @@ import os
         package func receive(_ message: TransportMessage) {
             guard !isClosed else { return }
             switch peer.admit(message) {
-            case .agreed, .ignored:
+            case .agreed:
+                hasAgreed = true
+                finishHandshake(true)
+            case .ignored:
                 return
             case .incompatible:
                 close(because: .incompatibleVersion)
                 disconnect()
+            case let .deliver(message) where message.kind == .acknowledgement:
+                unacknowledgedCommands.removeAll { $0.commandID == message.commandID }
             case let .deliver(message):
                 // On a stream, a snapshot of a plugin released since arrived after its
                 // unsubscribe left: dropped, so a later connect asks afresh rather than reading it.
@@ -89,6 +107,37 @@ import os
         /// connects still waiting throw ``DebugDrawerTransportError/disconnected``.
         package func close() {
             close(because: .disconnected)
+        }
+
+        /// Waits for the app's hello: `true` once it said one this build agrees with, `false` when
+        /// the connection closes, or the waiting task is cancelled, first. An app of version 1
+        /// says none, so this waits until the connection closes.
+        func handshake() async -> Bool {
+            if hasAgreed { return true }
+            if isClosed { return false }
+            let (agreement, agreed) = AsyncStream<Bool>.makeStream(bufferingPolicy: .bufferingNewest(1))
+            handshakeWaiters.append(agreed)
+            for await isAgreed in agreement {
+                return isAgreed
+            }
+            return false
+        }
+
+        /// Sends `message`, a command with an ID, keeping it until acknowledged when the app
+        /// acknowledges commands on a stream: `false`, and nothing sent, once the connection is
+        /// closed.
+        func send(command message: TransportMessage) -> Bool {
+            guard !isClosed else { return false }
+            guard peer.uses(.commands) else {
+                Self.logger.notice("Dropped a command for \(message.pluginID, privacy: .public): the app doesn't take commands")
+                return true
+            }
+            // The store acknowledges nothing: the app removing the file is what takes a command.
+            if link == .stream, peer.uses(.acknowledgements) {
+                unacknowledgedCommands.append(message)
+            }
+            send(message)
+            return true
         }
 
         /// A transport to the plugin `pluginID`, made once its first snapshot is in. It holds
@@ -126,12 +175,8 @@ import os
             }
             return DebugDrawerPluginTransport(initial: initial, snapshots: snapshots) { [self] command in
                 withExtendedLifetime(connection) {}
-                guard !isClosed, let payload = try? TransportMessage.payload(command) else { return }
-                guard peer.uses(.commands) else {
-                    Self.logger.notice("Dropped a command for \(pluginID, privacy: .public): the app doesn't take commands")
-                    return
-                }
-                send(TransportMessage(kind: .command, pluginID: pluginID, payload: payload))
+                guard let payload = try? TransportMessage.payload(command) else { return }
+                _ = send(command: TransportMessage(kind: .command, pluginID: pluginID, payload: payload, commandID: UUID()))
             }
         }
 
@@ -139,10 +184,20 @@ import os
         private func close(because reason: DebugDrawerTransportError) {
             guard !isClosed else { return }
             closedBecause = reason
+            finishHandshake(false)
             let all = readers.values.flatMap(\.values)
             readers = [:]
             for reader in all {
                 reader(nil)
+            }
+        }
+
+        private func finishHandshake(_ isAgreed: Bool) {
+            let waiters = handshakeWaiters
+            handshakeWaiters = []
+            for waiter in waiters {
+                waiter.yield(isAgreed)
+                waiter.finish()
             }
         }
 

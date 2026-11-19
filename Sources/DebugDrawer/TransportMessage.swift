@@ -17,6 +17,11 @@ import Foundation
 // each side sends as it connects (`TransportHello`). A kind this build doesn't know decodes as
 // `unknown`, so a newer peer's message reaches the receiver, which drops and logs it
 // (`TransportPeer`), rather than failing to decode where nothing would notice.
+//
+// A command carries a `commandID` beside its payload, which its acknowledgement names back, so a
+// command is performed once however many ways it arrives. It is a key of the envelope, left out
+// when absent, rather than inside the payload: the payload is the plugin's own command, which the
+// envelope never reads, and an older build ignores a key it doesn't know.
 
 #if DEBUG
     /// One message between the process holding plugin models and a viewer of them.
@@ -33,8 +38,13 @@ import Foundation
             case unsubscribe
             /// Models to viewer: the plugin's state now, its `Snapshot` as JSON.
             case snapshot
-            /// Viewer to models: do this, the plugin's `Command` as JSON.
+            /// Viewer to models: do this, the plugin's `Command` as JSON, under its
+            /// ``TransportMessage/commandID``.
             case command
+            /// Models to viewer: the command ``TransportMessage/commandID`` names was performed (or
+            /// dropped, as no model took it), sent only to a peer with
+            /// ``TransportCapability/acknowledgements``.
+            case acknowledgement
             /// A kind this build doesn't know, by its name: a newer peer's. Receivers drop it.
             case unknown(String)
 
@@ -46,6 +56,7 @@ import Foundation
                 case "unsubscribe": self = .unsubscribe
                 case "snapshot": self = .snapshot
                 case "command": self = .command
+                case "acknowledgement": self = .acknowledgement
                 default: self = .unknown(name)
                 }
             }
@@ -58,6 +69,7 @@ import Foundation
                 case .unsubscribe: "unsubscribe"
                 case .snapshot: "snapshot"
                 case .command: "command"
+                case .acknowledgement: "acknowledgement"
                 case let .unknown(name): name
                 }
             }
@@ -84,6 +96,10 @@ import Foundation
         /// The plugin's snapshot or command, or the hello, encoded as JSON; empty for
         /// ``Kind/subscribe`` and ``Kind/unsubscribe``.
         var payload = Data()
+        /// What names a command, so its ``Kind/acknowledgement`` can name it back and the models'
+        /// side performs it once however many ways it arrives; `nil` for every other kind, and
+        /// left out of the JSON then.
+        package var commandID: UUID?
 
         /// A hello saying `hello`.
         static func hello(_ hello: TransportHello) -> TransportMessage {

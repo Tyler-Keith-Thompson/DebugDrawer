@@ -12,10 +12,11 @@
 /// A connection to the plugin models of an app: hands out a ``DebugDrawerPluginTransport`` for a
 /// plugin, by the ID its model was registered under.
 ///
-/// Three transports conform: ``DebugDrawerInProcessTransport`` in the app's own process,
-/// ``DebugDrawerSocketTransport`` to an app that runs while the viewer does, and
+/// Four transports conform: ``DebugDrawerInProcessTransport`` in the app's own process,
+/// ``DebugDrawerSocketTransport`` to an app that runs while the viewer does,
 /// ``DebugDrawerAppGroupStoreTransport`` to the snapshots an app left in a shared directory, read
-/// even while it is suspended. The app offers its models through a ``DebugDrawerModelRegistry``,
+/// even while it is suspended, and ``DebugDrawerSidecarTransport``, which uses the socket while
+/// the app answers on it and the store while it doesn't. The app offers its models through a ``DebugDrawerModelRegistry``,
 /// which a ``DebugDrawerSocketServer`` or a ``DebugDrawerAppGroupStoreServer`` serves.
 ///
 /// ```swift

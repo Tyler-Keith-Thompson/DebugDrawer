@@ -10,8 +10,9 @@ import Foundation
     ///
     /// Commands reach the app as soon as it reads them, and each snapshot it publishes arrives as
     /// it changes. When the app quits or stops the server, the transports this handed out keep
-    /// their last snapshot, commands sent to them are dropped, and ``isConnected`` turns `false`:
-    /// a viewer observing it can switch to a ``DebugDrawerAppGroupStoreTransport``. The transports
+    /// their last snapshot, commands sent to them are dropped, and ``isConnected`` turns `false`.
+    /// A sidecar that should go on through the store then, and come back, holds a
+    /// ``DebugDrawerSidecarTransport``, which does both without losing a command. The transports
     /// it hands out hold it open; it disconnects on ``close()``, or once neither it nor any of
     /// them is held.
     ///
@@ -27,11 +28,11 @@ import Foundation
         /// Connects to the server listening at `socketPath`.
         ///
         /// - Parameter socketPath: The server's ``DebugDrawerSocketServer/socketPath``.
-        /// - Throws: ``DebugDrawerTransportError/socketPathTooLong`` when the path doesn't fit a
-        ///   socket's address, and ``DebugDrawerTransportError/unreachable`` when nothing listens
+        /// - Throws: ``DebugDrawerTransportError/socketPathTooLong`` when the socket's file name
+        ///   doesn't fit a socket's address, and ``DebugDrawerTransportError/unreachable`` when nothing listens
         ///   there.
         public init(socketPath: String) throws(DebugDrawerTransportError) {
-            guard UnixSocketAddress.make(socketPath) != nil else { throw .socketPathTooLong }
+            guard UnixSocketAddress.isReachable(socketPath) else { throw .socketPathTooLong }
             guard let descriptor = UnixSocketAddress.connect(to: socketPath) else { throw .unreachable }
             let connection = SocketConnection(descriptor: descriptor)
             let models = RemoteModels(link: .stream) {
@@ -77,6 +78,23 @@ import Foundation
         /// Disconnects from the app. The transports this handed out keep their last snapshot.
         public func close() {
             connection.close()
+        }
+
+        /// Waits for the app's hello: `true` once it said one this build agrees with, `false` when
+        /// the connection closes first.
+        func handshake() async -> Bool {
+            await models.handshake()
+        }
+
+        /// Sends `message`, a command with an ID: `false`, and nothing sent, once the connection
+        /// is closed.
+        func send(command message: TransportMessage) -> Bool {
+            models.send(command: message)
+        }
+
+        /// The commands sent to an app that acknowledges them, and not acknowledged, oldest first.
+        var unacknowledgedCommands: [TransportMessage] {
+            models.unacknowledgedCommands
         }
     }
 #else

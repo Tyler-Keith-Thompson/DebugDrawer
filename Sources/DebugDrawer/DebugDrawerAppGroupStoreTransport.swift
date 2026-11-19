@@ -28,6 +28,16 @@ import os
         private let models: RemoteModels
         /// What each snapshot file held when last read, so only a changed one is decoded.
         private var read: [URL: Data] = [:]
+        /// How many commands this has left, which orders the files of those left in one
+        /// nanosecond.
+        private var sequence = 0
+        /// Whether the snapshot files are read as they change: a sidecar on the socket stops
+        /// reading them, and reads what changed meanwhile when it starts again.
+        var isReading = true {
+            didSet {
+                if isReading, !oldValue { readSnapshots() }
+            }
+        }
 
         /// Reads the store in `directory`, making it if it doesn't exist, so the app's first
         /// snapshots are seen as they land.
@@ -41,11 +51,11 @@ import os
             guard layout.create(), let watcher = DirectoryWatcher(directory: layout.snapshots) else { throw .unreachable }
             self.layout = layout
             self.watcher = watcher
-            var sequence = 0
+            weak var leaving: DebugDrawerAppGroupStoreTransport?
             models = RemoteModels(link: .store) { message in
-                sequence += 1
-                Self.leave(StoreDocument(message), in: layout, sequence: sequence)
+                _ = leaving?.leave(message)
             }
+            leaving = self
             readSnapshots()
             Task { [weak self] in
                 for await _ in watcher.changes {
@@ -76,8 +86,17 @@ import os
             try await models.connect(toPlugin: pluginID, snapshot: snapshot, command: command, holding: self)
         }
 
+        /// Leaves `message`, a command, in the store for the app.
+        ///
+        /// - Returns: The command's file, or `nil` when it couldn't be left.
+        func leave(_ message: TransportMessage) -> URL? {
+            sequence += 1
+            return Self.leave(StoreDocument(message), in: layout, sequence: sequence)
+        }
+
         /// Reads each snapshot file that changed since it was last read.
         private func readSnapshots() {
+            guard isReading else { return }
             for file in layout.messageFiles(in: layout.snapshots) {
                 guard let data = try? Data(contentsOf: file), read[file] != data else { continue }
                 read[file] = data
@@ -93,7 +112,7 @@ import os
             }
         }
 
-        private static func leave(_ document: StoreDocument, in layout: AppGroupStoreLayout, sequence: Int) {
+        private static func leave(_ document: StoreDocument, in layout: AppGroupStoreLayout, sequence: Int) -> URL? {
             let time = String(format: "%020llu", clock_gettime_nsec_np(CLOCK_REALTIME))
             let count = String(format: "%010ld", sequence)
             let file = layout.commands.appending(path: "\(time)-\(count)-\(UUID().uuidString).json", directoryHint: .notDirectory)
@@ -103,17 +122,18 @@ import os
                 guard data.count <= AppGroupStoreLayout.maximumCommandBytes else {
                     let bytes = data.count
                     logger.error("Didn't leave a command for \(pluginID, privacy: .public): \(bytes, privacy: .public) bytes won't fit")
-                    return
+                    return nil
                 }
                 try layout.write(data, to: file)
             } catch {
                 logger.error("Couldn't leave a command for \(pluginID, privacy: .public): \(error.localizedDescription, privacy: .public)")
-                return
+                return nil
             }
             let removed = layout.trimCommands()
             if removed > 0 {
                 logger.notice("Removed the \(removed, privacy: .public) oldest commands waiting in the store, which was full")
             }
+            return file
         }
     }
 #else

@@ -189,39 +189,37 @@
     // WritingPlugins.md
     @MainActor
     func counterTransport(container: URL) async throws -> DebugDrawerPluginTransport<CounterModel.Snapshot, CounterModel.Command> {
-        let connection: any DebugDrawerTransport
-        do {
-            connection = try DebugDrawerSocketTransport(socketPath: container.appending(path: "drawer.sock").path)
-        } catch {
-            connection = try DebugDrawerAppGroupStoreTransport(directory: container.appending(path: "DebugDrawer"))
-        }
-        return try await connection.connect(toPlugin: "MyApp.CounterPlugin", snapshot: CounterModel.Snapshot.self, command: CounterModel.Command.self)
+        let sidecar = try DebugDrawerSidecarTransport(
+            socketPath: container.appending(path: "drawer.sock").path,
+            storeDirectory: container.appending(path: "DebugDrawer")
+        )
+        return try await sidecar.connect(toPlugin: "MyApp.CounterPlugin", snapshot: CounterModel.Snapshot.self, command: CounterModel.Command.self)
     }
 
     @MainActor
     @Suite("Documentation examples")
     struct DocumentationExamplesTests {
-        // The container stands in for an app group's: a short path in /tmp, as a socket's address
-        // holds 103 bytes and the test's temporary directory can be longer.
+        // The container stands in for an app group's: a directory in the test's temporary one,
+        // however long its path. The transport's first snapshot may come from the store, before
+        // the app's hello arrives over the socket; a command lands either way.
         @Test(
-            "Writing plugins: a viewer reaches a shared model over the socket while the app serves it, and through the store after",
+            "Writing plugins: a sidecar's transport carries a command while the app serves the socket, and another once it stops",
             .timeLimit(.minutes(1))
         )
         func modelFromAnotherProcess() async throws {
-            let container = URL(filePath: "/tmp/dd-\(UUID().uuidString.prefix(8))", directoryHint: .isDirectory)
+            let container = FileManager.default.temporaryDirectory.appending(path: "DocumentationExamplesTests-\(UUID().uuidString)")
             try FileManager.default.createDirectory(at: container, withIntermediateDirectories: true)
             let model = CounterModel()
             let sharing = try CounterSharing(model: model, container: container)
 
-            let live = try await counterTransport(container: container)
-            live.send(.increment)
-            for await snapshot in live.snapshots() where snapshot.count == 1 {
+            let sut = try await counterTransport(container: container)
+            sut.send(.increment)
+            for await snapshot in sut.snapshots() where snapshot.count == 1 {
                 break
             }
             sharing.socketServer.stop()
-            let fromStore = try await counterTransport(container: container)
-            fromStore.send(.increment)
-            for await snapshot in fromStore.snapshots() where snapshot.count == 2 {
+            sut.send(.increment)
+            for await snapshot in sut.snapshots() where snapshot.count == 2 {
                 break
             }
 

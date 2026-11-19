@@ -35,7 +35,7 @@
         func encodesSchemaAndWriter() throws {
             let sut = StoreDocument(TransportMessage(kind: .snapshot, pluginID: "Count", payload: Data("{}".utf8)))
             let expected = #"{"kind":"snapshot","payload":"e30=","pluginID":"Count","schemaVersion":2,"version":1,"#
-                + #""writer":{"capabilities":["commands","unsubscribe"],"oldestVersion":1,"version":2}}"#
+                + #""writer":{"capabilities":["commands","unsubscribe","acknowledgements"],"oldestVersion":1,"version":2}}"#
 
             let actual = try String(bytes: sut.encoded(), encoding: .utf8)
 

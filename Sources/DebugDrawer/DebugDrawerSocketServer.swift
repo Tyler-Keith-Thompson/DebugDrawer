@@ -18,7 +18,9 @@ import os
     /// try server.start()
     /// ```
     ///
-    /// A socket's path holds at most 103 bytes. Release builds get a stand-in that serves nothing.
+    /// The path can be of any length, a group container's in the iOS simulator included; the
+    /// socket's file name, its last component, holds at most 103 bytes. Release builds get a
+    /// stand-in that serves nothing.
     @MainActor
     public final class DebugDrawerSocketServer {
         private static let logger = Logger(subsystem: "DebugDrawer", category: "DebugDrawerSocketServer")
@@ -47,12 +49,12 @@ import os
 
         /// Makes the socket and listens on it. Does nothing while the server runs.
         ///
-        /// - Throws: ``DebugDrawerTransportError/socketPathTooLong`` when the path doesn't fit a
-        ///   socket's address, and ``DebugDrawerTransportError/cannotServe`` when something else
+        /// - Throws: ``DebugDrawerTransportError/socketPathTooLong`` when the socket's file name
+        ///   doesn't fit a socket's address, and ``DebugDrawerTransportError/cannotServe`` when something else
         ///   is at the path or the socket can't be made.
         public func start() throws(DebugDrawerTransportError) {
             guard listener == nil else { return }
-            guard UnixSocketAddress.make(socketPath) != nil else { throw .socketPathTooLong }
+            guard UnixSocketAddress.isReachable(socketPath) else { throw .socketPathTooLong }
             try removeStaleSocket()
             let listener = try SocketListener(path: socketPath)
             self.listener = listener

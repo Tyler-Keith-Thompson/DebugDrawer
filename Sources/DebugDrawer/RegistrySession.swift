@@ -7,7 +7,10 @@ import os
 // plugin's snapshots as messages and performs the commands that come back, through the registry,
 // so a model registered after a viewer asked for it is forwarded from then on, and one registered
 // anew is forwarded afresh. On a stream it says hello first, and closes a viewer it shares no
-// protocol version with (`TransportPeer`).
+// protocol version with (`TransportPeer`). A command with an ID is performed only the first time
+// the registry sees that ID, then acknowledged on a stream to a viewer that has the capability,
+// once performed, so an acknowledgement means the command landed. The store needs none: removing
+// its file is what takes the command.
 
 #if DEBUG
     /// Serves a ``DebugDrawerModelRegistry``'s models to one viewer, or one store, as messages.
@@ -16,6 +19,7 @@ import os
         private static let logger = Logger(subsystem: "DebugDrawer", category: "RegistrySession")
 
         private let registry: DebugDrawerModelRegistry
+        private let link: TransportLink
         private let send: @MainActor (TransportMessage) -> Void
         private let disconnect: @MainActor () -> Void
         /// Forwards each wanted plugin's snapshots while its model is registered.
@@ -42,6 +46,7 @@ import os
             disconnect: @escaping @MainActor () -> Void = {}
         ) {
             self.registry = registry
+            self.link = link
             self.send = send
             self.disconnect = disconnect
             registryObservation = registry.observe { [weak self] id in self?.registrationChanged(id) }
@@ -95,6 +100,14 @@ import os
                 guard wanted?.remove(message.pluginID) != nil else { return }
                 forwarding.removeValue(forKey: message.pluginID)?.cancel()
             case .command:
+                // Acknowledged once done with, performed or not, so the viewer never sends it again.
+                defer {
+                    if let id = message.commandID { acknowledge(id, of: message.pluginID) }
+                }
+                if let id = message.commandID, !registry.isFirstDelivery(of: id) {
+                    Self.logger.debug("Skipped a command for \(message.pluginID, privacy: .public) already performed")
+                    return
+                }
                 guard let model = registry.models[message.pluginID] else {
                     Self.logger.notice("Dropped a command for \(message.pluginID, privacy: .public): no model is registered")
                     return
@@ -102,9 +115,16 @@ import os
                 if !model.perform(message.payload) {
                     Self.logger.error("Dropped a command for \(message.pluginID, privacy: .public) that didn't decode")
                 }
-            case .snapshot, .hello, .unknown:
+            case .snapshot, .hello, .acknowledgement, .unknown:
                 Self.logger.debug("Ignored a \(message.kind.name, privacy: .public) sent to the models' side")
             }
+        }
+
+        /// Tells the viewer the command `id` names is done with, on a stream to a viewer that
+        /// listens for it.
+        private func acknowledge(_ id: UUID, of pluginID: String) {
+            guard link == .stream, peer.uses(.acknowledgements) else { return }
+            send(TransportMessage(kind: .acknowledgement, pluginID: pluginID, commandID: id))
         }
 
         private func registrationChanged(_ id: String) {

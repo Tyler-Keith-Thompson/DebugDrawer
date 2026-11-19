@@ -74,7 +74,7 @@ import os
                     Self.logger.notice("Ignored a message of kind \(kind, privacy: .public), which this build doesn't know; later ones go unlogged")
                 }
                 return .ignored
-            case .subscribe, .unsubscribe, .snapshot, .command:
+            case .subscribe, .unsubscribe, .snapshot, .command, .acknowledgement:
                 return .deliver(message)
             }
         }

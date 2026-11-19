@@ -45,6 +45,10 @@ import Foundation
         /// The viewer says when it no longer shows a plugin, and the models' side stops sending
         /// that plugin's snapshots. Since version 2.
         static let unsubscribe = TransportCapability(rawValue: "unsubscribe")
+        /// The models' side acknowledges each command it performs, and performs a command it has
+        /// seen once only: a viewer whose stream ends sends what wasn't acknowledged another way.
+        /// Since version 2.
+        static let acknowledgements = TransportCapability(rawValue: "acknowledgements")
     }
 
     /// What a side of a connection speaks: the protocol's major version, the oldest it still
@@ -58,7 +62,7 @@ import Foundation
         var capabilities: [TransportCapability]
 
         /// What this build speaks: version 2, back to version 1.
-        package static let current = TransportHello(version: 2, oldestVersion: 1, capabilities: [.commands, .unsubscribe])
+        package static let current = TransportHello(version: 2, oldestVersion: 1, capabilities: [.commands, .unsubscribe, .acknowledgements])
 
         /// What a peer that never says hello speaks: the protocol's first version, which had no
         /// hello and took commands.

@@ -49,6 +49,7 @@ and the API a host calls compiles to stand-ins that do nothing.
 - ``DebugDrawerSocketTransport``
 - ``DebugDrawerAppGroupStoreServer``
 - ``DebugDrawerAppGroupStoreTransport``
+- ``DebugDrawerSidecarTransport``
 - ``DebugDrawerTransportError``
 
 ### Building a Plugin's View

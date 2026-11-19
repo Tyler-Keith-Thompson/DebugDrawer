@@ -23,10 +23,10 @@ import os
         /// - Throws: ``DebugDrawerTransportError/socketPathTooLong`` or
         ///   ``DebugDrawerTransportError/cannotServe``.
         init(path: String) throws(DebugDrawerTransportError) {
-            guard let address = UnixSocketAddress.make(path) else { throw .socketPathTooLong }
+            guard UnixSocketAddress.isReachable(path) else { throw .socketPathTooLong }
             let descriptor = socket(AF_UNIX, SOCK_STREAM, 0)
             guard descriptor >= 0 else { throw .cannotServe }
-            guard UnixSocketAddress.withSocketAddress(address, { bind(descriptor, $0, $1) }) == 0,
+            guard UnixSocketAddress.bind(descriptor, to: path),
                   listen(descriptor, SOMAXCONN) == 0 else {
                 Darwin.close(descriptor)
                 throw .cannotServe
