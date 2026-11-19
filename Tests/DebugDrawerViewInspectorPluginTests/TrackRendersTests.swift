@@ -91,10 +91,10 @@
 
             let app = try sut.inspect()
             let texts = app.findAll(ViewType.Text.self).compactMap { try? $0.string() }
-            let plugin = try ViewInspectorPluginView().inspect()
+            let plugin = try ViewInspectorPluginView(transport: .direct(to: ViewInspectorModel.shared)).inspect()
             let pluginTexts = plugin.findAll(ViewType.Text.self).compactMap { try? $0.string() }
             try plugin.find(ViewType.Toggle.self) { try $0.labelView().text().string() == "Flash Renders" }.tap()
-            _ = try ViewInspectorPluginView().inspect().findAll(ViewType.Text.self)
+            _ = try ViewInspectorPluginView(transport: .direct(to: ViewInspectorModel.shared)).inspect().findAll(ViewType.Text.self)
             let actual = RenderTracker.shared.counts
             RenderFlashSetting.shared.isOn = flashesWereOn
 

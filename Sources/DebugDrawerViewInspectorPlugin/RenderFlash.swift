@@ -1,19 +1,5 @@
 #if DEBUG
-    import Combine
     import SwiftUI
-
-    /// Whether tracked views flash their frame when their body is evaluated.
-    ///
-    /// Apart from `RenderTracker`, so that a flash, which reads this, doesn't redraw each time the
-    /// counts are published.
-    @MainActor
-    final class RenderFlashSetting: ObservableObject {
-        /// The setting the plugin's Flash Renders row changes.
-        static let shared = RenderFlashSetting()
-
-        /// Off until the plugin turns it on.
-        @Published var isOn = false
-    }
 
     /// A tracked view's frame, drawn for a moment each time `trigger` changes, while flashes are on
     /// and Reduce Motion is off.

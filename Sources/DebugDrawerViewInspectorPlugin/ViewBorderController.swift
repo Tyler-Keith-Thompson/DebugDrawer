@@ -88,7 +88,7 @@
         }
 
         /// The grid's color.
-        public enum GridColor: String, CaseIterable {
+        public enum GridColor: String, CaseIterable, Codable, Sendable {
             case blue, red, green, white, gray
 
             var color: Color {
@@ -119,11 +119,6 @@
         ///   own; by default every visible one.
         init(appWindows: @escaping @MainActor () -> [Window] = ViewBorderController.visibleAppWindows) {
             self.appWindows = appWindows
-        }
-
-        /// The app's key window, not the drawer's when its search field has focus.
-        static var keyWindow: Window? {
-            debugDrawerAppKeyWindow
         }
 
         /// Whether any overlay is on, so the overlay windows must exist.
@@ -293,6 +288,54 @@
             overlays.removeAll()
         }
     }
+
+    // MARK: - The model's overlay service
+
+    extension ViewBorderController: ViewInspectorOverlayService {
+        var overlaySettings: ViewInspectorOverlaySettings {
+            get {
+                ViewInspectorOverlaySettings(
+                    isBordersEnabled: isBordersEnabled,
+                    isGridEnabled: isGridEnabled,
+                    gridSpacing: Double(gridSpacing),
+                    gridColor: gridColor,
+                    gridOpacity: gridOpacity,
+                    isClickIndicatorEnabled: isClickIndicatorEnabled,
+                    animationSpeed: animationSpeed
+                )
+            }
+            set {
+                // Only what differs: each switch's didSet does the work of turning it on or off.
+                update(\.isBordersEnabled, to: newValue.isBordersEnabled)
+                update(\.isGridEnabled, to: newValue.isGridEnabled)
+                update(\.gridSpacing, to: CGFloat(newValue.gridSpacing))
+                update(\.gridColor, to: newValue.gridColor)
+                update(\.gridOpacity, to: newValue.gridOpacity)
+                update(\.isClickIndicatorEnabled, to: newValue.isClickIndicatorEnabled)
+                update(\.animationSpeed, to: newValue.animationSpeed)
+            }
+        }
+
+        func install() {
+            #if os(iOS)
+                // Mac Catalyst is os(iOS) here on purpose: its windows are UIWindows, which take
+                // touches and clicks through sendEvent(_:), so the iOS swizzle is the right path.
+                // macOS observes clicks with an NSEvent monitor that the switch starts and stops.
+                ClickIndicatorMonitor.install()
+            #endif
+        }
+
+        func uninstall() {
+            turnEverythingOff()
+            #if os(iOS)
+                ClickIndicatorMonitor.uninstall()
+            #endif
+        }
+
+        private func update<Value: Equatable>(_ keyPath: ReferenceWritableKeyPath<ViewBorderController, Value>, to value: Value) {
+            if self[keyPath: keyPath] != value { self[keyPath: keyPath] = value }
+        }
+    }
 #elseif !DEBUG
     import Combine
     import CoreGraphics
@@ -322,7 +365,7 @@
         @Published public var animationSpeed: Double = 1.0
 
         /// The grid's color.
-        public enum GridColor: String, CaseIterable {
+        public enum GridColor: String, CaseIterable, Codable, Sendable {
             case blue, red, green, white, gray
         }
 

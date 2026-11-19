@@ -14,7 +14,7 @@
         static let shared = RenderTracker()
 
         /// A tracked name and how many times its body was evaluated.
-        struct Entry: Identifiable, Equatable {
+        struct Entry: Identifiable, Codable, Equatable, Sendable {
             /// The name given to `.trackRenders(_:)`.
             let id: String
             /// How many body evaluations were recorded under the name.

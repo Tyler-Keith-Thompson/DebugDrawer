@@ -1,4 +1,3 @@
-import Combine
 import DebugDrawer
 import SwiftUI
 
@@ -24,7 +23,7 @@ public struct ViewInspectorPlugin: DebugDrawerPlugin {
 
     public var body: some View {
         #if DEBUG
-            ViewInspectorPluginView()
+            ViewInspectorPluginView(transport: .direct(to: ViewInspectorModel.shared))
         #else
             EmptyView()
         #endif
@@ -35,16 +34,17 @@ public struct ViewInspectorPlugin: DebugDrawerPlugin {
     /// nothing.
     @MainActor public func install(in drawer: DebugDrawer) {
         #if DEBUG
-            ViewInspectorInstallation.install(for: drawer)
+            ViewInspectorModel.shared.install(in: ObjectIdentifier(drawer))
         #endif
     }
 
     /// Once no drawer holds the plugin, turns the borders, grid, click indicators, render flashes
-    /// and slowed animations off, removes the overlay windows, forgets the render counts and stops
-    /// counting, and on iOS gives `UIWindow.sendEvent(_:)` UIKit's implementation back.
+    /// and slowed animations off, removes the overlay windows, forgets the render counts and the
+    /// hierarchy snapshot and stops counting, and on iOS gives `UIWindow.sendEvent(_:)` UIKit's
+    /// implementation back.
     @MainActor public func uninstall(from drawer: DebugDrawer) {
         #if DEBUG
-            ViewInspectorInstallation.uninstall(for: drawer)
+            ViewInspectorModel.shared.uninstall(from: ObjectIdentifier(drawer))
         #endif
     }
 }
@@ -64,147 +64,7 @@ public extension DebugDrawer {
     }
 }
 
-#if DEBUG
-    /// What the View Inspector plugin's install and uninstall change, counted by drawer: it works
-    /// while any drawer holds the plugin.
-    @MainActor
-    enum ViewInspectorInstallation {
-        private static var drawers: Set<ObjectIdentifier> = []
-
-        static func install(for drawer: DebugDrawer) {
-            drawers.insert(ObjectIdentifier(drawer))
-            RenderTracker.shared.isTracking = true
-            #if os(iOS)
-                // Mac Catalyst is os(iOS) here on purpose: its windows are UIWindows, which take
-                // touches and clicks through sendEvent(_:), so the iOS swizzle is the right path.
-                // macOS observes clicks with an NSEvent monitor that the switch starts and stops.
-                ClickIndicatorMonitor.install()
-            #endif
-        }
-
-        static func uninstall(for drawer: DebugDrawer) {
-            guard drawers.remove(ObjectIdentifier(drawer)) != nil, drawers.isEmpty else { return }
-            ViewBorderController.shared.turnEverythingOff()
-            RenderFlashSetting.shared.isOn = false
-            RenderTracker.shared.isTracking = false
-            RenderTracker.shared.reset()
-            #if os(iOS)
-                ClickIndicatorMonitor.uninstall()
-            #endif
-        }
-    }
-#endif
-
-#if DEBUG
-    #if os(macOS)
-    import AppKit
-    #elseif os(iOS)
-    import UIKit
-    #endif
-
-    struct ViewInspectorPluginView: View {
-        @ObservedObject private var controller = ViewBorderController.shared
-        @ObservedObject private var renderTracker = RenderTracker.shared
-        @ObservedObject private var flashSetting = RenderFlashSetting.shared
-        @State private var hierarchy: ViewNode?
-        @State private var isHierarchyExpanded = false
-        @State private var searchText = ""
-
-        var body: some View {
-            DebugDrawerSection("Overlays") {
-                DebugDrawerRow("View Borders", isOn: $controller.isBordersEnabled)
-                DebugDrawerRow("Alignment Grid", isOn: $controller.isGridEnabled)
-
-                if controller.isGridEnabled {
-                    DebugDrawerRow("Grid Spacing") {
-                        Slider(value: $controller.gridSpacing, in: 4 ... 32, step: 4)
-                            .accessibilityLabel("Grid spacing")
-                            .accessibilityValue("\(Int(controller.gridSpacing)) points")
-                    } accessory: {
-                        Text("\(Int(controller.gridSpacing)) pt")
-                            .debugDrawerFont(.value)
-                            .accessibilityHidden(true)
-                    }
-
-                    DebugDrawerRow("Grid Color") {
-                        Picker("Grid color", selection: $controller.gridColor) {
-                            ForEach(ViewBorderController.GridColor.allCases, id: \.self) { gridColor in
-                                // Each segment shows the grid's own color, the choice it makes.
-                                Circle()
-                                    .fill(gridColor.color)
-                                    .frame(width: 8, height: 8)
-                                    .accessibilityLabel(gridColor.rawValue)
-                                    .tag(gridColor)
-                            }
-                        }
-                        .pickerStyle(.segmented)
-                        .fixedSize()
-                        .accessibilityLabel("Grid color")
-                        .accessibilityElement(children: .contain)
-                    }
-
-                    DebugDrawerRow("Grid Opacity") {
-                        Slider(value: $controller.gridOpacity, in: 0.05 ... 0.5)
-                            .accessibilityLabel("Grid opacity")
-                    } accessory: {
-                        Text(controller.gridOpacity, format: .percent.precision(.fractionLength(0)))
-                            .debugDrawerFont(.value)
-                            .accessibilityHidden(true)
-                    }
-                }
-
-                DebugDrawerRow("Click Indicators", isOn: $controller.isClickIndicatorEnabled)
-            }
-
-            DebugDrawerSection("Animation") {
-                AnimationSpeedRow(slowdown: $controller.animationSpeed)
-            }
-
-            // Counts only views the app tracks with .trackRenders(_:); the drawer tracks none of its own.
-            DebugDrawerSection("SwiftUI Renders") {
-                DebugDrawerRow("Flash Renders", isOn: $flashSetting.isOn)
-                RenderCountList(entries: renderTracker.entries) { renderTracker.reset() }
-            }
-
-            DebugDrawerSection("View Hierarchy") {
-                DebugDrawerActionRow {
-                    Button(isHierarchyExpanded ? "Collapse" : "Snapshot") {
-                        if isHierarchyExpanded {
-                            isHierarchyExpanded = false
-                            hierarchy = nil
-                        } else {
-                            snapshotHierarchy()
-                        }
-                    }
-                    .accessibilityLabel(isHierarchyExpanded ? "Collapse the view hierarchy" : "Snapshot the view hierarchy")
-                }
-
-                if isHierarchyExpanded, let root = hierarchy {
-                    DebugDrawerSearchableList("Filter...", text: $searchText, accessibilityLabel: "Filter views by class, label or role") {
-                        ViewNodeRow(node: root, depth: 0, filter: searchText)
-                    }
-                }
-            }
-        }
-
-        private func snapshotHierarchy() {
-            #if os(macOS)
-            guard let contentView = debugDrawerAppKeyWindow?.contentView else { return }
-            hierarchy = ViewNode.build(from: contentView)
-            isHierarchyExpanded = true
-            #elseif os(iOS)
-            guard let window = ViewBorderController.keyWindow,
-                  let rootView = window.rootViewController?.view
-            else { return }
-            hierarchy = ViewNode.build(from: rootView)
-            isHierarchyExpanded = true
-            #endif
-        }
-    }
-
-#else
-    import SwiftUI
-
+#if !DEBUG
     public extension View {
         /// Returns the view unchanged: release builds draw no grid.
         ///

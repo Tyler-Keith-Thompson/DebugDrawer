@@ -86,9 +86,9 @@
             let presentation = DrawerPresentation()
             presentation.isOpen = true
             _ = try DebugDrawerOverlay(drawer: .shared, presentation: presentation).inspect().findAll(ViewType.Text.self)
-            let plugin = try ViewInspectorPluginView().inspect()
+            let plugin = try ViewInspectorPluginView(transport: .direct(to: ViewInspectorModel.shared)).inspect()
             try plugin.find(ViewType.Toggle.self) { try $0.labelView().text().string() == "Flash Renders" }.tap()
-            _ = try ViewInspectorPluginView().inspect().findAll(ViewType.Text.self)
+            _ = try ViewInspectorPluginView(transport: .direct(to: ViewInspectorModel.shared)).inspect().findAll(ViewType.Text.self)
             RenderFlashSetting.shared.isOn = false
         }
     }
