@@ -1,5 +1,6 @@
 // iOS scales text with Dynamic Type, so the large-text snapshots run on the iOS simulator.
 #if os(iOS) && !targetEnvironment(macCatalyst)
+    import DebugDrawer
     import SnapshotTesting
     import SwiftUI
     import Testing
@@ -9,16 +10,28 @@
     // ImageRenderer draws UIKit-backed controls (text fields, pickers, switches) as placeholders,
     // so each view is hosted in a window that is never shown and its layer rendered, at a fixed
     // width and scale, so the reference doesn't depend on which simulator runs it.
+    /// A clock that reads out the uptimes it is given, one a read.
+    private final class FakeClock: UptimeClock {
+        private var uptimes: [TimeInterval]
+        init(_ uptimes: [TimeInterval]) { self.uptimes = uptimes }
+        var uptime: TimeInterval { uptimes.removeFirst() }
+    }
+
+    /// A process that started at `uptime`.
+    private struct FakeProcessStart: ProcessStartReader {
+        let uptime: TimeInterval?
+        func processStartUptime() -> TimeInterval? { uptime }
+    }
+
     @MainActor
     @Suite(.timeLimit(.minutes(1)))
     struct LaunchTimeDynamicTypeSnapshotTests {
         @Test("The measured launch time stays readable at a large accessibility text size")
         func measured() throws {
             // Process start at 100.0 s of uptime, install at 100.4 s, first frame at 100.9 s.
-            var uptimes = [100.4, 100.9]
-            let tracker = LaunchTimeTracker(clock: { uptimes.removeFirst() }, processStartUptime: 100.0)
-            tracker.recordFirstFrame()
-            let sut = LaunchTimePluginView(tracker: tracker)
+            let model = LaunchTimeModel(clock: FakeClock([100.4, 100.9]), processStart: FakeProcessStart(uptime: 100.0))
+            model.perform(LaunchTimeCommand(.recordFirstFrame))
+            let sut = LaunchTimePluginView(transport: .direct(to: model))
             let controller = UIHostingController(rootView: sut
                 .frame(width: 320, alignment: .leading)
                 // No height proposed, as the drawer's scroll view proposes none.
@@ -51,8 +64,8 @@
 
         @Test("The still-measuring message stays readable at a large accessibility text size")
         func measuring() throws {
-            let tracker = LaunchTimeTracker(clock: { 100.4 }, processStartUptime: 100.0)
-            let sut = LaunchTimePluginView(tracker: tracker)
+            let model = LaunchTimeModel(clock: FakeClock([100.4]), processStart: FakeProcessStart(uptime: 100.0))
+            let sut = LaunchTimePluginView(transport: .direct(to: model))
             let controller = UIHostingController(rootView: sut
                 .frame(width: 320, alignment: .leading)
                 // No height proposed, as the drawer's scroll view proposes none.

@@ -8,9 +8,16 @@
     @Suite("Launch Time install and uninstall")
     struct LaunchTimeLifecycleTests {
         /// A clock the test moves by hand.
-        private final class FakeClock {
+        private final class FakeClock: UptimeClock {
             var now: TimeInterval
             init(_ now: TimeInterval) { self.now = now }
+            var uptime: TimeInterval { now }
+        }
+
+        /// A process that started at `uptime`.
+        private struct FakeProcessStart: ProcessStartReader {
+            let uptime: TimeInterval?
+            func processStartUptime() -> TimeInterval? { uptime }
         }
 
         @Test("Unregistering the plugin before the first frame removes it and the run-loop observer waiting for the frame")
@@ -19,17 +26,18 @@
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let drawer = DebugDrawer(defaults: defaults)
-            let tracker = LaunchTimeTracker(clock: { 10 }, processStartUptime: 9)
-            let sut = LaunchTimePlugin(tracker: tracker)
+            let firstFrame = _FirstFrameObserver()
+            let model = LaunchTimeModel(clock: FakeClock(10), processStart: FakeProcessStart(uptime: 9), firstFrameObserver: firstFrame)
+            let sut = LaunchTimePlugin(model: model)
             drawer.registerGlobal(sut)
-            let observer = try #require(tracker.firstFrameObserver)
+            let observer = try #require(firstFrame.runLoopObserver)
 
             drawer.unregisterGlobal(id: sut.id)
 
             #expect(!drawer.globalPlugins.contains { $0.id == sut.id })
-            #expect(tracker.firstFrameObserver == nil)
+            #expect(firstFrame.runLoopObserver == nil)
             #expect(!CFRunLoopObserverIsValid(observer))
-            #expect(tracker.firstFrameUptime == nil)
+            #expect(model.firstFrameUptime == nil)
         }
 
         @Test("Installing again waits for the first frame again; uninstalling twice is harmless")
@@ -38,18 +46,19 @@
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let drawer = DebugDrawer(defaults: defaults)
-            let tracker = LaunchTimeTracker(clock: { 10 }, processStartUptime: 9)
-            let sut = LaunchTimePlugin(tracker: tracker)
+            let firstFrame = _FirstFrameObserver()
+            let model = LaunchTimeModel(clock: FakeClock(10), processStart: FakeProcessStart(uptime: 9), firstFrameObserver: firstFrame)
+            let sut = LaunchTimePlugin(model: model)
             drawer.registerGlobal(sut)
             sut.uninstall(from: drawer)
             sut.uninstall(from: drawer)
 
             sut.install(in: drawer)
-            let isObserving = tracker.firstFrameObserver != nil
+            let isObserving = firstFrame.runLoopObserver != nil
             drawer.unregisterGlobal(id: sut.id)
 
             #expect(isObserving)
-            #expect(tracker.firstFrameObserver == nil)
+            #expect(firstFrame.runLoopObserver == nil)
         }
 
         @Test("In two drawers the plugin waits for the first frame until the last one uninstalls it")
@@ -59,17 +68,18 @@
             defer { defaults.removePersistentDomain(forName: suite) }
             let first = DebugDrawer(defaults: defaults)
             let second = DebugDrawer(defaults: defaults)
-            let tracker = LaunchTimeTracker(clock: { 10 }, processStartUptime: 9)
-            let sut = LaunchTimePlugin(tracker: tracker)
+            let firstFrame = _FirstFrameObserver()
+            let model = LaunchTimeModel(clock: FakeClock(10), processStart: FakeProcessStart(uptime: 9), firstFrameObserver: firstFrame)
+            let sut = LaunchTimePlugin(model: model)
             first.registerGlobal(sut)
             second.registerGlobal(sut)
 
             first.unregisterGlobal(id: sut.id)
-            let isObservingWithOneLeft = tracker.firstFrameObserver != nil
+            let isObservingWithOneLeft = firstFrame.runLoopObserver != nil
             second.unregisterGlobal(id: sut.id)
 
             #expect(isObservingWithOneLeft)
-            #expect(tracker.firstFrameObserver == nil)
+            #expect(firstFrame.runLoopObserver == nil)
         }
 
         @Test("Uninstalling after the first frame keeps the times measured")
@@ -79,15 +89,15 @@
             defer { defaults.removePersistentDomain(forName: suite) }
             let drawer = DebugDrawer(defaults: defaults)
             let clock = FakeClock(10)
-            let tracker = LaunchTimeTracker(clock: { clock.now }, processStartUptime: 9)
-            let sut = LaunchTimePlugin(tracker: tracker)
+            let model = LaunchTimeModel(clock: clock, processStart: FakeProcessStart(uptime: 9))
+            let sut = LaunchTimePlugin(model: model)
             drawer.registerGlobal(sut)
             clock.now = 10.5
-            tracker.recordFirstFrame()
+            model.perform(LaunchTimeCommand(.recordFirstFrame))
 
             drawer.unregisterGlobal(id: sut.id)
 
-            #expect(tracker.firstFrameUptime == 10.5)
+            #expect(model.firstFrameUptime == 10.5)
         }
     }
 #endif

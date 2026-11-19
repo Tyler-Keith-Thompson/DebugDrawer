@@ -13,18 +13,18 @@
         func uninstallRemovesTheObserver() async {
             await #expect(processExitsWith: .success) {
                 let isExpected = await MainActor.run {
-                    let tracker = LaunchTimeTracker.shared
+                    guard let firstFrame = LaunchTimeModel.shared.firstFrameObserver as? _FirstFrameObserver else { return false }
                     DebugDrawer.shared.installLaunchTime()
-                    guard let installed = tracker.firstFrameObserver else { return false }
+                    guard let installed = firstFrame.runLoopObserver else { return false }
                     let isInstalled = CFRunLoopObserverIsValid(installed)
                         && CFRunLoopContainsObserver(CFRunLoopGetMain(), installed, .commonModes)
                     DebugDrawer.shared.unregisterGlobal(id: "LaunchTimePlugin")
                     DebugDrawer.shared.unregisterGlobal(id: "LaunchTimePlugin")
-                    let isUninstalled = tracker.firstFrameObserver == nil && !CFRunLoopObserverIsValid(installed)
+                    let isUninstalled = firstFrame.runLoopObserver == nil && !CFRunLoopObserverIsValid(installed)
                         && !CFRunLoopContainsObserver(CFRunLoopGetMain(), installed, .commonModes)
                         && !DebugDrawer.shared.globalPlugins.contains { $0.id == "LaunchTimePlugin" }
                     DebugDrawer.shared.installLaunchTime()
-                    let isReinstalled = tracker.firstFrameObserver.map(CFRunLoopObserverIsValid) == true
+                    let isReinstalled = firstFrame.runLoopObserver.map(CFRunLoopObserverIsValid) == true
                     return isInstalled && isUninstalled && isReinstalled
                 }
                 exit(isExpected ? EXIT_SUCCESS : EXIT_FAILURE)
@@ -39,7 +39,7 @@
                     DebugDrawer.shared.installLaunchTime()
                     DebugDrawer.shared.unregisterGlobal(id: "LaunchTimePlugin")
                     DebugDrawer.shared.installLaunchTime()
-                    for await uptime in LaunchTimeTracker.shared.$firstFrameUptime.values where uptime != nil {
+                    for await uptime in LaunchTimeModel.shared.$firstFrameUptime.values where uptime != nil {
                         return uptime
                     }
                     return nil
