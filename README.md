@@ -584,9 +584,38 @@ The console reads the app's os_log lines from its unified log every two seconds,
 kill can come before it has read the last ones. On macOS, where the app may read the system's log
 (`OSLogStore(scope: .system)`; an app outside the App Sandbox, run by an administrator, may), the
 next launch reads those lines from it and adds them to the end of the earlier session (a launch
-that starts before the system has taken in a crashed process's last lines misses them). Elsewhere,
-and on iOS, where a process reads only its own log, a session keeps what its launch read. A session
-that kept no line and missed none is deleted at the next launch.
+that starts before the system has taken in a crashed process's last lines misses them). Elsewhere
+a session keeps what its launch read. A session that kept no line and missed none is deleted at
+the next launch.
+
+In an app signed with the App Sandbox the system's log doesn't open: `OSLogStore(scope: .system)`
+throws "Connection to logd failed" (`OSLogError` 10), so the lines are lost as on iOS. A sandboxed
+app's debug build can read it with these temporary exceptions in its entitlements, which App
+Review doesn't accept, so keep them out of what you ship:
+
+```xml
+<key>com.apple.security.temporary-exception.mach-lookup.global-name</key>
+<array>
+    <string>com.apple.logd</string>
+    <string>com.apple.logd.admin</string>
+    <string>com.apple.logd.events</string>
+</array>
+<key>com.apple.security.temporary-exception.files.absolute-path.read-only</key>
+<array>
+    <string>/private/var/db/diagnostics/</string>
+    <string>/private/var/db/uuidtext/</string>
+</array>
+```
+
+On iOS, Mac Catalyst included, the os_log lines of up to the last two seconds before a crash are
+lost. A process there reads only its own log (`OSLogStore(scope: .currentProcessIdentifier)`),
+and at the next launch that holds none of the earlier process's lines, though the system still
+has them. Nothing public reads another process's log on iOS or tells the app of an os_log call as
+it is made, and a crash's signal handler can't read the log safely, so the plugin doesn't try. A
+line that has to outlive a crash can go through `ConsoleLogSink` (see "Console: your own logger"):
+its lines are written to the session as they arrive, not every two seconds. A line logged through
+both `os.Logger` and the sink shows twice. On the simulator the Mac can show the lost lines for a
+while after the crash: `xcrun simctl spawn booted log show --last 5m --predicate 'process == "YourApp"'`.
 
 While an earlier session is kept, the console offers Captured and Previous. Previous shows the
 newest earlier session, read-only, with a menu of the others by start and size, the app version
