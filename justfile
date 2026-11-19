@@ -10,6 +10,11 @@ BAZEL_RELEASE := "bazel --output_base=" + home_directory() + "/Library/Caches/ba
 # TOOLCHAINS (or first on PATH via swiftly) can fail to read the SDK's Testing module.
 SWIFT := "env -u TOOLCHAINS xcrun --toolchain default swift"
 
+# Every xcodebuild recipe compiles with Xcode's compilation caching, in one store under
+# ~/Library/Caches that every checkout shares (scripts/xcode_cache.py), so a fresh worktree replays
+# what another already compiled instead of building it all again. SwiftPM's own `swift build` has
+# no such setting, so spm-test-mac still compiles everything in a new worktree.
+
 [doc('Build everything (default)')]
 all: build
 
@@ -61,8 +66,11 @@ test-ios *env="":
     fi
     skips=$(python3 {{PROJECT_ROOT}}/scripts/modules.py performance-targets | sed 's/^/-skip-testing:/')
     skipped=$(python3 {{PROJECT_ROOT}}/scripts/test_skips.py xcodebuild)
+    derived={{PROJECT_ROOT}}/.build/xcode-ios
+    settings=$(python3 {{PROJECT_ROOT}}/scripts/xcode_cache.py "$derived")
+    cache=(); while IFS= read -r setting; do cache+=("$setting"); done <<< "$settings"
     env {{env}} xcodebuild test -quiet -scheme DebugDrawer-Package -destination "$destination" \
-        -derivedDataPath {{PROJECT_ROOT}}/.build/xcode-ios $skips $skipped
+        -derivedDataPath "$derived" "${cache[@]}" $skips $skipped
 
 [doc('Delete the simulator just test-ios made for this checkout (run it before removing a worktree)')]
 ios-simulator-delete:
@@ -143,9 +151,12 @@ spm:
 spm-platform platform:
     #!/usr/bin/env bash
     set -euo pipefail
+    derived={{PROJECT_ROOT}}/.build/xcode-{{lowercase(platform)}}
+    settings=$(python3 {{PROJECT_ROOT}}/scripts/xcode_cache.py "$derived")
+    cache=(); while IFS= read -r setting; do cache+=("$setting"); done <<< "$settings"
     for module in $(python3 {{PROJECT_ROOT}}/scripts/modules.py platform-modules {{platform}}); do
         xcodebuild build -quiet -scheme "$module" -destination 'generic/platform={{platform}} Simulator' \
-            -derivedDataPath {{PROJECT_ROOT}}/.build/xcode-{{lowercase(platform)}} SWIFT_TREAT_WARNINGS_AS_ERRORS=YES
+            -derivedDataPath "$derived" "${cache[@]}" SWIFT_TREAT_WARNINGS_AS_ERRORS=YES
     done
 
 [doc('Build the visionOS modules through SwiftPM for the visionOS simulator')]
@@ -159,10 +170,13 @@ spm-visionos: (spm-platform "visionOS")
 spm-platform-test platform destination:
     #!/usr/bin/env bash
     set -euo pipefail
+    derived={{PROJECT_ROOT}}/.build/xcode-{{lowercase(platform)}}
+    settings=$(python3 {{PROJECT_ROOT}}/scripts/xcode_cache.py "$derived" --tests)
+    cache=(); while IFS= read -r setting; do cache+=("$setting"); done <<< "$settings"
     for scheme in $(python3 {{PROJECT_ROOT}}/scripts/modules.py platform-test-schemes {{platform}}); do
         skipped=$(python3 {{PROJECT_ROOT}}/scripts/test_skips.py xcodebuild "$scheme")
         xcodebuild test -quiet -scheme "$scheme" -destination '{{destination}}' \
-            -derivedDataPath {{PROJECT_ROOT}}/.build/xcode-{{lowercase(platform)}} $skipped
+            -derivedDataPath "$derived" "${cache[@]}" $skipped
     done
 
 # The simulator `just spm-visionos-test` runs the visionOS tests in.
@@ -182,9 +196,12 @@ spm-watchos: (spm-platform "watchOS")
 spm-catalyst:
     #!/usr/bin/env bash
     set -euo pipefail
+    derived={{PROJECT_ROOT}}/.build/xcode-catalyst
+    settings=$(python3 {{PROJECT_ROOT}}/scripts/xcode_cache.py "$derived")
+    cache=(); while IFS= read -r setting; do cache+=("$setting"); done <<< "$settings"
     for module in $(python3 {{PROJECT_ROOT}}/scripts/modules.py catalyst-modules); do
         xcodebuild build -quiet -scheme "$module" -destination 'generic/platform=macOS,variant=Mac Catalyst' \
-            -derivedDataPath {{PROJECT_ROOT}}/.build/xcode-catalyst SWIFT_TREAT_WARNINGS_AS_ERRORS=YES
+            -derivedDataPath "$derived" "${cache[@]}" SWIFT_TREAT_WARNINGS_AS_ERRORS=YES
     done
 
 # The package holds every Example/iOS file and every example library and product their imports
@@ -206,10 +223,13 @@ spm-catalyst-test:
     set -euo pipefail
     skips=$(python3 {{PROJECT_ROOT}}/scripts/modules.py performance-targets | sed 's/^/-skip-testing:/')
     skipped=$(python3 {{PROJECT_ROOT}}/scripts/test_skips.py xcodebuild)
+    derived={{PROJECT_ROOT}}/.build/xcode-catalyst-test
+    settings=$(python3 {{PROJECT_ROOT}}/scripts/xcode_cache.py "$derived" --tests)
+    cache=(); while IFS= read -r setting; do cache+=("$setting"); done <<< "$settings"
     home=$(mktemp -d)
     trap 'rm -rf "$home"' EXIT
     xcodebuild test -quiet -scheme DebugDrawer-Package -destination 'platform=macOS,variant=Mac Catalyst' \
-        -derivedDataPath {{PROJECT_ROOT}}/.build/xcode-catalyst-test TEST_RUNNER_CFFIXED_USER_HOME="$home" $skips $skipped
+        -derivedDataPath "$derived" "${cache[@]}" TEST_RUNNER_CFFIXED_USER_HOME="$home" $skips $skipped
 
 # Plugins keep their files in Application Support and Caches under the home folder, which on macOS
 # Foundation reads from CFFIXED_USER_HOME (never HOME), so the test process and every exit test's

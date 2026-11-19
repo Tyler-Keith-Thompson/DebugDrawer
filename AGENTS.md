@@ -29,6 +29,8 @@ Benchmarks/                      The interception benchmarks: a SwiftPM package 
 scripts/modules.py               The module graph
 scripts/catalyst_example.py      The iOS example as a Mac Catalyst app: a SwiftPM package derived from Example's sources
 scripts/test_skips.py            SKIP_TESTS as each SwiftPM test runner takes it (swift test's --skip, xcodebuild's -skip-testing:)
+scripts/xcode_cache.py           The settings with which every xcodebuild recipe shares compile results between checkouts
+                                 (Xcode's compilation caching, in ~/Library/Caches/debugdrawer-xcode-cas)
 scripts/release.py               The release gates `just deploy` runs (changelog entry, API breaks)
 scripts/sign_example.py          Re-signs the Mac example `just run` installs with the Keychain's Apple Development identity
 tools/                           Bazel rule wrappers (warnings as errors, Swift 6 mode), DocC rules;
