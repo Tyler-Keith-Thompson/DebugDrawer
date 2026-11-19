@@ -2,7 +2,7 @@
     import DebugDrawer
     import Foundation
 
-    extension HTTPCookie {
+    extension StoredCookie {
         /// The cookie's value, or the mask when the rules call it sensitive: they mask the
         /// `Cookie` header, or the cookie's name contains a key pattern.
         func redactedValue(_ redaction: DebugDrawerRedaction) -> String {
@@ -16,13 +16,12 @@
         func report(redaction: DebugDrawerRedaction) -> String {
             var report = "HTTP Cookies (\(count))\n"
             report += String(repeating: "=", count: 40) + "\n"
-            for stored in self {
-                let cookie = stored.cookie
+            for cookie in self {
                 report += "\nName: \(cookie.name)\n"
                 report += "Value: \(cookie.redactedValue(redaction))\n"
                 report += "Domain: \(cookie.domain)\n"
                 report += "Path: \(cookie.path)\n"
-                report += "Store: \(stored.store.title)\n"
+                report += "Store: \(cookie.store.title)\n"
                 report += "Secure: \(cookie.isSecure)\n"
                 if let expires = cookie.expiresDate {
                     report += "Expires: \(expires)\n"

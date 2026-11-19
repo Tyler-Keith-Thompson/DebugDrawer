@@ -5,7 +5,7 @@
     import Testing
 
     @MainActor
-    @Suite("HTTP Cookies drops the cookies it read once removed from every drawer")
+    @Suite("HTTP Cookies drops the cookies it read once removed from every drawer", .timeLimit(.minutes(1)))
     struct CookiesUninstallTests {
         private static func drawer() throws -> (DebugDrawer, () -> Void) {
             let suite = "CookiesUninstallTests.\(UUID().uuidString)"
@@ -21,16 +21,22 @@
             let model = CookiesModel(jar: jar)
             let sut = CookiesPlugin(model: model)
             drawer.registerGlobal(sut)
-            await model.reload()
-            model.filter = "sess"
-            let readWhileInstalled = model.allCookies.count
+            let transport = DebugDrawerPluginTransport.direct(to: model)
+            let snapshots = transport.snapshots()
+            transport.send(CookiesCommand(.reload))
+            transport.send(CookiesCommand(.setFilter("sess")))
+            var readWhileInstalled = 0
+            for await snapshot in snapshots where snapshot.contents != .unread {
+                readWhileInstalled = snapshot.allCookies.count
+                break
+            }
 
             drawer.unregisterGlobal(id: sut.id)
 
             #expect(readWhileInstalled == 1)
             #expect(!drawer.globalPlugins.contains { $0.id == sut.id })
-            #expect(model.allCookies.isEmpty)
-            #expect(model.filter == "sess")
+            #expect(model.snapshot.allCookies.isEmpty)
+            #expect(model.snapshot.filter == "sess")
             #expect(jar.stored.count == 1)
         }
 
@@ -45,9 +51,16 @@
 
             sut.uninstall(from: drawer)
             drawer.registerGlobal(sut)
-            await model.reload()
+            let transport = DebugDrawerPluginTransport.direct(to: model)
+            let snapshots = transport.snapshots()
+            transport.send(CookiesCommand(.reload))
+            var actual = 0
+            for await snapshot in snapshots where snapshot.contents != .unread {
+                actual = snapshot.allCookies.count
+                break
+            }
 
-            #expect(model.allCookies.count == 1)
+            #expect(actual == 1)
         }
     }
 #endif

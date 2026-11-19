@@ -15,10 +15,6 @@
         @Environment(\.accessibilityReduceMotion) private var reduceMotion
         @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
-        private var cookie: HTTPCookie {
-            stored.cookie
-        }
-
         var body: some View {
             VStack(alignment: .leading, spacing: 2) {
                 if dynamicTypeSize.isAccessibilitySize {
@@ -55,29 +51,29 @@
                         .accessibilityHidden(true)
                     // One line cut in the middle, as the UserDefaults keys are, until expanded;
                     // VoiceOver reads it whole.
-                    Text(cookie.name)
+                    Text(stored.name)
                         .debugDrawerFont(.code)
                         .fontWeight(.medium)
                         .debugDrawerForegroundStyle(.primary)
                         .lineLimit(isExpanded ? nil : 1)
                         .truncationMode(.middle)
-                        .help(cookie.name)
+                        .help(stored.name)
                 }
             }
             .debugDrawerButtonStyle(.plain)
-            .accessibilityLabel(cookie.name)
+            .accessibilityLabel(stored.name)
             .accessibilityValue(isExpanded ? "Expanded" : "Collapsed")
         }
 
         private func location(alignment: HorizontalAlignment) -> some View {
             VStack(alignment: alignment, spacing: 0) {
                 // Cut in the middle like the name, and whole once the cookie is expanded.
-                Text(cookie.domain)
+                Text(stored.domain)
                     .debugDrawerFont(.code)
                     .debugDrawerForegroundStyle(.tertiary)
                     .lineLimit(isExpanded ? nil : 1)
                     .truncationMode(.middle)
-                    .help(cookie.domain)
+                    .help(stored.domain)
                 Text(stored.store.title)
                     .debugDrawerFont(.secondary)
                     .debugDrawerForegroundStyle(.tertiary)
@@ -93,7 +89,7 @@
                 Image(systemName: "trash")
             }
             .debugDrawerButtonStyle(.borderless)
-            .accessibilityLabel("Delete \(cookie.name) from \(stored.store.title)")
+            .accessibilityLabel("Delete \(stored.name) from \(stored.store.title)")
         }
     }
 #endif

@@ -1,5 +1,6 @@
 // ViewInspector is linked on Apple platforms only, and the views are tested on the Mac.
 #if os(macOS)
+    import DebugDrawer
     @testable import DebugDrawerCookiesPlugin
     import Foundation
     import SwiftUI
@@ -13,9 +14,13 @@
         func expandedStateStaysWithItsCookie() async throws {
             let first = CookieFixtures.stored("a_session")
             let jar = FakeCookieJar([first, CookieFixtures.stored("b_theme")])
-            let model = CookiesModel(jar: jar)
-            await model.reload()
-            let sut = CookiesPluginView(model: model)
+            let transport = DebugDrawerPluginTransport.direct(to: CookiesModel(jar: jar))
+            let snapshots = transport.snapshots()
+            transport.send(CookiesCommand(.reload))
+            for await snapshot in snapshots where snapshot.allCookies.count == 2 {
+                break
+            }
+            let sut = CookiesPluginView(transport: transport)
             var firstAfterTap = ""
             var secondAfterDelete = ""
             var detailsAfterDelete = -1
@@ -28,7 +33,10 @@
                     firstAfterTap = try view.find(ViewType.Button.self, where: { try $0.accessibilityLabel().string() == "a_session" })
                         .accessibilityValue().string()
                 }
-                await model.delete(first)
+                transport.send(CookiesCommand(.delete(first.id)))
+                for await snapshot in snapshots where snapshot.allCookies.count == 1 {
+                    break
+                }
                 try await sut.inspection.inspect { view in
                     secondAfterDelete = try view.find(ViewType.Button.self, where: { try $0.accessibilityLabel().string() == "b_theme" })
                         .accessibilityValue().string()
@@ -39,6 +47,41 @@
             #expect(firstAfterTap == "Expanded")
             #expect(secondAfterDelete == "Collapsed")
             #expect(detailsAfterDelete == 0)
+        }
+
+        @Test("Refresh, the filter and a row's delete reach the model as commands, and a filter shows only its matches")
+        func sendsCommands() throws {
+            let shown = CookieFixtures.stored("session", domain: "api.example.com")
+            let initial = CookiesSnapshot(
+                contents: .cookies([shown, CookieFixtures.stored("theme", domain: "web.example.com", in: .webView)]), filter: "api"
+            )
+            var sent: [CookiesCommand] = []
+            let sut = CookiesPluginView(transport: DebugDrawerPluginTransport(
+                initial: initial, snapshots: AsyncStream { $0.finish() }, send: { sent.append($0) }
+            ))
+            let expectedLabel = "1 of 2 cookies"
+
+            let view = try sut.inspect()
+            let label = try view.find(text: expectedLabel).string()
+            let rows = view.findAll(CookieRow.self).count
+            try view.find(button: "Refresh").tap()
+            try view.find(ViewType.TextField.self).setInput("web")
+            try view.find(ViewType.Button.self, where: { try $0.accessibilityLabel().string() == "Delete session from URLSession" }).tap()
+
+            #expect(label == expectedLabel)
+            #expect(rows == 1)
+            #expect(sent.count == 3)
+            if case .reload = sent.first?.action {} else { Issue.record("Refresh sent \(String(describing: sent.first?.action))") }
+            if case let .setFilter(filter) = sent.dropFirst().first?.action {
+                #expect(filter == "web")
+            } else {
+                Issue.record("The filter sent \(String(describing: sent.dropFirst().first?.action))")
+            }
+            if case let .delete(id) = sent.last?.action {
+                #expect(id == shown.id)
+            } else {
+                Issue.record("Delete sent \(String(describing: sent.last?.action))")
+            }
         }
 
         @Test("A row names the store its cookie is in, and its delete button says which")

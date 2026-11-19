@@ -20,13 +20,20 @@
             #endif
         }
 
-        func delete(_ cookie: StoredCookie) async {
-            switch cookie.store {
+        // The stores delete an `HTTPCookie`, so the one `id` names is looked up in its store as it
+        // is now; one no longer there is left alone.
+        func delete(_ id: StoredCookieID) async {
+            switch id.store {
             case .urlSession:
-                HTTPCookieStorage.shared.deleteCookie(cookie.cookie)
+                for cookie in HTTPCookieStorage.shared.cookies ?? [] where cookie.matches(id) {
+                    HTTPCookieStorage.shared.deleteCookie(cookie)
+                }
             case .webView:
                 #if canImport(WebKit) && !os(tvOS) && !os(watchOS)
-                    await WKWebsiteDataStore.default().httpCookieStore.deleteCookie(cookie.cookie)
+                    let store = WKWebsiteDataStore.default().httpCookieStore
+                    for cookie in await store.allCookies() where cookie.matches(id) {
+                        await store.deleteCookie(cookie)
+                    }
                 #endif
             }
         }

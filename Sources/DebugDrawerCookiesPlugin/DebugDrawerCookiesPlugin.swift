@@ -20,13 +20,15 @@ public struct CookiesPlugin: DebugDrawerPlugin {
     public var icon = "doc.plaintext"
 
     #if DEBUG
-        let model: CookiesModel
+        /// The model the plugin shows, or `nil` for the shared one.
+        private let model: CookiesModel?
 
         /// The plugin over the app's own cookie stores.
         public init() {
-            self.init(model: CookiesModel(jar: _CookieJar()))
+            model = nil
         }
 
+        /// - Parameter model: The model to show in place of the shared one.
         init(model: CookiesModel) {
             self.model = model
         }
@@ -37,7 +39,7 @@ public struct CookiesPlugin: DebugDrawerPlugin {
 
     public var body: some View {
         #if DEBUG
-            CookiesPluginView(model: model)
+            CookiesPluginView(transport: .direct(to: model ?? .shared))
         #else
             EmptyView()
         #endif
@@ -46,7 +48,7 @@ public struct CookiesPlugin: DebugDrawerPlugin {
     /// Counts `drawer` as one that holds the plugin; nothing is read until it is shown.
     @MainActor public func install(in drawer: DebugDrawer) {
         #if DEBUG
-            model.install(in: ObjectIdentifier(drawer))
+            (model ?? .shared).install(in: ObjectIdentifier(drawer))
         #endif
     }
 
@@ -54,7 +56,7 @@ public struct CookiesPlugin: DebugDrawerPlugin {
     /// stores' cookies are left as they are.
     @MainActor public func uninstall(from drawer: DebugDrawer) {
         #if DEBUG
-            model.uninstall(from: ObjectIdentifier(drawer))
+            (model ?? .shared).uninstall(from: ObjectIdentifier(drawer))
         #endif
     }
 }

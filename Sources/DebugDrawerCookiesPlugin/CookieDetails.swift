@@ -8,19 +8,15 @@
         let stored: StoredCookie
         let redaction: DebugDrawerRedaction
 
-        private var cookie: HTTPCookie {
-            stored.cookie
-        }
-
         var body: some View {
             VStack(alignment: .leading, spacing: 2) {
-                DebugDrawerKeyValueRow("Value", value: cookie.value, redacted: cookie.redactedValue(redaction))
-                DebugDrawerKeyValueRow("Domain", value: cookie.domain)
-                DebugDrawerKeyValueRow("Path", value: cookie.path)
+                DebugDrawerKeyValueRow("Value", value: stored.value, redacted: stored.redactedValue(redaction))
+                DebugDrawerKeyValueRow("Domain", value: stored.domain)
+                DebugDrawerKeyValueRow("Path", value: stored.path)
                 DebugDrawerKeyValueRow("Store", value: stored.store.title)
-                DebugDrawerKeyValueRow("Secure", value: cookie.isSecure ? "Yes" : "No")
-                DebugDrawerKeyValueRow("HTTP Only", value: cookie.isHTTPOnly ? "Yes" : "No")
-                if let expires = cookie.expiresDate {
+                DebugDrawerKeyValueRow("Secure", value: stored.isSecure ? "Yes" : "No")
+                DebugDrawerKeyValueRow("HTTP Only", value: stored.isHTTPOnly ? "Yes" : "No")
+                if let expires = stored.expiresDate {
                     DebugDrawerKeyValueRow("Expires", value: formatDate(expires))
                 } else {
                     DebugDrawerKeyValueRow("Expires", value: "Session")
