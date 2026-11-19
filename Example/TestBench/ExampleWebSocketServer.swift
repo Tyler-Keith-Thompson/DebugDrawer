@@ -8,9 +8,11 @@ import Network
 @MainActor
 public enum ExampleWebSocketServer {
     public nonisolated static let launchArgument = "-WebSocketEchoServer"
-    /// The port it listens on, on 127.0.0.1.
-    public nonisolated static let port: UInt16 = 8765
-    public nonisolated static let url = URL(string: "ws://127.0.0.1:\(port)/echo")
+    /// Its address once `start()` returns true. It listens on 127.0.0.1, on a port the system
+    /// picks, so two example apps (from two worktrees, say) each get one.
+    public nonisolated static var url: URL? {
+        listener?.port.flatMap { URL(string: "ws://127.0.0.1:\($0.rawValue)/echo") }
+    }
 
     /// Starts the server when the app was launched with the argument; compiles in release too,
     /// where it starts the server as well, since it is the example's, not the drawer's.
@@ -20,7 +22,7 @@ public enum ExampleWebSocketServer {
     }
 
     /// Starts the server unless it is running, and returns once it listens: true, or false when it
-    /// can't (the port is taken, say).
+    /// can't (the system refused the listener, say).
     public static func start() async -> Bool {
         switch state {
         case .ready:
@@ -71,7 +73,7 @@ public enum ExampleWebSocketServer {
         let webSocket = NWProtocolWebSocket.Options()
         webSocket.autoReplyPing = true
         parameters.defaultProtocolStack.applicationProtocols.insert(webSocket, at: 0)
-        parameters.requiredLocalEndpoint = .hostPort(host: "127.0.0.1", port: NWEndpoint.Port(rawValue: port) ?? .any)
+        parameters.requiredLocalEndpoint = .hostPort(host: "127.0.0.1", port: .any)
         let listener = try? NWListener(using: parameters)
         listener?.newConnectionHandler = { connection in
             connection.start(queue: queue)

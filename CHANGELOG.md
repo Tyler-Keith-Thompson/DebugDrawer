@@ -16,6 +16,7 @@ the entry becomes the GitHub release's notes.
 ### Changed
 
 - DD-211: Performance, Energy and App Info sample only while a drawer shows them, started by their `didBecomeVisible(in:)` and stopped by `didBecomeHidden(in:)`: App Info no longer reads the memory footprint and uptime every 2 seconds from launch, and Performance's display link and timer and Energy's timer follow the drawer's hooks rather than their views' appearance, so the views shown outside a drawer sample nothing.
+- DD-214: `just test-ios` runs each checkout on an iPad Pro 13-inch (M5) simulator of its own, made on first use and reused, so two worktrees can run it at once; `IOS_DESTINATION` still overrides it, and `just ios-simulator-delete` and `just ios-simulator-prune` delete those simulators. The example apps' WebSocket echo server listens on a port the system picks instead of 8765.
 
 ### Fixed
 

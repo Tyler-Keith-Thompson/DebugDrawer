@@ -37,15 +37,30 @@ record-snapshots:
 # fixed width and scale, so any simulator gives the same references. Like every SwiftPM run, it
 # builds the performance targets in debug and runs none of them (PERFORMANCE_TESTS in
 # scripts/modules.py); Bazel runs them, optimized under `just test-release`.
-IOS_DESTINATION := env("IOS_DESTINATION", "platform=iOS Simulator,name=iPad Pro 13-inch (M5)")
+# Each checkout runs on a simulator of its own (scripts/ios_simulator.py): an iPad Pro 13-inch (M5),
+# the snapshots' model, on the newest iOS runtime, made on first use and reused, so runs from two
+# worktrees don't launch their test hosts over each other. An IOS_DESTINATION given (CI's) wins.
+IOS_DESTINATION := env("IOS_DESTINATION", "")
 
-[doc('Run the SwiftPM tests on an iOS simulator (the Dynamic Type snapshots)')]
+[doc('Run the SwiftPM tests on an iOS simulator (the Dynamic Type snapshots), this checkout’s own unless IOS_DESTINATION names one')]
 test-ios *env="":
     #!/usr/bin/env bash
     set -euo pipefail
+    destination='{{IOS_DESTINATION}}'
+    if [ -z "$destination" ]; then
+        destination="platform=iOS Simulator,id=$(python3 {{PROJECT_ROOT}}/scripts/ios_simulator.py udid)"
+    fi
     skips=$(python3 {{PROJECT_ROOT}}/scripts/modules.py performance-targets | sed 's/^/-skip-testing:/')
-    env {{env}} xcodebuild test -quiet -scheme DebugDrawer-Package -destination '{{IOS_DESTINATION}}' \
+    env {{env}} xcodebuild test -quiet -scheme DebugDrawer-Package -destination "$destination" \
         -derivedDataPath {{PROJECT_ROOT}}/.build/xcode-ios $skips
+
+[doc('Delete the simulator just test-ios made for this checkout (run it before removing a worktree)')]
+ios-simulator-delete:
+    python3 {{PROJECT_ROOT}}/scripts/ios_simulator.py delete
+
+[doc('Delete the simulators just test-ios made for checkouts that no longer exist, such as removed worktrees')]
+ios-simulator-prune:
+    python3 {{PROJECT_ROOT}}/scripts/ios_simulator.py prune
 
 [doc('SwiftLint and a11y-check over every first-party target (tools/lint.bzl)')]
 lint:
