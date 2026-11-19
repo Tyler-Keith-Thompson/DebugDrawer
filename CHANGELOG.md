@@ -8,6 +8,10 @@ the entry becomes the GitHub release's notes.
 
 ## [Unreleased]
 
+### Fixed
+
+- DD-198: the test that checks a row's icon sits level with its title no longer crashes the whole iOS test process on an iPhone simulator. On a 3x screen the row's fitting height ends a third of a point into the test's 2x bitmap, whose partly clear last row read as ink across the full width; the bitmap is now whole pixels on white, and its scan reports a bitmap it can't read through `#require` instead of trapping.
+
 ## [0.1.3] - 2026-11-18
 
 ### Added

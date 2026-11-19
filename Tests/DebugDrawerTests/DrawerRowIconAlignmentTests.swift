@@ -8,11 +8,11 @@
     import UIKit
 
     // The row's icon and title are private parts of its layout, so each test hosts the row in a
-    // window that is never shown, draws it into a bitmap and finds them by their ink: the icon is
-    // the leftmost run of inked columns, the title is what follows it, and each one's line is its
-    // first run of inked rows. The icon is a filled circle and each title starts with letters as
-    // tall as a capital, so both inks are centred on the cap height when the icon sits on the
-    // title's baseline; a symbol like hand.tap reaches above it.
+    // window that is never shown, draws it into a bitmap and finds them by their ink (InkBitmap):
+    // the icon is the leftmost run of inked columns, the title is what follows it, and each one's
+    // line is its first run of inked rows. The icon is a filled circle and each title starts with
+    // letters as tall as a capital, so both inks are centred on the cap height when the icon sits
+    // on the title's baseline; a symbol like hand.tap reaches above it.
     @MainActor
     @Suite(.timeLimit(.minutes(1)))
     struct DrawerRowIconAlignmentTests {
@@ -60,7 +60,18 @@
             let scale = 2
             let format = UIGraphicsImageRendererFormat()
             format.scale = CGFloat(scale)
-            let image = UIGraphicsImageRenderer(size: size, format: format).image { context in
+            // On a 3x screen, like an iPhone's, the fitting size can end a third of a point into a 2x
+            // pixel, and that last row of pixels, partly clear, read as ink from edge to edge, which
+            // hid the gap between the icon and the title. So the bitmap is whole pixels, filled with
+            // white before the row draws on it.
+            let bitmapSize = CGSize(
+                width: (size.width * CGFloat(scale)).rounded(.up) / CGFloat(scale),
+                height: (size.height * CGFloat(scale)).rounded(.up) / CGFloat(scale)
+            )
+            format.opaque = true
+            let image = UIGraphicsImageRenderer(size: bitmapSize, format: format).image { context in
+                UIColor.white.setFill()
+                context.fill(CGRect(origin: .zero, size: bitmapSize))
                 controller.view.layer.render(in: context.cgContext)
             }
             window.isHidden = true
@@ -74,34 +85,12 @@
             ))
             context.draw(rendered, in: CGRect(x: 0, y: 0, width: width, height: height))
             let data = try #require(context.data)
-            let pixels = Array(UnsafeBufferPointer(start: data.assumingMemoryBound(to: UInt8.self), count: width * height * 4))
+            let pixels = UnsafeBufferPointer(start: data.assumingMemoryBound(to: UInt8.self), count: width * height * 4)
             // Ink: a pixel darker than the white background, down to a stepper's pale fill.
-            func inked(_ column: Int, _ row: Int) -> Bool {
-                let offset = (row * width + column) * 4
-                return pixels[offset ..< offset + 3].contains { $0 < 245 }
-            }
-            // The runs of true values, merging gaps up to `gap` pixels, which lie inside a glyph.
-            func runs(_ marks: [Bool], gap: Int) -> [ClosedRange<Int>] {
-                var result: [ClosedRange<Int>] = []
-                for index in marks.indices where marks[index] {
-                    if let last = result.last, index - last.upperBound <= gap {
-                        result[result.count - 1] = last.lowerBound ... index
-                    } else {
-                        result.append(index ... index)
-                    }
-                }
-                return result
-            }
-            // The icon and the title are at least the row's 8-point spacing apart; a symbol's own
-            // gaps are narrower than 4.
-            let columns = runs((0 ..< width).map { column in (0 ..< height).contains { row in inked(column, row) } }, gap: 4 * scale)
-            let iconColumns = try #require(columns.first)
-            // The title's first letters, past the icon: narrow enough to miss an accessory at the
-            // trailing edge, and above one stacked below the title.
-            let titleStart = iconColumns.upperBound + 4 * scale
-            let titleColumns = titleStart ... min(width - 1, titleStart + 16 * scale)
-            let iconLines = runs((0 ..< height).map { row in iconColumns.contains { column in inked(column, row) } }, gap: 2 * scale)
-            let titleLines = runs((0 ..< height).map { row in titleColumns.contains { column in inked(column, row) } }, gap: 2 * scale)
+            let bitmap = InkBitmap(width: width, height: height, ink: (0 ..< width * height).map { pixel in
+                pixels[pixel * 4 ..< pixel * 4 + 3].contains { $0 < 245 }
+            })
+            let (iconLines, titleLines) = try bitmap.iconAndTitleLines(scale: scale)
             let icon = try #require(iconLines.first)
             let title = try #require(titleLines.first)
             let tolerance: CGFloat = 2
