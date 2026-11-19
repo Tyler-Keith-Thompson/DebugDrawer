@@ -738,6 +738,8 @@ What the plugin doesn't capture, or can't keep as it was:
   loads them outside the app), web views' (`WKWebView`), AVFoundation's streaming (`AVPlayer`),
   Network.framework's connections and `URLSession` stream tasks. WebSocket tasks don't go through
   it either; their frames are recorded on the tasks themselves (Network WebSockets, below).
+- Requests to a host `installNetwork(bypassing:)` names aren't seen (Network: apps that pin
+  certificates, below).
 - A session made before `installNetwork()` is captured, but the plugin can't learn its
   configuration, so its requests are sent with the default one: the shared cookie storage, cache
   and credentials. Install at startup.
@@ -748,6 +750,52 @@ The log keeps the newest 200 requests (set
 `NetworkStore.shared.capacity` for another number) and the first megabyte of each request and
 response body, marked truncated with its full size beyond that; `installNetwork(bodyLimit:)` takes
 another limit. The server and the app always get the whole body.
+
+### Network: apps that pin certificates
+
+An app whose session delegate pins its server's certificate or key can count on these, with the
+Network plugin installed:
+
+- **The app's pin decides.** The plugin's session hands every TLS challenge to the app's task, so
+  the app's session delegate is asked about the server's trust as it is without the plugin, and its
+  answer is used. The plugin never trusts a server on its own. This holds for a session made before
+  `installNetwork()` too, which is sent with the default configuration but whose challenges still
+  go to its own delegate.
+- **A refused pin sends nothing.** When the delegate cancels the challenge, the connection ends in
+  its TLS handshake: the request line, the headers (an `Authorization` token among them) and the
+  body never reach the server, and the app's task fails with `URLError(.cancelled)`, as it does
+  without the plugin.
+- **A stream held open passes through.** Server-Sent Events and other long responses reach the app
+  as they arrive, while the response is still open, and the log keeps only the first `bodyLimit`
+  bytes however long the stream runs.
+
+What the tests don't cover:
+
+- **ATS pinning** (`NSPinnedDomains` in the app's Info.plist). The system reads it for every
+  `URLSession` in the app's process, the plugin's included, but no test shows the plugin's requests
+  are refused alike: ATS reads the key from the app's own Info.plist, which a test runner doesn't
+  have, and checks a pin only on top of the system's trust, which a test server's self-signed
+  certificate on a loopback address never gets.
+- **Pinning libraries.** Alamofire's `ServerTrustManager` and TrustKit's delegate swizzling check
+  the certificate in the session delegate, which gets the challenge as above, but neither library
+  is tested here.
+
+To keep a host out of the plugin entirely, bypass it:
+
+```swift
+import DebugDrawerNetworkPlugin
+
+DebugDrawer.shared.installNetwork(bypassing: ["api.example.com"])
+```
+
+The requests to a bypassed host, and to its subdomains, never reach the plugin's URL protocol: the
+app's session sends them itself, with its own delegate, as if the plugin weren't installed. They
+aren't logged, mocked, conditioned or offered for resending, and their WebSocket tasks aren't
+recorded; the app's other traffic is captured as usual. A host is matched as an ignored one is
+(below): on whole labels, ignoring case, and an IP address matches only itself. Each call replaces
+the hosts an earlier one bypassed, and text that isn't a host traps, so a typo can't leave a pinned
+host intercepted. Where `ignoring:` only hides requests from the list, `bypassing:` keeps the plugin
+out of them.
 
 ### Network mocks: canned responses without changing the server
 

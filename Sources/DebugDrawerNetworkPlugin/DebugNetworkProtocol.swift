@@ -50,6 +50,8 @@
             // uninstalled; its requests then go to the system's protocols.
             guard !NetworkInterception.isUninstalled else { return false }
             guard URLProtocol.property(forKey: handledKey, in: request) == nil else { return false }
+            // A host the app bypassed goes to the system's protocols, on the app's own session.
+            guard !NetworkBypass.covers(request.url) else { return false }
             return request.url?.scheme == "http" || request.url?.scheme == "https"
         }
 

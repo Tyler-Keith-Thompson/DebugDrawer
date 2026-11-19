@@ -76,6 +76,13 @@ public extension DebugDrawer {
     ///   - ignoring: Hosts or domains to add to the saved ignore list (`"analytics.example.com"`),
     ///     whose requests, and their subdomains', the log hides until shown. One the list holds
     ///     already is skipped, and one that isn't a host is logged and skipped.
+    ///   - bypassing: Hosts or domains the plugin leaves alone (`"api.example.com"`), such as
+    ///     those whose certificates the app pins. Their requests, and their subdomains', never
+    ///     reach the plugin's URL protocol: the app's session sends them as it would without the
+    ///     plugin, and only its delegate sees their TLS challenges. The plugin doesn't log, mock,
+    ///     condition or resend them, and doesn't record their WebSocket tasks. Replaces the hosts
+    ///     an earlier call bypassed. Traps on one that isn't a host, so a typo can't let the
+    ///     plugin take requests the app meant to keep out.
     ///   - sessions: How many earlier launches' requests are kept on disk, in how many bytes,
     ///     and where; each request is written, redacted, as it completes, and the log shows
     ///     the earlier sessions under Previous. ``NetworkSessionPersistence/off`` writes none.
@@ -88,11 +95,14 @@ public extension DebugDrawer {
         mocks: [NetworkMockRule] = [],
         conditions: [NetworkConditionProfile] = [],
         ignoring: [String] = [],
+        bypassing: [String] = [],
         sessions: NetworkSessionPersistence = .standard,
         bodyLimit: Int = 1_048_576
     ) {
         #if DEBUG
             precondition(bodyLimit >= 0, "installNetwork(bodyLimit:) can't be negative")
+            // Before the URL protocol is registered, so no request to a bypassed host is taken.
+            NetworkBypass.bypass(bypassing)
             NetworkBodyCapture.limit.withLock { $0 = bodyLimit }
             NetworkMocksModel.shared.load(adding: mocks)
             NetworkConditionsModel.shared.load(adding: conditions)

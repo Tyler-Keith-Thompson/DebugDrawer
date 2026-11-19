@@ -112,10 +112,11 @@
             }
         }
 
-        /// Records `task` as a new connection, unless it is recorded already: the URL factories
-        /// make their task with the request factory, which records it first.
+        /// Records `task` as a new connection, unless it is recorded already (the URL factories
+        /// make their task with the request factory, which records it first) or its host is
+        /// bypassed (``NetworkBypass``).
         private static func opened(_ task: URLSessionWebSocketTask, url: URL?, protocols: [String]) -> URLSessionWebSocketTask {
-            guard connectionID(of: task) == nil else { return task }
+            guard connectionID(of: task) == nil, !NetworkBypass.covers(url) else { return task }
             let id = UUID()
             objc_setAssociatedObject(task, connectionKey, id as NSUUID, .OBJC_ASSOCIATION_RETAIN)
             recorder.open(NetworkWebSocketConnection(id: id, url: url?.absoluteString ?? "", protocols: protocols, opened: Date()))
