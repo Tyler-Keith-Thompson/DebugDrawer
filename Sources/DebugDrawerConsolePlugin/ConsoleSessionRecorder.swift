@@ -191,9 +191,12 @@
             let since = tail.since.addingTimeInterval(-0.001)
             // Read off the recorder's queue, so the current session's lines go on being written,
             // and off Swift's cooperative threads, which it would hold: the read blocks on the log
-            // daemon for a second or more.
+            // daemon for a second or more. User-initiated, as listing and reading the earlier
+            // sessions wait for it: at utility the system throttles the read's CPU and disk while
+            // the Mac is busy, and the same read took 8.6 to 31 seconds under a full build and
+            // test run against 1.8 to 3.9 at user-initiated (1.2 to 1.6 for either when idle).
             let outcome = await withCheckedContinuation { [systemLog] continuation in
-                DispatchQueue.global(qos: .utility).async {
+                DispatchQueue.global(qos: .userInitiated).async {
                     continuation.resume(returning: systemLog.lines(loggedBy: tail.processIdentifier, since: since))
                 }
             }
