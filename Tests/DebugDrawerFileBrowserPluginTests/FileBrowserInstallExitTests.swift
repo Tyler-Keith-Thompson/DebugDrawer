@@ -12,15 +12,14 @@
         @Test("Install registers the plugin over the app's folders, the bundle and the given app groups")
         func install() async {
             await #expect(processExitsWith: .success) {
-                let folder = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+                let folder = URL(filePath: "/app/Documents", directoryHint: .isDirectory)
                 let locations = FakeFileLocations(
                     appFolders: [FileRoot(kind: .documents, url: folder)],
-                    appGroupContainers: ["group.com.example.shared": folder.appending(path: "Group")]
+                    appGroupContainers: ["group.com.example.shared": URL(filePath: "/groups/shared", directoryHint: .isDirectory)]
                 )
                 let isExpected = await MainActor.run {
-                    let model = FileBrowserInstallation.install(
-                        appGroups: ["group.com.example.shared"], locations: locations, fileSystem: LocalFileSystem()
-                    )
+                    let model = FileBrowserModel(locations: locations, fileSystem: FakeFileSystem())
+                    FileBrowserInstallation.install(appGroups: ["group.com.example.shared"], model: model)
                     return DebugDrawer.shared.globalPlugins.contains { $0.title == "File Browser" }
                         && model.roots.available.map(\.title) == ["Documents", "App bundle", "group.com.example.shared"]
                 }
@@ -32,8 +31,9 @@
         func installAgain() async {
             await #expect(processExitsWith: .success) {
                 let isExpected = await MainActor.run {
-                    FileBrowserInstallation.install(appGroups: [], locations: FakeFileLocations(), fileSystem: LocalFileSystem())
-                    FileBrowserInstallation.install(appGroups: [], locations: FakeFileLocations(), fileSystem: LocalFileSystem())
+                    let model = FileBrowserModel(locations: FakeFileLocations(), fileSystem: FakeFileSystem())
+                    FileBrowserInstallation.install(appGroups: [], model: model)
+                    FileBrowserInstallation.install(appGroups: [], model: model)
                     return DebugDrawer.shared.globalPlugins.filter { $0.title == "File Browser" }.count == 1
                 }
                 exit(isExpected ? EXIT_SUCCESS : EXIT_FAILURE)

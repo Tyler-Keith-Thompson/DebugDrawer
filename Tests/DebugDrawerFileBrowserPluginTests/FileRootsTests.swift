@@ -35,7 +35,7 @@
             let home = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
             try FileManager.default.createDirectory(at: home, withIntermediateDirectories: true)
             defer { try? FileManager.default.removeItem(at: home) }
-            let locations = SystemFileLocations(
+            let locations = _FileLocations(
                 home: home,
                 temporary: home.appending(path: "tmp", directoryHint: .isDirectory),
                 isSandboxed: true,
@@ -57,7 +57,7 @@
             try FileManager.default.createDirectory(at: home, withIntermediateDirectories: true)
             defer { try? FileManager.default.removeItem(at: home) }
             let temporary = home.appending(path: "T", directoryHint: .isDirectory)
-            let locations = SystemFileLocations(
+            let locations = _FileLocations(
                 home: home, temporary: temporary, isSandboxed: false, ownFolderNames: ["com.example.shop", "Shop"], bundle: home
             )
             let expectedKinds: [FileRoot.Kind] = [.applicationSupport, .caches, .temporary]
@@ -79,7 +79,7 @@
             let support = home.appending(path: "Library/Application Support/Shop", directoryHint: .isDirectory)
             try FileManager.default.createDirectory(at: support, withIntermediateDirectories: true)
             defer { try? FileManager.default.removeItem(at: home) }
-            let locations = SystemFileLocations(
+            let locations = _FileLocations(
                 home: home, temporary: home, isSandboxed: false, ownFolderNames: ["com.example.shop", "Shop"], bundle: home
             )
             let expected = support.filePath

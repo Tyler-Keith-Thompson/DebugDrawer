@@ -2,7 +2,7 @@
     import Foundation
 
     /// Where the app keeps its files: the folders the browser lists. The system's in production
-    /// (`SystemFileLocations`), temporary folders a test makes in tests.
+    /// (`_FileLocations`), a fake in tests.
     protocol FileLocations: Sendable {
         /// The app's own folders, in the order the browser lists them: Documents, Library and tmp.
         var appFolders: [FileRoot] { get }

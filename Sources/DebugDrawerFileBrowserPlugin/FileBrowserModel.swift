@@ -1,59 +1,128 @@
-#if DEBUG
-    import Combine
-    import Foundation
-    import os
+import Combine
+import DebugDrawer
+import Foundation
+import os
 
-    /// Where the browser is and what it shows, with the totals of the folders it has counted, and
-    /// the changes it makes: imports, renames and deletes, none of them in the bundle.
+#if DEBUG
+    // The file system is read and changed through `FileSystem`, and the app's folders and app
+    // group containers come from `FileLocations`; the model holds values only. Going to a place
+    // lands at once, so the view shows it loading on the next frame, and the read starts as a task
+    // of its own, cancelled by the next place shown or once no view reads. Imports, renames and
+    // deletes run as model tasks, each after the one sent before it, and a read waits for those
+    // sent before it, so a listing never shows a file a delete sent first has removed.
+
+    /// The File Browser plugin's state and behavior, without its views: where the browser is,
+    /// what it shows there, the folder totals counted so far and why the last change failed, read
+    /// as a ``FileBrowserSnapshot`` and changed with a ``FileBrowserCommand``.
     ///
-    /// Main-actor isolated, like the drawer that shows it; the file system work runs off it.
-    /// The view loads each place from `.task(id: request)`, so moving on cancels the reads and the
-    /// counting for the place it left.
+    /// The plugin's view reaches it through a `DebugDrawerPluginTransport`:
+    ///
+    /// ```swift
+    /// let transport = DebugDrawerPluginTransport.direct(to: FileBrowserModel.shared)
+    /// ```
+    ///
+    /// `FileBrowser.install(appGroups:)` sets the app groups whose containers it lists. Nothing is
+    /// read until a view of it appears. Release builds get a stand-in whose snapshot holds nothing
+    /// and which ignores every command.
     @MainActor
-    final class FileBrowserModel: ObservableObject {
-        /// A place to load; a new one each time a place is shown, so showing the same place again
-        /// reads it again.
-        struct LoadRequest: Hashable, Sendable {
+    public final class FileBrowserModel: DebugDrawerPluginModel {
+        /// A place to read, numbered each time a place is shown, so a read for one shown before
+        /// lands nowhere, and showing the same place again reads it again.
+        private struct LoadRequest: Equatable {
             let place: FileBrowserPlace
             let generation: Int
         }
 
-        @Published private(set) var screen: FileBrowserScreen
-        @Published private(set) var request = LoadRequest(place: .roots, generation: 0)
-        /// The total size of each folder counted, by its path.
-        @Published private(set) var folderSizes: [String: Int64] = [:]
-        /// Why the last import, rename or delete failed, until another place is shown.
-        @Published private(set) var failure: FileBrowserFailure?
+        /// The model over the app's own folders, its bundle and the containers of the app groups
+        /// `FileBrowser.install(appGroups:)` names, which the plugin shows.
+        public static let shared = FileBrowserModel()
 
-        let roots: FileRoots
-        private static let logger = Logger(subsystem: "DebugDrawerFileBrowserPlugin", category: "FileBrowserModel")
+        @Published private var screen: FileBrowserScreen
+        /// The total size of each folder counted, by its path.
+        @Published private var folderSizes: [String: Int64] = [:]
+        @Published private var failure: FileBrowserFailure?
+
+        /// The folders the browser starts from.
+        private(set) var roots: FileRoots
+        private let locations: any FileLocations
         private let fileSystem: any FileSystem
+        private static let logger = Logger(subsystem: "DebugDrawerFileBrowserPlugin", category: "FileBrowserModel")
         /// The drawers the plugin is installed in; the last to remove it drops what was read.
         private var installations: Set<ObjectIdentifier> = []
+        /// The views reading: each `startReading` not yet stopped.
+        private var readers = 0
+        private var request = LoadRequest(place: .roots, generation: 0)
+        /// The read of the place shown and the count of its folders.
+        private var loading: Task<Void, Never>?
+        /// The last import, rename or delete started, which the next, and every read, waits for.
+        private var work: Task<Void, Never>?
 
-        /// A browser of `roots`, read from and changed through `fileSystem`.
-        init(roots: FileRoots, fileSystem: any FileSystem = LocalFileSystem()) {
-            self.roots = roots
+        /// A browser of the app's folders in `locations` and the containers of `appGroups`.
+        ///
+        /// - Parameters:
+        ///   - locations: Where the app's folders, bundle and app group containers are.
+        ///   - appGroups: The app groups whose containers to list.
+        ///   - fileSystem: The file system to read and change.
+        init(locations: any FileLocations = _FileLocations(), appGroups: [String] = [], fileSystem: any FileSystem = _FileSystem()) {
+            self.locations = locations
             self.fileSystem = fileSystem
+            roots = FileRoots(locations: locations, appGroups: appGroups)
             screen = .roots(roots, isEmpty: false)
         }
 
-        /// Counts `drawer` as one the plugin is installed in.
+        public var snapshot: FileBrowserSnapshot {
+            FileBrowserSnapshot(screen: screen, folderSizes: folderSizes, failure: failure)
+        }
+
+        public func perform(_ command: FileBrowserCommand) {
+            switch command.action {
+            case let .open(place):
+                show(place)
+            case .back:
+                show(request.place.parent)
+            case .refresh:
+                refresh()
+            case .startReading:
+                readers += 1
+                read()
+            case .stopReading:
+                stopReading()
+            case let .importFile(source):
+                enqueueImport(from: source)
+            case let .rename(item, name):
+                enqueueRename(of: item, to: name)
+            case let .delete(item):
+                enqueueDelete(of: item)
+            }
+        }
+
+        /// Lists the containers of `appGroups` in place of those listed before, and goes back to
+        /// the list of roots.
+        func setAppGroups(_ appGroups: [String]) {
+            roots = FileRoots(locations: locations, appGroups: appGroups)
+            folderSizes = [:]
+            show(.roots)
+        }
+
+        /// Counts `drawer` as one the plugin is installed in; nothing is read until it is shown.
         func install(in drawer: ObjectIdentifier) {
             installations.insert(drawer)
         }
 
         /// Uncounts `drawer`; once no drawer holds the plugin, goes back to the list of roots,
-        /// dropping the listing, preview and folder totals read, and any failure. A read still
-        /// running is for a place no longer shown, so it changes nothing.
+        /// dropping the listing, preview and folder totals read, and any failure, without reading
+        /// them again. A read still running is for a place no longer shown, so it changes nothing.
         func uninstall(from drawer: ObjectIdentifier) {
             guard installations.remove(drawer) != nil, installations.isEmpty else { return }
+            loading?.cancel()
             folderSizes = [:]
-            show(.roots)
+            failure = nil
+            request = LoadRequest(place: .roots, generation: request.generation + 1)
+            screen = .roots(roots, isEmpty: false)
         }
 
-        /// Shows `place`, loading until `load(_:)` reads it.
-        func show(_ place: FileBrowserPlace) {
+        /// Shows `place`, loading, and reads it while a view reads.
+        private func show(_ place: FileBrowserPlace) {
             failure = nil
             request = LoadRequest(place: place, generation: request.generation + 1)
             screen = switch place {
@@ -61,23 +130,65 @@
             case let .directory(root, url): .directory(DirectoryListing(root: root, url: url, contents: .loading))
             case let .file(root, item): .file(FileDetailState(root: root, item: item, preview: .loading))
             }
+            read()
         }
 
-        /// Shows the place one step up.
-        func back() {
-            show(request.place.parent)
-        }
-
-        /// Reads the place shown again, and counts its folders again.
-        func refresh() {
+        /// Shows the place shown again, and counts its folders again.
+        private func refresh() {
             folderSizes = [:]
             show(request.place)
         }
 
+        /// Reads the place shown, once the changes sent before are done, in place of a read under
+        /// way; while no view reads, reads nothing.
+        private func read() {
+            loading?.cancel()
+            guard readers > 0 else { return }
+            let request = request
+            loading = Task { [work] in
+                await work?.value
+                await self.load(request)
+            }
+        }
+
+        /// Ends one view's reading; once none reads, stops the read under way.
+        private func stopReading() {
+            readers = max(readers - 1, 0)
+            if readers == 0 {
+                loading?.cancel()
+            }
+        }
+
+        /// Queues an import into the folder shown now, unless it is in the bundle.
+        private func enqueueImport(from source: URL) {
+            guard case let .directory(root, directory) = request.place, !root.isReadOnly else { return }
+            enqueue { model in await model.importFile(from: source, into: directory) }
+        }
+
+        /// Queues renaming `item`, under the root shown now, unless it is the root or in the bundle.
+        private func enqueueRename(of item: FileItem, to name: String) {
+            guard let root = request.place.root, canChange(item, in: root) else { return }
+            enqueue { model in await model.rename(item, to: name, in: root) }
+        }
+
+        /// Queues deleting `item`, under the root shown now, unless it is the root or in the bundle.
+        private func enqueueDelete(of item: FileItem) {
+            guard let root = request.place.root, canChange(item, in: root) else { return }
+            enqueue { model in await model.delete(item) }
+        }
+
+        /// Starts `body` once the change started before it is done.
+        private func enqueue(_ body: @escaping @MainActor (FileBrowserModel) async -> Void) {
+            work = Task { [previous = work] in
+                await previous?.value
+                await body(self)
+            }
+        }
+
         /// Reads what `request` shows, then counts the totals of the folders it lists, unless
         /// another place was shown first or the task is cancelled.
-        func load(_ request: LoadRequest) async {
-            guard request == self.request else { return }
+        private func load(_ request: LoadRequest) async {
+            guard request == self.request, !Task.isCancelled else { return }
             switch request.place {
             case .roots:
                 let isEmpty = await rootsAreEmpty()
@@ -105,15 +216,13 @@
             }
         }
 
-        /// Copies the file at `source`, as the file importer picked it, into the folder shown,
-        /// under a name of its own: "photo 2.png" beside a "photo.png". Never into the bundle.
-        func importFile(from source: URL) async {
-            guard case let .directory(root, directory) = request.place, !root.isReadOnly else { return }
-            let destination = directory.appending(path: Self.uniqueName(for: source.lastPathComponent, besides: shownNames))
-            let isScoped = source.startAccessingSecurityScopedResource()
-            defer {
-                if isScoped { source.stopAccessingSecurityScopedResource() }
-            }
+        /// Copies the file at `source` into `directory`, under a name nothing there has yet:
+        /// "photo 2.png" beside a "photo.png".
+        private func importFile(from source: URL, into directory: URL) async {
+            // The names in the folder now, not as last listed: an import sent just before may
+            // have added one the listing doesn't show yet.
+            let taken = Set(((try? await fileSystem.contents(of: directory)) ?? []).map(\.name))
+            let destination = directory.appending(path: Self.uniqueName(for: source.lastPathComponent, besides: taken))
             do {
                 try await fileSystem.copy(source, to: destination)
             } catch {
@@ -123,11 +232,11 @@
             refresh()
         }
 
-        /// Renames `item` to `name`, then shows it under its new name if it was shown. Nothing in
-        /// the bundle, and no root, is renamed.
-        func rename(_ item: FileItem, to name: String) async {
+        /// Renames `item`, under `root`, to `name`, then shows it under its new name if it was
+        /// shown.
+        private func rename(_ item: FileItem, to name: String, in root: FileRoot) async {
             let name = name.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard let root = request.place.root, canChange(item, in: root), name != item.name else { return }
+            guard name != item.name else { return }
             guard Self.isFileName(name) else {
                 failure = FileBrowserFailure(title: "Couldn't rename \(item.name)", reason: "“\(name)” can't be a file name.")
                 return
@@ -152,10 +261,8 @@
             }
         }
 
-        /// Deletes `item`, then shows its folder if it was shown. Nothing in the bundle, and no
-        /// root, is deleted.
-        func delete(_ item: FileItem) async {
-            guard let root = request.place.root, canChange(item, in: root) else { return }
+        /// Deletes `item`, then shows its folder if it was shown.
+        private func delete(_ item: FileItem) async {
             do {
                 try await fileSystem.remove(item.url)
             } catch {
@@ -164,12 +271,6 @@
             }
             folderSizes = [:]
             show(isShowing(item) ? request.place.parent : request.place)
-        }
-
-        /// The names in the folder shown.
-        private var shownNames: Set<String> {
-            guard case let .directory(listing) = screen, case let .loaded(contents) = listing.contents else { return [] }
-            return Set(contents.items.map(\.name))
         }
 
         /// Whether no root the app can change holds anything: the bundle never counts, and a
@@ -185,7 +286,9 @@
 
         private func contents(of url: URL) async -> Loadable<DirectoryContents> {
             do {
-                return .loaded(DirectoryContents(directory: try await fileSystem.item(at: url), items: try await fileSystem.contents(of: url)))
+                let directory = try await fileSystem.item(at: url)
+                let items = try await fileSystem.contents(of: url).sortedForDisplay()
+                return .loaded(DirectoryContents(directory: directory, items: items))
             } catch {
                 return .failed(error.localizedDescription)
             }
@@ -227,12 +330,12 @@
         }
 
         /// Whether `name` names a file: not empty, ".", "..", and with no slash or NUL.
-        static func isFileName(_ name: String) -> Bool {
+        nonisolated static func isFileName(_ name: String) -> Bool {
             !name.isEmpty && name != "." && name != ".." && !name.contains("/") && !name.contains("\0")
         }
 
         /// `name`, or with " 2", " 3"… before its extension, the first that isn't in `taken`.
-        static func uniqueName(for name: String, besides taken: Set<String>) -> String {
+        nonisolated static func uniqueName(for name: String, besides taken: Set<String>) -> String {
             guard taken.contains(name) else { return name }
             let url = URL(filePath: name)
             let stem = url.deletingPathExtension().lastPathComponent
@@ -248,6 +351,15 @@
         }
     }
 
+    extension [FileItem] {
+        /// Folders first, then by name as Finder sorts them: "file2" before "file10", ignoring case.
+        fileprivate func sortedForDisplay() -> [FileItem] {
+            sorted { lhs, rhs in
+                lhs.isDirectory != rhs.isDirectory ? lhs.isDirectory : lhs.name.localizedStandardCompare(rhs.name) == .orderedAscending
+            }
+        }
+    }
+
     extension FilePreview {
         /// The preview of `item`, read from `fileSystem` off the caller's actor: its first
         /// ``readLimit`` bytes, or an image's first ``imageReadLimit``.
@@ -260,5 +372,27 @@
             let image = try await fileSystem.read(item.url, upTo: imageReadLimit)
             return FilePreview(data: image, isTruncated: Int64(image.count) < item.size)
         }
+    }
+#else
+    // The release stand-in: the same members, and nothing behind them.
+
+    /// Release builds read no files: this stand-in's snapshot holds nothing, and it ignores every
+    /// command.
+    @MainActor
+    public final class FileBrowserModel: DebugDrawerPluginModel {
+        /// The stand-in model.
+        public static let shared = FileBrowserModel()
+
+        private init() {}
+
+        /// Always empty.
+        public var snapshot: FileBrowserSnapshot {
+            FileBrowserSnapshot()
+        }
+
+        /// Does nothing.
+        ///
+        /// - Parameter command: Ignored.
+        public func perform(_ command: FileBrowserCommand) {}
     }
 #endif

@@ -6,7 +6,7 @@
     ///
     /// Every call runs off the caller's actor: a folder's total walks its whole tree, and a read
     /// can take a while on a large file. Each is the drawer's own work, so Disk I/O leaves it out.
-    struct LocalFileSystem: FileSystem {
+    struct _FileSystem: FileSystem {
         private static let keys: [URLResourceKey] = [.isDirectoryKey, .fileSizeKey, .contentModificationDateKey, .creationDateKey]
 
         @concurrent
@@ -17,11 +17,7 @@
         @concurrent
         func contents(of url: URL) async throws -> [FileItem] {
             try DebugDrawerActivity.$isDrawerWork.withValue(true) {
-                try FileManager.default.contentsOfDirectory(at: url, includingPropertiesForKeys: Self.keys)
-                    .map(Self.item(at:))
-                    .sorted { lhs, rhs in
-                        lhs.isDirectory != rhs.isDirectory ? lhs.isDirectory : lhs.name.localizedStandardCompare(rhs.name) == .orderedAscending
-                    }
+                try FileManager.default.contentsOfDirectory(at: url, includingPropertiesForKeys: Self.keys).map(Self.item(at:))
             }
         }
 
@@ -54,6 +50,12 @@
 
         @concurrent
         func copy(_ url: URL, to destination: URL) async throws {
+            // A file the file importer picked is reachable only while its security scope is
+            // open; for any other file this opens nothing.
+            let isScoped = url.startAccessingSecurityScopedResource()
+            defer {
+                if isScoped { url.stopAccessingSecurityScopedResource() }
+            }
             try DebugDrawerActivity.$isDrawerWork.withValue(true) { try FileManager.default.copyItem(at: url, to: destination) }
         }
 

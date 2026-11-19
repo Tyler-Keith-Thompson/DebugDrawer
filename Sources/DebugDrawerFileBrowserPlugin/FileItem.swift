@@ -2,7 +2,7 @@
     import Foundation
 
     /// A file or folder, as the file system described it when it was listed.
-    struct FileItem: Identifiable, Hashable, Sendable {
+    struct FileItem: Identifiable, Hashable, Codable, Sendable {
         let url: URL
         let isDirectory: Bool
         /// The file's size in bytes; 0 for a folder, whose total is counted apart.

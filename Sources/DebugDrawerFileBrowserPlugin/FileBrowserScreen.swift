@@ -2,7 +2,7 @@
     import Foundation
 
     /// Where the browser is: the list of roots, a folder or a file, and the root it is under.
-    enum FileBrowserPlace: Hashable, Sendable {
+    enum FileBrowserPlace: Hashable, Codable, Sendable {
         case roots
         case directory(FileRoot, URL)
         case file(FileRoot, FileItem)
@@ -29,23 +29,32 @@
     }
 
     /// What the browser shows.
-    enum FileBrowserScreen: Hashable, Sendable {
+    enum FileBrowserScreen: Hashable, Codable, Sendable {
         /// The folders it starts from, and whether none the app can change holds anything.
         case roots(FileRoots, isEmpty: Bool)
         /// A folder and what it holds.
         case directory(DirectoryListing)
         /// A file, its facts and its preview.
         case file(FileDetailState)
+
+        /// Where it is.
+        var place: FileBrowserPlace {
+            switch self {
+            case .roots: .roots
+            case let .directory(listing): .directory(listing.root, listing.url)
+            case let .file(detail): .file(detail.root, detail.item)
+            }
+        }
     }
 
     /// A change the file system refused: what failed ("Couldn't delete old.log") and why.
-    struct FileBrowserFailure: Hashable, Sendable {
+    struct FileBrowserFailure: Hashable, Codable, Sendable {
         let title: String
         let reason: String
     }
 
     /// A read the browser waits on.
-    enum Loadable<Value: Hashable & Sendable>: Hashable, Sendable {
+    enum Loadable<Value: Hashable & Codable & Sendable>: Hashable, Codable, Sendable {
         case loading
         case loaded(Value)
         /// The read failed, with why.
@@ -53,7 +62,7 @@
     }
 
     /// A folder the browser shows.
-    struct DirectoryListing: Hashable, Sendable {
+    struct DirectoryListing: Hashable, Codable, Sendable {
         let root: FileRoot
         let url: URL
         let contents: Loadable<DirectoryContents>
@@ -70,13 +79,13 @@
     }
 
     /// A folder, and the files and folders in it.
-    struct DirectoryContents: Hashable, Sendable {
+    struct DirectoryContents: Hashable, Codable, Sendable {
         let directory: FileItem
         let items: [FileItem]
     }
 
     /// A file the browser shows.
-    struct FileDetailState: Hashable, Sendable {
+    struct FileDetailState: Hashable, Codable, Sendable {
         let root: FileRoot
         let item: FileItem
         let preview: Loadable<FilePreview>

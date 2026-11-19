@@ -17,6 +17,7 @@ public struct FileBrowserPlugin: DebugDrawerPlugin {
     public var icon = "folder"
 
     #if DEBUG
+        /// The model the plugin shows: `FileBrowserModel.shared` once installed.
         let model: FileBrowserModel
 
         init(model: FileBrowserModel) {
@@ -26,7 +27,7 @@ public struct FileBrowserPlugin: DebugDrawerPlugin {
 
     public var body: some View {
         #if DEBUG
-            FileBrowserPluginView(model: model)
+            FileBrowserPluginView(transport: .direct(to: model))
         #else
             EmptyView()
         #endif
@@ -50,7 +51,7 @@ public struct FileBrowserPlugin: DebugDrawerPlugin {
     /// The root being browsed, so where the browser is shows while the plugin is closed.
     public var headerAccessory: some View {
         #if DEBUG
-            FileBrowserHeaderAccessory(model: model)
+            FileBrowserHeaderAccessory(transport: .direct(to: model))
         #else
             EmptyView()
         #endif
@@ -60,10 +61,15 @@ public struct FileBrowserPlugin: DebugDrawerPlugin {
 #if DEBUG
     /// "Documents" while a folder or file under Documents is shown; nothing at the list of roots.
     struct FileBrowserHeaderAccessory: View {
-        @ObservedObject var model: FileBrowserModel
+        @StateObject private var transport: DebugDrawerPluginTransport<FileBrowserSnapshot, FileBrowserCommand>
+
+        /// - Parameter transport: Joins the view to the model; made once, for the view's lifetime.
+        init(transport: @escaping @autoclosure () -> DebugDrawerPluginTransport<FileBrowserSnapshot, FileBrowserCommand>) {
+            _transport = StateObject(wrappedValue: transport())
+        }
 
         var body: some View {
-            if let root = model.request.place.root {
+            if let root = transport.snapshot.place.root {
                 Text(root.title)
             }
         }

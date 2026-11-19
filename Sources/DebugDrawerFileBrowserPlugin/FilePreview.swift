@@ -5,7 +5,7 @@
     import UniformTypeIdentifiers
 
     /// What a file's contents show as, told from its bytes rather than its extension.
-    enum FilePreview: Hashable, Sendable {
+    enum FilePreview: Hashable, Codable, Sendable {
         /// UTF-8 text.
         case text(PreviewText)
         /// JSON, pretty-printed with its keys sorted.
@@ -22,7 +22,7 @@
         case binary
 
         /// The kind of property list.
-        enum PropertyListFormat: Hashable, Sendable {
+        enum PropertyListFormat: Hashable, Codable, Sendable {
             case binary
             case xml
         }
@@ -133,6 +133,17 @@
             guard !data.contains(0) else { return nil }
             let candidates = isTruncated ? (0 ... min(3, data.count - 1)).map { data.dropLast($0) } : [data[...]]
             guard let string = candidates.lazy.compactMap({ String(bytes: $0, encoding: .utf8) }).first else { return nil }
+            self.init(string: string, isTruncated: isTruncated)
+        }
+
+        init(lines: [String], isTruncated: Bool = false) {
+            self.lines = lines
+            string = lines.joined(separator: "\n")
+            self.isTruncated = isTruncated
+        }
+
+        /// `string` in lines.
+        private init(string: String, isTruncated: Bool) {
             // By character, so "\r\n", one character, ends a line too. A newline that ends the
             // text ends its last line rather than starting an empty one.
             var split = string.split(omittingEmptySubsequences: false, whereSeparator: \.isNewline)
@@ -141,12 +152,6 @@
             }
             lines = split.flatMap(Self.pieces(of:))
             self.string = string
-            self.isTruncated = isTruncated
-        }
-
-        init(lines: [String], isTruncated: Bool = false) {
-            self.lines = lines
-            string = lines.joined(separator: "\n")
             self.isTruncated = isTruncated
         }
 
@@ -167,9 +172,31 @@
         }
     }
 
-    /// An image's thumbnail, made by ImageIO without decoding the image at full size.
-    struct PreviewImage: Hashable, Sendable {
-        let thumbnail: CGImage
+    // The text travels once: on decoding, its lines are split from it again as they were when it
+    // was read, rather than sent beside it, doubling a megabyte of preview.
+    extension PreviewText: Codable {
+        private enum CodingKeys: String, CodingKey {
+            case string
+            case isTruncated
+        }
+
+        init(from decoder: any Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            try self.init(string: container.decode(String.self, forKey: .string), isTruncated: container.decode(Bool.self, forKey: .isTruncated))
+        }
+
+        func encode(to encoder: any Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(string, forKey: .string)
+            try container.encode(isTruncated, forKey: .isTruncated)
+        }
+    }
+
+    /// An image's thumbnail, made by ImageIO without decoding the image at full size, and kept as
+    /// PNG, so it travels as bytes; the view draws it.
+    struct PreviewImage: Hashable, Codable, Sendable {
+        /// The thumbnail, at most ``thumbnailSize`` pixels on its longest side, as PNG.
+        let thumbnail: Data
         let pixelWidth: Int
         let pixelHeight: Int
         /// Its format's usual extension, capitalized: "PNG", "JPEG".
@@ -187,13 +214,24 @@
             ]
             guard let source = CGImageSourceCreateWithData(data as CFData, nil),
                   let type = CGImageSourceGetType(source),
-                  let thumbnail = CGImageSourceCreateThumbnailAtIndex(source, 0, thumbnailOptions as CFDictionary)
+                  let thumbnail = CGImageSourceCreateThumbnailAtIndex(source, 0, thumbnailOptions as CFDictionary),
+                  let png = Self.png(thumbnail)
             else { return nil }
             let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any]
-            self.thumbnail = thumbnail
+            self.thumbnail = png
             pixelWidth = properties?[kCGImagePropertyPixelWidth] as? Int ?? thumbnail.width
             pixelHeight = properties?[kCGImagePropertyPixelHeight] as? Int ?? thumbnail.height
             typeName = (UTType(type as String)?.preferredFilenameExtension ?? "image").uppercased()
+        }
+
+        /// `image` as PNG, which keeps every pixel, or `nil` when ImageIO can't write it.
+        private static func png(_ image: CGImage) -> Data? {
+            let data = NSMutableData()
+            guard let destination = CGImageDestinationCreateWithData(data as CFMutableData, UTType.png.identifier as CFString, 1, nil) else {
+                return nil
+            }
+            CGImageDestinationAddImage(destination, image, nil)
+            return CGImageDestinationFinalize(destination) ? data as Data : nil
         }
     }
 #endif

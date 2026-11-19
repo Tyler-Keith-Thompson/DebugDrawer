@@ -121,12 +121,10 @@
 
         @Test("A file over the read limit is read up to it and marked as cut short")
         func readLimit() async throws {
-            let url = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString + ".txt")
-            try Data(repeating: UInt8(ascii: "a"), count: FilePreview.readLimit + 10).write(to: url)
-            defer { try? FileManager.default.removeItem(at: url) }
-            let item = try await LocalFileSystem().item(at: url)
+            let fileSystem = FakeFileSystem(files: ["/app/Documents/long.txt": Data(repeating: UInt8(ascii: "a"), count: FilePreview.readLimit + 10)])
+            let item = try await fileSystem.item(at: URL(filePath: "/app/Documents/long.txt"))
 
-            let actual = try await FilePreview.reading(item, from: LocalFileSystem())
+            let actual = try await FilePreview.reading(item, from: fileSystem)
 
             let text = try #require(actual.text)
             #expect(text.isTruncated)

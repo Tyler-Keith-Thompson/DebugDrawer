@@ -28,7 +28,7 @@ public enum FileBrowser {
     @MainActor
     public static func install(appGroups: [String] = []) {
         #if DEBUG
-            FileBrowserInstallation.install(appGroups: appGroups, locations: SystemFileLocations(), fileSystem: LocalFileSystem())
+            FileBrowserInstallation.install(appGroups: appGroups, model: .shared)
         #endif
     }
 }

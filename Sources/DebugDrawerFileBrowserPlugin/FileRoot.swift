@@ -3,9 +3,9 @@
 
     /// A folder the browser starts from: one of the app's own, its bundle or an app group's
     /// container.
-    struct FileRoot: Identifiable, Hashable, Sendable {
+    struct FileRoot: Identifiable, Hashable, Codable, Sendable {
         /// Which folder it is.
-        enum Kind: Hashable, Sendable {
+        enum Kind: Hashable, Codable, Sendable {
             case documents
             case library
             /// The app's own folder of Application Support, on a Mac app outside the sandbox.
@@ -56,7 +56,7 @@
 
     /// The folders the browser starts from, and the app groups it was given that have no
     /// container.
-    struct FileRoots: Hashable, Sendable {
+    struct FileRoots: Hashable, Codable, Sendable {
         let available: [FileRoot]
         /// App groups the system gives the app no container for, as when its entitlements don't
         /// name them.

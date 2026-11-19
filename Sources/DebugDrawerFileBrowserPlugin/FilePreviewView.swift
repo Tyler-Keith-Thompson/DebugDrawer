@@ -1,5 +1,6 @@
 #if DEBUG
     import DebugDrawer
+    import ImageIO
     import SwiftUI
 
     /// A file's preview: its text, JSON or property list in a code block, its image's thumbnail,
@@ -17,12 +18,14 @@
                 case let .text(text), let .json(text), let .propertyList(text, _):
                     PreviewTextView(text: text)
                 case let .image(image):
-                    let label = "\(image.typeName) image, \(image.pixelWidth) by \(image.pixelHeight) pixels"
-                    Image(image.thumbnail, scale: 1, label: Text(label))
-                        .resizable()
-                        .scaledToFit()
-                        .frame(maxWidth: .infinity, maxHeight: imageHeight)
-                        .accessibilityLabel(label)
+                    if let thumbnail = image.thumbnailImage {
+                        let label = "\(image.typeName) image, \(image.pixelWidth) by \(image.pixelHeight) pixels"
+                        Image(thumbnail, scale: 1, label: Text(label))
+                            .resizable()
+                            .scaledToFit()
+                            .frame(maxWidth: .infinity, maxHeight: imageHeight)
+                            .accessibilityLabel(label)
+                    }
                 case .sqlite, .empty, .binary:
                     EmptyView()
                 }
@@ -45,6 +48,13 @@
             case .empty: "The file is empty."
             case .binary: "No preview: the file isn't text, JSON, a property list or an image."
             }
+        }
+    }
+
+    extension PreviewImage {
+        /// The thumbnail's pixels, decoded from its PNG; `nil` for bytes that aren't one.
+        fileprivate var thumbnailImage: CGImage? {
+            CGImageSourceCreateWithData(thumbnail as CFData, nil).flatMap { CGImageSourceCreateImageAtIndex($0, 0, nil) }
         }
     }
 

@@ -1,35 +1,47 @@
 #if DEBUG
+    import DebugDrawer
     import SwiftUI
     import UniformTypeIdentifiers
 
-    /// Reads the model and hands what it shows to `FileBrowserView`. It loads each place the
-    /// model shows, and presents the file importer for Import.
+    /// The plugin's body: draws ``FileBrowserModel``'s snapshots from its transport through
+    /// `FileBrowserView`, and sends the model what the user does. The model reads while the view
+    /// is on screen, so leaving the drawer stops the counting of folder totals. The file importer
+    /// for Import is presented here, and Share, Copy and Reveal in Finder stay in the views.
     struct FileBrowserPluginView: View {
-        @ObservedObject var model: FileBrowserModel
+        @StateObject private var transport: DebugDrawerPluginTransport<FileBrowserSnapshot, FileBrowserCommand>
         @State private var isImporting = false
 
+        /// - Parameter transport: Joins the view to the model; made once, for the view's lifetime.
+        init(transport: @escaping @autoclosure () -> DebugDrawerPluginTransport<FileBrowserSnapshot, FileBrowserCommand>) {
+            _transport = StateObject(wrappedValue: transport())
+        }
+
         var body: some View {
+            let snapshot = transport.snapshot
             FileBrowserView(
-                screen: model.screen,
-                folderSizes: model.folderSizes,
-                failure: model.failure,
+                screen: snapshot.screen,
+                folderSizes: snapshot.folderSizes,
+                failure: snapshot.failure,
                 actions: FileBrowserActions(
-                    open: model.show,
-                    back: model.back,
-                    refresh: model.refresh,
+                    open: { send(.open($0)) },
+                    back: { send(.back) },
+                    refresh: { send(.refresh) },
                     importFile: { isImporting = true },
-                    rename: { item, name in Task { await model.rename(item, to: name) } },
-                    delete: { item in Task { await model.delete(item) } }
+                    rename: { send(.rename($0, to: $1)) },
+                    delete: { send(.delete($0)) }
                 )
             )
-            // Cancelled and started again for every place shown, so leaving a folder stops
-            // counting its totals.
-            .task(id: model.request) { await model.load(model.request) }
+            .onAppear { send(.startReading) }
+            .onDisappear { send(.stopReading) }
             .fileImporter(isPresented: $isImporting, allowedContentTypes: [.item]) { result in
                 if case let .success(url) = result {
-                    Task { await model.importFile(from: url) }
+                    send(.importFile(url))
                 }
             }
+        }
+
+        private func send(_ action: FileBrowserCommand.Action) {
+            transport.send(FileBrowserCommand(action))
         }
     }
 #endif

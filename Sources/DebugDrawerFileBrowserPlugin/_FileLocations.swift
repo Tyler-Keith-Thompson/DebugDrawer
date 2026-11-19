@@ -9,7 +9,7 @@
     /// other app of the user's, so there it lists its own subfolders of Application Support and
     /// Caches (named for its bundle identifier or its executable) instead: listing all of Library
     /// would show other apps' files, and reading Documents asks the user's permission.
-    struct SystemFileLocations: FileLocations {
+    struct _FileLocations: FileLocations {
         /// The app's home folder: its container on iOS and in the Mac's sandbox, the user's home
         /// folder outside it.
         let home: URL

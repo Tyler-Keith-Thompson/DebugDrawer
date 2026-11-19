@@ -1,13 +1,13 @@
 #if DEBUG
     import Foundation
 
-    /// The file system the browser reads and changes: `LocalFileSystem` in production, a fake
-    /// that fails or waits on purpose in tests.
+    /// The file system the browser reads and changes: `_FileSystem` in production, a fake in
+    /// memory in tests.
     protocol FileSystem: Sendable {
-        /// The file or folder at `url`.
+        /// The file or folder at `url`: its size, its dates and whether it is a folder.
         func item(at url: URL) async throws -> FileItem
 
-        /// What the folder at `url` holds, folders first, then by name as Finder sorts them.
+        /// What the folder at `url` holds, in no particular order.
         func contents(of url: URL) async throws -> [FileItem]
 
         /// The total size in bytes of the files in the folder at `url`, at any depth; links are
@@ -25,7 +25,8 @@
         /// Moves the file or folder at `url` to `destination`, which must not exist.
         func move(_ url: URL, to destination: URL) async throws
 
-        /// Copies the file or folder at `url` to `destination`, which must not exist.
+        /// Copies the file or folder at `url`, which may be one the file importer picked from
+        /// outside the app, to `destination`, which must not exist.
         func copy(_ url: URL, to destination: URL) async throws
     }
 #endif
