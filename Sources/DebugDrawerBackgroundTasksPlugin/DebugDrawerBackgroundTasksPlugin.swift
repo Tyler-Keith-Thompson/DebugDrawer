@@ -8,9 +8,9 @@ import SwiftUI
 /// and the pending requests, each cancellable.
 public struct BackgroundTasksPlugin: DebugDrawerPlugin {
     /// The plugin's identity in the drawer.
-    static let pluginID = "BackgroundTasksPlugin"
+    nonisolated static let pluginID = "BackgroundTasksPlugin"
 
-    public var id: String {
+    public nonisolated var id: String {
         Self.pluginID
     }
 

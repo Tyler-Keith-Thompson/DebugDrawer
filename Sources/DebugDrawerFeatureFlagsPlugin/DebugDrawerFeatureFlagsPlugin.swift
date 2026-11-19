@@ -9,7 +9,7 @@ import SwiftUI
 /// override, search, an overridden-only filter and Reset All.
 public struct FeatureFlagsPlugin: DebugDrawerPlugin {
     /// The plugin's identity in the drawer, which its saved state, HUD pin and badges are kept under.
-    public var id: String {
+    public nonisolated var id: String {
         "FeatureFlagsPlugin"
     }
 

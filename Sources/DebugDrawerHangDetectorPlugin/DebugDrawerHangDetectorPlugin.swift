@@ -9,9 +9,9 @@ import SwiftUI
 /// its duration and stack, and the threshold; a badge counts the ones not yet opened.
 public struct HangDetectorPlugin: DebugDrawerPlugin {
     /// The plugin's identity in the drawer, which its badge is set under.
-    static let pluginID = "HangDetectorPlugin"
+    nonisolated static let pluginID = "HangDetectorPlugin"
 
-    public var id: String {
+    public nonisolated var id: String {
         Self.pluginID
     }
 

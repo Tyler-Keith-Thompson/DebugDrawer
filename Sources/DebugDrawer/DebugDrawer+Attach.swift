@@ -247,13 +247,10 @@
         /// Brings ``isOpen`` up to date with the key window's drawer, and tells the views that
         /// read the drawer that one window's drawer changed.
         func presentationDidChange() {
-            isSyncingOpenState = true
-            defer { isSyncingOpenState = false }
+            objectWillChange.send()
             let keyIsOpen = keyPresentation.isOpen
             if isOpen != keyIsOpen {
-                isOpen = keyIsOpen
-            } else {
-                objectWillChange.send()
+                openState.value = keyIsOpen
             }
         }
     }

@@ -1,4 +1,5 @@
 #if DEBUG
+    import Combine
     @testable import DebugDrawer
     import SwiftUI
     import Testing
@@ -95,6 +96,48 @@
 
             sut.toggle()
             #expect(!sut.isOpen)
+        }
+
+        @Test("Opening opens the drawer, and opening it again leaves it open")
+        func openTwice() {
+            let sut = DebugDrawer.shared
+            defer { sut.close() }
+            #expect(!sut.isOpen)
+
+            sut.open()
+            #expect(sut.isOpen)
+
+            sut.open()
+            #expect(sut.isOpen)
+        }
+
+        @Test("Closing closes the drawer, and closing it again leaves it closed")
+        func closeTwice() {
+            let sut = DebugDrawer.shared
+            sut.open()
+            #expect(sut.isOpen)
+
+            sut.close()
+            #expect(!sut.isOpen)
+
+            sut.close()
+            #expect(!sut.isOpen)
+        }
+
+        @Test("Opening and closing publish each change through $isOpen, and repeating either publishes nothing more")
+        func openAndClosePublish() {
+            let sut = DebugDrawer.shared
+            let expected: [Bool] = [true, false]
+            var actual: [Bool] = []
+            let subscription = sut.$isOpen.dropFirst().sink { actual.append($0) }
+
+            sut.open()
+            sut.open()
+            sut.close()
+            sut.close()
+
+            subscription.cancel()
+            #expect(actual == expected)
         }
     }
 #endif

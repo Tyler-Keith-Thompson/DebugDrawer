@@ -10,7 +10,7 @@ import SwiftUI
 /// the provisioning profile and the entitlements.
 public struct AppInfoPlugin: DebugDrawerPlugin {
     /// The plugin's identity in the drawer, which its saved state, HUD pin and badges are kept under.
-    public var id: String {
+    public nonisolated var id: String {
         "AppInfoPlugin"
     }
 

@@ -11,14 +11,14 @@
 
         /// Adds `localization.txt`. Keys and development text are the app's own strings, so
         /// nothing is masked.
-        static func contribute(
+        nonisolated static func contribute(
             mode: Localization.Mode, launchedWith: Set<NextLaunchOption>, bundles: [LocalizedBundle], lookups: [LocalizationLookup],
             to report: inout DebugDrawerReport
         ) {
             report.add(text: text(mode: mode, launchedWith: launchedWith, bundles: bundles, lookups: lookups), named: "localization.txt")
         }
 
-        static func text(
+        nonisolated static func text(
             mode: Localization.Mode, launchedWith: Set<NextLaunchOption>, bundles: [LocalizedBundle], lookups: [LocalizationLookup]
         ) -> String {
             var lines = [

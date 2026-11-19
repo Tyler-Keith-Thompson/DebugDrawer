@@ -19,7 +19,7 @@ extension NetworkPlugin: DebugDrawerReportContributor {
     extension NetworkPlugin {
         /// Adds `entries` and `webSockets` as an HTTP Archive, `network.har`, oldest first, with
         /// what `redaction` calls sensitive masked. Neither adds nothing.
-        static func contribute(
+        nonisolated static func contribute(
             _ entries: [NetworkEntry],
             webSockets: [NetworkWebSocketConnection] = [],
             to report: inout DebugDrawerReport,
@@ -36,7 +36,7 @@ extension NetworkPlugin: DebugDrawerReportContributor {
         /// Adds the entries of `previous`, an earlier launch's session, as an HTTP Archive,
         /// `network-previous.har`, in the order they were written. They were masked as they were
         /// written, by the rules of that launch. No session, or one with no entries, adds nothing.
-        static func contribute(previous: NetworkSessionLog?, to report: inout DebugDrawerReport) {
+        nonisolated static func contribute(previous: NetworkSessionLog?, to report: inout DebugDrawerReport) {
             guard let previous, !previous.archiveEntries.isEmpty else { return }
             let encoder = JSONEncoder()
             encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]

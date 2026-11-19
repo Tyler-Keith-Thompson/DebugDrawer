@@ -10,11 +10,11 @@
 
         /// Adds the stores as `databases.txt`. No row is read into it, since rows may hold what a
         /// report shouldn't carry; table names and counts describe the app's own schema.
-        static func contribute(_ stores: StoresState, to report: inout DebugDrawerReport) {
+        nonisolated static func contribute(_ stores: StoresState, to report: inout DebugDrawerReport) {
             report.add(text: text(stores), named: "databases.txt")
         }
 
-        static func text(_ stores: StoresState) -> String {
+        nonisolated static func text(_ stores: StoresState) -> String {
             guard case let .loaded(listings) = stores else { return "Stores: not read yet" }
             return (["Stores (\(listings.count)):"] + listings.flatMap(\.reportLines)).joined(separator: "\n")
         }

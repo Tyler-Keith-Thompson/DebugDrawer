@@ -11,8 +11,9 @@
         /// The stand-in drawer.
         public static let shared = DebugDrawer()
 
-        /// Always false: release builds have no drawer to open.
-        @Published public var isOpen = false
+        /// False: release builds have no drawer to open. Setting it is deprecated, as in debug
+        /// builds.
+        @DrawerOpenState public var isOpen = false
 
         /// Always empty: registering drops the plugin.
         @Published public private(set) var globalPlugins: [AnyDebugDrawerPlugin] = []
@@ -56,6 +57,12 @@
 
         /// Does nothing: release builds have no drawer to open.
         public func toggle() {}
+
+        /// Does nothing: release builds have no drawer to open.
+        public func open() {}
+
+        /// Does nothing: release builds have no drawer to close.
+        public func close() {}
 
         /// Runs `action`: there is no drawer or HUD to hide.
         ///

@@ -8,9 +8,9 @@ import SwiftUI
 /// a Request button while the user hasn't decided and an Open Settings button.
 public struct PermissionsPlugin: DebugDrawerPlugin {
     /// The plugin's identity in the drawer.
-    static let pluginID = "PermissionsPlugin"
+    nonisolated static let pluginID = "PermissionsPlugin"
 
-    public var id: String {
+    public nonisolated var id: String {
         Self.pluginID
     }
 

@@ -12,7 +12,7 @@
         /// Adds `rows` as `flags.json`: an object of each key's title, live value, override (absent
         /// when none) and the value the app reads, every value whose key matches a key pattern
         /// masked. No flags add nothing.
-        static func contribute(_ rows: [FeatureFlagRowState], to report: inout DebugDrawerReport, redaction: DebugDrawerRedaction) {
+        nonisolated static func contribute(_ rows: [FeatureFlagRowState], to report: inout DebugDrawerReport, redaction: DebugDrawerRedaction) {
             guard !rows.isEmpty else { return }
             let object = rows.reduce(into: [String: ReportedFlag]()) { object, row in
                 object[row.id] = ReportedFlag(

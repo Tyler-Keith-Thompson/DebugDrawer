@@ -7,7 +7,7 @@ import SwiftUI
 /// Protanopia, deuteranopia, tritanopia and grayscale simulated over the app. The header and
 /// the HUD name the simulation on; the HUD cycles through them.
 public struct ColorVisionPlugin: DebugDrawerPlugin {
-    public var id: String {
+    public nonisolated var id: String {
         "ColorVisionPlugin"
     }
 

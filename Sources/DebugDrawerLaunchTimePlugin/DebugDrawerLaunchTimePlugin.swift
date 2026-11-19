@@ -10,7 +10,7 @@ import SwiftUI
 /// (pre-main), from there to the first frame, and the total.
 public struct LaunchTimePlugin: DebugDrawerPlugin {
     /// The plugin's identity in the drawer, which its saved state, HUD pin and badges are kept under.
-    public var id: String {
+    public nonisolated var id: String {
         "LaunchTimePlugin"
     }
 

@@ -10,6 +10,11 @@ A plugin is a type that adopts ``DebugDrawerPlugin``: a ``DebugDrawerPlugin/titl
 else has a default. The drawer shows each plugin as a collapsible section with that title and
 icon, and builds its body on the main actor, as SwiftUI builds a view's.
 
+The protocol is isolated to the main actor, so a plugin type is too: make and register it there.
+A plugin that declares its own ``DebugDrawerPlugin/id`` as a computed property marks it
+`nonisolated` (`nonisolated var id: String { "Orders" }`), since `Identifiable` reads it from any
+thread.
+
 The protocol exists in every build, so a plugin compiles in release too, as long as its body
 uses only API that does (<doc:ReleaseBuilds>).
 

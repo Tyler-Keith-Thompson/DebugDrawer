@@ -11,7 +11,7 @@
 
         /// Adds `analytics.json`: `events` as a JSON array, the newest first, with what
         /// `redaction` calls sensitive masked. No events add nothing.
-        static func contribute(_ events: [AnalyticsEvent], redaction: DebugDrawerRedaction, to report: inout DebugDrawerReport) {
+        nonisolated static func contribute(_ events: [AnalyticsEvent], redaction: DebugDrawerRedaction, to report: inout DebugDrawerReport) {
             guard !events.isEmpty else { return }
             report.add(jsonData: Data(AnalyticsEvent.formattedJSON(of: events, redaction: redaction).utf8), named: "analytics")
         }

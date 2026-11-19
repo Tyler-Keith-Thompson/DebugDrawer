@@ -9,9 +9,9 @@ import SwiftUI
 /// notifications, each removable.
 public struct NotificationsPlugin: DebugDrawerPlugin {
     /// The plugin's identity in the drawer.
-    static let pluginID = "NotificationsPlugin"
+    nonisolated static let pluginID = "NotificationsPlugin"
 
-    public var id: String {
+    public nonisolated var id: String {
         Self.pluginID
     }
 

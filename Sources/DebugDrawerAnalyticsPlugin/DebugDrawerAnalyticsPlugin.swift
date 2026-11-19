@@ -9,9 +9,9 @@ import SwiftUI
 /// badge counts the events that arrived while the list was off screen.
 public struct AnalyticsPlugin: DebugDrawerPlugin {
     /// The plugin's identity in the drawer, which its badge is set under.
-    static let pluginID = "AnalyticsPlugin"
+    nonisolated static let pluginID = "AnalyticsPlugin"
 
-    public var id: String {
+    public nonisolated var id: String {
         Self.pluginID
     }
 

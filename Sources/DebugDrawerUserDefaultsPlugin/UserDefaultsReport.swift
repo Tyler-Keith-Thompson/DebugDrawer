@@ -12,7 +12,7 @@
 
         /// Adds `entries` as `user-defaults.json`: an object of each key's type and value as the
         /// plugin copies it, a value whose key matches a key pattern masked. No entries add nothing.
-        static func contribute(_ entries: [DefaultsEntry], to report: inout DebugDrawerReport, redaction: DebugDrawerRedaction) {
+        nonisolated static func contribute(_ entries: [DefaultsEntry], to report: inout DebugDrawerReport, redaction: DebugDrawerRedaction) {
             guard !entries.isEmpty else { return }
             let object = entries.reduce(into: [String: ReportedDefault]()) { object, entry in
                 object[entry.key] = ReportedDefault(type: entry.value.type.title, value: entry.copiedValue(redaction: redaction))

@@ -10,7 +10,7 @@ import SwiftUI
 /// path, UUID, load address and, for a framework, its version.
 public struct LoadedLibrariesPlugin: DebugDrawerPlugin {
     /// The plugin's identity in the drawer, which its saved state, HUD pin and badges are kept under.
-    public var id: String {
+    public nonisolated var id: String {
         "LoadedLibrariesPlugin"
     }
 

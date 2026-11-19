@@ -8,7 +8,7 @@ import SwiftUI
 /// their sizes and dates, folder totals, previews, and imports, renames and deletes outside
 /// the bundle.
 public struct FileBrowserPlugin: DebugDrawerPlugin {
-    public var id: String {
+    public nonisolated var id: String {
         "FileBrowserPlugin"
     }
 

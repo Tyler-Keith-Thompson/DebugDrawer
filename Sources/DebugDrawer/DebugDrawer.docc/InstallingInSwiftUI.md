@@ -100,8 +100,13 @@ struct OrdersRootView: View {
 }
 ```
 
+``DebugDrawer/DebugDrawer/open()`` and ``DebugDrawer/DebugDrawer/close()`` open and close it
+outright, and do nothing if it is already so. Read ``DebugDrawer/DebugDrawer/isOpen`` (or observe
+`$isOpen`) to know whether it is open; setting it is deprecated.
+
 Each window has a drawer of its own, open or closed apart from the others;
-``DebugDrawer/DebugDrawer/toggle()`` and ``DebugDrawer/DebugDrawer/isOpen`` act on the key
+``DebugDrawer/DebugDrawer/toggle()``, ``DebugDrawer/DebugDrawer/open()``,
+``DebugDrawer/DebugDrawer/close()`` and ``DebugDrawer/DebugDrawer/isOpen`` act on the key
 window's, as "Use the drawer with several windows" below describes.
 
 While the drawer is open, Cmd-K focuses its search field, Cmd-Option-Down and Cmd-Option-Up move

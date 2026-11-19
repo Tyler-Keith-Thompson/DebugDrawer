@@ -11,7 +11,7 @@
 
         /// Adds each of `recordings` under its file's name, mapped rather than read into memory;
         /// one whose file has gone is skipped, and none adds nothing.
-        static func contribute(_ recordings: [Recording], to report: inout DebugDrawerReport) {
+        nonisolated static func contribute(_ recordings: [Recording], to report: inout DebugDrawerReport) {
             for recording in recordings {
                 guard let movie = try? Data(contentsOf: recording.url, options: .alwaysMapped) else { continue }
                 report.add(movie: movie, named: recording.url.lastPathComponent)

@@ -7,7 +7,7 @@ import SwiftUI
 /// The app's stores, each open to its tables or entities, a table's rows paged and searched in
 /// a grid, and a read-only query editor.
 public struct DatabaseBrowserPlugin: DebugDrawerPlugin {
-    public var id: String {
+    public nonisolated var id: String {
         "DatabaseBrowserPlugin"
     }
 

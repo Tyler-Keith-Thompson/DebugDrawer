@@ -2,6 +2,11 @@ import SwiftUI
 
 // MARK: - Plugin protocol
 
+// Main actor on the protocol rather than on each requirement: everything that reads a plugin
+// (registration, the drawer, `AnyDebugDrawerPlugin`, its views and hooks) already runs there, and
+// per-requirement isolation would leave `id`, `title`, `icon`, `category` and `actions` readable
+// from any thread while the drawer never reads them off the main actor.
+
 /// A tool in the debug drawer: a title, an icon and a view, shown as a collapsible section.
 ///
 /// A plugin needs a ``title``, an ``icon`` and a ``body``; everything else has a default.
@@ -32,9 +37,13 @@ import SwiftUI
 /// collapsed, and where it is pinned, under its ``id``, in a `UserDefaults` suite of its own
 /// rather than the app's.
 ///
+/// The protocol is isolated to the main actor, as the drawer and SwiftUI views are: a plugin
+/// is made, registered and read there.
+///
 /// The protocol exists in every build so conformances compile everywhere. In release builds
 /// `debugLocalPlugin(_:)` and `debugDrawer()` return the view unchanged, and nothing reads the
 /// plugin.
+@MainActor
 public protocol DebugDrawerPlugin: Identifiable {
     /// The type of the view the plugin shows in its section.
     associatedtype Body: View
@@ -134,8 +143,9 @@ public protocol DebugDrawerPlugin: Identifiable {
 }
 
 public extension DebugDrawerPlugin {
+    // Nonisolated: it witnesses `Identifiable.id`, which isn't isolated to the main actor.
     /// The type's fully qualified name, such as `MyApp.CachePlugin`.
-    var id: String {
+    nonisolated var id: String {
         qualifiedName(of: type(of: self))
     }
 

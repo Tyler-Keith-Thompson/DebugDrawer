@@ -11,7 +11,7 @@ import SwiftUI
 /// domain, each expanded to its attributes and deletable, or all the filter shows.
 public struct CookiesPlugin: DebugDrawerPlugin {
     /// The plugin's identity in the drawer, which its saved state, HUD pin and badges are kept under.
-    public var id: String {
+    public nonisolated var id: String {
         "CookiesPlugin"
     }
 

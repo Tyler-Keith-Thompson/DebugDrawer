@@ -20,7 +20,7 @@ extension ConsolePlugin: DebugDrawerReportContributor {
     extension ConsolePlugin {
         /// Adds `lines` as `console.txt`, one per line in Copy All's format; no lines add nothing.
         /// Log text has no keys for the redaction rules to match, so it goes in as logged.
-        static func contribute(_ lines: [LogLine], to report: inout DebugDrawerReport) {
+        nonisolated static func contribute(_ lines: [LogLine], to report: inout DebugDrawerReport) {
             guard !lines.isEmpty else { return }
             report.add(text: lines.copiedText, named: "console.txt")
         }
@@ -28,7 +28,7 @@ extension ConsolePlugin: DebugDrawerReportContributor {
         /// Adds the lines of `previous`, an earlier launch's session, as `console-previous.txt`,
         /// in Copy All's format, every level included. No session, or one with no lines, adds
         /// nothing.
-        static func contribute(previous: ConsoleSessionLog?, to report: inout DebugDrawerReport) {
+        nonisolated static func contribute(previous: ConsoleSessionLog?, to report: inout DebugDrawerReport) {
             guard let previous, !previous.lines.isEmpty else { return }
             report.add(text: previous.lines.copiedText, named: "console-previous.txt")
         }

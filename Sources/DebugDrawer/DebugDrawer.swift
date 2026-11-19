@@ -40,21 +40,26 @@
         /// one ID.
         static let logger = Logger(subsystem: "DebugDrawer", category: "DebugDrawer")
 
-        /// Whether the key window's drawer is on screen. Set it, or call ``toggle()``.
+        /// Whether the key window's drawer is on screen. Read or observe it (`$isOpen`); open and
+        /// close the drawer with ``open()``, ``close()`` or ``toggle()``. Setting it is
+        /// deprecated.
         ///
         /// Each window has a drawer of its own, open or closed apart from the others; this is the
         /// one in the key window (on iOS, the scene in front), or, with none attached yet, the
         /// drawer the next window attached opens with.
-        @Published public var isOpen = false {
+        @DrawerOpenState public var isOpen = false {
+            // Only a caller's deprecated set gets here: the drawer's own changes set the storage.
             didSet {
-                guard !isSyncingOpenState, isOpen != keyPresentation.isOpen else { return }
+                guard isOpen != keyPresentation.isOpen else { return }
                 keyPresentation.isOpen = isOpen
             }
         }
 
-        /// True while ``isOpen`` is being set from the key window's drawer, so the change isn't
-        /// passed back to it.
-        var isSyncingOpenState = false
+        /// The storage of ``isOpen``, which the drawer sets as the key window's drawer opens and
+        /// closes: without the deprecation, and without passing the change back to that drawer.
+        var openState: DrawerOpenState {
+            _isOpen
+        }
 
         /// Bring ``isOpen`` up to date when another window becomes key, and on iOS detach a scene's
         /// drawer when the scene disconnects; added on the first attach.

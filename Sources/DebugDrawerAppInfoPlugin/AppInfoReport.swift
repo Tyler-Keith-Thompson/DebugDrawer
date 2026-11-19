@@ -21,7 +21,7 @@ extension AppInfoPlugin: DebugDrawerReportContributor {
         /// Adds `facts` as `app-info.json`: an object of each section's title and, under it, an
         /// object of each fact's label and value, a value whose label matches a key pattern masked.
         /// Provisioning and Entitlements are sections like the rest, entitlements by key.
-        static func contribute(_ facts: AppInfoFacts, to report: inout DebugDrawerReport, redaction: DebugDrawerRedaction) {
+        nonisolated static func contribute(_ facts: AppInfoFacts, to report: inout DebugDrawerReport, redaction: DebugDrawerRedaction) {
             let object = facts.reportSections.reduce(into: [String: [String: String]]()) { object, section in
                 object[section.title] = section.facts.reduce(into: [String: String]()) { values, fact in
                     // Labels are unique within a section; the first wins should two ever share one.

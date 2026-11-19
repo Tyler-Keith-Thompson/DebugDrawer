@@ -17,6 +17,18 @@
             keyPresentation.isOpen.toggle()
         }
 
+        /// Opens the key window's drawer; does nothing if it is already open. It acts on the
+        /// drawer ``toggle()`` does.
+        public func open() {
+            keyPresentation.isOpen = true
+        }
+
+        /// Closes the key window's drawer; does nothing if it is already closed. It acts on the
+        /// drawer ``toggle()`` does.
+        public func close() {
+            keyPresentation.isOpen = false
+        }
+
         /// Hides the HUD, and every open drawer unless `drawer` is false, runs `action` once that
         /// has rendered, then shows them again. For screenshots and anything else that needs a
         /// clean view.

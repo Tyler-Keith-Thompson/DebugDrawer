@@ -65,7 +65,7 @@
         let title: String
         let category: String
         var icon = "circle"
-        var id: String { title }
+        nonisolated var id: String { title }
         var body: some View { EmptyView() }
     }
 #endif

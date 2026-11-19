@@ -27,7 +27,7 @@
     struct BadgeAndToastTests {
         init() {
             let drawer = DebugDrawer.shared
-            drawer.isOpen = false
+            drawer.close()
             drawer.dismissToast()
             drawer.revealRequest = nil
             for id in drawer.badges.keys {
@@ -82,8 +82,8 @@
 
         @Test("A post while the drawer is open is dropped")
         func aPostWhileOpenIsDropped() {
-            DebugDrawer.shared.isOpen = true
-            defer { DebugDrawer.shared.isOpen = false }
+            DebugDrawer.shared.open()
+            defer { DebugDrawer.shared.close() }
 
             NoticePlugin().postToast("ignored")
 
@@ -95,7 +95,7 @@
             NoticePlugin().postToast("Disk write on main")
             let sut = DebugDrawer.shared
             defer {
-                sut.isOpen = false
+                sut.close()
                 sut.revealRequest = nil
             }
 

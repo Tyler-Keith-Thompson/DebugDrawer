@@ -9,9 +9,9 @@ import SwiftUI
 /// macOS).
 public struct AppStateResetPlugin: DebugDrawerPlugin {
     /// The plugin's identity in the drawer.
-    static let pluginID = "AppStateResetPlugin"
+    nonisolated static let pluginID = "AppStateResetPlugin"
 
-    public var id: String {
+    public nonisolated var id: String {
         Self.pluginID
     }
 

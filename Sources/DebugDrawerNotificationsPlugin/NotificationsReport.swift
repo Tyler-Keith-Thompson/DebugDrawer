@@ -12,13 +12,13 @@
         /// Adds the state as `notifications.txt`. The token is a device identifier, so it is
         /// redacted under its key as the drawer's rules say (the standard rules mask it), as is
         /// every sensitive value in a `userInfo`; times are in UTC.
-        static func contribute(
+        nonisolated static func contribute(
             registration: RemoteRegistration, center: NotificationCenterState, redaction: DebugDrawerRedaction, to report: inout DebugDrawerReport
         ) {
             report.add(text: text(registration: registration, center: center, redaction: redaction), named: "notifications.txt")
         }
 
-        static func text(registration: RemoteRegistration, center: NotificationCenterState, redaction: DebugDrawerRedaction) -> String {
+        nonisolated static func text(registration: RemoteRegistration, center: NotificationCenterState, redaction: DebugDrawerRedaction) -> String {
             let token = switch registration {
             case .notRegistered: "APNs device token: none reported"
             case let .registered(deviceToken):
@@ -36,7 +36,7 @@
                 .joined(separator: "\n")
         }
 
-        private static func list(_ title: String, _ notifications: [ListedNotification], redaction: DebugDrawerRedaction) -> [String] {
+        private nonisolated static func list(_ title: String, _ notifications: [ListedNotification], redaction: DebugDrawerRedaction) -> [String] {
             ["\(title) (\(notifications.count)):"] + notifications.flatMap { $0.reportLines(redaction: redaction) }
         }
     }

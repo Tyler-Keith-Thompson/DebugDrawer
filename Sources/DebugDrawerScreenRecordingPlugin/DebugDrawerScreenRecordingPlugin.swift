@@ -9,9 +9,9 @@ import SwiftUI
 /// add to the bug report.
 public struct ScreenRecordingPlugin: DebugDrawerPlugin {
     /// The plugin's identity in the drawer and the HUD.
-    static let pluginID = "ScreenRecordingPlugin"
+    nonisolated static let pluginID = "ScreenRecordingPlugin"
 
-    public var id: String {
+    public nonisolated var id: String {
         Self.pluginID
     }
 

@@ -8,9 +8,9 @@ import SwiftUI
 /// formatted JSON to copy or export; a badge counts the ones not yet opened.
 public struct MetricKitPlugin: DebugDrawerPlugin {
     /// The plugin's identity in the drawer, which its badge is set under.
-    static let pluginID = "MetricKitPlugin"
+    nonisolated static let pluginID = "MetricKitPlugin"
 
-    public var id: String {
+    public nonisolated var id: String {
         Self.pluginID
     }
 

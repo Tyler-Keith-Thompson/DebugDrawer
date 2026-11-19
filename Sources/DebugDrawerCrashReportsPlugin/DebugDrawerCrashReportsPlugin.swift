@@ -9,9 +9,9 @@ import SwiftUI
 /// stack trace; a badge counts the ones not yet opened, and the header counts them all.
 public struct CrashReportsPlugin: DebugDrawerPlugin {
     /// The plugin's identity in the drawer, which its badge is set under.
-    static let pluginID = "CrashReportsPlugin"
+    nonisolated static let pluginID = "CrashReportsPlugin"
 
-    public var id: String {
+    public nonisolated var id: String {
         Self.pluginID
     }
 

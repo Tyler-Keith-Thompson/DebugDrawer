@@ -36,10 +36,13 @@
         @Test("Two tweaks sharing a key trap when the plugin is made")
         func duplicateKeys() async {
             await #expect(processExitsWith: .failure) {
-                _ = TweaksPlugin(sections: [
-                    TweakSection("One") { Tweak.toggle("A", key: "shared", default: false) },
-                    TweakSection("Two") { Tweak.text("B", key: "shared", default: "") }
-                ])
+                // A plugin is made on the main actor, as DebugDrawerPlugin is isolated there.
+                await MainActor.run {
+                    _ = TweaksPlugin(sections: [
+                        TweakSection("One") { Tweak.toggle("A", key: "shared", default: false) },
+                        TweakSection("Two") { Tweak.text("B", key: "shared", default: "") }
+                    ])
+                }
             }
         }
     }

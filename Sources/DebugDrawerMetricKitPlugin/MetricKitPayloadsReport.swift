@@ -12,7 +12,7 @@
         /// Adds each of `payloads` as `<kind> <end of its period>.json`, formatted. No payloads add
         /// nothing. Nothing is redacted: a payload holds measurements, the app's version, the
         /// device's model and OS, and stack frames, none of the user's data.
-        static func contribute(_ payloads: [MetricKitPayload], to report: inout DebugDrawerReport) {
+        nonisolated static func contribute(_ payloads: [MetricKitPayload], to report: inout DebugDrawerReport) {
             for payload in payloads {
                 report.add(jsonData: payload.formattedJSONData, named: payload.reportName)
             }

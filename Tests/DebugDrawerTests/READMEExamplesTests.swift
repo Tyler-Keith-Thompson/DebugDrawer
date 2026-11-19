@@ -201,7 +201,7 @@
         @Test("Badges and toasts")
         func badgesAndToasts() {
             let wasOpen = DebugDrawer.shared.isOpen
-            DebugDrawer.shared.isOpen = false
+            DebugDrawer.shared.close()
 
             let uploads = UploadsPlugin()
             uploads.setBadge(2)
@@ -212,7 +212,7 @@
 
             // Leave the shared drawer as the other suites expect it, within this one main-actor turn.
             DebugDrawer.shared.dismissToast()
-            DebugDrawer.shared.isOpen = wasOpen
+            if wasOpen { DebugDrawer.shared.open() }
             #expect(badge == 2)
             #expect(toast?.pluginID == "DebugDrawerTests.UploadsPlugin")
             #expect(toast?.message == "Upload of report.pdf failed")

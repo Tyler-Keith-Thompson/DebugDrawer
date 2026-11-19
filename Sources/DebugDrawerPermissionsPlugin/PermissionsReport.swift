@@ -10,11 +10,11 @@
         /// Adds `rows` as `permissions.txt`, a line per permission (`Camera: Denied`) and an
         /// indented line per usage description. Nothing is redacted: the descriptions are the
         /// app's own text, shown to every user.
-        static func contribute(_ rows: [PermissionRowState], to report: inout DebugDrawerReport) {
+        nonisolated static func contribute(_ rows: [PermissionRowState], to report: inout DebugDrawerReport) {
             report.add(text: text(of: rows), named: "permissions.txt")
         }
 
-        static func text(of rows: [PermissionRowState]) -> String {
+        nonisolated static func text(of rows: [PermissionRowState]) -> String {
             rows.map { row in
                 let declarations = row.permission.usageDescriptions.isEmpty
                     ? ["  (needs no usage description)"]

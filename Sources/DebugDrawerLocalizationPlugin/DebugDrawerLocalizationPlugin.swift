@@ -9,9 +9,9 @@ import SwiftUI
 /// counts the translations missing for the language the app runs in, after a pending relaunch.
 public struct LocalizationPlugin: DebugDrawerPlugin {
     /// The plugin's identity in the drawer.
-    static let pluginID = "LocalizationPlugin"
+    nonisolated static let pluginID = "LocalizationPlugin"
 
-    public var id: String {
+    public nonisolated var id: String {
         Self.pluginID
     }
 

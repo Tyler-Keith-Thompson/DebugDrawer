@@ -11,7 +11,7 @@
         /// Adds `sections`' tweaks as `tweaks.json`: an object of each key's title, the value it
         /// reads as given `stored`, and whether that is its default; a value whose key matches a
         /// key pattern masked. No tweaks add nothing.
-        static func contribute(
+        nonisolated static func contribute(
             _ sections: [TweakSection],
             stored: (String) -> TweakStoredValue?,
             to report: inout DebugDrawerReport,

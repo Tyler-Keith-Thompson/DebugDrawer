@@ -17,7 +17,7 @@ extension CookiesPlugin: DebugDrawerReportContributor {
     extension CookiesPlugin {
         /// Adds `cookies` as `cookies.txt` in Copy's format, sensitive values masked; no cookies
         /// add nothing.
-        static func contribute(_ cookies: [StoredCookie], to report: inout DebugDrawerReport, redaction: DebugDrawerRedaction) {
+        nonisolated static func contribute(_ cookies: [StoredCookie], to report: inout DebugDrawerReport, redaction: DebugDrawerRedaction) {
             guard !cookies.isEmpty else { return }
             report.add(text: cookies.report(redaction: redaction), named: "cookies.txt")
         }

@@ -8,9 +8,9 @@ import SwiftUI
 /// ignored.
 public struct LeakDetectorPlugin: DebugDrawerPlugin {
     /// The plugin's identity in the drawer, which its badge is set under.
-    static let pluginID = "LeakDetectorPlugin"
+    nonisolated static let pluginID = "LeakDetectorPlugin"
 
-    public var id: String {
+    public nonisolated var id: String {
         Self.pluginID
     }
 

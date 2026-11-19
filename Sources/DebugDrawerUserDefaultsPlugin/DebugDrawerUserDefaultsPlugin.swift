@@ -9,7 +9,7 @@ import SwiftUI
 /// ``UserDefaultsBrowser/install(suites:)``.
 public struct UserDefaultsPlugin: DebugDrawerPlugin {
     /// The plugin's identity in the drawer, which its saved state, HUD pin and badges are kept under.
-    public var id: String {
+    public nonisolated var id: String {
         "UserDefaultsPlugin"
     }
 

@@ -79,8 +79,9 @@ opens, the plugins' `install*()` calls install nothing, and `.debugDrawer()` and
 The drawer opens in a window of its own, above the app's sheets and alerts: on macOS a panel along
 the trailing edge of the window, on iOS a window above the scene's, at 316 points wide or, where
 the window is narrower than two of those (an iPhone in portrait), as wide as the window. Each
-window's drawer opens and closes on its own; `toggle()` and `isOpen` act on the key window's
-(on iPadOS, the scene with the key window, or else the foreground-active one), and `toggle(in:)`
+window's drawer opens and closes on its own; `toggle()`, `open()`, `close()` and `isOpen` act on
+the key window's (on iPadOS, the scene with the key window, or else the foreground-active one), and
+`toggle(in:)`
 on the `NSWindow` or `UIWindowScene` it is given, attaching it first if it isn't yet. The plugin
 registry is shared, but each window's drawer lists only the local plugins of its own views. A
 UIKit or AppKit app without `debugDrawer()` attaches it with `DebugDrawer.shared.attach(to:)`,
@@ -2052,7 +2053,9 @@ sessions, Network sessions).
 ### Opening the drawer
 
 The drawer doesn't decide how it opens. Call `DebugDrawer.shared.toggle()` from whatever trigger
-makes sense for your app:
+makes sense for your app, or `open()` and `close()` where the trigger knows which it wants.
+`isOpen` says whether the key window's drawer is open, and `$isOpen` publishes each change; open
+and close the drawer with these calls rather than setting it.
 
 ```swift
 // A keyboard shortcut of the app's own (Ctrl-D here)

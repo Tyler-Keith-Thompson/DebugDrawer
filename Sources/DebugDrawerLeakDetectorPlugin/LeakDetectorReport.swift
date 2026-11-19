@@ -10,7 +10,7 @@
 
         /// Adds `suspects`, in order, as `leaks.txt`. No suspects add nothing. Nothing is redacted:
         /// a class name names code, not the user's data.
-        static func contribute(_ suspects: [LeakSuspect], to report: inout DebugDrawerReport) {
+        nonisolated static func contribute(_ suspects: [LeakSuspect], to report: inout DebugDrawerReport) {
             guard !suspects.isEmpty else { return }
             report.add(text: suspects.map { $0.text() }.joined(separator: "\n"), named: "leaks")
         }

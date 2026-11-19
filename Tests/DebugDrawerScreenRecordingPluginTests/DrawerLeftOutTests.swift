@@ -15,8 +15,8 @@
             "With the drawer open, a recorded frame shows the app where the panel is, the right way up; the panel's own window is left out"
         )
         func drawerLeftOut() throws {
-            DebugDrawer.shared.isOpen = true
-            defer { DebugDrawer.shared.isOpen = false }
+            DebugDrawer.shared.open()
+            defer { DebugDrawer.shared.close() }
             // Green above, red below: a frame drawn upside down fails too.
             let content = VStack(spacing: 0) {
                 Color.green.frame(height: 200)

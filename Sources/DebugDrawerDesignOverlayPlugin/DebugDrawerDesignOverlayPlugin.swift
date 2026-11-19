@@ -8,9 +8,9 @@ import SwiftUI
 /// Move. The header and the HUD say whether it shows and at what opacity, or that Move is on.
 public struct DesignOverlayPlugin: DebugDrawerPlugin {
     /// The plugin's identity in the drawer and the HUD.
-    static let pluginID = "DesignOverlayPlugin"
+    nonisolated static let pluginID = "DesignOverlayPlugin"
 
-    public var id: String {
+    public nonisolated var id: String {
         Self.pluginID
     }
 
