@@ -2,8 +2,9 @@
     import Combine
     import Foundation
 
-    /// Plays a route through a ``LocationSimulator``: each point at its offset in the track divided
-    /// by the speed, on the scheduler's clock.
+    /// Plays a route through a ``LocationOverride``: each point at its offset in the track divided
+    /// by the speed, on the scheduler's clock. ``LocationModel`` holds the one the plugin shows,
+    /// which keeps playing while the drawer is closed.
     ///
     /// Each point goes to every manager the simulator tracks, stamped with the moment it is
     /// delivered, so the track's spacing divided by the speed, and carrying the course and speed
@@ -26,14 +27,14 @@
         }
 
         private let scheduler: any PlaybackScheduler
-        private let simulator: LocationSimulator
+        private let simulator: any LocationOverride
         private var pending: AnyCancellable?
 
         /// - Parameters:
         ///   - routes: The routes to choose from, the first chosen; at least one.
         ///   - scheduler: The clock playback runs on.
         ///   - simulator: Where each point is delivered.
-        init(routes: [Route] = Route.samples, scheduler: any PlaybackScheduler, simulator: LocationSimulator) {
+        init(routes: [Route] = Route.samples, scheduler: any PlaybackScheduler, simulator: any LocationOverride) {
             precondition(!routes.isEmpty, "A route player needs a route to play")
             self.routes = routes
             route = routes[0]
@@ -117,10 +118,5 @@
                 self?.deliver(delivered)
             }
         }
-    }
-
-    extension RoutePlayer {
-        /// The player the plugin shows, which keeps playing while the drawer is closed.
-        static let shared = RoutePlayer(scheduler: TimerPlaybackScheduler(), simulator: .shared)
     }
 #endif

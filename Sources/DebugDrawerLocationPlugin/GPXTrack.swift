@@ -25,7 +25,7 @@
     }
 
     /// One point of a ``GPXTrack``.
-    struct GPXTrackPoint: Equatable, Sendable {
+    struct GPXTrackPoint: Codable, Equatable, Sendable {
         /// Degrees north of the equator, from -90 through 90.
         let latitude: Double
         /// Degrees east of the prime meridian, from -180 through 180.

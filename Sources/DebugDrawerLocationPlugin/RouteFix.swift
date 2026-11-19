@@ -3,7 +3,7 @@
 
     /// One point of a route as playback delivers it: where it is, when it comes in the route, and
     /// the heading and speed of the move that reaches it.
-    struct RouteFix: Equatable, Sendable {
+    struct RouteFix: Codable, Equatable, Sendable {
         let point: GPXTrackPoint
         /// Seconds from the route's first point to this one.
         let offset: TimeInterval

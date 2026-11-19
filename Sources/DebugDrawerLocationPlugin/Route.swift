@@ -2,7 +2,7 @@
     import Foundation
 
     /// A route playback can play: a bundled sample or an imported file.
-    struct Route: Identifiable, Equatable, Sendable {
+    struct Route: Identifiable, Codable, Equatable, Sendable {
         let id: String
         /// What the route picker calls it.
         let name: String

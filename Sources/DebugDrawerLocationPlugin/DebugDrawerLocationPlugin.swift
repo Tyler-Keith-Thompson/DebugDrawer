@@ -1,7 +1,5 @@
-import CoreLocation
 import DebugDrawer
 import SwiftUI
-import UniformTypeIdentifiers
 
 // MARK: - Plugin
 
@@ -26,6 +24,9 @@ import UniformTypeIdentifiers
 ///
 /// Authorization isn't simulated: `authorizationStatus` is the real one, and a spoofed location
 /// is delivered whether or not the app is authorized.
+///
+/// Its state and behavior are ``LocationModel``'s, which the plugin's view draws through a
+/// `DebugDrawerPluginTransport`.
 public struct LocationPlugin: DebugDrawerPlugin {
     /// The plugin's identity in the drawer, which its saved state, HUD pin and badges are kept under.
     public var id: String {
@@ -36,11 +37,25 @@ public struct LocationPlugin: DebugDrawerPlugin {
     public var category = "App"
     public var icon = "location.circle"
 
-    public init() {}
+    #if DEBUG
+        /// The model the plugin shows, or `nil` for the shared one.
+        private let model: LocationModel?
+
+        public init() {
+            model = nil
+        }
+
+        /// - Parameter model: The model to show and install in place of the shared one.
+        init(model: LocationModel) {
+            self.model = model
+        }
+    #else
+        public init() {}
+    #endif
 
     public var body: some View {
         #if DEBUG
-            LocationPluginView()
+            LocationPluginView(transport: .direct(to: model ?? .shared))
         #else
             EmptyView()
         #endif
@@ -51,7 +66,7 @@ public struct LocationPlugin: DebugDrawerPlugin {
     /// nothing.
     @MainActor public func install(in drawer: DebugDrawer) {
         #if DEBUG
-            LocationInstallation.install(for: drawer)
+            (model ?? .shared).install(in: ObjectIdentifier(drawer))
         #endif
     }
 
@@ -61,7 +76,7 @@ public struct LocationPlugin: DebugDrawerPlugin {
     /// and the coordinate stay saved for the next install.
     @MainActor public func uninstall(from drawer: DebugDrawer) {
         #if DEBUG
-            LocationInstallation.uninstall(for: drawer)
+            (model ?? .shared).uninstall(from: ObjectIdentifier(drawer))
         #endif
     }
 }
@@ -81,191 +96,3 @@ public extension DebugDrawer {
         #endif
     }
 }
-
-#if DEBUG
-    /// What the Location plugin's install and uninstall change, counted by drawer: the methods are
-    /// swapped while any drawer holds the plugin.
-    @MainActor
-    enum LocationInstallation {
-        private static var drawers: Set<ObjectIdentifier> = []
-
-        static func install(for drawer: DebugDrawer) {
-            drawers.insert(ObjectIdentifier(drawer))
-            LocationSwizzles.install()
-        }
-
-        static func uninstall(for drawer: DebugDrawer) {
-            guard drawers.remove(ObjectIdentifier(drawer)) != nil, drawers.isEmpty else { return }
-            RoutePlayer.shared.stop()
-            LocationSimulator.shared.release()
-            LocationSwizzles.uninstall()
-        }
-    }
-
-    /// Reads and writes `LocationSimulator.shared` and `RoutePlayer.shared`; `LocationForm` and
-    /// `RouteSection` draw them. It presents the file importer for Import GPX….
-    private struct LocationPluginView: View {
-        @ObservedObject private var player = RoutePlayer.shared
-        @State private var isImporting = false
-        @State private var isEnabled: Bool = LocationSimulator.shared.isEnabled
-        @State private var latText: String = LocationSimulator.shared.coordinate.map { String($0.latitude) } ?? ""
-        @State private var lonText: String = LocationSimulator.shared.coordinate.map { String($0.longitude) } ?? ""
-
-        var body: some View {
-            VStack(alignment: .leading, spacing: 0) {
-                form
-                if isEnabled {
-                    RouteSection(
-                        routes: player.routes,
-                        selection: Binding(get: { player.route.id }, set: { player.select($0) }),
-                        speed: $player.speed,
-                        playback: player.playback,
-                        importFailure: player.importFailure,
-                        actions: RouteActions(
-                            play: player.play,
-                            pause: player.pause,
-                            stop: player.stop,
-                            importFile: { isImporting = true }
-                        )
-                    )
-                }
-            }
-            .fileImporter(isPresented: $isImporting, allowedContentTypes: [.gpx, .xml]) { result in
-                if case let .success(url) = result {
-                    player.importFile(Result { () throws(GPXError) in try GPXTrack(contentsOf: url) }, from: url)
-                }
-            }
-        }
-
-        private var form: some View {
-            LocationForm(
-                isEnabled: $isEnabled,
-                latitudeText: $latText,
-                longitudeText: $lonText,
-                active: LocationSimulator.shared.simulatedLocation.map {
-                    LocationForm.Coordinate(latitude: $0.coordinate.latitude, longitude: $0.coordinate.longitude)
-                },
-                presets: LocationSimulator.presets
-            ) { preset in
-                latText = String(preset.latitude)
-                lonText = String(preset.longitude)
-                LocationSimulator.shared.coordinate = CLLocationCoordinate2D(latitude: preset.latitude, longitude: preset.longitude)
-            }
-            .onChange(of: isEnabled) { _, newValue in
-                // The Route section goes with the switch, so a route stops with it.
-                if !newValue { player.stop() }
-                LocationSimulator.shared.isEnabled = newValue
-            }
-            .onChange(of: latText) { _, newValue in applyCoordinate(latitude: newValue, longitude: lonText) }
-            .onChange(of: lonText) { _, newValue in applyCoordinate(latitude: latText, longitude: newValue) }
-        }
-
-        /// Spoofs the typed coordinate once both fields hold numbers in range. Until then the one
-        /// in effect stays, and the Active row shows it.
-        private func applyCoordinate(latitude: String, longitude: String) {
-            guard let latitude = Double(latitude), let longitude = Double(longitude) else { return }
-            let typed = CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
-            guard CLLocationCoordinate2DIsValid(typed) else { return }
-            LocationSimulator.shared.coordinate = typed
-        }
-    }
-
-    /// The spoofing switch and, while it is on, the coordinate fields, the location in effect and
-    /// the presets.
-    struct LocationForm: View {
-        /// A latitude and longitude in degrees.
-        struct Coordinate: Equatable {
-            var latitude: Double
-            var longitude: Double
-        }
-
-        @Binding var isEnabled: Bool
-        @Binding var latitudeText: String
-        @Binding var longitudeText: String
-        /// The location apps are given now, or nil while none is.
-        let active: Coordinate?
-        let presets: [LocationSimulator.PresetLocation]
-        let onPreset: (LocationSimulator.PresetLocation) -> Void
-        // Grows with the text, so "Longitude" keeps fitting its column at large sizes.
-        @ScaledMetric(relativeTo: .body) private var labelWidth = 72
-        @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-
-        var body: some View {
-            VStack(alignment: .leading, spacing: 0) {
-                DebugDrawerRow("Spoof Location", isOn: $isEnabled)
-
-                if isEnabled {
-                    DebugDrawerSection {
-                        coordinateField("Latitude", text: $latitudeText)
-                        coordinateField("Longitude", text: $longitudeText)
-                        if let active {
-                            DebugDrawerIssueRow(
-                                "Active",
-                                status: "\(String(format: "%.4f", active.latitude)), \(String(format: "%.4f", active.longitude))",
-                                severity: .ok
-                            )
-                        }
-                    }
-
-                    DebugDrawerSection("Presets") {
-                        ForEach(presets) { preset in
-                            Button {
-                                onPreset(preset)
-                            } label: {
-                                // At accessibility text sizes the coordinates go under the name, where
-                                // they fit on one line.
-                                let layout = dynamicTypeSize.isAccessibilitySize
-                                    ? AnyLayout(VStackLayout(alignment: .leading, spacing: 0))
-                                    : AnyLayout(HStackLayout(alignment: .firstTextBaseline))
-                                layout {
-                                    Text(preset.name)
-                                        .debugDrawerFont(.body)
-                                    if !dynamicTypeSize.isAccessibilitySize {
-                                        Spacer()
-                                    }
-                                    Text("\(String(format: "%.2f", preset.latitude)), \(String(format: "%.2f", preset.longitude))")
-                                        .debugDrawerFont(.value)
-                                        .debugDrawerForegroundStyle(.tertiary)
-                                }
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(.vertical, 3)
-                            }
-                            .debugDrawerButtonStyle(.plain)
-                            .accessibilityHint("Spoofs this location")
-                        }
-                    }
-                }
-            }
-        }
-
-        private func coordinateField(_ name: String, text: Binding<String>) -> some View {
-            // At accessibility text sizes the name goes above the field, as the presets' coordinates
-            // go under their names, so the field gets the full width and shows a whole coordinate.
-            let isAccessibilitySize = dynamicTypeSize.isAccessibilitySize
-            let layout = isAccessibilitySize
-                ? AnyLayout(VStackLayout(alignment: .leading, spacing: 4))
-                : AnyLayout(HStackLayout(spacing: 8))
-            return layout {
-                Text(name)
-                    .debugDrawerFont(.label)
-                    .debugDrawerForegroundStyle(.secondary)
-                    .frame(width: isAccessibilitySize ? nil : labelWidth, alignment: isAccessibilitySize ? .leading : .trailing)
-                TextField(name, text: text)
-                    .debugDrawerFont(.code)
-                    .debugDrawerTextFieldStyle()
-                    .accessibilityLabel(name)
-                    #if os(iOS)
-                        // Not .decimalPad, which has no minus sign for southern and western coordinates.
-                        .keyboardType(.numbersAndPunctuation)
-                    #endif
-            }
-            .padding(.vertical, 3)
-        }
-    }
-
-    extension UTType {
-        /// GPX files, by their extension: the system declares no type for them.
-        fileprivate static let gpx = UTType(filenameExtension: "gpx", conformingTo: .xml) ?? .xml
-    }
-
-#endif

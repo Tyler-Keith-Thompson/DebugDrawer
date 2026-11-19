@@ -12,15 +12,11 @@
     /// one, and `requestLocation` and `location` answer with it. When simulation begins, the
     /// real updates of managers already updating stop; when it ends, they start again.
     final class LocationSimulator: @unchecked Sendable {
-        // @unchecked: `defaults` is thread-safe and the rest of the mutable state is behind `state`.
+        // @unchecked: the store is `Sendable` and the rest of the mutable state is behind `state`.
 
         static let shared = LocationSimulator()
 
-        private static let latKey = "com.debugdrawer.location.latitude"
-        private static let lonKey = "com.debugdrawer.location.longitude"
-        private static let enabledKey = "com.debugdrawer.location.enabled"
-
-        private let defaults: UserDefaults
+        private let store: any LocationSpoofingStore
         private let service: any LocationService
 
         // A lock rather than an actor: the swizzled CLLocationManager methods ask synchronously,
@@ -43,20 +39,27 @@
         }
 
         /// - Parameters:
+        ///   - store: Where the switch and the fixed coordinate are kept.
+        ///   - service: Core Location's own behavior, for the calls the simulator lets through.
+        init(store: some LocationSpoofingStore, service: some LocationService = CoreLocationService()) {
+            self.store = store
+            self.service = service
+        }
+
+        /// - Parameters:
         ///   - defaults: Where the switch and the fixed coordinate are kept: the drawer's own suite,
         ///     apart from the app's defaults.
         ///   - service: Core Location's own behavior, for the calls the simulator lets through.
-        init(defaults: UserDefaults = .debugDrawer, service: some LocationService = CoreLocationService()) {
-            self.defaults = defaults
-            self.service = service
+        convenience init(defaults: UserDefaults = .debugDrawer, service: some LocationService = CoreLocationService()) {
+            self.init(store: _LocationSpoofingStore(defaults: defaults), service: service)
         }
 
         // MARK: - State
 
         /// Whether locations are simulated. Kept across launches.
         var isEnabled: Bool {
-            get { defaults.bool(forKey: Self.enabledKey) }
-            set { change { defaults.set(newValue, forKey: Self.enabledKey) } }
+            get { store.isEnabled }
+            set { change { store.isEnabled = newValue } }
         }
 
         /// The fixed location given while no route plays, or nil for none. Kept across launches.
@@ -65,10 +68,8 @@
         /// the plugin's form applies only coordinates in range.
         var coordinate: CLLocationCoordinate2D? {
             get {
-                guard let latitude = defaults.object(forKey: Self.latKey) as? Double,
-                      let longitude = defaults.object(forKey: Self.lonKey) as? Double
-                else { return nil }
-                let coordinate = CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
+                guard let kept = store.coordinate else { return nil }
+                let coordinate = CLLocationCoordinate2D(latitude: kept.latitude, longitude: kept.longitude)
                 return CLLocationCoordinate2DIsValid(coordinate) ? coordinate : nil
             }
             set {
@@ -76,8 +77,7 @@
                     precondition(CLLocationCoordinate2DIsValid(newValue), "Latitude must be in -90...90 and longitude in -180...180")
                 }
                 change {
-                    defaults.set(newValue?.latitude, forKey: Self.latKey)
-                    defaults.set(newValue?.longitude, forKey: Self.lonKey)
+                    store.coordinate = newValue.map { LocationCoordinate(latitude: $0.latitude, longitude: $0.longitude) }
                 }
             }
         }
@@ -104,11 +104,14 @@
 
         // MARK: - Presets
 
-        struct PresetLocation: Identifiable {
-            let id = UUID()
+        /// A place the Presets section offers. `Codable`, as the Location snapshot carries the list.
+        struct PresetLocation: Identifiable, Codable, Equatable, Sendable {
             let name: String
             let latitude: Double
             let longitude: Double
+
+            /// Its name: no two presets share one.
+            var id: String { name }
         }
 
         static let presets: [PresetLocation] = [
@@ -231,4 +234,9 @@
             }
         }
     }
+
+    // In an extension rather than the class's declaration: conforming there would infer the
+    // protocol's main-actor isolation for the whole class, which the swizzled methods call from
+    // any thread.
+    extension LocationSimulator: LocationOverride {}
 #endif

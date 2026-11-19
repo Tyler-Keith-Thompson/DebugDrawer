@@ -1,6 +1,6 @@
 #if DEBUG
     /// Where playback of a route stands.
-    enum RoutePlayback: Equatable, Sendable {
+    enum RoutePlayback: Codable, Equatable, Sendable {
         /// Not started, or stopped: no point delivered.
         case stopped
         /// Delivering, with this many points delivered so far.
@@ -21,7 +21,7 @@
     }
 
     /// How much faster than the track's own times a route plays.
-    enum PlaybackSpeed: Double, CaseIterable, Identifiable, Sendable {
+    enum PlaybackSpeed: Double, CaseIterable, Codable, Identifiable, Sendable {
         case times1 = 1
         case times2 = 2
         case times5 = 5
