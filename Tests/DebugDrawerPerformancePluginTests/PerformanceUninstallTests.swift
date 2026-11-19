@@ -54,12 +54,12 @@
             let (drawer, cleanUp) = try Self.drawer()
             defer { cleanUp() }
             let sampler = TickingSampler()
-            let monitor = PerformanceMonitor(sampler: sampler, threadSampler: OneThread())
-            let sut = PerformancePlugin(monitor: monitor)
+            let model = PerformanceModel(sampler: sampler, threadSampler: OneThread())
+            let sut = PerformancePlugin(model: model)
             drawer.registerGlobal(sut)
             drawer.pluginContentDidAppear(id: sut.id)
             sampler.deliverTick()
-            let historyWhileShown = monitor.fpsHistory.count
+            let historyWhileShown = model.snapshot.fpsHistory.count
 
             drawer.unregisterGlobal(id: sut.id)
 
@@ -67,11 +67,11 @@
             #expect(!drawer.globalPlugins.contains { $0.id == sut.id })
             #expect(sampler.stops == 1)
             #expect(!sampler.isRunning)
-            #expect(!monitor.isMonitoring)
-            #expect(monitor.fpsHistory.isEmpty)
-            #expect(monitor.footprintHistory.isEmpty)
-            #expect(monitor.threads.isEmpty)
-            #expect(monitor.footprintMB == 0)
+            #expect(!model.snapshot.isMonitoring)
+            #expect(model.snapshot.fpsHistory.isEmpty)
+            #expect(model.snapshot.footprintHistory.isEmpty)
+            #expect(model.snapshot.threads.isEmpty)
+            #expect(model.snapshot.footprintMB == 0)
         }
 
         @Test("Uninstalling twice is harmless, and a plugin registered again samples again")
@@ -79,7 +79,7 @@
             let (drawer, cleanUp) = try Self.drawer()
             defer { cleanUp() }
             let sampler = TickingSampler()
-            let sut = PerformancePlugin(monitor: PerformanceMonitor(sampler: sampler, threadSampler: OneThread()))
+            let sut = PerformancePlugin(model: PerformanceModel(sampler: sampler, threadSampler: OneThread()))
             drawer.registerGlobal(sut)
             drawer.unregisterGlobal(id: sut.id)
 
@@ -101,8 +101,8 @@
                 cleanUpSecond()
             }
             let sampler = TickingSampler()
-            let monitor = PerformanceMonitor(sampler: sampler, threadSampler: OneThread())
-            let sut = PerformancePlugin(monitor: monitor)
+            let model = PerformanceModel(sampler: sampler, threadSampler: OneThread())
+            let sut = PerformancePlugin(model: model)
             first.registerGlobal(sut)
             second.registerGlobal(sut)
             second.pluginContentDidAppear(id: sut.id)
@@ -111,7 +111,7 @@
             first.unregisterGlobal(id: sut.id)
 
             #expect(sampler.isRunning)
-            #expect(monitor.fpsHistory.count == 1)
+            #expect(model.snapshot.fpsHistory.count == 1)
         }
     }
 #endif

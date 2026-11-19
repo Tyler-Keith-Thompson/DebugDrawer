@@ -4,15 +4,22 @@ import SwiftUI
 /// Performance's HUD readout: the frame rate and memory now. Performance samples while a drawer's
 /// HUD shows it.
 ///
-/// The type exists in every build; in release it draws nothing and monitors nothing.
+/// It draws ``PerformanceModel``'s snapshots from the transport the plugin passes. The type exists
+/// in every build; in release it draws nothing and samples nothing.
 public struct PerformanceHUD: View {
     #if DEBUG
-        @ObservedObject var monitor = PerformanceMonitor.shared
+        @StateObject private var transport: DebugDrawerPluginTransport<PerformanceSnapshot, PerformanceCommand>
+
+        /// - Parameter transport: Joins the readout to the model; made once, for the view's lifetime.
+        init(transport: @escaping @autoclosure () -> DebugDrawerPluginTransport<PerformanceSnapshot, PerformanceCommand>) {
+            _transport = StateObject(wrappedValue: transport())
+        }
     #endif
 
     public var body: some View {
         #if DEBUG
-            PerformanceHUDReadout(fps: monitor.fps, maximumFPS: monitor.maximumFPS, footprintMB: monitor.footprintMB)
+            let snapshot = transport.snapshot
+            PerformanceHUDReadout(fps: snapshot.fps, maximumFPS: snapshot.maximumFPS, footprintMB: snapshot.footprintMB)
         #else
             EmptyView()
         #endif

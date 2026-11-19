@@ -24,6 +24,13 @@
         }
     }
 
+    /// The model's real way to post the warning.
+    extension MemoryWarningSimulator: MemoryWarningPoster {
+        @MainActor func postMemoryWarning() -> Date {
+            post()
+        }
+    }
+
     /// The memory warning action, and when it was last posted.
     struct MemoryWarningSection: View {
         /// Posts the warning and returns when.

@@ -26,7 +26,7 @@
 
             sut.installPerformance()
 
-            #expect(!PerformanceMonitor.shared.isMonitoring)
+            #expect(!PerformanceModel.shared.snapshot.isMonitoring)
         }
     }
 #endif

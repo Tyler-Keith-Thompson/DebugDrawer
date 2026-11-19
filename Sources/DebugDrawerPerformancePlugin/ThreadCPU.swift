@@ -1,7 +1,7 @@
 #if DEBUG
     /// One of the process's threads and how much of a CPU core it is using, as the Threads list
-    /// shows it.
-    struct ThreadCPU: Hashable, Sendable, Identifiable {
+    /// shows it. `Codable`, as the model's snapshot carries the list.
+    struct ThreadCPU: Codable, Hashable, Sendable, Identifiable {
         /// The thread's name: its pthread name, "Main Thread" for an unnamed main thread, or
         /// "Thread 0x…" with its ID for any other unnamed one.
         let name: String

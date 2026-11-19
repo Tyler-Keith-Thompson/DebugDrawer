@@ -45,8 +45,8 @@
             defer { defaults.removePersistentDomain(forName: suite) }
             let drawer = DebugDrawer(defaults: defaults)
             let sampler = FakePerformanceSampler()
-            let monitor = PerformanceMonitor(sampler: sampler, threadSampler: NoThreads())
-            let sut = PerformancePlugin(monitor: monitor)
+            let model = PerformanceModel(sampler: sampler, threadSampler: NoThreads())
+            let sut = PerformancePlugin(model: model)
 
             drawer.registerGlobal(sut)
             let runningOnceRegistered = sampler.isRunning
@@ -59,7 +59,7 @@
             #expect(sampler.starts == 1)
             #expect(sampler.stops == 1)
             #expect(!sampler.isRunning)
-            #expect(!monitor.isMonitoring)
+            #expect(!model.snapshot.isMonitoring)
         }
 
         @Test("Two drawers showing the plugin start the sampler once, and it stops only when both hide it")
@@ -75,7 +75,7 @@
             let first = DebugDrawer(defaults: firstDefaults)
             let second = DebugDrawer(defaults: secondDefaults)
             let sampler = FakePerformanceSampler()
-            let sut = PerformancePlugin(monitor: PerformanceMonitor(sampler: sampler, threadSampler: NoThreads()))
+            let sut = PerformancePlugin(model: PerformanceModel(sampler: sampler, threadSampler: NoThreads()))
             first.registerGlobal(sut)
             second.registerGlobal(sut)
 
@@ -98,7 +98,7 @@
             defer { defaults.removePersistentDomain(forName: suite) }
             let drawer = DebugDrawer(defaults: defaults)
             let sampler = FakePerformanceSampler()
-            let sut = PerformancePlugin(monitor: PerformanceMonitor(sampler: sampler, threadSampler: NoThreads()))
+            let sut = PerformancePlugin(model: PerformanceModel(sampler: sampler, threadSampler: NoThreads()))
             drawer.registerGlobal(sut)
             drawer.pluginContentDidAppear(id: sut.id)
 
@@ -115,7 +115,7 @@
             defer { defaults.removePersistentDomain(forName: suite) }
             let drawer = DebugDrawer(defaults: defaults)
             let sampler = DisplayLinkSampler()
-            let sut = PerformancePlugin(monitor: PerformanceMonitor(sampler: sampler, threadSampler: NoThreads()))
+            let sut = PerformancePlugin(model: PerformanceModel(sampler: sampler, threadSampler: NoThreads()))
             drawer.registerGlobal(sut)
 
             drawer.pluginContentDidAppear(id: sut.id)
@@ -137,7 +137,7 @@
                 defer { defaults.removePersistentDomain(forName: suite) }
                 let drawer = DebugDrawer(defaults: defaults)
                 let sampler = FakePerformanceSampler()
-                drawer.registerGlobal(PerformancePlugin(monitor: PerformanceMonitor(sampler: sampler, threadSampler: NoThreads())))
+                drawer.registerGlobal(PerformancePlugin(model: PerformanceModel(sampler: sampler, threadSampler: NoThreads())))
                 let plugin = try #require(drawer.globalPlugins.first)
                 let model = PerformanceSectionModel()
                 let window = NSWindow(
@@ -164,15 +164,15 @@
             @Test("The plugin's view and HUD readout shown outside a drawer sample nothing")
             func outsideADrawer() {
                 let sampler = FakePerformanceSampler()
-                let monitor = PerformanceMonitor(sampler: sampler, threadSampler: NoThreads())
+                let model = PerformanceModel(sampler: sampler, threadSampler: NoThreads())
                 let window = NSWindow(
                     contentRect: CGRect(x: -30000, y: -30000, width: 400, height: 800),
                     styleMask: .borderless, backing: .buffered, defer: false
                 )
                 window.isReleasedWhenClosed = false
                 let host = NSHostingView(rootView: VStack {
-                    PerformancePluginView(monitor: monitor)
-                    PerformanceHUD(monitor: monitor)
+                    PerformancePluginView(transport: .direct(to: model))
+                    PerformanceHUD(transport: .direct(to: model))
                 })
                 window.contentView = host
                 window.orderFront(nil)
@@ -181,7 +181,7 @@
                 host.layoutSubtreeIfNeeded()
 
                 #expect(sampler.starts == 0)
-                #expect(!monitor.isMonitoring)
+                #expect(!model.snapshot.isMonitoring)
             }
         #endif
     }

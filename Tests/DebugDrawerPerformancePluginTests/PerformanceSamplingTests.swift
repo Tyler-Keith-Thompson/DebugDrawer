@@ -53,16 +53,16 @@
         func idleUntilShown() {
             let sampler = FakePerformanceSampler()
 
-            let sut = PerformanceMonitor(sampler: sampler, threadSampler: NoThreads())
+            let sut = PerformanceModel(sampler: sampler, threadSampler: NoThreads())
 
             #expect(sampler.starts == 0)
-            #expect(!sut.isMonitoring)
+            #expect(!sut.snapshot.isMonitoring)
         }
 
         @Test("Sampling starts on the first viewer and stops after the last one leaves")
         func referenceCounted() {
             let sampler = FakePerformanceSampler()
-            let sut = PerformanceMonitor(sampler: sampler, threadSampler: NoThreads())
+            let sut = PerformanceModel(sampler: sampler, threadSampler: NoThreads())
 
             sut.addViewer()
             sut.addViewer()
@@ -75,26 +75,26 @@
             #expect(runningWhileOneViewerRemains)
             #expect(sampler.stops == 1)
             #expect(!sampler.isRunning)
-            #expect(!sut.isMonitoring)
+            #expect(!sut.snapshot.isMonitoring)
         }
 
         @Test("A viewer removed with none counted stops nothing and starts nothing later on its own")
         func unbalancedRemoval() {
             let sampler = FakePerformanceSampler()
-            let sut = PerformanceMonitor(sampler: sampler, threadSampler: NoThreads())
+            let sut = PerformanceModel(sampler: sampler, threadSampler: NoThreads())
 
             sut.removeViewer()
             sut.addViewer()
 
             #expect(sampler.stops == 0)
             #expect(sampler.starts == 1)
-            #expect(sut.isMonitoring)
+            #expect(sut.snapshot.isMonitoring)
         }
 
         @Test("A 500 ms gap between frames shows as 29 dropped frames and 31 fps")
         func gapDropsFrames() {
             let sampler = FakePerformanceSampler()
-            let sut = PerformanceMonitor(sampler: sampler, threadSampler: NoThreads())
+            let sut = PerformanceModel(sampler: sampler, threadSampler: NoThreads())
             let frameDuration: TimeInterval = 1.0 / 60
             sut.addViewer()
             for index in 0 ... 15 {
@@ -106,15 +106,15 @@
 
             sampler.deliverTick()
 
-            #expect(sut.droppedFrames == 29)
-            #expect(sut.fps == 31)
-            #expect(sut.maximumFPS == 60)
+            #expect(sut.snapshot.droppedFrames == 29)
+            #expect(sut.snapshot.fps == 31)
+            #expect(sut.snapshot.maximumFPS == 60)
         }
 
         @Test("The gap from the last frame of one second to the first of the next counts")
         func gapAcrossTicks() {
             let sampler = FakePerformanceSampler()
-            let sut = PerformanceMonitor(sampler: sampler, threadSampler: NoThreads())
+            let sut = PerformanceModel(sampler: sampler, threadSampler: NoThreads())
             let frameDuration: TimeInterval = 1.0 / 60
             sut.addViewer()
             sampler.deliverFrame(at: 10, duration: frameDuration)
@@ -124,13 +124,13 @@
 
             sampler.deliverTick()
 
-            #expect(sut.droppedFrames == 29)
+            #expect(sut.snapshot.droppedFrames == 29)
         }
 
         @Test("The time between closing and reopening drops no frames")
         func noGapAcrossSessions() {
             let sampler = FakePerformanceSampler()
-            let sut = PerformanceMonitor(sampler: sampler, threadSampler: NoThreads())
+            let sut = PerformanceModel(sampler: sampler, threadSampler: NoThreads())
             let frameDuration: TimeInterval = 1.0 / 60
             sut.addViewer()
             sampler.deliverFrame(at: 10, duration: frameDuration)
@@ -141,7 +141,7 @@
 
             sampler.deliverTick()
 
-            #expect(sut.droppedFrames == 0)
+            #expect(sut.snapshot.droppedFrames == 0)
         }
     }
 #endif

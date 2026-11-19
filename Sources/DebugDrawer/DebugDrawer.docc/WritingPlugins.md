@@ -296,10 +296,11 @@ current snapshot first, for a connection to forward elsewhere; on the other side
 ``DebugDrawerPluginTransport/init(initial:snapshots:send:)`` makes a transport from such a stream
 and a closure that carries the commands back. A plugin that doesn't adopt the protocol keeps
 working as it does. The Network, Console, View Inspector, Accessibility, Launch Time, Cookies, File
-Browser, Loaded Libraries, Deep Link, Screenshot, Location, UserDefaults, Keychain and Disk I/O
-plugins are built this way (`NetworkModel`, `ConsoleModel`, `ViewInspectorModel`, `AccessibilityModel`,
-`LaunchTimeModel`, `CookiesModel`, `FileBrowserModel`, `LoadedLibrariesModel`, `DeepLinkModel`,
-`ScreenshotModel`, `LocationModel`, `UserDefaultsModel`, `KeychainModel`, `DiskIOModel`). A plugin that acts
+Browser, Loaded Libraries, Deep Link, Screenshot, Location, UserDefaults, Keychain, Disk I/O and
+Performance plugins are built this way (`NetworkModel`, `ConsoleModel`, `ViewInspectorModel`,
+`AccessibilityModel`, `LaunchTimeModel`, `CookiesModel`, `FileBrowserModel`,
+`LoadedLibrariesModel`, `DeepLinkModel`, `ScreenshotModel`, `LocationModel`, `UserDefaultsModel`,
+`KeychainModel`, `DiskIOModel`, `PerformanceModel`). A plugin that acts
 on the app's live windows, as the View Inspector does, keeps its windows and views behind a service
 the model takes at init and puts only values read from them in its snapshot. A model that reads
 secrets, as Keychain reads passwords, keeps them out of its snapshot: the snapshot says a value
