@@ -100,7 +100,9 @@ import os
                 guard wanted?.remove(message.pluginID) != nil else { return }
                 forwarding.removeValue(forKey: message.pluginID)?.cancel()
             case .command:
-                // Acknowledged once done with, performed or not, so the viewer never sends it again.
+                // Acknowledged once done with, performed, refused (outside a session, say) or
+                // dropped, so the viewer never sends it again: a refusal is final, and a sidecar
+                // that opens a session sends the command anew, under a new ID.
                 defer {
                     if let id = message.commandID { acknowledge(id, of: message.pluginID) }
                 }
@@ -108,13 +110,7 @@ import os
                     Self.logger.debug("Skipped a command for \(message.pluginID, privacy: .public) already performed")
                     return
                 }
-                guard let model = registry.models[message.pluginID] else {
-                    Self.logger.notice("Dropped a command for \(message.pluginID, privacy: .public): no model is registered")
-                    return
-                }
-                if !model.perform(message.payload) {
-                    Self.logger.error("Dropped a command for \(message.pluginID, privacy: .public) that didn't decode")
-                }
+                registry.perform(message.payload, for: message.pluginID)
             case .snapshot, .hello, .acknowledgement, .unknown:
                 Self.logger.debug("Ignored a \(message.kind.name, privacy: .public) sent to the models' side")
             }

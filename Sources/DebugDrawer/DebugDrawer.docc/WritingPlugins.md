@@ -436,6 +436,26 @@ whose writer it shares no version with, migrates an older schema forward as it r
 1, a bare message, was written by version 1), and reads a newer one for the keys it knows. A
 reader of bare messages still reads every document, as the message's keys are where they were.
 
+**Sessions.** A registry made with ``DebugDrawerModelRegistry/init(sessions:)`` performs a
+command a transport carries in only within a session a sidecar opened, and only on a model
+registered with ``DebugDrawerModelRegistry/register(_:id:scope:)``; anything else is refused and
+changes nothing. The gate is the same over the socket and the store. A refused command is still
+acknowledged, and its ID remembered, so a ``DebugDrawerSidecarTransport`` doesn't send it again
+on a switch: a refusal is final, and a sidecar sends the command anew once a session is open. ``DebugDrawerSessions`` is itself a model, served under
+``DebugDrawerSessions/pluginID``: a sidecar connects to it as to any plugin, sends
+``DebugDrawerSessionCommand/open(duration:)`` and ``DebugDrawerSessionCommand/end`` as commands,
+and reads ``DebugDrawerSessionState`` snapshots, so sessions need no message kind or capability
+of their own and work over every transport. A session expires at most
+``DebugDrawerSessions/maximumDuration`` after it opens; as it ends or expires, each capability
+registered as ``DebugDrawerChangeScope/session(revertWith:)`` that a command changed performs its
+reverting command once, and ``DebugDrawerChangeScope/persistent`` ones keep their changes. The
+host reads ``DebugDrawerSessions/snapshot`` to draw its own indicator for as long as a session is
+open, ends one with ``DebugDrawerSessions/end()``, and reads ``DebugDrawerSessions/auditLog``
+(the newest ``DebugDrawerSessions/auditCapacity`` entries) or forwards every
+``DebugDrawerAuditEntry`` from ``DebugDrawerSessions/auditEntries``. An entry holds its date,
+session, capability and event, never what a command carried. Commands from the in-process
+transport, the app's own drawer, aren't gated. The README's "Sidecar sessions" shows the setup.
+
 **Why it is built this way.** The protocol hands out ``DebugDrawerPluginTransport``s rather than
 raw messages, so a view never changes and the in-process transport keeps `direct(to:)`'s
 synchronous commands; a protocol rather than a compile-time choice, so a viewer can hold two

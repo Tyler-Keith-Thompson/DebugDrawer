@@ -1,5 +1,6 @@
 import Combine
 import Foundation
+import os
 
 // The app's side of every transport: which models it offers, by plugin ID. It holds each model
 // type-erased behind `RegisteredModel`, so one registry holds models of different snapshot and
@@ -16,6 +17,13 @@ import Foundation
 // what a viewer sends again is what it sent last, unacknowledged. Rejected: remembering them in
 // each session (the socket's and the store's are different sessions), and on disk (a command
 // performed in a process since killed acted on models that went with it).
+//
+// Made with `DebugDrawerSessions`, the registry is the sidecar's gate: it serves the sessions
+// under their own ID, and every command a transport carries in, over the socket or the store,
+// goes through them, applied only within an open session and to a model registered with a
+// `DebugDrawerChangeScope`. A refused command is still acknowledged and its ID remembered, as a
+// refusal is final. The in-process transport hands out the model itself, so the app's own drawer
+// is never gated: it is the app's code, not a sidecar's.
 
 #if DEBUG
     /// The plugin models an app offers to viewers outside its drawer, each under its plugin's ID.
@@ -35,6 +43,8 @@ import Foundation
     /// Release builds get a stand-in that offers nothing.
     @MainActor
     public final class DebugDrawerModelRegistry {
+        private static let logger = Logger(subsystem: "DebugDrawer", category: "DebugDrawerModelRegistry")
+
         /// The models, by plugin ID.
         private(set) var models: [String: RegisteredModel] = [:]
         /// What to tell when a model is registered or unregistered, by the token that removes it.
@@ -44,18 +54,70 @@ import Foundation
         private var performedOrder: [UUID] = []
         /// How many command IDs are remembered.
         static let rememberedCommands = 4096
+        /// The sessions every command from outside the process acts within; `nil` when commands
+        /// aren't gated.
+        private let sessions: DebugDrawerSessions?
 
-        /// An empty registry.
-        public init() {}
+        /// An empty registry, performing every command a viewer sends.
+        public init() {
+            sessions = nil
+        }
+
+        /// A registry whose commands from outside the process act only within `sessions`: it
+        /// serves them under ``DebugDrawerSessions/pluginID``, so a sidecar can open one, and
+        /// refuses a command while none is open, or to a model registered without a
+        /// ``DebugDrawerChangeScope``.
+        ///
+        /// - Parameter sessions: The sessions to act within.
+        public init(sessions: DebugDrawerSessions) {
+            self.sessions = sessions
+            models[DebugDrawerSessions.pluginID] = RegisteredModel(sessions, scope: nil)
+        }
 
         /// Offers `model` under `id`, in place of any model registered under it before.
+        ///
+        /// In a registry made with ``DebugDrawerSessions``, a viewer reads the model's snapshots
+        /// and its commands are refused: register it with ``register(_:id:scope:)`` to let a
+        /// session's commands change it.
         ///
         /// - Parameters:
         ///   - model: The model to offer.
         ///   - id: The ID a viewer connects to it by, usually its plugin's ``DebugDrawerPlugin/id``.
         public func register<Model: DebugDrawerPluginModel>(_ model: Model, id: String) {
-            models[id] = RegisteredModel(model)
+            models[id] = RegisteredModel(model, scope: nil)
             notify(id)
+        }
+
+        /// Offers `model` under `id` as a capability whose commands a session applies, in place
+        /// of any model registered under it before.
+        ///
+        /// - Parameters:
+        ///   - model: The model to offer.
+        ///   - id: The ID a viewer connects to it by, and the audit log names it by.
+        ///   - scope: What becomes of its changes as the session that made them ends: reverted
+        ///     with a command, or kept.
+        public func register<Model: DebugDrawerPluginModel>(_ model: Model, id: String, scope: DebugDrawerChangeScope<Model>) {
+            models[id] = RegisteredModel(model, scope: DebugDrawerSessions.CapabilityScope(scope, of: model))
+            notify(id)
+        }
+
+        /// Performs the command `payload` encodes on the model registered under `id`, as a
+        /// transport carried it in: within the sessions, when the registry has them.
+        func perform(_ payload: Data, for id: String) {
+            guard let model = models[id] else {
+                Self.logger.notice("Dropped a command for \(id, privacy: .public): no model is registered")
+                sessions?.refuse(id, .unknownCapability)
+                return
+            }
+            // The sessions' own commands open and end a session, so no session gates them; the
+            // sessions record what comes of them.
+            guard let sessions, id != DebugDrawerSessions.pluginID else {
+                if !model.perform(payload) {
+                    Self.logger.error("Dropped a command for \(id, privacy: .public) that didn't decode")
+                }
+                return
+            }
+            sessions.apply(to: id, scope: model.scope) { model.perform(payload) }
         }
 
         /// Stops offering the model registered under `id`. A viewer connected to it stops getting
@@ -111,9 +173,12 @@ import Foundation
         /// Performs the command `payload` encodes; `false` when it isn't one of the model's
         /// commands.
         let perform: @MainActor (_ payload: Data) -> Bool
+        /// What becomes of its changes as a session ends; `nil` when the host didn't say.
+        let scope: DebugDrawerSessions.CapabilityScope?
 
-        init<Model: DebugDrawerPluginModel>(_ model: Model) {
+        init<Model: DebugDrawerPluginModel>(_ model: Model, scope: DebugDrawerSessions.CapabilityScope?) {
             self.model = model
+            self.scope = scope
             encodedSnapshots = { model.encodedSnapshots() }
             perform = { payload in
                 guard let command = try? JSONDecoder().decode(Model.Command.self, from: payload) else { return false }
@@ -165,12 +230,25 @@ import Foundation
         /// An empty registry.
         public init() {}
 
+        /// An empty registry.
+        ///
+        /// - Parameter sessions: Ignored.
+        public init(sessions: DebugDrawerSessions) {}
+
         /// Does nothing.
         ///
         /// - Parameters:
         ///   - model: Ignored.
         ///   - id: Ignored.
         public func register<Model: DebugDrawerPluginModel>(_ model: Model, id: String) {}
+
+        /// Does nothing.
+        ///
+        /// - Parameters:
+        ///   - model: Ignored.
+        ///   - id: Ignored.
+        ///   - scope: Ignored.
+        public func register<Model: DebugDrawerPluginModel>(_ model: Model, id: String, scope: DebugDrawerChangeScope<Model>) {}
 
         /// Does nothing.
         ///

@@ -54,6 +54,20 @@ public enum TestBench {
         TestBenchAction(
             id: "crashReports.fatalError", title: "Crash the App", plugin: "Crash Reports", isIncludedInAll: false, isDestructive: true,
             perform: TestBenchDiagnostics.crash
+        ),
+        // As a sidecar app would, through the app's own store (ExampleSidecar). Left out of `all`,
+        // so the other checks' screens show no session indicator.
+        TestBenchAction(
+            id: "sidecar.open", title: "Open a 60-Second Session", plugin: "Sidecar Session", isIncludedInAll: false,
+            perform: { await ExampleSidecar.openSession(duration: 60) }
+        ),
+        TestBenchAction(
+            id: "sidecar.elevateLogLevel", title: "Elevate the Log Level", plugin: "Sidecar Session", isIncludedInAll: false,
+            perform: ExampleSidecar.elevateLogLevel
+        ),
+        TestBenchAction(
+            id: "sidecar.end", title: "End the Session", plugin: "Sidecar Session", isIncludedInAll: false,
+            perform: ExampleSidecar.endSession
         )
     ]
 

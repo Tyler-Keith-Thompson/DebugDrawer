@@ -171,7 +171,7 @@ struct DebugDrawerExampleiOSApp: App {
 
     var body: some Scene {
         WindowGroup {
-            ExampleContentView_iOS()
+            ExampleContentView_iOS().sidecarSessionIndicator()
                 // Redraws the app's own strings when a Localization mode changes; beneath
                 // .debugDrawer(), so the drawer keeps its place.
                 .debugLocalization()

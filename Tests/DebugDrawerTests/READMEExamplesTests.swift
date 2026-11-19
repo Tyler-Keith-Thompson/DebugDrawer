@@ -1,6 +1,7 @@
 // The README's examples, verbatim, so the README cannot drift from the code.
 
 #if DEBUG
+    import Combine
     import DebugDrawer
     import SwiftUI
     import Testing
@@ -110,9 +111,135 @@
         }
     }
 
+    /// What the sidecar sessions example registers: a log level reset at the session's end.
+    @MainActor
+    final class LogLevelsModel: DebugDrawerPluginModel {
+        struct Snapshot: Codable, Equatable, Sendable {
+            var level = "info"
+        }
+
+        enum Command: Codable, Sendable {
+            case elevate
+            case reset
+        }
+
+        @Published private(set) var snapshot = Snapshot()
+
+        func perform(_ command: Command) {
+            switch command {
+            case .elevate: snapshot.level = "debug"
+            case .reset: snapshot.level = "info"
+            }
+        }
+    }
+
+    /// What the sidecar sessions example registers: flag overrides kept past the session.
+    @MainActor
+    final class FlagOverridesModel: DebugDrawerPluginModel {
+        struct Snapshot: Codable, Equatable, Sendable {
+            var overrides: [String: Bool] = [:]
+        }
+
+        enum Command: Codable, Sendable {
+            case override(String, Bool)
+        }
+
+        @Published private(set) var snapshot = Snapshot()
+
+        func perform(_ command: Command) {
+            switch command {
+            case let .override(flag, value): snapshot.overrides[flag] = value
+            }
+        }
+    }
+
+    /// Where the sidecar sessions example forwards its audit entries: kept here for the test.
+    @MainActor
+    enum AuditForwarder {
+        static var sent: [DebugDrawerAuditEntry] = []
+
+        static func send(_ entry: DebugDrawerAuditEntry) {
+            sent.append(entry)
+        }
+    }
+
+    @MainActor
+    final class SidecarReceiver {
+        let sessions = DebugDrawerSessions(maximumDuration: 15 * 60)
+        let registry: DebugDrawerModelRegistry
+        let server: DebugDrawerAppGroupStoreServer
+        private var forwarding: AnyCancellable?
+
+        init(logLevels: LogLevelsModel, flags: FlagOverridesModel, container: URL) throws {
+            registry = DebugDrawerModelRegistry(sessions: sessions)
+            registry.register(logLevels, id: "MyApp.LogLevels", scope: .session(revertWith: .reset))
+            registry.register(flags, id: "MyApp.FlagOverrides", scope: .persistent)
+            server = DebugDrawerAppGroupStoreServer(registry: registry, directory: container.appending(path: "DebugDrawer"))
+            forwarding = sessions.auditEntries.sink { entry in
+                AuditForwarder.send(entry)
+            }
+            try server.start()
+        }
+    }
+
+    struct SessionIndicator: View {
+        @ObservedObject var sessions: DebugDrawerSessions
+
+        var body: some View {
+            if let session = sessions.snapshot.session {
+                HStack {
+                    Text("Debug session until \(session.expires, style: .time)")
+                    Button("End") { sessions.end() }
+                }
+            }
+        }
+    }
+
     @MainActor
     @Suite("README examples")
     struct READMEExamplesTests {
+        @Test(
+            "Sidecar sessions: ending a session reverts the session-scoped capability, keeps the persistent one, and the audit is forwarded",
+            .timeLimit(.minutes(1))
+        )
+        func sidecarSessions() async throws {
+            let logLevels = LogLevelsModel()
+            let flags = FlagOverridesModel()
+            let container = FileManager.default.temporaryDirectory.appending(path: "READMESidecar-\(UUID().uuidString)")
+            AuditForwarder.sent = []
+            let sut = try SidecarReceiver(logLevels: logLevels, flags: flags, container: container)
+            let sidecar = try DebugDrawerAppGroupStoreTransport(directory: container.appending(path: "DebugDrawer"))
+            let session = try await sidecar.connect(
+                toPlugin: DebugDrawerSessions.pluginID, snapshot: DebugDrawerSessionState.self, command: DebugDrawerSessionCommand.self
+            )
+            let levels = try await sidecar.connect(
+                toPlugin: "MyApp.LogLevels", snapshot: LogLevelsModel.Snapshot.self, command: LogLevelsModel.Command.self
+            )
+            let overrides = try await sidecar.connect(
+                toPlugin: "MyApp.FlagOverrides", snapshot: FlagOverridesModel.Snapshot.self, command: FlagOverridesModel.Command.self
+            )
+            let expectedEvents: [DebugDrawerAuditEntry.Event] = [.commandApplied, .commandApplied, .changeReverted, .sessionEnded(.ended)]
+
+            session.send(.open(duration: 60))
+            for await state in session.snapshots() where state.isActive {
+                break
+            }
+            levels.send(.elevate)
+            overrides.send(.override("checkout", true))
+            for await snapshot in overrides.snapshots() where !snapshot.overrides.isEmpty {
+                break
+            }
+            let elevated = logLevels.snapshot.level
+            sut.sessions.end()
+
+            #expect(elevated == "debug")
+            #expect(logLevels.snapshot.level == "info")
+            #expect(flags.snapshot.overrides == ["checkout": true])
+            #expect(Array(AuditForwarder.sent.dropFirst().map(\.event)) == expectedEvents)
+            #expect(SessionIndicator(sessions: sut.sessions).sessions.snapshot == .inactive)
+            sut.server.stop()
+        }
+
         @Test("Sending reports")
         func sendingReports() throws {
             let reportsEndpoint = try #require(URL(string: "https://bugs.example.com/reports"))

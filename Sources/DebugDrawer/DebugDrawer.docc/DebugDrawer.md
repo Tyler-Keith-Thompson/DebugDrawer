@@ -44,6 +44,12 @@ and the API a host calls compiles to stand-ins that do nothing.
 
 - ``DebugDrawerTransport``
 - ``DebugDrawerModelRegistry``
+- ``DebugDrawerSessions``
+- ``DebugDrawerSessionState``
+- ``DebugDrawerSession``
+- ``DebugDrawerSessionCommand``
+- ``DebugDrawerChangeScope``
+- ``DebugDrawerAuditEntry``
 - ``DebugDrawerInProcessTransport``
 - ``DebugDrawerSocketServer``
 - ``DebugDrawerSocketTransport``

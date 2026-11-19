@@ -1,4 +1,5 @@
 import DebugDrawer
+import ExampleTestBench
 import UIKit
 
 /// The UIKit example's screen: the URL or activity the scene took last, a bar button that toggles
@@ -56,6 +57,19 @@ final class ExampleUIKitViewController: UIViewController {
             stack.topAnchor.constraint(equalTo: view.layoutMarginsGuide.topAnchor, constant: 24),
             stack.leadingAnchor.constraint(equalTo: view.layoutMarginsGuide.leadingAnchor),
             stack.trailingAnchor.constraint(equalTo: view.layoutMarginsGuide.trailingAnchor)
+        ])
+        addSessionBanner()
+    }
+
+    /// While a sidecar's session is open, a banner along the bottom says so.
+    private func addSessionBanner() {
+        let sessionBanner = ExampleSessionBanner(sessions: ExampleSidecar.sessions, logLevel: ExampleSidecar.logLevel)
+        sessionBanner.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(sessionBanner)
+        NSLayoutConstraint.activate([
+            sessionBanner.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            sessionBanner.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            sessionBanner.bottomAnchor.constraint(equalTo: view.bottomAnchor)
         ])
     }
 

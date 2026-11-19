@@ -2092,6 +2092,75 @@ sandboxed Mac app also needs the `com.apple.security.network.server` entitlement
 permission covers. Release builds get stand-ins: the server never listens, the browser finds
 nothing and a viewer's pairing fails as unreachable.
 
+### Sidecar sessions: commands only while someone is debugging
+
+A registry made with `DebugDrawerSessions` acts on a sidecar's commands only within a session
+the sidecar opens. Sessions expire, at most the host's maximum after they open; ending one, or
+its expiry, reverts the changes the host declared session-scoped and keeps the persistent ones;
+and every command is written to an audit log the host reads and forwards. Each capability's model
+is registered with a `DebugDrawerChangeScope`: `.session(revertWith:)` names the command that
+puts it back, `.persistent` keeps its changes. A model registered without one serves its
+snapshots, and its commands are refused.
+
+```swift
+@MainActor
+final class SidecarReceiver {
+    let sessions = DebugDrawerSessions(maximumDuration: 15 * 60)
+    let registry: DebugDrawerModelRegistry
+    let server: DebugDrawerAppGroupStoreServer
+    private var forwarding: AnyCancellable?
+
+    init(logLevels: LogLevelsModel, flags: FlagOverridesModel, container: URL) throws {
+        registry = DebugDrawerModelRegistry(sessions: sessions)
+        registry.register(logLevels, id: "MyApp.LogLevels", scope: .session(revertWith: .reset))
+        registry.register(flags, id: "MyApp.FlagOverrides", scope: .persistent)
+        server = DebugDrawerAppGroupStoreServer(registry: registry, directory: container.appending(path: "DebugDrawer"))
+        forwarding = sessions.auditEntries.sink { entry in
+            AuditForwarder.send(entry)
+        }
+        try server.start()
+    }
+}
+```
+
+The library draws nothing: `sessions.snapshot` is a `DebugDrawerSessionState`, published as it
+changes, and the app shows its own indicator, in its own style, for as long as it is active, so
+the person holding the device always knows debug tooling is engaged:
+
+```swift
+struct SessionIndicator: View {
+    @ObservedObject var sessions: DebugDrawerSessions
+
+    var body: some View {
+        if let session = sessions.snapshot.session {
+            HStack {
+                Text("Debug session until \(session.expires, style: .time)")
+                Button("End") { sessions.end() }
+            }
+        }
+    }
+}
+```
+
+A sidecar opens a session by connecting to `DebugDrawerSessions.pluginID` like any plugin, with
+`DebugDrawerSessionState` snapshots and `DebugDrawerSessionCommand` commands, and sending
+`.open(duration:)`; it ends it with `.end`. A command sent while no session is open, after it
+ended or expired, to a model registered without a scope, or to no model, is refused and changes
+nothing, over the socket and the store alike. A refusal is final: the app still acknowledges the
+command, so `DebugDrawerSidecarTransport` doesn't send it again when it switches channels, and a
+sidecar sends it anew once a session is open. A session asked to last longer than the maximum expires at the maximum, and one asked to
+open while another is open is refused. Expiry is a one-shot timer at the expiry date, and a
+command that arrives after it, before a suspended app's timer has fired, expires the session
+first. The app's own drawer, in the process, is not gated.
+
+Each `DebugDrawerAuditEntry` holds its date, the session's ID, the capability (the ID the model
+was registered under, or `DebugDrawerSessions.pluginID` for a session opening or ending) and the
+event: `sessionOpened(expires:)`, `sessionEnded(.ended or .expired)`, `commandApplied`,
+`commandRefused` with its reason, or `changeReverted`. It never holds what a command carried. It
+is `Codable` for forwarding as JSON. `auditLog` keeps the newest 1,000 entries in memory
+(`auditCapacity` sets another bound), and `auditEntries` publishes every entry as it is recorded.
+In release builds the sessions are stand-ins that never open, so an indicator never shows.
+
 ### What the plugins need from the app
 
 No plugin needs an Info.plist key or an entitlement to install. Some of what they show depends on

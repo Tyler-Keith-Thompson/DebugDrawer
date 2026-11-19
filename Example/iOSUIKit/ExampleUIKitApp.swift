@@ -20,6 +20,8 @@ final class ExampleUIKitAppDelegate: UIResponder, UIApplicationDelegate {
                 .compactMap { $0.delegate as? ExampleUIKitSceneDelegate }
                 .first?.route(url, via: "openURL") ?? false
         })
+        // Serves a sidecar's sessions; the screen shows a banner while one is open.
+        ExampleSidecar.install()
         return true
     }
 
