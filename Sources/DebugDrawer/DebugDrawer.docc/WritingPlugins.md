@@ -391,10 +391,16 @@ big-endian length, then that many bytes of JSON, at most 64 MiB. Each side of a 
 `hello` first (below). A viewer sends `subscribe` for each plugin it connects to and gets that
 plugin's current snapshot, then one after each change, each different from the one before; it
 sends `command`s back, and `unsubscribe` once the last transport to a plugin is released. The
-store keeps one document per file, written atomically: `snapshots/<plugin ID>.json` holds each
-plugin's newest snapshot (the ID percent-encoded), and `commands/<time>-<count>-<UUID>.json`
-holds each command until the app performs it, oldest first, and removes it. Both sides learn of a
-change from a dispatch source on the directory, so nothing polls.
+store keeps one document per file: `snapshots/<plugin ID>.json` holds each plugin's newest
+snapshot (the ID percent-encoded), and `commands/<time>-<count>-<UUID>.json` holds each command
+until the app performs it, oldest first, and removes it. Both sides learn of a change from a
+dispatch source on the directory, so nothing polls; the app also performs what waits as it starts
+serving and as it comes back to the foreground, since a suspended app may hear nothing. Each
+document is written to `<file>.<UUID>.partial` beside its file, then renamed over it, so a
+process killed mid-write leaves the last complete document and a partial file no reader reads.
+The store is bounded: one snapshot file per plugin (the app's server removes partial files there
+as it starts), and at most 256 command files and 16 MiB, partial ones included, as a viewer
+removes the oldest past either after leaving a command and leaves none larger.
 
 **Versions.** The app and a viewer, a sidecar especially, ship on different schedules, so a
 pairing of any two builds either works or fails clearly. On a stream, each side's `hello` names
@@ -421,7 +427,9 @@ Unix-domain support; the network transport frames the same messages over Network
 instead, which it needs for Bonjour. The store is files and a directory's dispatch source
 rather than `NSFilePresenter` (file coordination across processes would bind both apps to it for
 every write) or a Darwin notification (a name to agree on and a second step to read what
-changed). JSON rather than a binary property list, so a capture can be read and a viewer on any
+changed). A snapshot replaces the plugin's last one rather than being appended to a ring file, as
+a viewer wants the newest state, which the plugin already bounds. JSON rather than a binary
+property list, so a capture can be read and a viewer on any
 platform can write it.
 
 ### Capturing what the app does

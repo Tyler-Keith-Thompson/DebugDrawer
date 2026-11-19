@@ -5,7 +5,8 @@ import os
 // time the snapshots directory changes, handing the ones that changed to `RemoteModels`, and
 // leaves each command as a file of its own for the app to perform. Command files are named by the
 // wall clock in nanoseconds, then a count, then a UUID, so the app performs one viewer's commands
-// in the order sent, and two viewers' never collide. A file a build this one shares no protocol
+// in the order sent, and two viewers' never collide. Leaving one trims the oldest past the store's
+// budget (AppGroupStoreLayout). A file a build this one shares no protocol
 // version with wrote is skipped rather than closing the store, as a stale file can outlive the app
 // that wrote it.
 
@@ -96,11 +97,22 @@ import os
             let time = String(format: "%020llu", clock_gettime_nsec_np(CLOCK_REALTIME))
             let count = String(format: "%010ld", sequence)
             let file = layout.commands.appending(path: "\(time)-\(count)-\(UUID().uuidString).json", directoryHint: .notDirectory)
+            let pluginID = document.message.pluginID
             do {
-                try document.encoded().write(to: file, options: .atomic)
+                let data = try document.encoded()
+                guard data.count <= AppGroupStoreLayout.maximumCommandBytes else {
+                    let bytes = data.count
+                    logger.error("Didn't leave a command for \(pluginID, privacy: .public): \(bytes, privacy: .public) bytes won't fit")
+                    return
+                }
+                try layout.write(data, to: file)
             } catch {
-                let pluginID = document.message.pluginID
                 logger.error("Couldn't leave a command for \(pluginID, privacy: .public): \(error.localizedDescription, privacy: .public)")
+                return
+            }
+            let removed = layout.trimCommands()
+            if removed > 0 {
+                logger.notice("Removed the \(removed, privacy: .public) oldest commands waiting in the store, which was full")
             }
         }
     }

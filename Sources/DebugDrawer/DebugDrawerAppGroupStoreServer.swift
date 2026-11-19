@@ -3,16 +3,34 @@ import os
 
 // The app's end of the app-group store: it writes every registered model's snapshot to the store
 // as it changes, through one `RegistrySession` that wants every plugin, and performs the commands
-// viewers leave there. Commands left while the app was suspended or not running are performed when
-// it starts serving, then each as its file lands. Writes run on the main actor, where the models
-// are: a snapshot is written once per change the transport folds, not once per edit.
+// viewers leave there. Commands left while the app was not running are performed when it starts
+// serving, those left while it was suspended as it comes back to the foreground, then each as its
+// file lands. Writes run on the main actor, where the models are: a snapshot is written once per
+// change the transport folds, not once per edit.
+//
+// The directory's dispatch source is the wake-up while the app runs. Nothing promises what a
+// suspended app hears of it, so coming to the foreground performs what waits too, synchronously in
+// the system's notification. Both may find the same file; it runs once, as each is removed before
+// it is performed. Rejected: a Darwin notification posted by the viewer (a suspended app doesn't
+// run to hear it either, and the directory's own event already wakes a running one) and
+// NSFileCoordinator (see DirectoryWatcher). Starting removes the snapshot files an earlier
+// run's cut-off writes left (AppGroupStoreLayout), as this server is the only snapshot writer.
 
 #if DEBUG
+    #if os(macOS)
+        import AppKit
+    #elseif os(watchOS)
+        import WatchKit
+    #elseif canImport(UIKit)
+        import UIKit
+    #endif
+
     /// Keeps a ``DebugDrawerModelRegistry``'s snapshots in a directory both apps of an app group
     /// can reach, and performs the commands a ``DebugDrawerAppGroupStoreTransport`` leaves there.
     ///
     /// The snapshots stay when the app is suspended or quits, so a viewer reads the last state
-    /// then, and its commands wait for the app to serve again.
+    /// then, and its commands wait for the app to serve again: the server performs them as it
+    /// starts, as the app comes back to the foreground, and as each lands while it runs.
     ///
     /// ```swift
     /// let container = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: "group.com.example.debug")!
@@ -32,6 +50,7 @@ import os
         private var session: RegistrySession?
         private var watcher: DirectoryWatcher?
         private var performing: Task<Void, Never>?
+        private var foregroundObservation: (any NSObjectProtocol)?
 
         /// A server of `registry`'s models into `directory`; it writes once started.
         ///
@@ -51,16 +70,18 @@ import os
         }
 
         /// Writes every registered model's snapshot, performs the commands waiting in the store,
-        /// and goes on doing both as they change. Does nothing while the server runs.
+        /// and goes on doing both as they change, and as the app comes back to the foreground.
+        /// Does nothing while the server runs.
         ///
         /// - Throws: ``DebugDrawerTransportError/cannotServe`` when the store's directories can't
         ///   be made or watched.
         public func start() throws(DebugDrawerTransportError) {
             guard session == nil else { return }
             guard layout.create(), let watcher = DirectoryWatcher(directory: layout.commands) else { throw .cannotServe }
+            layout.removeCutOffSnapshots()
             let layout = layout
             let session = RegistrySession(registry: registry, link: .store) { message in
-                Self.write(StoreDocument(message), to: layout.snapshotFile(for: message.pluginID))
+                Self.write(StoreDocument(message), to: layout.snapshotFile(for: message.pluginID), in: layout)
             }
             self.session = session
             self.watcher = watcher
@@ -71,10 +92,21 @@ import os
                     self?.performWaitingCommands()
                 }
             }
+            // No queue, so the commands are performed before the post returns, not on a later
+            // turn of the main run loop. The system posts it on the main thread.
+            foregroundObservation = NotificationCenter.default.addObserver(forName: Self.foreground, object: nil, queue: nil) { [weak self] _ in
+                MainActor.assumeIsolated {
+                    self?.performWaitingCommands()
+                }
+            }
         }
 
         /// Stops writing snapshots and performing commands. The snapshots written stay in the store.
         public func stop() {
+            if let foregroundObservation {
+                NotificationCenter.default.removeObserver(foregroundObservation)
+            }
+            foregroundObservation = nil
             session?.close()
             session = nil
             watcher?.cancel()
@@ -111,9 +143,23 @@ import os
             }
         }
 
-        private static func write(_ document: StoreDocument, to file: URL) {
+        /// What the system posts as the app comes to the foreground: on the Mac, where apps aren't
+        /// suspended, as it becomes active.
+        private static var foreground: Notification.Name {
+            #if os(macOS)
+                NSApplication.willBecomeActiveNotification
+            #elseif os(watchOS)
+                WKApplication.willEnterForegroundNotification
+            #else
+                // Mac Catalyst takes this branch too: a Catalyst app is a UIKit app, and UIKit
+                // posts it there.
+                UIApplication.willEnterForegroundNotification
+            #endif
+        }
+
+        private static func write(_ document: StoreDocument, to file: URL, in layout: AppGroupStoreLayout) {
             do {
-                try document.encoded().write(to: file, options: .atomic)
+                try layout.write(document.encoded(), to: file)
             } catch {
                 let pluginID = document.message.pluginID
                 logger.error("Couldn't write \(pluginID, privacy: .public)'s snapshot: \(error.localizedDescription, privacy: .public)")
