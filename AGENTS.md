@@ -82,7 +82,7 @@ Every shell command gets a timeout. macOS has no `timeout`; use
 | `just modules` | Regenerate build files from `scripts/modules.py` |
 | `just resolve` | Re-resolve Bazel's SwiftPM dependencies after editing `PACKAGES` |
 | `just docs` | Combined DocC site into `.build/docs` |
-| `just generate` | Xcode project from the Bazel graph |
+| `just generate` | Xcode project from the Bazel graph, written to `xcode/DebugDrawer.xcodeproj` (gitignored) and opened; `--no-open` skips opening it. Never at the root: xcodebuild run beside a `.xcodeproj` builds it instead of `Package.swift`, so every SwiftPM recipe that calls xcodebuild would fail |
 | `just run [macOS\|iOS\|appkit\|uikit\|catalyst\|visionOS\|tvOS\|watchOS]` | Build and launch an example app (`catalyst`: the iOS one as a Mac Catalyst app, through SwiftPM); `-RunTestBench all` runs the test bench at launch. `macOS` installs at `/tmp/debugdrawer-example` and signs with the Keychain's Apple Development identity (`scripts/sign_example.py`; `DEBUGDRAWER_SIGN_IDENTITY` overrides it, `-` for ad hoc, with a warning), so privacy grants survive a rebuild |
 | `just deploy [patch\|minor\|major] [allow-breaking] [dry-run]` | Check the release gates, verify, then tag, push the tag and create the GitHub release (the owner's call); `dry-run` runs only the gates |
 | `just buildbuddy-key` | Store the BuildBuddy key in the Keychain (once per Mac; builds then use the remote cache) |

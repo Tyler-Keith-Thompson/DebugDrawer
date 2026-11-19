@@ -2058,7 +2058,7 @@ Bazel is the development build; SwiftPM is the published package. Both are gener
 | `just docs` | The DocC site into `.build/docs` |
 | `just lint` | SwiftLint and a11y-check over every first-party target |
 | `just record-snapshots` | Every snapshot reference, re-recorded into the workspace |
-| `just generate` | An Xcode project from the Bazel graph |
+| `just generate` | An Xcode project from the Bazel graph, `xcode/DebugDrawer.xcodeproj`, opened in Xcode (`--no-open` only writes it) |
 | `just run [macOS\|iOS\|appkit\|uikit\|catalyst\|visionOS\|tvOS\|watchOS]` | Build and launch an example app; each has a Test Bench of actions that give every plugin something to show (`-RunTestBench all` runs them at launch). The Mac example is signed with your Apple Development certificate when the Keychain has one, so macOS keeps its Location and other privacy grants across rebuilds; set `DEBUGDRAWER_SIGN_IDENTITY` to choose another identity, or `-` to sign ad hoc |
 
 `AGENTS.md` describes the layout, the workflow and the house rules in full.

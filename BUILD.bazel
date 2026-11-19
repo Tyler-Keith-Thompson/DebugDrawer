@@ -56,9 +56,12 @@ TEST_TARGETS = [bundle for package in TEST_PACKAGES for bundle in TEST_BUNDLES[p
 EXECUTABLE_TARGETS = ["//" + package for package in EXECUTABLE_PACKAGES]
 
 # The project's top-level targets are its test bundles and executables. Every library reaches the
-# project as a dependency of one of them.
+# project as a dependency of one of them. It is written to xcode/, not the root: xcodebuild run
+# beside a .xcodeproj builds that project instead of Package.swift, so the SwiftPM recipes would
+# look for the package's schemes in it.
 xcodeproj(
     name = "xcodeproj",
+    install_directory = "xcode",
     project_name = "DebugDrawer",
     scheme_autogeneration_mode = "none",
     top_level_targets = TEST_TARGETS + EXECUTABLE_TARGETS + APP_TARGETS,

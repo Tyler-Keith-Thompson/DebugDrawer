@@ -16,7 +16,9 @@
 # pins Bazel's dependencies and is.
 /Package.resolved
 
-# Xcode (generated from the Bazel graph by `just generate`)
+# Xcode (generated from the Bazel graph by `just generate`; the root one is where it was before
+# DD-217)
+/xcode/
 /DebugDrawer.xcodeproj/
 xcuserdata/
 
