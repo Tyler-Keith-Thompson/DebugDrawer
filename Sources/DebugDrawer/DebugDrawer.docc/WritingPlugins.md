@@ -497,6 +497,20 @@ open, ends one with ``DebugDrawerSessions/end()``, and reads ``DebugDrawerSessio
 session, capability and event, never what a command carried. Commands from the in-process
 transport, the app's own drawer, aren't gated. The README's "Sidecar sessions" shows the setup.
 
+**Production builds.** Everything above is debug-only. A release build links the
+`DebugDrawerReceiver` product instead: `DebugDrawerReceiver(directory:sessions:)` serves the same
+store files, read by the same sidecar transports, but only for the capabilities the host passes to
+`enable(_:)`, and refuses, logs and audits every other command, every command while none is
+enabled, and every command outside a session. A capability is a model:
+`.featureFlagOverrides(adapter)` over the host's `DebugDrawerFeatureFlagAdapter`, or
+`.model(_:id:scope:)` for any plugin model, each with its ``DebugDrawerChangeScope``. So a plugin
+whose model should be drivable in production needs nothing more than its model: the host enables
+it in the receiver, and in a debug build can show the same model in its drawer through
+``DebugDrawerPluginTransport/direct(to:)``. The receiver's module holds
+``DebugDrawerPluginModel``, the sessions and the store's wire format, real in every build, and
+`DebugDrawer` re-exports it; it serves no socket and holds no view. The README's "Production
+builds: the receiver" shows the setup.
+
 **Why it is built this way.** The protocol hands out ``DebugDrawerPluginTransport``s rather than
 raw messages, so a view never changes and the in-process transport keeps `direct(to:)`'s
 synchronous commands; a protocol rather than a compile-time choice, so a viewer can hold two

@@ -194,6 +194,29 @@ macos_application(
     visibility = ["//visibility:public"],
 )
 
+# ── macOS, production receiver ───────────────────────────────────────
+# A production app's use of DebugDrawer: the release-safe receiver and nothing else, serving a
+# sidecar its feature flag overrides. `just release-check` builds it optimized, and its binary holds
+# no drawer, plugin or interception code (README, "Production builds: the receiver").
+
+swift_library(
+    name = "ExampleAppLib_macOSReceiver",
+    srcs = glob(["macOSReceiver/*.swift"]),
+    module_name = "ExampleApp_macOSReceiver",
+    target_compatible_with = ["@platforms//os:macos"],
+    deps = ["//Sources/DebugDrawerReceiver"],
+)
+
+macos_application(
+    name = "ExampleApp_macOSReceiver",
+    bundle_id = "com.debugdrawer.example.receiver",
+    bundle_name = "DebugDrawerReceiverExample",
+    infoplists = ["macOSReceiver/Info.plist"],
+    minimum_os_version = "15.0",
+    deps = [":ExampleAppLib_macOSReceiver"],
+    visibility = ["//visibility:public"],
+)
+
 # ── visionOS ─────────────────────────────────────────────────────────
 # Core alone: no plugin builds for visionOS yet (EXTRA_PLATFORMS in scripts/modules.py), so the
 # app registers plugins of its own.

@@ -2179,7 +2179,80 @@ event: `sessionOpened(expires:)`, `sessionEnded(.ended or .expired)`, `commandAp
 `commandRefused` with its reason, or `changeReverted`. It never holds what a command carried. It
 is `Codable` for forwarding as JSON. `auditLog` keeps the newest 1,000 entries in memory
 (`auditCapacity` sets another bound), and `auditEntries` publishes every entry as it is recorded.
-In release builds the sessions are stand-ins that never open, so an indicator never shows.
+The sessions are real in every build, as the receiver below uses them; in a release build the
+drawer's registry and servers are stand-ins that never reach them, so only a
+`DebugDrawerReceiver` opens one there.
+
+### Production builds: the receiver
+
+A release build gets none of the drawer. To let an employee-only sidecar app reach a production
+app, the app links one more product, `DebugDrawerReceiver`: UI-less, with no interception, no
+plugin and no dependency on the drawer. It serves a sidecar, over the app group's store, only the
+capabilities the app enables, within sessions the sidecar opens, and refuses everything else:
+
+```swift
+import DebugDrawerReceiver
+
+@MainActor
+final class FlagServiceAdapter: DebugDrawerFeatureFlagAdapter {
+    private(set) var overrides: [String: DebugDrawerFeatureFlagValue] = [:]
+
+    func overridableFlags() -> [DebugDrawerFeatureFlag] {
+        [DebugDrawerFeatureFlag(key: "new-checkout", value: overrides["new-checkout"] ?? .bool(false))]
+    }
+
+    func setOverride(_ value: DebugDrawerFeatureFlagValue, forKey key: String) {
+        overrides[key] = value
+    }
+
+    func clearOverride(forKey key: String) {
+        overrides[key] = nil
+    }
+}
+
+@MainActor
+final class ProductionReceiver {
+    let sessions = DebugDrawerSessions(maximumDuration: 15 * 60)
+    let receiver: DebugDrawerReceiver
+
+    init(flags: FlagServiceAdapter, container: URL) throws {
+        receiver = DebugDrawerReceiver(directory: container.appending(path: "DebugDrawer"), sessions: sessions)
+        receiver.enable(.featureFlagOverrides(flags))
+        try receiver.start()
+    }
+}
+```
+
+Add it to the production target alone (`.product(name: "DebugDrawerReceiver", package:
+"DebugDrawer")`); the drawer and its plugins stay in the debug configuration. `container` is the
+app group's container, `FileManager.default.containerURL(forSecurityApplicationGroupIdentifier:)`,
+which the sidecar app shares: it reaches the receiver with a `DebugDrawerSidecarTransport` (or a
+`DebugDrawerAppGroupStoreTransport`) on the same directory, opens a session through
+`DebugDrawerSessions.pluginID`, then connects to `DebugDrawerFeatureFlagOverrides.pluginID`. The
+receiver serves the store only, not the socket.
+
+What the receiver does:
+
+- **Nothing until enabled.** With no capability enabled every command is refused, opening a
+  session included. A command to an ID the app didn't enable, or disabled with `disable(_:)`, is
+  refused even inside an open session. Each refusal is logged and written to the sessions' audit
+  log (`commandRefused(.unknownCapability)`).
+- **Capabilities are models.** `.featureFlagOverrides(adapter)` overrides the flags the adapter
+  lists, and only with a value of the kind the flag has; `clearAllOverrides` clears only the
+  overrides it set, never the app's own. `.model(_:id:scope:)` serves any
+  `DebugDrawerPluginModel` of the app's. A command decodes into the model's own `Command` type or
+  is refused as malformed; nothing received is run or evaluated, and a sidecar reads only the
+  model's snapshot, so list nothing secret in it.
+- **Scopes.** Each capability takes a `DebugDrawerChangeScope`: `.session(revertWith:)` reverts it
+  as the session ends or expires (feature flag overrides default to `.session(revertWith:
+  .clearAllOverrides)`), `.persistent` keeps it.
+- **The app draws the indicator.** Observe `sessions.snapshot` as in "Sidecar sessions" above.
+
+In a debug build the receiver runs beside the drawer: show the same model in a plugin through
+`DebugDrawerPluginTransport.direct(to:)`, and pass it to `.featureFlagOverrides(_:)` or
+`.model(_:id:scope:)`, so what a sidecar does is seen in the app's own drawer. `DebugDrawer`
+re-exports the receiver's module. Keep the receiver's store directory apart from a debug
+`DebugDrawerAppGroupStoreServer`'s, as both perform the commands left there.
 
 ### What the plugins need from the app
 
@@ -2309,6 +2382,7 @@ ContentView()
 | Module | Holds |
 |---|---|
 | `DebugDrawer` | The drawer: its window, the plugin protocol and registry, the views plugins are built from, and release-build stand-ins |
+| `DebugDrawerReceiver` | The one product a release build may link: serves a sidecar app, over the app group's store, only the capabilities the app enables (feature flag overrides, or any plugin model) within sessions the sidecar opens, refusing and auditing everything else; UI-less, no interception |
 | `DebugDrawerConsolePlugin` | `os_log` entries (stdout and stderr on macOS) and an app logger's lines through `ConsoleLogSink`, with metadata: level filter, text or regular-expression search, subsystem and category mutes, time range, auto-follow, copy, lines kept across launches |
 | `DebugDrawerViewInspectorPlugin` | View borders by depth, alignment grid, click indicators, animation speed, render counts of the views an app tracks with `.trackRenders(_:)`, hierarchy snapshot |
 | `DebugDrawerAccessibilityPlugin` | Runtime overrides of color scheme, Dynamic Type, layout direction, locale and the system accessibility settings SwiftUI exposes, the accessibility settings each beside the system's value |

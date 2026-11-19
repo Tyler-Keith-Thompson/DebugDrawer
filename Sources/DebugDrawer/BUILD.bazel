@@ -12,6 +12,9 @@ swift_library(
     name = "DebugDrawer",
     srcs = glob(["**/*.swift"]),
     module_name = "DebugDrawer",
+    deps = [
+        "//Sources/DebugDrawerReceiver",
+    ],
     visibility = ["//visibility:public"],
 )
 
@@ -20,6 +23,9 @@ docc_archive(
     name = "DebugDrawerDocumentation",
     module = ":DebugDrawer",
     catalog = glob(["*.docc/**"], allow_empty = True),
+    deps = [
+        "//Sources/DebugDrawerReceiver:DebugDrawerReceiverDocumentation",
+    ],
     require_documentation = True,
     tags = ["manual"],
     visibility = ["//visibility:public"],

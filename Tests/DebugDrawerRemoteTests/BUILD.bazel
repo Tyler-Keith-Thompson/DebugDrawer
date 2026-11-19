@@ -20,6 +20,7 @@ swift_library(
     deps = [
         "//Sources/DebugDrawerRemote",
         "//Sources/DebugDrawer",
+        "//Sources/DebugDrawerReceiver",
         "//Sources/DebugDrawerNetworkPlugin",
         "//Sources/DebugDrawerConsolePlugin",
     ],

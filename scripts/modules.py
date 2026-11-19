@@ -73,7 +73,11 @@ MOCKING = "mockable/Mockable"
 # (name, group, description, dependencies)
 MODULES = [
     # Core
-    ("DebugDrawer", "Core", "The drawer: its window, the plugin protocol and registry, the views plugins are built from, and release-build stand-ins.", []),
+    # The one module a release build may link (the charter's D6 and D9): UI-less, and real in every
+    # build. Core depends on it for the wire format, the plugin model and the sidecar's sessions,
+    # and re-exports it, so `import DebugDrawer` still sees them.
+    ("DebugDrawerReceiver", "Core", "The release-build sidecar receiver: serves a sidecar app, over the app group's store, only the capabilities the host enables (feature flag overrides, or any plugin model), within sessions the sidecar opens, refusing and auditing everything else; UI-less, with no interception.", []),
+    ("DebugDrawer", "Core", "The drawer: its window, the plugin protocol and registry, the views plugins are built from, and release-build stand-ins.", ["DebugDrawerReceiver"]),
     # Plugins
     ("DebugDrawerConsolePlugin", "Plugins", "Captures os_log entries (stdout and stderr on macOS) and an app logger's lines through ConsoleLogSink, with metadata: level filter, text or regular-expression search, subsystem and category mutes, time range, auto-follow, copy, lines kept across launches.", ["DebugDrawer", "oslogclient/OSLogClient"]),
     ("DebugDrawerViewInspectorPlugin", "Plugins", "View borders by depth, alignment grid, click indicators, animation speed, render tracking, hierarchy snapshot.", ["DebugDrawer"]),
@@ -129,11 +133,11 @@ IOS_MINIMUM = "17.0"
 # only on modules listed for it.
 EXTRA_PLATFORMS = {
     # visionOS 1 shipped with iOS 17's SwiftUI.
-    "visionOS": ("1.0", ["DebugDrawer", "DebugDrawerAnalyticsPlugin", "DebugDrawerDatabaseBrowserPlugin", "DebugDrawerLocalizationPlugin", "DebugDrawerColorVisionPlugin", "DebugDrawerAppStateResetPlugin"]),
+    "visionOS": ("1.0", ["DebugDrawerReceiver", "DebugDrawer", "DebugDrawerAnalyticsPlugin", "DebugDrawerDatabaseBrowserPlugin", "DebugDrawerLocalizationPlugin", "DebugDrawerColorVisionPlugin", "DebugDrawerAppStateResetPlugin"]),
     # tvOS 17 shipped with iOS 17's SwiftUI.
-    "tvOS": ("17.0", ["DebugDrawer", "DebugDrawerAnalyticsPlugin", "DebugDrawerDatabaseBrowserPlugin", "DebugDrawerLocalizationPlugin", "DebugDrawerColorVisionPlugin", "DebugDrawerAppStateResetPlugin"]),
+    "tvOS": ("17.0", ["DebugDrawerReceiver", "DebugDrawer", "DebugDrawerAnalyticsPlugin", "DebugDrawerDatabaseBrowserPlugin", "DebugDrawerLocalizationPlugin", "DebugDrawerColorVisionPlugin", "DebugDrawerAppStateResetPlugin"]),
     # watchOS 10 shipped with iOS 17's SwiftUI.
-    "watchOS": ("10.0", ["DebugDrawer", "DebugDrawerAnalyticsPlugin", "DebugDrawerDatabaseBrowserPlugin", "DebugDrawerLocalizationPlugin"]),
+    "watchOS": ("10.0", ["DebugDrawerReceiver", "DebugDrawer", "DebugDrawerAnalyticsPlugin", "DebugDrawerDatabaseBrowserPlugin", "DebugDrawerLocalizationPlugin"]),
 }
 
 # Test targets that also run in the simulator of iOS or of a platform in EXTRA_PLATFORMS, by
@@ -169,13 +173,13 @@ BAZEL_TESTED_PLATFORM_EXCLUDED_PACKAGES = {
 # beside each library compiles it for the IOS_MINIMUM Catalyst target triple instead. A module
 # listed here depends only on modules listed here, and on no C or Objective-C package, which that
 # rule would still build for macOS.
-CATALYST_MODULES = ["DebugDrawer", "DebugDrawerAnalyticsPlugin", "DebugDrawerDatabaseBrowserPlugin", "DebugDrawerLocalizationPlugin", "DebugDrawerScreenRecordingPlugin", "DebugDrawerDesignOverlayPlugin", "DebugDrawerColorVisionPlugin", "DebugDrawerAppStateResetPlugin"]
+CATALYST_MODULES = ["DebugDrawerReceiver", "DebugDrawer", "DebugDrawerAnalyticsPlugin", "DebugDrawerDatabaseBrowserPlugin", "DebugDrawerLocalizationPlugin", "DebugDrawerScreenRecordingPlugin", "DebugDrawerDesignOverlayPlugin", "DebugDrawerColorVisionPlugin", "DebugDrawerAppStateResetPlugin"]
 
 # Modules whose every public symbol must have a doc comment. Their DocC archive, and so `just docs`,
 # fails on one that has none (tools/documentation_coverage.py, run by docc_archive's
 # `require_documentation`). Checked against the debug build's symbol graph, which holds the drawer
 # as well as the API that exists in every build.
-DOCUMENTED_MODULES = ["DebugDrawer"]
+DOCUMENTED_MODULES = ["DebugDrawerReceiver", "DebugDrawer"]
 
 # Dynamic libraries: (name, description). Each is C sources under Sources/<name> (headers in
 # include/) with no dependencies, shipped as a `.dynamic` library product in Package.swift and as
@@ -197,7 +201,8 @@ EXECUTABLES = [
 # Test targets. SwiftPM rejects a target with no sources, so list a target only once its directory
 # holds tests. (name, dependencies)
 TEST_TARGETS = [
-    ("DebugDrawerTests", ["DebugDrawer", "viewinspector/ViewInspector", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
+    ("DebugDrawerReceiverTests", ["DebugDrawerReceiver"]),
+    ("DebugDrawerTests", ["DebugDrawer", "DebugDrawerReceiver", "viewinspector/ViewInspector", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
     ("DebugDrawerConsolePluginTests", ["DebugDrawerConsolePlugin", "DebugDrawer", "DebugDrawerTestSupport", "viewinspector/ViewInspector", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
     ("DebugDrawerViewInspectorPluginTests", ["DebugDrawerViewInspectorPlugin", "DebugDrawer", "DebugDrawerInterceptionContract", "viewinspector/ViewInspector", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
     ("DebugDrawerAccessibilityPluginTests", ["DebugDrawerAccessibilityPlugin", "DebugDrawer", "viewinspector/ViewInspector", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
@@ -231,7 +236,7 @@ TEST_TARGETS = [
     ("DebugDrawerDesignOverlayPluginTests", ["DebugDrawerDesignOverlayPlugin", "DebugDrawer", "viewinspector/ViewInspector", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
     ("DebugDrawerColorVisionPluginTests", ["DebugDrawerColorVisionPlugin", "DebugDrawer", "viewinspector/ViewInspector", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
     ("DebugDrawerAppStateResetPluginTests", ["DebugDrawerAppStateResetPlugin", "DebugDrawer", "viewinspector/ViewInspector", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
-    ("DebugDrawerRemoteTests", ["DebugDrawerRemote", "DebugDrawer", "DebugDrawerNetworkPlugin", "DebugDrawerConsolePlugin"]),
+    ("DebugDrawerRemoteTests", ["DebugDrawerRemote", "DebugDrawer", "DebugDrawerReceiver", "DebugDrawerNetworkPlugin", "DebugDrawerConsolePlugin"]),
 ]
 
 # The modules the test-support target depends on (fixtures are usually written against the

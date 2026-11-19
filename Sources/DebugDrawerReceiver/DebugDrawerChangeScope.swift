@@ -10,10 +10,11 @@
 /// What becomes of the changes a capability's commands make when the sidecar's session ends:
 /// reverted, or kept.
 ///
-/// Pass it to ``DebugDrawerModelRegistry/register(_:id:scope:)``:
+/// Pass it to ``DebugDrawerReceiverCapability/model(_:id:scope:)``, or, in a debug build, to
+/// `DebugDrawerModelRegistry`'s `register(_:id:scope:)`:
 ///
 /// ```swift
-/// registry.register(logLevels, id: "MyApp.LogLevels", scope: .session(revertWith: .resetLevels))
+/// receiver.enable(.model(logLevels, id: "MyApp.LogLevels", scope: .session(revertWith: .resetLevels)))
 /// registry.register(flagOverrides, id: "MyApp.FlagOverrides", scope: .persistent)
 /// ```
 public struct DebugDrawerChangeScope<Model: DebugDrawerPluginModel>: Sendable {

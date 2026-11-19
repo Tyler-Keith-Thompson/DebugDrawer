@@ -1,3 +1,4 @@
+import DebugDrawerReceiver
 import Foundation
 
 // The viewer's end of the socket transport: one connection to a `DebugDrawerSocketServer`, read on

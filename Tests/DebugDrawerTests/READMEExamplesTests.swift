@@ -182,6 +182,35 @@
         }
     }
 
+    @MainActor
+    final class FlagServiceAdapter: DebugDrawerFeatureFlagAdapter {
+        private(set) var overrides: [String: DebugDrawerFeatureFlagValue] = [:]
+
+        func overridableFlags() -> [DebugDrawerFeatureFlag] {
+            [DebugDrawerFeatureFlag(key: "new-checkout", value: overrides["new-checkout"] ?? .bool(false))]
+        }
+
+        func setOverride(_ value: DebugDrawerFeatureFlagValue, forKey key: String) {
+            overrides[key] = value
+        }
+
+        func clearOverride(forKey key: String) {
+            overrides[key] = nil
+        }
+    }
+
+    @MainActor
+    final class ProductionReceiver {
+        let sessions = DebugDrawerSessions(maximumDuration: 15 * 60)
+        let receiver: DebugDrawerReceiver
+
+        init(flags: FlagServiceAdapter, container: URL) throws {
+            receiver = DebugDrawerReceiver(directory: container.appending(path: "DebugDrawer"), sessions: sessions)
+            receiver.enable(.featureFlagOverrides(flags))
+            try receiver.start()
+        }
+    }
+
     struct SessionIndicator: View {
         @ObservedObject var sessions: DebugDrawerSessions
 
@@ -238,6 +267,42 @@
             #expect(Array(AuditForwarder.sent.dropFirst().map(\.event)) == expectedEvents)
             #expect(SessionIndicator(sessions: sut.sessions).sessions.snapshot == .inactive)
             sut.server.stop()
+        }
+
+        @Test(
+            "Production builds: a sidecar overrides a flag through the receiver within a session, and ending it clears the override",
+            .timeLimit(.minutes(1))
+        )
+        func productionReceiver() async throws {
+            let flags = FlagServiceAdapter()
+            let container = FileManager.default.temporaryDirectory.appending(path: "READMEReceiver-\(UUID().uuidString)")
+            let sut = try ProductionReceiver(flags: flags, container: container)
+            defer { sut.receiver.stop() }
+            let sidecar = try DebugDrawerAppGroupStoreTransport(directory: container.appending(path: "DebugDrawer"))
+            let session = try await sidecar.connect(
+                toPlugin: DebugDrawerSessions.pluginID, snapshot: DebugDrawerSessionState.self, command: DebugDrawerSessionCommand.self
+            )
+            let overrides = try await sidecar.connect(
+                toPlugin: DebugDrawerFeatureFlagOverrides.pluginID,
+                snapshot: DebugDrawerFeatureFlagOverrides.Snapshot.self,
+                command: DebugDrawerFeatureFlagOverrides.Command.self
+            )
+            let expectedEvents: [DebugDrawerAuditEntry.Event] = [.commandApplied, .changeReverted, .sessionEnded(.ended)]
+
+            session.send(.open(duration: 60))
+            for await state in session.snapshots() where state.isActive {
+                break
+            }
+            overrides.send(.setOverride(key: "new-checkout", value: .bool(true)))
+            for await snapshot in overrides.snapshots() where !snapshot.overriddenKeys.isEmpty {
+                break
+            }
+            let overridden = flags.overrides
+            sut.sessions.end()
+
+            #expect(overridden == ["new-checkout": .bool(true)])
+            #expect(flags.overrides.isEmpty)
+            #expect(Array(sut.sessions.auditLog.dropFirst().map(\.event)) == expectedEvents)
         }
 
         @Test("Sending reports")

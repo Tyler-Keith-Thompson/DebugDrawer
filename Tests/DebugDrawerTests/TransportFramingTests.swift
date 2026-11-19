@@ -1,5 +1,6 @@
 #if DEBUG
     @testable import DebugDrawer
+    @testable import DebugDrawerReceiver
     import Foundation
     import Testing
 

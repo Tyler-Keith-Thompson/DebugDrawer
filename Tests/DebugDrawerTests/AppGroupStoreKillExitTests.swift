@@ -5,6 +5,7 @@
 #if os(macOS) && DEBUG
     import Combine
     @testable import DebugDrawer
+    @testable import DebugDrawerReceiver
     import Foundation
     import Testing
 

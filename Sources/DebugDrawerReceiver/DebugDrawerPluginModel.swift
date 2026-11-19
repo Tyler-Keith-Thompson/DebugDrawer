@@ -20,8 +20,8 @@ import Combine
 /// another process. The model holds no SwiftUI types: colors, fonts and formatting belong to the
 /// views. The services it uses (storage, a clock, the network) come in through its initializer.
 ///
-/// The plugin's view then takes a ``DebugDrawerPluginTransport``, rather than the model, and
-/// draws from its snapshot and sends it commands; ``DebugDrawerPluginTransport/direct(to:)``
+/// The plugin's view then takes a `DebugDrawerPluginTransport`, rather than the model, and
+/// draws from its snapshot and sends it commands; `DebugDrawerPluginTransport.direct(to:)`
 /// joins the two in the process.
 ///
 /// ```swift
@@ -48,7 +48,7 @@ import Combine
 /// ```
 ///
 /// A plugin that doesn't adopt it keeps working as it does: the drawer still shows its
-/// ``DebugDrawerPlugin/body``. The protocol exists in every build, so a conformance compiles in
+/// `DebugDrawerPlugin.body`. The protocol exists in every build, so a conformance compiles in
 /// release too.
 @MainActor
 public protocol DebugDrawerPluginModel: ObservableObject {

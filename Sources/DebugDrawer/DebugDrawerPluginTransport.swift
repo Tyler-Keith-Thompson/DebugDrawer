@@ -1,4 +1,5 @@
 import Combine
+import DebugDrawerReceiver
 
 // What a model-backed plugin's view draws from. The view sees the latest snapshot synchronously
 // (`snapshot`, so its first frame is complete and a binding reads back what it just set) and
