@@ -2,9 +2,9 @@
     import Foundation
 
     /// How the app was signed, as App Info shows it: its provisioning profile and its entitlements.
-    struct AppSigning: Equatable {
+    struct AppSigning: Codable, Equatable, Sendable {
         /// What the bundle holds of a provisioning profile.
-        enum Profile: Equatable {
+        enum Profile: Codable, Equatable, Sendable {
             /// No profile: a simulator, App Store or unprovisioned Mac build.
             case none
             /// A profile file that can't be read as one.

@@ -7,12 +7,12 @@
     @MainActor
     @Suite(.timeLimit(.minutes(1)))
     struct AppInfoPluginTests {
-        @Test("Refreshing the shared metrics gives a memory footprint and an uptime above zero")
+        @Test("Refreshing a model over the real sources gives a memory footprint and an uptime above zero")
         func appMetricsRefresh() throws {
-            let metrics = AppMetrics.shared
-            metrics.refresh()
-            #expect(metrics.footprintMB > 0)
-            #expect(try #require(metrics.uptime) > 0)
+            let model = AppInfoModel(bundle: _BundleInfoSource(), device: _DeviceInfoSource(), process: _ProcessMetricsSource())
+            model.perform(AppInfoCommand(.refresh))
+            #expect(model.snapshot.footprintMB > 0)
+            #expect(try #require(model.snapshot.uptime) > 0)
         }
 
         @Test("The plugin is titled App Info, with the info.circle icon")

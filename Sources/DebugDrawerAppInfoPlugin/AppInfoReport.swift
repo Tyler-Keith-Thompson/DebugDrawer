@@ -6,9 +6,12 @@ extension AppInfoPlugin: DebugDrawerReportContributor {
     /// nothing.
     public func contribute(to report: inout DebugDrawerReport, redaction: DebugDrawerRedaction) {
         #if DEBUG
-            AppMetrics.shared.refresh()
-            let facts = AppInfoFacts(metrics: AppMetrics.shared, buildMetadata: buildMetadata, signing: signing.signing)
-            Self.contribute(facts, to: &report, redaction: redaction)
+            let model = model ?? .shared
+            model.refresh()
+            // This plugin's own build metadata, whichever plugin installed the shared model last.
+            var snapshot = model.snapshot
+            snapshot.buildMetadata = buildMetadata
+            Self.contribute(AppInfoFacts(snapshot: snapshot), to: &report, redaction: redaction)
         #endif
     }
 }

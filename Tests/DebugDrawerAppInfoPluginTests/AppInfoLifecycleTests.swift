@@ -31,7 +31,7 @@
     }
 
     /// A wall clock the test moves by hand.
-    private final class FakeClock {
+    private final class FakeClock: WallClock {
         var now: Date
 
         init(_ now: Date) {
@@ -51,12 +51,15 @@
             let timer = FakeSamplingTimer()
             let start = Date(timeIntervalSince1970: 1_000)
             let clock = FakeClock(start.addingTimeInterval(10))
-            let metrics = AppMetrics(processStart: ProcessStart(date: start, isTraced: false), now: { clock.now }, timer: timer)
-            let sut = AppInfoPlugin(
-                buildMetadata: AppInfoBuildMetadata(),
-                signing: AppSigningStore(source: FakeSigningInformation()),
-                metrics: metrics
+            let model = AppInfoModel(
+                bundle: FakeBundleInfoSource(),
+                device: FakeDeviceInfoSource(),
+                process: FakeProcessMetricsSource(start: ProcessStart(date: start, isTraced: false)),
+                signing: FakeSigningInformation(),
+                clock: clock,
+                timer: timer
             )
+            let sut = AppInfoPlugin(buildMetadata: AppInfoBuildMetadata(), model: model)
             let expectedUptimeOnShow: TimeInterval = 20
             let expectedUptimeOnTick: TimeInterval = 22
 
@@ -64,10 +67,10 @@
             let runningOnceRegistered = timer.isRunning
             clock.now = start.addingTimeInterval(20)
             drawer.pluginContentDidAppear(id: sut.id)
-            let uptimeOnShow = metrics.uptime
+            let uptimeOnShow = model.snapshot.uptime
             clock.now = start.addingTimeInterval(22)
             timer.deliverTick()
-            let uptimeOnTick = metrics.uptime
+            let uptimeOnTick = model.snapshot.uptime
             drawer.pluginContentDidDisappear(id: sut.id)
 
             #expect(!runningOnceRegistered)
@@ -93,8 +96,13 @@
             let timer = FakeSamplingTimer()
             let sut = AppInfoPlugin(
                 buildMetadata: AppInfoBuildMetadata(),
-                signing: AppSigningStore(source: FakeSigningInformation()),
-                metrics: AppMetrics(processStart: nil, now: Date.init, timer: timer)
+                model: AppInfoModel(
+                    bundle: FakeBundleInfoSource(),
+                    device: FakeDeviceInfoSource(),
+                    process: FakeProcessMetricsSource(),
+                    signing: FakeSigningInformation(),
+                    timer: timer
+                )
             )
             first.registerGlobal(sut)
             second.registerGlobal(sut)
@@ -120,8 +128,13 @@
             let timer = RunLoopSamplingTimer(interval: 2)
             let sut = AppInfoPlugin(
                 buildMetadata: AppInfoBuildMetadata(),
-                signing: AppSigningStore(source: FakeSigningInformation()),
-                metrics: AppMetrics(processStart: nil, now: Date.init, timer: timer)
+                model: AppInfoModel(
+                    bundle: FakeBundleInfoSource(),
+                    device: FakeDeviceInfoSource(),
+                    process: FakeProcessMetricsSource(),
+                    signing: FakeSigningInformation(),
+                    timer: timer
+                )
             )
             drawer.registerGlobal(sut)
 

@@ -1,10 +1,9 @@
 #if DEBUG
     /// The app's signing, read the first time App Info is shown or reported, then kept: it can't
-    /// change while the process runs, and the drawer redraws App Info every two seconds.
+    /// change while the process runs, and App Info's model reads its facts every two seconds while
+    /// shown. ``AppInfoModel`` keeps one.
     @MainActor
     final class AppSigningStore {
-        static let shared = AppSigningStore(source: _SigningInformation())
-
         private let source: any SigningInformation
         private var read: AppSigning?
 

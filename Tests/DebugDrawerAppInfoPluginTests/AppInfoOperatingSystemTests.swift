@@ -16,9 +16,8 @@
                 let expectedLabel = "iOS"
             #endif
             let expectedValue = ProcessInfo.processInfo.operatingSystemVersionString
-            let metrics = AppMetrics(processStart: nil, now: Date.init)
 
-            let facts = AppInfoFacts(metrics: metrics, buildMetadata: AppInfoBuildMetadata(), signing: AppSigning(profile: .none, entitlements: nil))
+            let facts = AppInfoFacts(snapshot: AppInfoSnapshot(device: _DeviceInfoSource().read()))
 
             let actual = try #require(facts.sections.first { $0.title == "Environment" }?.facts.first)
             #expect(actual.label == expectedLabel)

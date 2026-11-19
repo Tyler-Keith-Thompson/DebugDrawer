@@ -4,9 +4,9 @@
     /// A provisioning profile, as `embedded.mobileprovision` (iOS) or `embedded.provisionprofile`
     /// (macOS) holds it: who it was issued to, for how long, for which devices, and the
     /// entitlements it allows.
-    struct ProvisioningProfile: Equatable {
+    struct ProvisioningProfile: Codable, Equatable, Sendable {
         /// The devices a profile lets the app run on.
-        enum Devices: Equatable {
+        enum Devices: Codable, Equatable, Sendable {
             /// The devices in `ProvisionedDevices`, by count; a development or ad hoc profile.
             case listed(Int)
             /// Any device (`ProvisionsAllDevices`); an enterprise profile.

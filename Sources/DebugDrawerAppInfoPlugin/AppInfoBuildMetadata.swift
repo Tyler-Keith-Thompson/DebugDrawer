@@ -19,7 +19,7 @@ import Foundation
 ///
 /// The type exists in every build, so a value made outside `#if DEBUG` compiles unchanged in
 /// release, where nothing reads it.
-public struct AppInfoBuildMetadata: Equatable, Sendable {
+public struct AppInfoBuildMetadata: Codable, Equatable, Sendable {
     /// The commit the build was made from, such as a git SHA; `nil` to read `DebugDrawerGitCommit`.
     public var gitCommit: String?
     /// The branch the build was made from; `nil` to read `DebugDrawerGitBranch`.
@@ -50,6 +50,15 @@ public struct AppInfoBuildMetadata: Equatable, Sendable {
                 gitCommit: gitCommit ?? info.string(forKey: Self.gitCommitKey),
                 gitBranch: gitBranch ?? info.string(forKey: Self.gitBranchKey),
                 ciBuildNumber: ciBuildNumber ?? info.string(forKey: Self.ciBuildNumberKey)
+            )
+        }
+
+        /// These values, each one that is `nil` taken from `other`, such as the Info.plist's.
+        func filled(from other: AppInfoBuildMetadata) -> AppInfoBuildMetadata {
+            AppInfoBuildMetadata(
+                gitCommit: gitCommit ?? other.gitCommit,
+                gitBranch: gitBranch ?? other.gitBranch,
+                ciBuildNumber: ciBuildNumber ?? other.ciBuildNumber
             )
         }
     }

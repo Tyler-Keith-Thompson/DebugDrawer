@@ -2,9 +2,9 @@
     import Foundation
 
     /// One entitlement: its key, and its value as text.
-    struct Entitlement: Equatable {
+    struct Entitlement: Codable, Equatable, Sendable {
         /// A value as App Info shows it.
-        enum Value: Equatable {
+        enum Value: Codable, Equatable, Sendable {
             /// A switch, such as `com.apple.security.app-sandbox`.
             case boolean(Bool)
             /// A string, or the items of an array, such as each associated domain; a dictionary's

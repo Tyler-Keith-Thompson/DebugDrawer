@@ -1,9 +1,4 @@
 #if DEBUG
-    #if os(macOS)
-        import AppKit
-    #elseif os(iOS)
-        import UIKit
-    #endif
     import Foundation
 
     /// What the App Info plugin shows: labeled facts about the build, the process and the device,
@@ -57,82 +52,47 @@
     }
 
     extension AppInfoFacts {
-        /// The facts now: the main bundle, this process and the device.
+        /// The facts a snapshot holds, worded as the drawer shows them.
         ///
-        /// - Parameters:
-        ///   - metrics: Memory, uptime, network and the process's start.
-        ///   - buildMetadata: The commit, branch and CI build the host passed; each one missing
-        ///     is read from `bundle`'s Info.plist.
-        ///   - signing: The profile and the entitlements.
-        ///   - bundle: The app's bundle.
-        ///   - process: This process.
-        ///   - now: The time the profile's expiry is checked against.
-        @MainActor init(
-            metrics: AppMetrics,
-            buildMetadata: AppInfoBuildMetadata,
-            signing: AppSigning,
-            bundle: Bundle = .main,
-            process: ProcessInfo = .processInfo,
-            now: Date = Date()
-        ) {
-            let info = bundle.infoDictionary
-            let build = buildMetadata.filled(from: info)
+        /// - Parameter snapshot: What ``AppInfoModel`` read.
+        init(snapshot: AppInfoSnapshot) {
+            let build = snapshot.build
+            let device = snapshot.device
             let gigabyte = 1024.0 * 1024 * 1024
-            var environment = [Fact(label: Self.operatingSystemName, value: process.operatingSystemVersionString)]
-            #if os(macOS)
-                // iOS, tvOS, watchOS and visionOS apps are always sandboxed, and don't get this variable.
-                let isSandboxed = process.environment["APP_SANDBOX_CONTAINER_ID"] != nil
+            var environment = [Fact(label: device.operatingSystemName, value: device.operatingSystemVersion)]
+            if let isSandboxed = device.isSandboxed {
                 environment.append(Fact(label: "Sandbox", value: isSandboxed ? "Yes" : "No"))
-            #endif
+            }
             environment += [
-                Fact(label: "Debugger", value: metrics.processStart.map { $0.isTraced ? "Attached" : "Not attached" } ?? "—"),
-                Fact(label: "Active CPU", value: "\(process.activeProcessorCount)"),
-                Fact(label: "Physical Mem", value: String(format: "%.0f GB", Double(process.physicalMemory) / gigabyte)),
-                Fact(label: "Screen", value: Self.screenResolution),
-                Fact(label: "Network", value: metrics.networkStatus),
-                Fact(label: "Launched", value: metrics.processStart.map { Self.launchFormatter.string(from: $0.date) } ?? "—")
+                Fact(label: "Debugger", value: snapshot.processStart.map { $0.isTraced ? "Attached" : "Not attached" } ?? "—"),
+                Fact(label: "Active CPU", value: "\(device.activeProcessorCount)"),
+                Fact(label: "Physical Mem", value: String(format: "%.0f GB", Double(device.physicalMemory) / gigabyte)),
+                Fact(label: "Screen", value: device.screen.map(Self.format) ?? "—"),
+                Fact(label: "Network", value: snapshot.network.text),
+                Fact(label: "Launched", value: snapshot.processStart.map { Self.launchFormatter.string(from: $0.date) } ?? "—")
             ]
             self.init(
                 sections: [
                     Section(title: "Build", facts: [
-                        Fact(label: "Bundle ID", value: bundle.bundleIdentifier ?? "—"),
-                        Fact(label: "Version", value: info?["CFBundleShortVersionString"] as? String ?? "—"),
-                        Fact(label: "Build", value: info?["CFBundleVersion"] as? String ?? "—"),
+                        Fact(label: "Bundle ID", value: snapshot.bundle.identifier ?? "—"),
+                        Fact(label: "Version", value: snapshot.bundle.version ?? "—"),
+                        Fact(label: "Build", value: snapshot.bundle.build ?? "—"),
                         Fact(label: "Commit", value: build.gitCommit ?? "—"),
                         Fact(label: "Branch", value: build.gitBranch ?? "—"),
                         Fact(label: "CI Build", value: build.ciBuildNumber ?? "—")
                     ]),
                     Section(title: "Runtime", facts: [
-                        Fact(label: "Footprint", value: String(format: "%.1f MB", metrics.footprintMB)),
-                        Fact(label: "Uptime", value: metrics.uptime.map(Self.formatDuration) ?? "—"),
-                        Fact(label: "PID", value: "\(process.processIdentifier)"),
-                        Fact(label: "Arch", value: process.machineHardwareName),
-                        Fact(label: "Arguments", value: "\(process.arguments.count)")
+                        Fact(label: "Footprint", value: String(format: "%.1f MB", snapshot.footprintMB)),
+                        Fact(label: "Uptime", value: snapshot.uptime.map(Self.formatDuration) ?? "—"),
+                        Fact(label: "PID", value: "\(snapshot.processIdentifier)"),
+                        Fact(label: "Arch", value: device.architecture),
+                        Fact(label: "Arguments", value: "\(snapshot.argumentCount)")
                     ]),
                     Section(title: "Environment", facts: environment)
                 ],
-                signing: signing,
-                isProfileExpired: signing.profile.provisioningProfile?.isExpired(at: now) ?? false
+                signing: snapshot.signing,
+                isProfileExpired: snapshot.isProfileExpired
             )
-        }
-
-        /// The OS row's label. The same names as core's bug-report summary, written out again
-        /// here because core's are private to it, not part of the plugin contract.
-        static var operatingSystemName: String {
-            #if os(macOS)
-                "macOS"
-            #elseif targetEnvironment(macCatalyst)
-                // ProcessInfo reports the Mac's macOS version, not an iOS one, under Catalyst.
-                "macOS (Mac Catalyst)"
-            #elseif os(visionOS)
-                "visionOS"
-            #elseif os(tvOS)
-                "tvOS"
-            #elseif os(watchOS)
-                "watchOS"
-            #else
-                "iOS"
-            #endif
         }
 
         static func formatDuration(_ seconds: TimeInterval) -> String {
@@ -144,23 +104,9 @@
             return "\(remainder)s"
         }
 
-        @MainActor private static var screenResolution: String {
-            #if os(macOS)
-                guard let screen = NSScreen.main else { return "—" }
-                let size = screen.frame.size
-                let scale = screen.backingScaleFactor
-                return "\(Int(size.width))×\(Int(size.height)) @\(Int(scale))x"
-            #elseif os(iOS)
-                // The screen of the foreground window scene (UIScreen.main is deprecated).
-                let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
-                guard let screen = (scenes.first { $0.activationState == .foregroundActive } ?? scenes.first)?.screen
-                else { return "—" }
-                let size = screen.bounds.size
-                let scale = screen.scale
-                return "\(Int(size.width))×\(Int(size.height)) @\(Int(scale))x"
-            #else
-                return "—"
-            #endif
+        /// A screen as its size in points and its scale: `1512×982 @2x`.
+        private static func format(_ screen: DeviceInfo.Screen) -> String {
+            "\(Int(screen.width))×\(Int(screen.height)) @\(Int(screen.scale))x"
         }
     }
 
@@ -189,6 +135,20 @@
                 title: "Entitlements",
                 facts: [Fact(label: "Source", value: entitlements.source.text)] + entitlements.entries.map { Fact(label: $0.key, value: $0.text) }
             )
+        }
+    }
+
+    extension NetworkReachability {
+        /// The reachability in a word.
+        var text: String {
+            switch self {
+            case .unknown: "Unknown"
+            case .offline: "Offline"
+            case .wifi: "WiFi"
+            case .cellular: "Cellular"
+            case .wiredEthernet: "Ethernet"
+            case .online: "Online"
+            }
         }
     }
 

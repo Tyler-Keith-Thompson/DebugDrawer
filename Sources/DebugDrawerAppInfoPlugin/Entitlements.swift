@@ -3,9 +3,9 @@
 
     /// The entitlements the app runs with, in the order App Info lists them: the common ones by
     /// name first, associated domains at the top, then the rest by key.
-    struct Entitlements: Equatable {
+    struct Entitlements: Codable, Equatable, Sendable {
         /// Where the entitlements were read.
-        enum Source: Equatable {
+        enum Source: Codable, Equatable, Sendable {
             /// The app's code signature, as on the Mac.
             case codeSignature
             /// The `__TEXT,__entitlements` section linked into the executable, as a simulator

@@ -9,14 +9,13 @@
         @Test("The commit, branch and CI build passed at install appear in the Build section and in Copy Info")
         func installParameter() throws {
             let metadata = AppInfoBuildMetadata(gitCommit: "4f9c2e1", gitBranch: "release/2.4", ciBuildNumber: "812")
-            let metrics = AppMetrics(processStart: nil, now: Date.init)
             let expected: [AppInfoFacts.Fact] = [
                 .init(label: "Commit", value: "4f9c2e1"),
                 .init(label: "Branch", value: "release/2.4"),
                 .init(label: "CI Build", value: "812")
             ]
 
-            let actual = AppInfoFacts(metrics: metrics, buildMetadata: metadata, signing: AppSigning(profile: .none, entitlements: nil))
+            let actual = AppInfoFacts(snapshot: AppInfoSnapshot(buildMetadata: metadata))
 
             let build = try #require(actual.sections.first { $0.title == "Build" })
             #expect(Array(build.facts.suffix(3)) == expected)
@@ -42,7 +41,6 @@
             try FileManager.default.createDirectory(at: contents, withIntermediateDirectories: true)
             try PropertyListSerialization.data(fromPropertyList: info, format: .xml, options: 0).write(to: contents.appending(path: "Info.plist"))
             let bundle = try #require(Bundle(url: url))
-            let metrics = AppMetrics(processStart: nil, now: Date.init)
             let expected: [AppInfoFacts.Fact] = [
                 .init(label: "Version", value: "2.4.0"),
                 .init(label: "Build", value: "97"),
@@ -51,9 +49,7 @@
                 .init(label: "CI Build", value: "1042")
             ]
 
-            let actual = AppInfoFacts(
-                metrics: metrics, buildMetadata: AppInfoBuildMetadata(), signing: AppSigning(profile: .none, entitlements: nil), bundle: bundle
-            )
+            let actual = AppInfoFacts(snapshot: AppInfoSnapshot(bundle: _BundleInfoSource(bundle: bundle).read()))
 
             let build = try #require(actual.sections.first { $0.title == "Build" })
             #expect(Array(build.facts.dropFirst()) == expected)
@@ -81,14 +77,13 @@
 
         @Test("With nothing passed and no keys, the Build section shows a dash for each")
         func noMetadata() throws {
-            let metrics = AppMetrics(processStart: nil, now: Date.init)
             let expected: [AppInfoFacts.Fact] = [
                 .init(label: "Commit", value: "—"),
                 .init(label: "Branch", value: "—"),
                 .init(label: "CI Build", value: "—")
             ]
 
-            let actual = AppInfoFacts(metrics: metrics, buildMetadata: AppInfoBuildMetadata(), signing: AppSigning(profile: .none, entitlements: nil))
+            let actual = AppInfoFacts(snapshot: AppInfoSnapshot(bundle: _BundleInfoSource().read()))
 
             let build = try #require(actual.sections.first { $0.title == "Build" })
             #expect(Array(build.facts.suffix(3)) == expected)

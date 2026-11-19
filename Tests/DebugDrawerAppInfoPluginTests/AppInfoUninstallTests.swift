@@ -10,13 +10,13 @@
     private final class FakeNetworkPathWatcher: NetworkPathWatcher {
         private(set) var starts = 0
         private(set) var stops = 0
-        private var update: (@Sendable (String) -> Void)?
+        private var update: (@Sendable (NetworkReachability) -> Void)?
 
         var isWatching: Bool {
             update != nil
         }
 
-        func start(_ update: @escaping @Sendable (String) -> Void) {
+        func start(_ update: @escaping @Sendable (NetworkReachability) -> Void) {
             starts += 1
             self.update = update
         }
@@ -39,8 +39,14 @@
         private static func plugin(watcher: FakeNetworkPathWatcher) -> AppInfoPlugin {
             AppInfoPlugin(
                 buildMetadata: AppInfoBuildMetadata(),
-                signing: AppSigningStore(source: FakeSigningInformation()),
-                metrics: AppMetrics(processStart: nil, now: Date.init, timer: RunLoopSamplingTimer(interval: 2), pathWatcher: watcher)
+                model: AppInfoModel(
+                    bundle: FakeBundleInfoSource(),
+                    device: FakeDeviceInfoSource(),
+                    process: FakeProcessMetricsSource(),
+                    signing: FakeSigningInformation(),
+                    timer: RunLoopSamplingTimer(interval: 2),
+                    pathWatcher: watcher
+                )
             )
         }
 
@@ -107,8 +113,14 @@
             let timer = RunLoopSamplingTimer(interval: 2)
             let sut = AppInfoPlugin(
                 buildMetadata: AppInfoBuildMetadata(),
-                signing: AppSigningStore(source: FakeSigningInformation()),
-                metrics: AppMetrics(processStart: nil, now: Date.init, timer: timer, pathWatcher: FakeNetworkPathWatcher())
+                model: AppInfoModel(
+                    bundle: FakeBundleInfoSource(),
+                    device: FakeDeviceInfoSource(),
+                    process: FakeProcessMetricsSource(),
+                    signing: FakeSigningInformation(),
+                    timer: timer,
+                    pathWatcher: FakeNetworkPathWatcher()
+                )
             )
             drawer.registerGlobal(sut)
             drawer.pluginContentDidAppear(id: sut.id)

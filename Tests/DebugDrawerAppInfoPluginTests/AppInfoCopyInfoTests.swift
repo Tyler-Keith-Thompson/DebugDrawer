@@ -67,11 +67,17 @@
 
         @Test("An expired profile's expiry says so")
         @MainActor
-        func expired() {
-            let metrics = AppMetrics(processStart: nil, now: Date.init)
-            let signing = AppSigning(profile: .embedded(AppInfoFixtures.profile), entitlements: nil)
+        func expired() throws {
+            let model = try AppInfoModel(
+                bundle: FakeBundleInfoSource(),
+                device: FakeDeviceInfoSource(),
+                process: FakeProcessMetricsSource(),
+                signing: FakeSigningInformation(profile: AppInfoFixtures.profileData()),
+                clock: FakeWallClock(AppInfoFixtures.expires)
+            )
+            model.perform(AppInfoCommand(.refresh))
 
-            let actual = AppInfoFacts(metrics: metrics, buildMetadata: AppInfoBuildMetadata(), signing: signing, now: AppInfoFixtures.expires)
+            let actual = AppInfoFacts(snapshot: model.snapshot)
 
             #expect(actual.isProfileExpired)
             #expect(actual.report.contains("Expires: 2027-01-15 12:00 UTC (expired)"))
@@ -79,11 +85,17 @@
 
         @Test("A profile before its expiry isn't marked expired")
         @MainActor
-        func current() {
-            let metrics = AppMetrics(processStart: nil, now: Date.init)
-            let signing = AppSigning(profile: .embedded(AppInfoFixtures.profile), entitlements: nil)
+        func current() throws {
+            let model = try AppInfoModel(
+                bundle: FakeBundleInfoSource(),
+                device: FakeDeviceInfoSource(),
+                process: FakeProcessMetricsSource(),
+                signing: FakeSigningInformation(profile: AppInfoFixtures.profileData()),
+                clock: FakeWallClock(AppInfoFixtures.created)
+            )
+            model.perform(AppInfoCommand(.refresh))
 
-            let actual = AppInfoFacts(metrics: metrics, buildMetadata: AppInfoBuildMetadata(), signing: signing, now: AppInfoFixtures.created)
+            let actual = AppInfoFacts(snapshot: model.snapshot)
 
             #expect(!actual.isProfileExpired)
             #expect(actual.report.contains("Expires: 2027-01-15 12:00 UTC\n"))

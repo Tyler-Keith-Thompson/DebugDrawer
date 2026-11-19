@@ -91,9 +91,14 @@
         @Test("The plugin's own contribution carries the build metadata it was installed with")
         @MainActor
         func pluginContribution() throws {
-            let signing = AppSigningStore(source: FakeSigningInformation())
+            let model = AppInfoModel(
+                bundle: FakeBundleInfoSource(),
+                device: FakeDeviceInfoSource(),
+                process: FakeProcessMetricsSource(),
+                signing: FakeSigningInformation()
+            )
             let metadata = AppInfoBuildMetadata(gitCommit: "4f9c2e1", gitBranch: "main", ciBuildNumber: "812")
-            let sut = AppInfoPlugin(buildMetadata: metadata, signing: signing)
+            let sut = AppInfoPlugin(buildMetadata: metadata, model: model)
             let expected = ["Commit": "4f9c2e1", "Branch": "main", "CI Build": "812"]
             var report = DebugDrawerReport()
 

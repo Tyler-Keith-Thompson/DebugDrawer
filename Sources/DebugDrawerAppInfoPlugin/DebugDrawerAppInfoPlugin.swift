@@ -21,25 +21,23 @@ public struct AppInfoPlugin: DebugDrawerPlugin {
     let buildMetadata: AppInfoBuildMetadata
 
     #if DEBUG
-        let signing: AppSigningStore
-        /// The metrics the plugin shows and refreshes, or `nil` for ``AppMetrics/shared``, which
+        /// The model the plugin shows and refreshes, or `nil` for ``AppInfoModel/shared``, which
         /// is made only once something reads it.
-        private let metrics: AppMetrics?
+        let model: AppInfoModel?
 
         /// - Parameter buildMetadata: The commit, branch and CI build to show; each one `nil` is
         ///   read from the main bundle's Info.plist (``AppInfoBuildMetadata``).
         @MainActor public init(buildMetadata: AppInfoBuildMetadata = AppInfoBuildMetadata()) {
-            self.init(buildMetadata: buildMetadata, signing: .shared)
+            self.buildMetadata = buildMetadata
+            model = nil
         }
 
         /// - Parameters:
         ///   - buildMetadata: The commit, branch and CI build to show.
-        ///   - signing: The provisioning profile and entitlements to show.
-        ///   - metrics: The metrics to show and refresh in place of the shared ones.
-        init(buildMetadata: AppInfoBuildMetadata, signing: AppSigningStore, metrics: AppMetrics? = nil) {
+        ///   - model: The model to show and refresh in place of the shared one.
+        init(buildMetadata: AppInfoBuildMetadata, model: AppInfoModel) {
             self.buildMetadata = buildMetadata
-            self.signing = signing
-            self.metrics = metrics
+            self.model = model
         }
     #else
         /// - Parameter buildMetadata: The commit, branch and CI build to show; each one `nil` is
@@ -51,24 +49,24 @@ public struct AppInfoPlugin: DebugDrawerPlugin {
 
     public var body: some View {
         #if DEBUG
-            AppInfoPluginView(metrics: metrics ?? .shared, buildMetadata: buildMetadata, signing: signing)
+            AppInfoPluginView(transport: .direct(to: model ?? .shared))
         #else
             EmptyView()
         #endif
     }
 
-    /// Reads the memory footprint and uptime now and every 2 seconds after: the plugin's view is
-    /// on screen in `drawer`. Release builds read nothing.
+    /// Reads the facts, the memory footprint and uptime among them, now and every 2 seconds
+    /// after: the plugin's view is on screen in `drawer`. Release builds read nothing.
     @MainActor public func didBecomeVisible(in drawer: DebugDrawer) {
         #if DEBUG
-            (metrics ?? .shared).addViewer()
+            (model ?? .shared).addViewer()
         #endif
     }
 
     /// Stops the refreshing ``didBecomeVisible(in:)`` started, once no drawer shows the plugin.
     @MainActor public func didBecomeHidden(in drawer: DebugDrawer) {
         #if DEBUG
-            (metrics ?? .shared).removeViewer()
+            (model ?? .shared).removeViewer()
         #endif
     }
 
@@ -76,16 +74,16 @@ public struct AppInfoPlugin: DebugDrawerPlugin {
     /// Info, once the first drawer holds the plugin. Release builds watch nothing.
     @MainActor public func install(in drawer: DebugDrawer) {
         #if DEBUG
-            (metrics ?? .shared).install(in: ObjectIdentifier(drawer))
+            (model ?? .shared).install(in: ObjectIdentifier(drawer), buildMetadata: buildMetadata)
         #endif
     }
 
     /// Stops watching the network once the last drawer that held the plugin removes it, and
-    /// forgets the status it read. The build metadata, signing and process facts are read again
-    /// when shown, and nothing is kept on disk.
+    /// forgets the status it read. The build, signing and process facts are read again when
+    /// shown, and nothing is kept on disk.
     @MainActor public func uninstall(from drawer: DebugDrawer) {
         #if DEBUG
-            (metrics ?? .shared).uninstall(from: ObjectIdentifier(drawer))
+            (model ?? .shared).uninstall(from: ObjectIdentifier(drawer))
         #endif
     }
 }
@@ -108,188 +106,3 @@ public extension DebugDrawer {
         #endif
     }
 }
-
-#if DEBUG
-    #if os(macOS)
-        import AppKit
-    #elseif os(iOS)
-        import UIKit
-    #endif
-    import Combine
-    import DebugDrawer
-    import Network
-    import SwiftUI
-
-    // MARK: - Process start
-
-    /// What the kernel knows about this process's start (`kinfo_proc`).
-    struct ProcessStart: Equatable {
-        /// When the process started (`kp_proc.p_starttime`).
-        var date: Date
-        /// A debugger is attached (`P_TRACED` in `kp_proc.p_flag`).
-        var isTraced: Bool
-
-        static func current() -> ProcessStart? {
-            var mib = [CTL_KERN, KERN_PROC, KERN_PROC_PID, getpid()]
-            var info = kinfo_proc()
-            var size = MemoryLayout<kinfo_proc>.size
-            guard sysctl(&mib, UInt32(mib.count), &info, &size, nil, 0) == 0 else { return nil }
-            let start = info.kp_proc.p_starttime
-            guard start.tv_sec > 0 else { return nil }
-            return ProcessStart(
-                date: Date(timeIntervalSince1970: TimeInterval(start.tv_sec) + TimeInterval(start.tv_usec) / 1_000_000),
-                isTraced: info.kp_proc.p_flag & P_TRACED != 0
-            )
-        }
-    }
-
-    // MARK: - App metrics
-
-    /// The memory footprint and uptime, refreshed every 2 seconds while a drawer shows the plugin,
-    /// and the network's reachability.
-    ///
-    /// The refresh timer runs from the first drawer showing the plugin to the last. The network
-    /// path watcher runs from the first drawer installing the plugin to the last removing it: it
-    /// costs nothing between changes, and the bug report and Copy Info read the network status
-    /// while the drawer may be closed, which a watcher started only then would not yet know.
-    @MainActor
-    final class AppMetrics: ObservableObject {
-        static let shared = AppMetrics()
-
-        @Published private(set) var footprintMB: Double = 0
-        /// Time since the process started, or nil if the kernel didn't say when that was.
-        @Published private(set) var uptime: TimeInterval?
-        @Published private(set) var networkStatus: String = "Unknown"
-
-        /// The process's start, read once; nil if `kinfo_proc` couldn't be read.
-        let processStart: ProcessStart?
-
-        private let now: () -> Date
-        private let timer: any SamplingTimer
-        private let pathWatcher: any NetworkPathWatcher
-        /// The drawers showing the plugin; the timer runs while there is one.
-        private var viewers = 0
-        /// The drawers the plugin is installed in; the path watcher runs while there is one.
-        private var installations: Set<ObjectIdentifier> = []
-
-        private convenience init() {
-            self.init(processStart: .current(), now: Date.init, timer: RunLoopSamplingTimer(interval: 2))
-        }
-
-        /// - Parameters:
-        ///   - processStart: the process's start, from `ProcessStart.current()`.
-        ///   - now: the wall clock. Injected in tests.
-        ///   - timer: what calls ``refresh()`` while a drawer shows the plugin. Injected in tests.
-        ///   - pathWatcher: what reports the network status while a drawer holds the plugin.
-        ///     Injected in tests.
-        init(
-            processStart: ProcessStart?,
-            now: @escaping () -> Date,
-            timer: any SamplingTimer = RunLoopSamplingTimer(interval: 2),
-            pathWatcher: any NetworkPathWatcher = NWPathNetworkWatcher()
-        ) {
-            self.processStart = processStart
-            self.now = now
-            self.timer = timer
-            self.pathWatcher = pathWatcher
-            refresh()
-        }
-
-        /// Counts `drawer` as one the plugin is installed in; the first one starts watching the
-        /// network path.
-        func install(in drawer: ObjectIdentifier) {
-            guard installations.insert(drawer).inserted, installations.count == 1 else { return }
-            pathWatcher.start { [weak self] status in
-                Task { @MainActor [weak self] in
-                    // A status that arrives after the last uninstall is dropped.
-                    guard let self, !self.installations.isEmpty else { return }
-                    self.networkStatus = status
-                }
-            }
-        }
-
-        /// Uncounts `drawer`; once no drawer holds the plugin, stops watching the network path,
-        /// forgets its status, and stops the refresh timer should a drawer still count as showing it.
-        func uninstall(from drawer: ObjectIdentifier) {
-            guard installations.remove(drawer) != nil, installations.isEmpty else { return }
-            pathWatcher.stop()
-            networkStatus = "Unknown"
-            if viewers > 0 {
-                viewers = 0
-                timer.stop()
-            }
-        }
-
-        /// Counts a drawer showing the plugin; the first one refreshes now and starts the timer.
-        func addViewer() {
-            viewers += 1
-            guard viewers == 1 else { return }
-            refresh()
-            timer.start { [weak self] in self?.refresh() }
-        }
-
-        /// Uncounts a drawer that showed the plugin; the last one stops the timer.
-        func removeViewer() {
-            guard viewers > 0 else { return }
-            viewers -= 1
-            if viewers == 0 { timer.stop() }
-        }
-
-        func refresh() {
-            footprintMB = MemoryFootprint.currentMB()
-            uptime = processStart.map { now().timeIntervalSince($0.date) }
-        }
-
-    }
-
-    /// The facts. Showing it refreshes nothing by itself: the drawer that shows it starts the
-    /// metrics' timer through the plugin's lifecycle hooks.
-    struct AppInfoPluginView: View {
-        @ObservedObject var metrics: AppMetrics
-        let buildMetadata: AppInfoBuildMetadata
-        let signing: AppSigningStore
-
-        var body: some View {
-            AppInfoFactsView(facts: AppInfoFacts(metrics: metrics, buildMetadata: buildMetadata, signing: signing.signing)) {
-                metrics.refresh()
-            }
-        }
-    }
-
-    /// The facts, in sections, then the provisioning profile and the entitlements, with buttons
-    /// to copy them all and to read them again.
-    struct AppInfoFactsView: View {
-        let facts: AppInfoFacts
-        let refresh: () -> Void
-
-        var body: some View {
-            VStack(alignment: .leading, spacing: 0) {
-                ForEach(facts.sections, id: \.title) { section in
-                    DebugDrawerSection(section.title) {
-                        ForEach(section.facts, id: \.label) { fact in
-                            DebugDrawerKeyValueRow(fact.label, value: fact.value)
-                        }
-                    }
-                }
-                AppInfoProvisioningSection(profile: facts.signing.profile, isExpired: facts.isProfileExpired)
-                AppInfoEntitlementsSection(entitlements: facts.signing.entitlements)
-
-                DebugDrawerActionRow {
-                    DebugDrawerCopyButton("Copy Info") { facts.report }
-                    Button("Refresh", action: refresh)
-                }
-            }
-        }
-    }
-
-    extension ProcessInfo {
-        var machineHardwareName: String {
-            var sysinfo = utsname()
-            uname(&sysinfo)
-            return withUnsafeBytes(of: &sysinfo.machine) { buf in
-                String(cString: buf.bindMemory(to: CChar.self).baseAddress!)
-            }
-        }
-    }
-
-#endif
