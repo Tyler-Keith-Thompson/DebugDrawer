@@ -315,6 +315,7 @@ already draws from, so neither the model nor the view knows which transport it i
 | In the process | (the registry itself) | ``DebugDrawerInProcessTransport`` | The drawer, or a test, in the app's own process; a command lands before `send` returns |
 | Unix domain socket | ``DebugDrawerSocketServer`` | ``DebugDrawerSocketTransport`` | Both apps run; snapshots arrive as they change, commands land at once |
 | App-group store | ``DebugDrawerAppGroupStoreServer`` | ``DebugDrawerAppGroupStoreTransport`` | Either app may be suspended; the viewer reads the last snapshots, and commands wait for the app |
+| Local network (the `DebugDrawerRemote` library) | `DebugDrawerNetworkServer` | `DebugDrawerNetworkTransport` | A viewer on another device, such as a Mac showing a phone's logs; nothing listens until the app starts the server, and each viewer pairs with a code the device shows |
 
 ```swift
 @MainActor
@@ -382,8 +383,8 @@ synchronous commands; a protocol rather than a compile-time choice, so a viewer 
 transports at once and switch when the app goes to the background. Registration is explicit,
 not done by plugins as they install, so an app offers only what it chooses. The socket is POSIX
 `AF_UNIX` with dispatch sources rather than Network.framework, whose listener documents no
-Unix-domain support, and its connection code doesn't know the address family, so a network
-transport can reuse it with the framing. The store is files and a directory's dispatch source
+Unix-domain support; the network transport frames the same messages over Network.framework
+instead, which it needs for Bonjour. The store is files and a directory's dispatch source
 rather than `NSFilePresenter` (file coordination across processes would bind both apps to it for
 every write) or a Darwin notification (a name to agree on and a second step to read what
 changed). JSON rather than a binary property list, so a capture can be read and a viewer on any

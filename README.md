@@ -1884,6 +1884,111 @@ Flash Renders outlines a tracked view each time its body runs, unless Reduce Mot
 drawer tracks none of its own views, so only the app's appear. In release builds
 `.trackRenders(_:)` returns the view unchanged.
 
+### Remote viewing: a phone's logs and requests on a Mac
+
+`DebugDrawerRemote` serves the Network and Console plugins' models, or any plugin's, to a viewer
+on another device over the local network, so a phone's traffic can be read on a Mac's screen.
+Nothing listens or advertises until the app starts the server, and a viewer reaches nothing until
+it pairs with a code the device shows.
+
+On the device, register the models to offer and start the server, in a debug build:
+
+```swift
+import DebugDrawer
+import DebugDrawerConsolePlugin
+import DebugDrawerNetworkPlugin
+import DebugDrawerRemote
+import SwiftUI
+
+@MainActor
+final class RemoteViewing {
+    let registry = DebugDrawerModelRegistry()
+    let server: DebugDrawerNetworkServer
+
+    init() {
+        registry.register(NetworkModel.shared, id: NetworkPlugin().id)
+        registry.register(ConsoleModel.shared, id: ConsolePlugin().id)
+        server = DebugDrawerNetworkServer(registry: registry)
+    }
+
+    func enable() async throws {
+        try await server.start()
+    }
+}
+```
+
+The server listens on a port the system picks and advertises itself over Bonjour as the device's
+name. `DebugDrawerNetworkServerConfiguration` picks the name and the port, or `.loopback`
+listens on 127.0.0.1 only and advertises nothing, for a viewer on the same Mac as a simulator.
+
+When a viewer connects, the server lists it in `pairingRequests` with a new six-digit code. Show
+the code where the person holding the device sees it, such as a plugin of the app's own in the
+drawer, with a Reject button:
+
+```swift
+struct RemotePairingPlugin: DebugDrawerPlugin {
+    let server: DebugDrawerNetworkServer
+    var title = "Remote Viewing"
+    var icon = "laptopcomputer.and.iphone"
+
+    var body: some View {
+        RemotePairingList(server: server)
+    }
+}
+
+struct RemotePairingList: View {
+    @ObservedObject var server: DebugDrawerNetworkServer
+
+    var body: some View {
+        ForEach(server.pairingRequests) { request in
+            DebugDrawerKeyValueRow(request.viewerName, value: request.code)
+            Button("Reject \(request.viewerName)") { server.reject(request) }
+        }
+        ForEach(server.pairedViewers) { viewer in
+            Button("Disconnect \(viewer.name)") { server.disconnect(viewer) }
+        }
+    }
+}
+```
+
+The person types the code into the viewer, which is then paired for as long as its connection
+lasts. A wrong code, or anything sent before pairing, closes the connection; each code is good for
+one try, and each try shows on the device. Pairing is remembered nowhere, so a viewer pairs again
+after either app relaunches. Traffic is not encrypted: use it on a network you trust, in debug
+builds.
+
+On the Mac, `DebugDrawerNetworkBrowser` lists the devices advertising, and a
+`DebugDrawerNetworkTransport` connects to one. It is a `DebugDrawerTransport`, so once paired it
+hands out the same transports the plugins' views draw from:
+
+```swift
+@MainActor
+func viewNetwork(of device: DebugDrawerNetworkDevice, code: String) async throws
+    -> DebugDrawerPluginTransport<NetworkSnapshot, NetworkCommand> {
+    let viewer = DebugDrawerNetworkTransport(endpoint: device.endpoint, viewerName: "Studio Mac")
+    try await viewer.pair(code: code)
+    return try await viewer.connect(toPlugin: NetworkPlugin().id, snapshot: NetworkSnapshot.self, command: NetworkCommand.self)
+}
+```
+
+**Info.plist.** iOS asks the person before an app uses the local network, and both the device's
+app and the viewer must declare the service they advertise or browse for. Add to each:
+
+```xml
+<key>NSLocalNetworkUsageDescription</key>
+<string>Lets a Mac on your network show this debug build's logs and requests.</string>
+<key>NSBonjourServices</key>
+<array>
+    <string>_debugdrawer._tcp</string>
+</array>
+```
+
+Put them in the debug configuration's Info.plist only, as release builds never listen. A
+sandboxed Mac app also needs the `com.apple.security.network.server` entitlement to serve, and
+`com.apple.security.network.client` to view. Nothing else is needed for `.loopback`, which no
+permission covers. Release builds get stand-ins: the server never listens, the browser finds
+nothing and a viewer's pairing fails as unreachable.
+
 ### What the plugins need from the app
 
 No plugin needs an Info.plist key or an entitlement to install. Some of what they show depends on
@@ -2044,6 +2149,7 @@ ContentView()
 | `DebugDrawerDesignOverlayPlugin` | A design mockup over the app's content, picked from Photos or Files on iOS or a file or the pasteboard on macOS: opacity, an offset set by steppers or by dragging in Move mode, the scale, and a difference blend that shows pixel drift; touches pass through to the app |
 | `DebugDrawerColorVisionPlugin` | Protanopia, deuteranopia, tritanopia and grayscale simulated live over the views marked `.debugColorVision()`, in linear RGB with Machado et al.'s matrices, picked in the drawer or cycled from the HUD, while the drawer keeps its colors |
 | `DebugDrawerAppStateResetPlugin` | The app's state cleared as a fresh install leaves it, by category: UserDefaults, keychain items, the container's files, caches, cookies, the URL cache and the app's own cleanup, each listed before a confirmation, then relaunched on macOS or quit elsewhere |
+| `DebugDrawerRemote` | Plugin models served to a viewer on another device over the local network: an opt-in Network.framework server advertised over Bonjour, each viewer paired with a six-digit code the device shows, and the viewer's transport and browser |
 
 ## Development
 

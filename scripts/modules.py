@@ -108,6 +108,8 @@ MODULES = [
     ("DebugDrawerDesignOverlayPlugin", "Plugins", "A design mockup laid over the app's content, picked from Photos or Files on iOS or a file or the pasteboard on macOS: opacity, an offset set by steppers or by dragging in Move mode, the mockup's scale, and a difference blend that shows pixel drift; touches pass through to the app.", ["DebugDrawer"]),
     ("DebugDrawerColorVisionPlugin", "Plugins", "Protanopia, deuteranopia, tritanopia and grayscale simulated live over the views marked debugColorVision(), with a color-matrix shader in linear RGB, picked in the drawer or cycled from the HUD, so meaning carried only by color shows.", ["DebugDrawer"]),
     ("DebugDrawerAppStateResetPlugin", "Plugins", "The app's state cleared as a fresh install leaves it, by category: UserDefaults, keychain items, the container's files, caches, cookies, the URL cache and the app's own cleanup, each listed with what it will delete, confirmed, then relaunched on macOS or quit elsewhere.", ["DebugDrawer"]),
+    # Transports
+    ("DebugDrawerRemote", "Transports", "Plugin models served to a viewer on another device over the local network: an opt-in Network.framework server with Bonjour, each viewer paired with a code the device shows, and the viewer's transport and browser.", ["DebugDrawer"]),
 ]
 
 # Modules only iOS builds: SwiftUI views and what they draw with. Bazel builds them for the
@@ -229,6 +231,7 @@ TEST_TARGETS = [
     ("DebugDrawerDesignOverlayPluginTests", ["DebugDrawerDesignOverlayPlugin", "DebugDrawer", "viewinspector/ViewInspector", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
     ("DebugDrawerColorVisionPluginTests", ["DebugDrawerColorVisionPlugin", "DebugDrawer", "viewinspector/ViewInspector", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
     ("DebugDrawerAppStateResetPluginTests", ["DebugDrawerAppStateResetPlugin", "DebugDrawer", "viewinspector/ViewInspector", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
+    ("DebugDrawerRemoteTests", ["DebugDrawerRemote", "DebugDrawer", "DebugDrawerNetworkPlugin", "DebugDrawerConsolePlugin"]),
 ]
 
 # The modules the test-support target depends on (fixtures are usually written against the
@@ -419,9 +422,9 @@ def check():
     # The charter's vertical modules: a plugin depends on core and Apple's frameworks alone, so an
     # app links only the tools it picks. Console's OSLogClient is the one package allowed.
     for name, group, _, deps in MODULES:
-        if group == "Plugins":
+        if group in ("Plugins", "Transports"):
             allowed = ["DebugDrawer"] + (["oslogclient/OSLogClient"] if name == "DebugDrawerConsolePlugin" else [])
-            assert set(deps) <= set(allowed), f"{name} is a plugin, so it depends on DebugDrawer alone, not {sorted(set(deps) - set(allowed))}"
+            assert set(deps) <= set(allowed), f"{name} is a plugin or transport, so it depends on DebugDrawer alone, not {sorted(set(deps) - set(allowed))}"
     for name, _, _, deps in MODULES:
         if name not in IOS_MODULES:
             for d in deps:

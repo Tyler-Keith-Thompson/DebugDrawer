@@ -49,6 +49,7 @@ let products: [Product] = [
     .library(name: "DebugDrawerDesignOverlayPlugin", targets: ["DebugDrawerDesignOverlayPlugin"]),
     .library(name: "DebugDrawerColorVisionPlugin", targets: ["DebugDrawerColorVisionPlugin"]),
     .library(name: "DebugDrawerAppStateResetPlugin", targets: ["DebugDrawerAppStateResetPlugin"]),
+    .library(name: "DebugDrawerRemote", targets: ["DebugDrawerRemote"]),
     .library(name: "DebugDrawerDiskIOInterposer", type: .dynamic, targets: ["DebugDrawerDiskIOInterposer"]),
 ]
 
@@ -97,6 +98,8 @@ let targets: [Target] = [
     .target(name: "DebugDrawerDesignOverlayPlugin", dependencies: ["DebugDrawer"], exclude: bazelFiles),
     .target(name: "DebugDrawerColorVisionPlugin", dependencies: ["DebugDrawer"], exclude: ["BUILD.bazel", "Shaders"]),
     .target(name: "DebugDrawerAppStateResetPlugin", dependencies: ["DebugDrawer"], exclude: bazelFiles),
+    // Transports
+    .target(name: "DebugDrawerRemote", dependencies: ["DebugDrawer"], exclude: bazelFiles),
 
     // Dynamic libraries: C, each a `.dynamic` product of its own (DYNAMIC_LIBRARIES in scripts/modules.py).
     .target(name: "DebugDrawerDiskIOInterposer", exclude: bazelFiles),
@@ -141,6 +144,7 @@ let targets: [Target] = [
     .testTarget(name: "DebugDrawerDesignOverlayPluginTests", dependencies: ["DebugDrawerDesignOverlayPlugin", "DebugDrawer", .product(name: "ViewInspector", package: "viewinspector", condition: .when(platforms: [.macOS, .macCatalyst, .iOS, .tvOS, .watchOS])), .product(name: "SnapshotTesting", package: "swift-snapshot-testing", condition: .when(platforms: [.macOS, .iOS, .tvOS, .watchOS])), .product(name: "IssueReportingTestSupport", package: "xctest-dynamic-overlay", condition: .when(platforms: applePlatforms))], exclude: ["BUILD.bazel", "Performance", "__Snapshots__"]),
     .testTarget(name: "DebugDrawerColorVisionPluginTests", dependencies: ["DebugDrawerColorVisionPlugin", "DebugDrawer", .product(name: "ViewInspector", package: "viewinspector", condition: .when(platforms: [.macOS, .macCatalyst, .iOS, .tvOS, .watchOS])), .product(name: "SnapshotTesting", package: "swift-snapshot-testing", condition: .when(platforms: [.macOS, .iOS, .tvOS, .watchOS])), .product(name: "IssueReportingTestSupport", package: "xctest-dynamic-overlay", condition: .when(platforms: applePlatforms))], exclude: ["BUILD.bazel", "Performance", "__Snapshots__"]),
     .testTarget(name: "DebugDrawerAppStateResetPluginTests", dependencies: ["DebugDrawerAppStateResetPlugin", "DebugDrawer", .product(name: "ViewInspector", package: "viewinspector", condition: .when(platforms: [.macOS, .macCatalyst, .iOS, .tvOS, .watchOS])), .product(name: "SnapshotTesting", package: "swift-snapshot-testing", condition: .when(platforms: [.macOS, .iOS, .tvOS, .watchOS])), .product(name: "IssueReportingTestSupport", package: "xctest-dynamic-overlay", condition: .when(platforms: applePlatforms))], exclude: ["BUILD.bazel", "Performance", "__Snapshots__"]),
+    .testTarget(name: "DebugDrawerRemoteTests", dependencies: ["DebugDrawerRemote", "DebugDrawer", "DebugDrawerNetworkPlugin", "DebugDrawerConsolePlugin"], exclude: bazelFiles),
 
     // Speed-reliant tests, split from the target of the same module (PERFORMANCE_TESTS in scripts/modules.py).
     .testTarget(name: "DebugDrawerConsolePluginPerformanceTests", dependencies: ["DebugDrawerConsolePlugin", "DebugDrawer", .product(name: "ViewInspector", package: "viewinspector", condition: .when(platforms: [.macOS, .macCatalyst, .iOS, .tvOS, .watchOS])), .product(name: "SnapshotTesting", package: "swift-snapshot-testing", condition: .when(platforms: [.macOS, .iOS, .tvOS, .watchOS])), .product(name: "IssueReportingTestSupport", package: "xctest-dynamic-overlay", condition: .when(platforms: applePlatforms))], path: "Tests/DebugDrawerConsolePluginTests/Performance"),

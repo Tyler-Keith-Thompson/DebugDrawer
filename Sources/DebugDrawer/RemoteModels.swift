@@ -2,14 +2,15 @@ import Foundation
 
 // The viewer's half of every transport that leaves the process, written once: the socket and the
 // app-group store feed it the messages they receive and give it a way to send, and it turns them
-// into `DebugDrawerPluginTransport`s of the types the viewer asks for. DD-19's network transport
-// feeds it the same way. Everything here runs on the main actor, where the transports it hands out
-// live; the transports' own I/O runs on their queues and hops here in order.
+// into `DebugDrawerPluginTransport`s of the types the viewer asks for. `DebugDrawerRemote`'s
+// network transport feeds it the same way, once paired (`package`, so that module reuses it).
+// Everything here runs on the main actor, where the transports it hands out live; the transports'
+// own I/O runs on their queues and hops here in order.
 
 #if DEBUG
     /// The snapshots a connection has received, by plugin ID, and the transports reading them.
     @MainActor
-    final class RemoteModels {
+    package final class RemoteModels {
         /// Sends a message to the models' side.
         private let send: @MainActor (TransportMessage) -> Void
         /// Whether a plugin's snapshots must be asked for (the socket), rather than arriving
@@ -24,14 +25,14 @@ import Foundation
         private var subscribed: Set<String> = []
         private(set) var isClosed = false
 
-        init(subscribesOnConnect: Bool, send: @escaping @MainActor (TransportMessage) -> Void) {
+        package init(subscribesOnConnect: Bool, send: @escaping @MainActor (TransportMessage) -> Void) {
             self.subscribesOnConnect = subscribesOnConnect
             self.send = send
         }
 
         /// Takes in a message from the models' side: a snapshot is kept and handed to its readers;
         /// anything else is not for a viewer and is dropped.
-        func receive(_ message: TransportMessage) {
+        package func receive(_ message: TransportMessage) {
             guard message.kind == .snapshot, !isClosed, latest[message.pluginID] != message.payload else { return }
             latest[message.pluginID] = message.payload
             for reader in readers[message.pluginID, default: [:]].values {
@@ -41,7 +42,7 @@ import Foundation
 
         /// The connection is gone: transports keep their last snapshot and stop changing, and
         /// connects still waiting throw ``DebugDrawerTransportError/disconnected``.
-        func close() {
+        package func close() {
             guard !isClosed else { return }
             isClosed = true
             let all = readers.values.flatMap(\.values)
@@ -54,7 +55,7 @@ import Foundation
         /// A transport to the plugin `pluginID`, made once its first snapshot is in. It holds
         /// `connection` (the public transport that made it) while it lives, so a viewer can keep
         /// only the plugin transports and the connection stays open for them.
-        func connect<Snapshot: Codable & Equatable & Sendable, Command: Codable & Sendable>(
+        package func connect<Snapshot: Codable & Equatable & Sendable, Command: Codable & Sendable>(
             toPlugin pluginID: String,
             snapshot: Snapshot.Type,
             command: Command.Type,

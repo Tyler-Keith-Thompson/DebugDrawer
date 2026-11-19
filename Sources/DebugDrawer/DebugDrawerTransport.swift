@@ -1,7 +1,7 @@
 // The one abstraction a viewer of plugin models sees, whichever way it reaches them: the drawer
 // in the app's own process, a sidecar app reading the shared app-group store while either app is
-// suspended, a sidecar talking over a Unix domain socket while both run, and DD-19's remote Mac
-// viewer over the network. Each hands out the same `DebugDrawerPluginTransport` a plugin's view
+// suspended, a sidecar talking over a Unix domain socket while both run, and a viewer on another
+// device over the network (`DebugDrawerRemote`). Each hands out the same `DebugDrawerPluginTransport` a plugin's view
 // already draws from, so a view never learns which it is on, and a viewer picks the transport per
 // connection at run time: it holds an `any DebugDrawerTransport`. Rejected: a transport chosen by
 // a compile-time flag or generic parameter (a viewer couldn't hold two at once, or switch when the

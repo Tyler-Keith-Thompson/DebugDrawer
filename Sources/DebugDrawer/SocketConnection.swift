@@ -5,8 +5,8 @@ import os
 // One connected stream socket, carrying framed messages. POSIX sockets with dispatch sources over
 // Network.framework: an AF_UNIX socket and the calls on it behave the same on every Apple
 // platform, watchOS included, and NWListener documents no Unix-domain listening. Nothing here
-// knows the address family, so DD-19's network transport can hand it a connected TCP socket and
-// reuse it whole.
+// knows the address family. `DebugDrawerRemote`'s network transport doesn't use it: it needs
+// Network.framework for Bonjour, so it frames the same messages over an `NWConnection` instead.
 //
 // Reads run on one queue and writes on another, so a write that waits for a slow reader never
 // stops this side reading, and two sides writing large snapshots at each other can't deadlock.

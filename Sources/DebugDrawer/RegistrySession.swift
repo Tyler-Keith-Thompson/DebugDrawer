@@ -2,15 +2,16 @@ import Foundation
 import os
 
 // The models' half of every transport that leaves the process, written once: a socket server runs
-// one per connected viewer, the store server one for the directory, and DD-19's network transport
-// one per remote viewer. It forwards each plugin's snapshots as messages and performs the commands
-// that come back, through the registry, so a model registered after a viewer asked for it is
-// forwarded from then on, and one registered anew is forwarded afresh.
+// one per connected viewer, the store server one for the directory, and `DebugDrawerRemote`'s
+// network server one per paired viewer (`package`, so that module reuses it). It forwards each
+// plugin's snapshots as messages and performs the commands that come back, through the registry,
+// so a model registered after a viewer asked for it is forwarded from then on, and one registered
+// anew is forwarded afresh.
 
 #if DEBUG
     /// Serves a ``DebugDrawerModelRegistry``'s models to one viewer, or one store, as messages.
     @MainActor
-    final class RegistrySession {
+    package final class RegistrySession {
         private static let logger = Logger(subsystem: "DebugDrawer", category: "RegistrySession")
 
         private let registry: DebugDrawerModelRegistry
@@ -21,7 +22,7 @@ import os
         private var wanted: Set<String>? = []
         private var registryObservation: UUID?
 
-        init(registry: DebugDrawerModelRegistry, send: @escaping @MainActor (TransportMessage) -> Void) {
+        package init(registry: DebugDrawerModelRegistry, send: @escaping @MainActor (TransportMessage) -> Void) {
             self.registry = registry
             self.send = send
             registryObservation = registry.observe { [weak self] id in self?.registrationChanged(id) }
@@ -38,7 +39,7 @@ import os
 
         /// Takes in a message from the viewer: forwards the plugin a subscribe names, performs the
         /// command a command carries.
-        func receive(_ message: TransportMessage) {
+        package func receive(_ message: TransportMessage) {
             switch message.kind {
             case .subscribe:
                 guard wanted?.insert(message.pluginID).inserted == true else { return }
@@ -57,7 +58,7 @@ import os
         }
 
         /// Stops forwarding, for good.
-        func close() {
+        package func close() {
             if let registryObservation { registry.removeObserver(registryObservation) }
             registryObservation = nil
             for task in forwarding.values {

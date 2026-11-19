@@ -1,8 +1,8 @@
 import Foundation
 
 // The wire format every transport that leaves the process speaks: the socket's stream, the
-// app-group store's files, and the network transport DD-19 adds, which reuses this file and
-// `TransportFrameDecoder` unchanged. A message is a JSON object naming its plugin, carrying the
+// app-group store's files, and `DebugDrawerRemote`'s network transport, which reuses this file and
+// `TransportFrameDecoder` unchanged (hence `package`). A message is a JSON object naming its plugin, carrying the
 // plugin's own snapshot or command as JSON bytes, so the envelope never needs the plugin's types:
 // the side that knows them decodes the payload. JSON over a binary property list or a hand-made
 // layout: a person can read it in a capture, and every Apple platform and a non-Apple viewer can
@@ -12,9 +12,9 @@ import Foundation
 
 #if DEBUG
     /// One message between the process holding plugin models and a viewer of them.
-    struct TransportMessage: Codable, Equatable, Sendable {
+    package struct TransportMessage: Codable, Equatable, Sendable {
         /// What a message asks or carries.
-        enum Kind: String, Codable, Sendable {
+        package enum Kind: String, Codable, Sendable {
             /// Viewer to models: send this plugin's snapshots, the current one first.
             case subscribe
             /// Models to viewer: the plugin's state now, its `Snapshot` as JSON.
@@ -28,9 +28,9 @@ import Foundation
         static let currentVersion = 1
 
         var version = TransportMessage.currentVersion
-        var kind: Kind
+        package var kind: Kind
         /// The plugin's ``DebugDrawerPlugin/id``, or whatever ID its model was registered under.
-        var pluginID: String
+        package var pluginID: String
         /// The plugin's snapshot or command, encoded as JSON; empty for ``Kind/subscribe``.
         var payload = Data()
 
@@ -41,7 +41,7 @@ import Foundation
 
         /// The message `data` holds, or `nil` when it holds none this build reads (malformed, or
         /// another version).
-        static func decoded(from data: Data) -> TransportMessage? {
+        package static func decoded(from data: Data) -> TransportMessage? {
             guard let message = try? JSONDecoder().decode(TransportMessage.self, from: data),
                   message.version == currentVersion else { return nil }
             return message
@@ -62,14 +62,19 @@ import Foundation
 
     /// Frames for a byte stream: each message is a 4-byte big-endian length, then that many bytes
     /// of ``TransportMessage`` JSON.
-    enum TransportFraming {
+    package enum TransportFraming {
         /// The longest frame a reader accepts: 64 MiB. A longer length means the stream is not
         /// this format, or is corrupt, and the reader closes it.
-        static let maximumLength = 64 << 20
+        package static let maximumLength = 64 << 20
 
         /// `message` as one frame.
-        static func frame(_ message: TransportMessage) throws -> Data {
-            let body = try message.encoded()
+        package static func frame(_ message: TransportMessage) throws -> Data {
+            try frame(body: message.encoded())
+        }
+
+        /// `body`, any bytes up to ``maximumLength``, as one frame: what a transport that speaks
+        /// a message of its own on the same stream (the network transport's pairing) sends.
+        package static func frame(body: Data) -> Data {
             var length = UInt32(body.count).bigEndian
             var frame = Data(bytes: &length, count: MemoryLayout<UInt32>.size)
             frame.append(body)
@@ -78,18 +83,21 @@ import Foundation
     }
 
     /// Splits a byte stream into frames as its bytes arrive, however the stream cuts them.
-    struct TransportFrameDecoder {
+    package struct TransportFrameDecoder {
         /// The stream announced a frame longer than ``TransportFraming/maximumLength``.
-        struct FrameTooLong: Error {}
+        package struct FrameTooLong: Error {}
 
         private var buffer = Data()
+
+        /// A decoder that has read nothing yet.
+        package init() {}
 
         /// Adds `bytes` and returns the bodies of the frames they complete, in order. Bytes of an
         /// unfinished frame wait for the next call.
         ///
         /// - Throws: ``FrameTooLong`` when a frame announces more than
         ///   ``TransportFraming/maximumLength`` bytes; the stream can't be read on from there.
-        mutating func append(_ bytes: Data) throws(FrameTooLong) -> [Data] {
+        package mutating func append(_ bytes: Data) throws(FrameTooLong) -> [Data] {
             buffer.append(bytes)
             var bodies: [Data] = []
             let headerLength = MemoryLayout<UInt32>.size
