@@ -18,6 +18,7 @@ plugins call, as stand-ins, so the same code compiles in both configurations wit
 | `debugDrawer()` | Returns the view unchanged |
 | `DebugDrawer.shared.attach(to:)`, for a `UIWindowScene` or an `NSWindow` | Does nothing |
 | `debugLocalPlugin(_:)` | Returns the view unchanged; the plugin is never read |
+| `DebugDrawer.shared.registerLocal(_:in:)`, for a `UIWindowScene` or an `NSWindow` | Drops the plugin and returns a token that unregisters nothing |
 | ``DebugDrawerPlugin`` and its defaults | Compile; nothing reads a plugin |
 | ``DebugDrawerPlugin/setBadge(_:)``, ``DebugDrawerPlugin/clearBadge()``, ``DebugDrawerPlugin/postToast(_:)`` | Do nothing |
 | ``DebugDrawer/DebugDrawer/setNoticesMuted(_:forPlugin:)``, ``DebugDrawer/DebugDrawer/isNoticesMuted(forPlugin:)`` | Do nothing; every plugin reads as allowed |

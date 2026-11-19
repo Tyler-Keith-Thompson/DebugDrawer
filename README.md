@@ -88,6 +88,22 @@ passing each `UIWindowScene` or `NSWindow`, and gets the same drawer with every 
 HUD and the toasts are drawn by `debugDrawer()`, so such a window shows neither). A section header's chevron, or the jump bar's menu, shows
 one plugin alone at the panel's full height, and the back button returns to the list.
 
+Such an app has no SwiftUI view for `.debugLocalPlugin()` to find its window from, so it ties a
+local plugin to one window with `DebugDrawer.shared.registerLocal(_:in:)`, passing the `NSWindow`
+or `UIWindowScene`: only that window's drawer lists the plugin, and closing the window (or
+disconnecting the scene) removes it. It returns the token `unregisterLocal(id:token:)` takes to
+remove it sooner.
+
+```swift
+final class CacheWindowController: NSWindowController {
+    override func showWindow(_ sender: Any?) {
+        super.showWindow(sender)
+        guard let window else { return }
+        DebugDrawer.shared.registerLocal(CachePlugin(), in: window)
+    }
+}
+```
+
 A local plugin is registered when its view appears and removed when it disappears, unless a newer
 view has registered a plugin with the same `id` since. While the view is on screen the drawer shows
 the plugin's latest value: `.debugLocalPlugin(UserPlugin(user: user))` shows the new user once

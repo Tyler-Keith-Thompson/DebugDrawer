@@ -225,4 +225,41 @@
             #expect(!DebugDrawerActivity.isDrawerWork)
         }
     }
+
+    #if os(macOS)
+        import AppKit
+
+        // README.md and InstallingInSwiftUI.md
+        final class CacheWindowController: NSWindowController {
+            override func showWindow(_ sender: Any?) {
+                super.showWindow(sender)
+                guard let window else { return }
+                DebugDrawer.shared.registerLocal(CachePlugin(), in: window)
+            }
+        }
+
+        @MainActor
+        @Suite("README examples: windows")
+        struct READMEWindowExamplesTests {
+            @Test("A window controller registers a local plugin for its window, removed as the window closes")
+            func registerLocalInWindow() {
+                // Borderless and far off screen, so showing it shows nothing.
+                let window = NSWindow(
+                    contentRect: CGRect(x: -30000, y: -30000, width: 900, height: 600),
+                    styleMask: .borderless, backing: .buffered, defer: false
+                )
+                window.isReleasedWhenClosed = false
+                let sut = CacheWindowController(window: window)
+                let id = CachePlugin().id
+
+                sut.showWindow(nil)
+
+                let actualWhileOpen = DebugDrawer.shared.localPlugins.contains { $0.id == id }
+                window.close()
+                let actualAfterClosing = DebugDrawer.shared.localPlugins.contains { $0.id == id }
+                #expect(actualWhileOpen)
+                #expect(!actualAfterClosing)
+            }
+        }
+    #endif
 #endif

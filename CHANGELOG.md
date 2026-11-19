@@ -8,6 +8,10 @@ the entry becomes the GitHub release's notes.
 
 ## [Unreleased]
 
+### Added
+
+- DD-209: `DebugDrawer.registerLocal(_:in:)` ties a local plugin to one `NSWindow` (macOS) or `UIWindowScene` (iOS, Mac Catalyst and visionOS), so a UIKit- or AppKit-only app can list a plugin in only that window's drawer, as `debugLocalPlugin(_:)` does for a SwiftUI view. It returns the token `unregisterLocal(id:token:)` takes, closing the window or disconnecting the scene removes the registration, and release builds get a stand-in that drops the plugin.
+
 ### Fixed
 
 - DD-198: the test that checks a row's icon sits level with its title no longer crashes the whole iOS test process on an iPhone simulator. On a 3x screen the row's fitting height ends a third of a point into the test's 2x bitmap, whose partly clear last row read as ink across the full width; the bitmap is now whole pixels on white, and its scan reports a bitmap it can't read through `#require` instead of trapping.

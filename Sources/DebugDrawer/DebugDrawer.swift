@@ -66,14 +66,19 @@
         /// The plugins attached with `debugLocalPlugin(_:)` whose views are on screen, in every
         /// window, in the order they first appeared.
         ///
-        /// Each window's drawer lists only the local plugins registered from views in that window,
-        /// and those registered with ``registerLocal(_:)``, which belong to no window.
+        /// Each window's drawer lists only the local plugins registered from views in that window
+        /// or for it with `registerLocal(_:in:)`, and those registered with ``registerLocal(_:)``,
+        /// which belong to no window.
         @Published public private(set) var localPlugins: [AnyDebugDrawerPlugin] = []
 
         /// Every local plugin's registration: its token and the window whose views registered it.
         var localRegistrations: [DrawerLocalRegistration] = [] {
             didSet { localPlugins = localRegistrations.map(\.plugin) }
         }
+
+        /// What watches each window (on iOS and visionOS, scene) given to `registerLocal(_:in:)`
+        /// close, by the window's identifier, until it does.
+        var localScopeObservers: [ObjectIdentifier: any NSObjectProtocol] = [:]
 
         /// Where the drawer saves what it keeps across launches: the HUD's layout, which plugins'
         /// notices are silenced, and each window's collapsed sections, pins and order.
@@ -126,8 +131,9 @@
         /// Registers a plugin tied to a view, listed in every window's drawer, replacing any local
         /// plugin with the same ID registered this way.
         ///
-        /// `debugLocalPlugin(_:)` registers its plugin for the window its view is in; call this
-        /// directly only to tie a plugin to something other than a SwiftUI view.
+        /// `debugLocalPlugin(_:)` registers its plugin for the window its view is in, and
+        /// `registerLocal(_:in:)` for the `NSWindow` or `UIWindowScene` it is given; call this
+        /// directly only to tie a plugin to something other than a SwiftUI view or one window.
         ///
         /// - Parameter plugin: The plugin to add.
         /// - Returns: The token that owns the registration; pass it to

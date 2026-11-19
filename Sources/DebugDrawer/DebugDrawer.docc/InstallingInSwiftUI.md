@@ -62,6 +62,27 @@ final class OrdersWindowController: NSWindowController {
 }
 ```
 
+A local plugin belongs to the window its view is in, which `debugLocalPlugin(_:)` finds from the
+SwiftUI view. A window with no SwiftUI view passes its window instead, to
+`DebugDrawer.shared.registerLocal(_:in:)`: an `NSWindow` on the Mac, a `UIWindowScene` on iOS.
+Only that window's drawer lists the plugin, which stays until the window closes or the scene
+disconnects; the window needn't be attached yet. The call returns the token to pass to
+``DebugDrawer/DebugDrawer/unregisterLocal(id:token:)`` to remove the plugin sooner, and a
+registration of the same plugin ID for the same window replaces the earlier one.
+
+```swift
+final class CacheWindowController: NSWindowController {
+    override func showWindow(_ sender: Any?) {
+        super.showWindow(sender)
+        guard let window else { return }
+        DebugDrawer.shared.registerLocal(CachePlugin(), in: window)
+    }
+}
+```
+
+In a scene delegate, register once the scene has connected, with
+`DebugDrawer.shared.registerLocal(CachePlugin(), in: windowScene)`.
+
 ### Open the drawer
 
 The drawer binds no gesture or key of its own to open it. Call
