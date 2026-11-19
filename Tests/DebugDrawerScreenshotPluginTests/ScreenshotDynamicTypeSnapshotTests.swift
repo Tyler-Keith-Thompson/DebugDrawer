@@ -1,5 +1,6 @@
 // iOS scales text with Dynamic Type, so the large-text snapshots run on the iOS simulator.
 #if os(iOS) && !targetEnvironment(macCatalyst)
+    import DebugDrawer
     import SnapshotTesting
     import SwiftUI
     import Testing
@@ -14,7 +15,8 @@
     struct ScreenshotDynamicTypeSnapshotTests {
         @Test("Before a capture, the button and switch stay readable at a large accessibility text size")
         func ready() throws {
-            let sut = ScreenshotPluginView()
+            let model = ScreenshotModel(capturer: FakeScreenshotCapturer([]), saver: FakeScreenshotSaver())
+            let sut = ScreenshotPluginView(transport: .direct(to: model))
             let controller = UIHostingController(rootView: sut
                 .frame(width: 320, alignment: .leading)
                 // No height proposed, as the drawer's scroll view proposes none.

@@ -296,11 +296,11 @@ current snapshot first, for a connection to forward elsewhere; on the other side
 ``DebugDrawerPluginTransport/init(initial:snapshots:send:)`` makes a transport from such a stream
 and a closure that carries the commands back. A plugin that doesn't adopt the protocol keeps
 working as it does. The Network, Console, View Inspector, Accessibility, Launch Time, Cookies, File
-Browser, Loaded Libraries and Deep Link plugins are built this way (`NetworkModel`,
+Browser, Loaded Libraries, Deep Link and Screenshot plugins are built this way (`NetworkModel`,
 `ConsoleModel`, `ViewInspectorModel`, `AccessibilityModel`, `LaunchTimeModel`, `CookiesModel`,
-`FileBrowserModel`, `LoadedLibrariesModel`, `DeepLinkModel`). A plugin that acts on the app's
-live windows, as the View Inspector does, keeps its windows and views behind a service the model
-takes at init and puts only values read from them in its snapshot.
+`FileBrowserModel`, `LoadedLibrariesModel`, `DeepLinkModel`, `ScreenshotModel`). A plugin that acts
+on the app's live windows, as the View Inspector does, keeps its windows and views behind a service
+the model takes at init and puts only values read from them in its snapshot.
 
 ### Reaching a model from another process
 

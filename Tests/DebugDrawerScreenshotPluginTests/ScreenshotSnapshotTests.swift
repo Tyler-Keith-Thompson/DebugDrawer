@@ -1,6 +1,7 @@
 // Views render on the Mac; the snapshot packages are linked on Apple platforms only.
 #if os(macOS)
     import AppKit
+    import DebugDrawer
     import SnapshotTesting
     import SwiftUI
     import Testing
@@ -16,7 +17,8 @@
     struct ScreenshotSnapshotTests {
         @Test("Before a capture, the plugin shows the capture button and the hide-drawer switch", arguments: [ColorScheme.light, .dark])
         func ready(colorScheme: ColorScheme) throws {
-            let sut = ScreenshotPluginView()
+            let model = ScreenshotModel(capturer: FakeScreenshotCapturer([]), saver: FakeScreenshotSaver())
+            let sut = ScreenshotPluginView(transport: .direct(to: model))
             let host = NSHostingView(rootView: sut
                 .frame(width: 320, alignment: .leading)
                 .padding()
