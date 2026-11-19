@@ -13,7 +13,8 @@
     @MainActor
     @Suite(.timeLimit(.minutes(1)))
     struct FileBrowserStateDynamicTypeSnapshotTests {
-        @Test("In an iPad's drawer a folder's facts, items and actions stay readable", arguments: [DynamicTypeSize.large, .accessibility3])
+        @Test("In an iPad's drawer a folder's facts and items stay readable, and Refresh and More stay on one line",
+              arguments: [DynamicTypeSize.large, .accessibility3])
         func folder(size: DynamicTypeSize) throws {
             let documents = URL(filePath: "/var/mobile/Containers/Data/Application/0A1B2C3D/Documents", directoryHint: .isDirectory)
             let exports = documents.appending(path: "Exports", directoryHint: .isDirectory)

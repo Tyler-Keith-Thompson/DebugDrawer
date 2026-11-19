@@ -141,7 +141,7 @@
             assertSnapshot(of: actual, as: .image(perceptualPrecision: 0.98), named: "\(colorScheme)")
         }
 
-        @Test("A folder: its total, item count and dates, its folders and files with sizes, and Import, Rename and Delete",
+        @Test("A folder: its total, item count and dates, its folders and files with sizes, and Refresh and More on one line",
               arguments: [ColorScheme.light, .dark])
         func folder(colorScheme: ColorScheme) throws {
             let documents = URL(filePath: "/Users/me/Library/Containers/com.example.shop/Data/Documents", directoryHint: .isDirectory)

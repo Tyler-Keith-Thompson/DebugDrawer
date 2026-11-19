@@ -182,23 +182,21 @@
             #expect(deleted == [item])
         }
 
-        @Test("A file offers Share and Delete in the row, and Copy Path, Copy Text, Reveal in Finder and Rename… in its More menu")
+        @Test("A file offers Share in the row, and Copy Path, Copy Text, Reveal in Finder, Rename… and Delete in its More menu")
         func fileActions() throws {
             let item = FileItem(url: URL(filePath: "/data/Documents/notes.txt"), isDirectory: false, size: 5, modified: nil, created: nil)
             let sut = FileItemActions(item: item, canChange: true, copyText: "hello", actions: FileBrowserActions())
-            let expectedMenuItems = ["Copy Path", "Copy Text", "Reveal in Finder", "Rename…"]
+            let expectedMenuItems = ["Copy Path", "Copy Text", "Reveal in Finder", "Rename…", "Delete"]
 
             let view = try sut.inspect()
             let menu = try view.find(ViewType.Menu.self)
-            let menuTitle = try menu.labelView().text().string()
+            let menuLabel = try menu.accessibilityLabel().string()
             let actual = try menu.findAll(ViewType.Button.self).map { try $0.labelView().text().string() }
             let share = try view.find(ViewType.ShareLink.self).labelView().text().string()
-            let delete = try view.find(button: "Delete").labelView().text().string()
 
-            #expect(menuTitle == "More")
+            #expect(menuLabel == "More")
             #expect(actual == expectedMenuItems)
             #expect(share == "Share…")
-            #expect(delete == "Delete")
         }
 
         @Test("Rename edits the name in place and renames to what was typed")

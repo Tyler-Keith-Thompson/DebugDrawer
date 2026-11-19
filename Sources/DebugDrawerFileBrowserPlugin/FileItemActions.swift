@@ -7,10 +7,11 @@
 
     /// The actions on the folder or file shown, in the drawer's action row.
     ///
-    /// A folder offers Import… (unless read-only) and Refresh; a file offers Share. Both have a More
-    /// menu of Copy Path, Copy Text for a preview that is text, Reveal in Finder for a file on the
-    /// Mac, and, unless read-only, Rename…, which edits the name in place. Unless read-only, Delete
-    /// trails the row and asks first, in place under it. It keeps which of those is open.
+    /// A folder offers Refresh; a file offers Share…. Beside it, an icon-only More menu
+    /// (``FileItemMoreMenu``) offers Import… for a folder that takes files, Copy Path, Copy Text for
+    /// a preview that is text, Reveal in Finder for a file on the Mac, and, unless read-only,
+    /// Rename…, which edits the name in place, and Delete, which asks first, in place under the
+    /// row. It keeps which of those is open.
     struct FileItemActions: View {
         /// What is open under the row.
         enum Pending: Hashable {
@@ -28,22 +29,26 @@
         var copyText: String?
         let actions: FileBrowserActions
         @State var pending = Pending.none
+        @ScaledMetric(relativeTo: .body) var actionGap: CGFloat = 8
         let inspection = Inspection<Self>()
 
         var body: some View {
             VStack(alignment: .leading, spacing: 0) {
                 DebugDrawerActionRow {
-                    if item.isDirectory {
-                        folderActions
-                    } else {
-                        fileActions
-                    }
-                } trailing: {
-                    if canChange {
-                        Button("Delete", role: .destructive) { pending = .deleting }
-                            .debugDrawerButtonStyle(.destructive)
-                            .disabled(pending != .none)
-                            .accessibilityLabel("Delete \(item.name)")
+                    // One item in the row, so the button and More stay on one line at
+                    // accessibility sizes too, where the row stacks its items.
+                    HStack(spacing: actionGap) {
+                        if item.isDirectory {
+                            Button("Refresh", action: actions.refresh)
+                                .accessibilityLabel("Refresh")
+                                .accessibilityHint("Reads the folder again and counts its sizes")
+                        } else {
+                            ShareLink(item: item.url) {
+                                Text("Share…")
+                            }
+                            .accessibilityLabel("Share \(item.name)")
+                        }
+                        moreMenu
                     }
                 }
                 switch pending {
@@ -58,52 +63,30 @@
             .onReceive(inspection.notice) { inspection.visit(self, $0) }
         }
 
-        @ViewBuilder private var folderActions: some View {
-            if canImport {
-                Button("Import…", action: actions.importFile)
-                    .accessibilityHint("Copies a file you pick into this folder")
-            }
-            Button("Refresh", action: actions.refresh)
-                .accessibilityHint("Reads the folder again and counts its sizes")
-            moreMenu
-        }
-
-        @ViewBuilder private var fileActions: some View {
-            ShareLink(item: item.url) {
-                Text("Share…")
-            }
-            .accessibilityLabel("Share \(item.name)")
-            moreMenu
-        }
-
-        // The less frequent actions sit in one menu rather than a button each, so the row fits on
-        // one line at the drawer's narrowest (316 points), with Delete still trailing. Reveal in
-        // Finder is among them: as a button it pushed the Mac's row onto a second line.
+        // Every action but one sits in an icon-only menu, so the row is one line at the drawer's
+        // narrowest (316 points) at every text size. Refresh is the folder's visible one because
+        // every folder offers it, read-only or not.
         private var moreMenu: some View {
-            Menu("More") {
-                Button("Copy Path") { debugDrawerCopyToClipboard(item.path) }
-                    .accessibilityHint("Copies to the clipboard")
-                if let copyText {
-                    Button("Copy Text") { debugDrawerCopyToClipboard(copyText) }
-                        .accessibilityHint("Copies to the clipboard")
-                }
-                #if os(macOS)
-                    if !item.isDirectory {
-                        Button("Reveal in Finder") { NSWorkspace.shared.activateFileViewerSelecting([item.url]) }
-                            .accessibilityHint("Shows the file in a Finder window")
-                    }
-                #endif
-                if canChange {
-                    Divider()
-                    Button("Rename…") { pending = .renaming(item.name) }
-                        .disabled(pending != .none)
-                        .accessibilityHint("Edits the name of \(item.name) below")
-                }
-            }
-            .menuStyle(.button)
-            .fixedSize()
-            .accessibilityLabel("More")
-            .accessibilityHint("Copies the path of \(item.name), or renames it")
+            FileItemMoreMenu(
+                name: item.name,
+                importFile: item.isDirectory && canImport ? actions.importFile : nil,
+                copyPath: { [path = item.path] in debugDrawerCopyToClipboard(path) },
+                copyText: copyText.map { text in { debugDrawerCopyToClipboard(text) } },
+                revealInFinder: revealInFinder,
+                rename: canChange ? { [name = item.name] in pending = .renaming(name) } : nil,
+                delete: canChange ? { pending = .deleting } : nil,
+                isAsking: pending != .none
+            )
+        }
+
+        /// Reveal in Finder, for a file on the Mac.
+        private var revealInFinder: (() -> Void)? {
+            #if os(macOS)
+                guard !item.isDirectory else { return nil }
+                return { [url = item.url] in NSWorkspace.shared.activateFileViewerSelecting([url]) }
+            #else
+                return nil
+            #endif
         }
 
         private func renameEditor(_ name: String) -> some View {
