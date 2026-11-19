@@ -16,6 +16,21 @@
         /// The simulation applied to the app, or `nil` for the app's own colors.
         @Published var simulation: ColorVision.Simulation?
 
+        /// The drawers the plugin is installed in; the last to remove it turns the simulation off.
+        private var installations: Set<ObjectIdentifier> = []
+
+        /// Counts `drawer` as one the plugin is installed in.
+        func install(in drawer: ObjectIdentifier) {
+            installations.insert(drawer)
+        }
+
+        /// Uncounts `drawer`; once no drawer holds the plugin, turns the simulation off, so the
+        /// app shows its own colors with nothing left to turn it off from.
+        func uninstall(from drawer: ObjectIdentifier) {
+            guard installations.remove(drawer) != nil, installations.isEmpty else { return }
+            simulation = nil
+        }
+
         /// Moves to the next simulation in the order the picker lists them, then back to none.
         func cycle() {
             simulation = ColorVision.Simulation.after(simulation)

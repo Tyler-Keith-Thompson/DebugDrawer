@@ -1,11 +1,22 @@
 #if DEBUG
     import Foundation
+    import os
     import OSLogClient
 
     /// Receives os_log entries and pushes them into the shared ConsoleLogStore.
     final class ConsoleLogDriver: LogDriver, @unchecked Sendable {
+        /// Entries logged before it are dropped; `nil` keeps every entry. OSLogClient calls the
+        /// driver from its own actor, so it sits behind a lock. `OSAllocatedUnfairLock` rather
+        /// than `Mutex`, which needs iOS 18.
+        private let earliestDate = OSAllocatedUnfairLock<Date?>(initialState: nil)
+
         convenience init() {
             self.init(id: "com.debugdrawer.console")
+        }
+
+        /// Drops the entries logged before `date` from now on; `nil` keeps every entry.
+        func ignoreEntries(before date: Date?) {
+            earliestDate.withLock { $0 = date }
         }
 
         #if os(macOS)
@@ -32,6 +43,7 @@
         #endif
 
         private func handleLog(level: LogLevel, subsystem: String, category: String, date: Date, message: String) {
+            guard earliestDate.withLock({ $0.map { date >= $0 } ?? true }) else { return }
             let line = Self.line(level: level, subsystem: subsystem, category: category, date: date, message: message)
             Task { @MainActor in
                 ConsoleLogStore.shared.ingest(line)

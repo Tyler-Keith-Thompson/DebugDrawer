@@ -20,6 +20,7 @@
         private var observer: (any NSObjectProtocol)?
 
         func observe(_ onChange: @escaping @MainActor () async -> Void) {
+            stop()
             observer = NotificationCenter.default.addObserver(forName: Self.didBecomeActive, object: nil, queue: .main) { _ in
                 // Posted on the main thread and delivered on the main queue.
                 MainActor.assumeIsolated {
@@ -27,6 +28,17 @@
                     Task { await onChange() }
                 }
             }
+        }
+
+        func stop() {
+            guard let observer else { return }
+            NotificationCenter.default.removeObserver(observer)
+            self.observer = nil
+        }
+
+        /// Whether the source is observing the app becoming active.
+        var isObserving: Bool {
+            observer != nil
         }
 
         private static var didBecomeActive: Notification.Name {

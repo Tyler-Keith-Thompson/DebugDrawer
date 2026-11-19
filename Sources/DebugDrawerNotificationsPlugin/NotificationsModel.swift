@@ -48,6 +48,33 @@
             changes.observe { [weak self] in await self?.refresh() }
         }
 
+        /// Whether the model reads again on each change the source reports: from its creation
+        /// until the last drawer uninstalls the plugin, and again once one installs it.
+        private(set) var isObserving = true
+        /// The drawers the plugin over this model is installed in.
+        private var installedDrawers: Set<ObjectIdentifier> = []
+
+        /// Counts `drawer` as one the plugin is installed in. If an uninstall stopped the model,
+        /// observes the source again and reads the center again.
+        func install(in drawer: ObjectIdentifier) {
+            installedDrawers.insert(drawer)
+            guard !isObserving else { return }
+            isObserving = true
+            changes.observe { [weak self] in await self?.refresh() }
+            Task { await refresh() }
+        }
+
+        /// Uncounts `drawer`. Once no drawer has the plugin, stops observing the source and drops
+        /// what was read; a read on its way is dropped too.
+        func uninstall(from drawer: ObjectIdentifier) {
+            installedDrawers.remove(drawer)
+            guard installedDrawers.isEmpty, isObserving else { return }
+            isObserving = false
+            changes.stop()
+            latestRead += 1
+            center = .loading
+        }
+
         /// Shows what the app reported last.
         func update(_ registration: RemoteRegistration) {
             self.registration = registration

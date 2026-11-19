@@ -108,5 +108,31 @@
                 #expect(sut.subviews.isEmpty)
             }
         #endif
+
+        @Test("Removing the plugin gives sendEvent(_:) UIKit's implementation and dd_sendEvent(_:) its own back; adding it swaps again")
+        func uninstallRestoresSendEvent() throws {
+            let sendEvent = try #require(class_getInstanceMethod(UIWindow.self, #selector(UIWindow.sendEvent(_:))))
+            let ddSendEvent = try #require(class_getInstanceMethod(UIWindow.self, #selector(UIWindow.dd_sendEvent(_:))))
+            let drawer = DebugDrawer.shared
+            drawer.installViewInspector()
+            let installed = method_getImplementation(sendEvent)
+            // While swapped, dd_sendEvent(_:) names UIKit's original.
+            let expected = method_getImplementation(ddSendEvent)
+
+            drawer.unregisterGlobal(id: ViewInspectorPlugin().id)
+            let actual = method_getImplementation(sendEvent)
+            let ownAfterUninstall = method_getImplementation(ddSendEvent)
+            drawer.unregisterGlobal(id: ViewInspectorPlugin().id)
+            let afterSecondUninstall = method_getImplementation(sendEvent)
+            // Installed again, as the other tests here and the app expect it.
+            drawer.installViewInspector()
+            let reinstalled = method_getImplementation(sendEvent)
+
+            #expect(actual == expected)
+            #expect(ownAfterUninstall == installed)
+            #expect(afterSecondUninstall == expected)
+            #expect(reinstalled == installed)
+            #expect(!ViewBorderController.shared.isClickIndicatorEnabled)
+        }
     }
 #endif

@@ -24,6 +24,10 @@
                         self.receive = receive
                         receive([ReceivedMetricKitPayload(kind: .metrics, json: Data(#"{"appVersion":"1.0"}"#.utf8))])
                     }
+
+                    func unsubscribe() {
+                        receive = nil
+                    }
                 }
                 let isExpected = await MainActor.run {
                     let url = URL(filePath: directory, directoryHint: .isDirectory)
@@ -58,6 +62,8 @@
                     func subscribe(_: @escaping @MainActor ([ReceivedMetricKitPayload]) -> Void) {
                         subscriptions += 1
                     }
+
+                    func unsubscribe() {}
                 }
                 let isExpected = await MainActor.run {
                     let first = CountingSource()

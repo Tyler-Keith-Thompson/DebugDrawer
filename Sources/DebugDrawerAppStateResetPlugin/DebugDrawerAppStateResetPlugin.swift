@@ -35,6 +35,21 @@ public struct AppStateResetPlugin: DebugDrawerPlugin {
         #endif
     }
 
+    /// Counts `drawer` as one that holds the plugin; nothing is read until it is shown.
+    @MainActor public func install(in drawer: DebugDrawer) {
+        #if DEBUG
+            model.install(in: ObjectIdentifier(drawer))
+        #endif
+    }
+
+    /// Once the last drawer that held the plugin removes it, drops the plan it read (the files,
+    /// keys and items each category holds). Nothing is deleted: a reset under way finishes.
+    @MainActor public func uninstall(from drawer: DebugDrawer) {
+        #if DEBUG
+            model.uninstall(from: ObjectIdentifier(drawer))
+        #endif
+    }
+
     /// How many categories are selected ("3 selected").
     public var headerAccessory: some View {
         #if DEBUG

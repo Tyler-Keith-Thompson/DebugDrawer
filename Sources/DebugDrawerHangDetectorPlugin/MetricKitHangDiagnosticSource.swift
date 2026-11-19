@@ -6,8 +6,17 @@
         private var receive: (@MainActor ([HangDiagnostic]) -> Void)?
 
         func subscribe(_ receive: @escaping @MainActor ([HangDiagnostic]) -> Void) {
+            let isSubscribed = self.receive != nil
             self.receive = receive
-            MXMetricManager.shared.add(self)
+            if !isSubscribed {
+                MXMetricManager.shared.add(self)
+            }
+        }
+
+        func unsubscribe() {
+            guard receive != nil else { return }
+            receive = nil
+            MXMetricManager.shared.remove(self)
         }
 
         /// MetricKit calls this on a queue of its own.

@@ -16,8 +16,11 @@
         static let limit = 10
 
         let directory: URL
-        /// Every report kept, newest first.
+        /// Every report kept, newest first; empty while unloaded.
         @Published private(set) var reports: [CrashReport] = []
+        /// Whether ``reports`` holds what the directory does, rather than being dropped by
+        /// ``unload()``.
+        private(set) var isLoaded = true
         /// Called with the number of unseen reports whenever the reports change.
         private let onUnseenCountChange: @MainActor (Int) -> Void
 
@@ -34,6 +37,21 @@
                 try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
                 return Self.load(from: directory)
             }
+        }
+
+        /// Reads the reports from the directory again, after ``unload()``; does nothing while they
+        /// are loaded.
+        func load() {
+            guard !isLoaded else { return }
+            isLoaded = true
+            update(DebugDrawerActivity.$isDrawerWork.withValue(true) { Self.load(from: directory) })
+        }
+
+        /// Drops the reports from memory, leaving their files, until ``load()``.
+        func unload() {
+            guard isLoaded else { return }
+            isLoaded = false
+            update([])
         }
 
         /// The file the crash handlers write.

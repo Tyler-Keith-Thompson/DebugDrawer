@@ -35,6 +35,9 @@
         /// Does nothing: release builds capture nothing.
         public func install() {}
 
+        /// Does nothing: release builds capture nothing.
+        public func uninstall() {}
+
         /// Does nothing.
         public func clear() {}
     }

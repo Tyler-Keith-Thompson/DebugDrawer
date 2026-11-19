@@ -7,8 +7,11 @@ import SwiftUI
 /// The permissions `PrivacyPermissions.install()` found declared, each with its live status,
 /// a Request button while the user hasn't decided and an Open Settings button.
 public struct PermissionsPlugin: DebugDrawerPlugin {
+    /// The plugin's identity in the drawer.
+    static let pluginID = "PermissionsPlugin"
+
     public var id: String {
-        "PermissionsPlugin"
+        Self.pluginID
     }
 
     public var title = "Permissions"
@@ -28,6 +31,23 @@ public struct PermissionsPlugin: DebugDrawerPlugin {
             PermissionsPluginView(model: model)
         #else
             EmptyView()
+        #endif
+    }
+
+    /// Reads every status again on each change from now on, if an uninstall stopped it. Release
+    /// builds read nothing.
+    @MainActor public func install(in drawer: DebugDrawer) {
+        #if DEBUG
+            model.install(in: ObjectIdentifier(drawer))
+        #endif
+    }
+
+    /// Once no drawer has the plugin, stops observing the app becoming active and Location's
+    /// authorization, drops the statuses read, and lets go of the Location and Bluetooth managers.
+    /// A request still waiting for the user's answer returns.
+    @MainActor public func uninstall(from drawer: DebugDrawer) {
+        #if DEBUG
+            model.uninstall(from: ObjectIdentifier(drawer))
         #endif
     }
 }

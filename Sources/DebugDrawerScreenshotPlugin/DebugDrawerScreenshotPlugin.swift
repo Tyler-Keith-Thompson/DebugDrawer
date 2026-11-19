@@ -18,13 +18,43 @@ public struct ScreenshotPlugin: DebugDrawerPlugin {
     public var category = "Interface"
     public var icon = "camera"
 
-    public init() {}
+    #if DEBUG
+        /// The store the plugin shows and captures into, or `nil` for ``ScreenshotStore/shared``,
+        /// which is made only once something reads it.
+        private let store: ScreenshotStore?
+
+        public init() {
+            store = nil
+        }
+
+        /// - Parameter store: The store to show and capture into in place of the shared one.
+        init(store: ScreenshotStore) {
+            self.store = store
+        }
+    #else
+        public init() {}
+    #endif
 
     public var body: some View {
         #if DEBUG
-            ScreenshotPluginView()
+            ScreenshotPluginView(store: store ?? .shared)
         #else
             EmptyView()
+        #endif
+    }
+
+    /// Counts `drawer` as one that holds the plugin.
+    @MainActor public func install(in drawer: DebugDrawer) {
+        #if DEBUG
+            (store ?? .shared).install(in: ObjectIdentifier(drawer))
+        #endif
+    }
+
+    /// Once the last drawer that held the plugin removes it, drops the last capture, where it
+    /// went, and a capture still waiting for a place to be saved. Files already saved stay.
+    @MainActor public func uninstall(from drawer: DebugDrawer) {
+        #if DEBUG
+            (store ?? .shared).uninstall(from: ObjectIdentifier(drawer))
         #endif
     }
 }
@@ -65,11 +95,30 @@ public extension DebugDrawer {
         @Published var refusedFilename = ""
         #endif
 
-        private init() {}
+        /// The drawers the plugin is installed in; the last to remove it drops the capture.
+        private var installations: Set<ObjectIdentifier> = []
+
+        /// Counts `drawer` as one the plugin is installed in.
+        func install(in drawer: ObjectIdentifier) {
+            installations.insert(drawer)
+        }
+
+        /// Uncounts `drawer`; once no drawer holds the plugin, drops the last capture and its
+        /// result, and on the Mac a capture waiting for a place to be saved. Whether to hide the
+        /// drawer stays, and a capture under way finishes.
+        func uninstall(from drawer: ObjectIdentifier) {
+            guard installations.remove(drawer) != nil, installations.isEmpty else { return }
+            lastPath = nil
+            lastCapture = nil
+            #if os(macOS)
+            refusedCapture = nil
+            refusedFilename = ""
+            #endif
+        }
     }
 
     struct ScreenshotPluginView: View {
-        @ObservedObject private var store = ScreenshotStore.shared
+        @ObservedObject var store = ScreenshotStore.shared
 
         var body: some View {
             VStack(alignment: .leading, spacing: 0) {

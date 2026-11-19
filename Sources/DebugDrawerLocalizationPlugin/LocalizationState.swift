@@ -75,6 +75,15 @@
             }
         }
 
+        /// Forgets every untranslated lookup recorded.
+        func removeLookups() {
+            storage.withLock { storage in
+                storage.lookups = []
+                storage.seen = []
+                storage.isChangeReported = false
+            }
+        }
+
         /// Calls `onChange` after a lookup is recorded, from the thread that looked it up, until
         /// ``lookups`` is read; then again on the next. Replaces the observer before it.
         func observe(_ onChange: @escaping @Sendable () -> Void) {

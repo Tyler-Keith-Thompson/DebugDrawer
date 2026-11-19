@@ -48,6 +48,21 @@ public struct DeepLinkPlugin: DebugDrawerPlugin {
             EmptyView()
         #endif
     }
+
+    /// Counts `drawer` as one that holds the plugin.
+    @MainActor public func install(in drawer: DebugDrawer) {
+        #if DEBUG
+            model.install(in: ObjectIdentifier(drawer))
+        #endif
+    }
+
+    /// Once the last drawer that held the plugin removes it, forgets what came of the last URL
+    /// or activity sent. The history of URLs and activities stays in the drawer's defaults.
+    @MainActor public func uninstall(from drawer: DebugDrawer) {
+        #if DEBUG
+            model.uninstall(from: ObjectIdentifier(drawer))
+        #endif
+    }
 }
 
 // MARK: - Convenience installer

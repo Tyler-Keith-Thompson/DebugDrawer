@@ -42,6 +42,8 @@
 
         private let storage: any MockupStorage
         private let pasteboardImage: @MainActor () -> Data?
+        /// The drawers the plugin is installed in; the last to remove it takes the mockup away.
+        private var installations: Set<ObjectIdentifier> = []
 
         /// - Parameters:
         ///   - storage: Where the mockup and settings are kept between launches.
@@ -118,6 +120,21 @@
         /// Says why a picked photo or file couldn't be read.
         func fail(_ failure: MockupFailure) {
             self.failure = failure
+        }
+
+        /// Counts `drawer` as one the plugin is installed in.
+        func install(in drawer: ObjectIdentifier) {
+            installations.insert(drawer)
+        }
+
+        /// Uncounts `drawer`; once no drawer holds the plugin, ends Move, which takes the window's
+        /// touches, and drops the mockup from memory, so nothing is drawn over the app. The saved
+        /// mockup and settings stay for the next ``load()``.
+        func uninstall(from drawer: ObjectIdentifier) {
+            guard installations.remove(drawer) != nil, installations.isEmpty else { return }
+            isMoving = false
+            mockup = nil
+            failure = nil
         }
 
         /// Removes the mockup, here and from Caches, and ends Move.

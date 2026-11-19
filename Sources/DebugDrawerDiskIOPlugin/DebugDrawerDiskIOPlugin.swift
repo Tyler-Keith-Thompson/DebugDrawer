@@ -49,6 +49,23 @@ public struct DiskIOPlugin: DebugDrawerPlugin {
             EmptyView()
         #endif
     }
+
+    /// Starts recording (``DiskIOStore/install()``, or
+    /// ``DiskIOStore/unsafeInstallWithInterposing()`` once the app asked for it) as `drawer` adds
+    /// the plugin. Release builds record nothing.
+    @MainActor public func install(in drawer: DebugDrawer) {
+        #if DEBUG
+            DiskIOStore.shared.install(for: drawer)
+        #endif
+    }
+
+    /// Stops recording and forgets the recorded calls (``DiskIOStore/uninstall()``) once no
+    /// drawer holds the plugin: every swizzled method gets its original implementation back.
+    @MainActor public func uninstall(from drawer: DebugDrawer) {
+        #if DEBUG
+            DiskIOStore.shared.uninstall(for: drawer)
+        #endif
+    }
 }
 
 // MARK: - Convenience installer
@@ -57,7 +74,7 @@ public extension DebugDrawer {
     /// Swizzles the file methods ``DiskIOPlugin`` lists and registers the plugin.
     func installDiskIO() {
         #if DEBUG
-            DiskIOStore.shared.install()
+            // Adding the plugin installs it, which swizzles.
             registerGlobal(DiskIOPlugin())
         #endif
     }
@@ -166,11 +183,49 @@ public extension DebugDrawer {
         }
 
         /// Swizzles the file methods ``DiskIOPlugin`` lists, so the app's calls through them are
-        /// recorded. `installDiskIO()` calls it; a second call does nothing.
+        /// recorded. A drawer that adds the Disk I/O plugin calls it; a second call does nothing.
         public func install() {
             guard !installed else { return }
             installed = true
+            recorder.isRecording.withLock { $0 = true }
             DiskIOSwizzler.install()
+        }
+
+        /// Stops recording what ``install()`` and ``unsafeInstallWithInterposing()`` started and
+        /// forgets the recorded calls: every swizzled method gets its original implementation
+        /// back, and the interposer's hooks call the system straight through (dyld's interposing,
+        /// bound at launch, stays). A method other code swizzled again since stays in place, its
+        /// calls unrecorded. A drawer that removes the Disk I/O plugin, and holds it in no other
+        /// drawer, calls it; a second call does nothing.
+        public func uninstall() {
+            guard installed else { return }
+            installed = false
+            recorder.isRecording.withLock { $0 = false }
+            DiskIOSwizzler.uninstall()
+            if interposes { DiskIOInterposer.stop() }
+            clear()
+        }
+
+        /// Whether the app asked for interposing, so a drawer's install interposes too.
+        private var interposes = false
+
+        /// The drawers holding the Disk I/O plugin; recording runs while there is one.
+        private var drawers: Set<ObjectIdentifier> = []
+
+        /// Counts `drawer` as holding the plugin; the first one starts recording.
+        func install(for drawer: DebugDrawer) {
+            drawers.insert(ObjectIdentifier(drawer))
+            if interposes {
+                unsafeInstallWithInterposing()
+            } else {
+                install()
+            }
+        }
+
+        /// Uncounts `drawer`; once no drawer holds the plugin, recording stops.
+        func uninstall(for drawer: DebugDrawer) {
+            guard drawers.remove(ObjectIdentifier(drawer)) != nil, drawers.isEmpty else { return }
+            uninstall()
         }
 
         /// Does what ``install()`` does, then turns on the DebugDrawerDiskIOInterposer library's
@@ -183,6 +238,7 @@ public extension DebugDrawer {
         /// swizzling already sees those calls (before iOS 18), it does what ``install()`` does.
         /// `unsafeInstallDiskIOWithInterposing()` calls it; a second call does nothing.
         public func unsafeInstallWithInterposing() {
+            interposes = true
             install()
             DiskIOInterposer.start()
         }
@@ -277,6 +333,9 @@ public extension DebugDrawer {
 
         /// Does nothing: release builds swizzle nothing.
         public func install() {}
+
+        /// Does nothing: release builds swizzle nothing.
+        public func uninstall() {}
 
         /// Does nothing: release builds swizzle and interpose nothing.
         public func unsafeInstallWithInterposing() {}

@@ -33,5 +33,10 @@
                 return read
             }
         }
+
+        /// Forgets every bundle's keys; the next lookup in a bundle reads them again.
+        func removeAll() {
+            keys.withLock { $0 = [:] }
+        }
     }
 #endif

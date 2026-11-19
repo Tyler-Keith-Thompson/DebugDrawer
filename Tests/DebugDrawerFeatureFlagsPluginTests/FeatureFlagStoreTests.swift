@@ -6,6 +6,9 @@
     @MainActor
     @Suite(.timeLimit(.minutes(1)))
     struct FeatureFlagStoreTests {
+        /// Stands in for the drawer a store is installed in.
+        private static let drawer = ObjectIdentifier(FeatureFlagStoreTests.self)
+
         @Test("An override is stored and applied to the provider, so the app reads it")
         func setOverride() {
             let storage = FakeFeatureFlagOverrideStorage()
@@ -19,7 +22,7 @@
             #expect(provider.currentValue(forKey: "newCheckout") == .bool(true))
         }
 
-        @Test("Overrides persist: a fresh store over the same storage applies them to a fresh provider, as on the next launch")
+        @Test("Overrides persist: a fresh store over the same storage applies them to a fresh provider once installed, as on the next launch")
         func persistsAcrossLaunches() {
             let storage = FakeFeatureFlagOverrideStorage()
             let flags = [FeatureFlag(key: "newCheckout", liveValue: .bool(false)), FeatureFlag(key: "discount", liveValue: .number(0))]
@@ -29,13 +32,14 @@
             let provider = FakeFeatureFlagProvider(flags)
 
             let sut = FeatureFlagStore(provider: provider, storage: storage)
+            sut.install(in: Self.drawer)
 
             #expect(provider.calls == [.set("discount", .number(0.2)), .set("newCheckout", .bool(true))])
             #expect(sut.rows.map(\.override) == [.bool(true), .number(0.2)])
             #expect(sut.rows.map(\.control) == [.toggle(true), .number(0.2)])
         }
 
-        @Test("Overrides persist in UserDefaults: a fresh store over the same defaults applies them")
+        @Test("Overrides persist in UserDefaults: a fresh store over the same defaults applies them once installed")
         func persistsInUserDefaults() throws {
             let suiteName = "com.debugdrawer.tests.featureFlags.\(UUID().uuidString)"
             let defaults = try #require(UserDefaults(suiteName: suiteName))
@@ -45,7 +49,7 @@
                 .setOverride(.string("dark"), forKey: "theme")
             let provider = FakeFeatureFlagProvider(flags)
 
-            _ = FeatureFlagStore(provider: provider, storage: UserDefaultsFeatureFlagOverrideStorage(defaults: defaults))
+            FeatureFlagStore(provider: provider, storage: UserDefaultsFeatureFlagOverrideStorage(defaults: defaults)).install(in: Self.drawer)
 
             #expect(provider.currentValue(forKey: "theme") == .string("dark"))
         }
@@ -55,6 +59,7 @@
             let storage = FakeFeatureFlagOverrideStorage(["a": .bool(true), "b": .string("x")])
             let provider = FakeFeatureFlagProvider()
             let sut = FeatureFlagStore(provider: provider, storage: storage)
+            sut.install(in: Self.drawer)
             provider.calls = []
 
             sut.clearOverride(forKey: "a")

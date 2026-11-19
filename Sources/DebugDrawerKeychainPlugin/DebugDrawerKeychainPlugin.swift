@@ -44,6 +44,21 @@ public struct KeychainPlugin: DebugDrawerPlugin {
         #endif
     }
 
+    /// Counts `drawer` as one that holds the plugin; nothing is read until it is shown.
+    @MainActor public func install(in drawer: DebugDrawer) {
+        #if DEBUG
+            model.install(in: ObjectIdentifier(drawer))
+        #endif
+    }
+
+    /// Once the last drawer that held the plugin removes it, drops the items it read, the
+    /// password of the open item and any form's draft. The keychain itself is untouched.
+    @MainActor public func uninstall(from drawer: DebugDrawer) {
+        #if DEBUG
+            model.uninstall(from: ObjectIdentifier(drawer))
+        #endif
+    }
+
     /// How many items the keychain holds, once read.
     public var headerAccessory: some View {
         #if DEBUG

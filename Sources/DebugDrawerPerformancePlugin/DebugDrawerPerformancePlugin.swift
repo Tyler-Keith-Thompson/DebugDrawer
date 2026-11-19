@@ -66,6 +66,21 @@ public struct PerformancePlugin: DebugDrawerPlugin {
             (monitor ?? .shared).removeViewer()
         #endif
     }
+
+    /// Counts `drawer` as one that holds the plugin; nothing is sampled until it is shown.
+    @MainActor public func install(in drawer: DebugDrawer) {
+        #if DEBUG
+            (monitor ?? .shared).install(in: ObjectIdentifier(drawer))
+        #endif
+    }
+
+    /// Once the last drawer that held the plugin removes it, stops any sampling still running and
+    /// drops the frame, memory and thread history, so a later install starts from nothing.
+    @MainActor public func uninstall(from drawer: DebugDrawer) {
+        #if DEBUG
+            (monitor ?? .shared).uninstall(from: ObjectIdentifier(drawer))
+        #endif
+    }
 }
 
 // MARK: - Convenience installer
@@ -115,6 +130,8 @@ public extension DebugDrawer {
         private let sampler: any PerformanceSampler
         private let threadSampler: any ThreadSampler
         private var viewers = 0
+        /// The drawers the plugin is installed in; the last to remove it drops the history.
+        private var installations: Set<ObjectIdentifier> = []
         /// The frames' timestamps since the last tick.
         private var frameTimestamps: [TimeInterval] = []
         /// The last frame of the tick before, which starts this tick's first gap.
@@ -146,6 +163,30 @@ public extension DebugDrawer {
             guard viewers > 0 else { return }
             viewers -= 1
             if viewers == 0 { stop() }
+        }
+
+        /// Counts `drawer` as one the plugin is installed in.
+        func install(in drawer: ObjectIdentifier) {
+            installations.insert(drawer)
+        }
+
+        /// Uncounts `drawer`; once no drawer holds the plugin, stops sampling should a drawer still
+        /// count as showing it, and drops every reading and its history.
+        func uninstall(from drawer: ObjectIdentifier) {
+            guard installations.remove(drawer) != nil, installations.isEmpty else { return }
+            if viewers > 0 {
+                viewers = 0
+                stop()
+            }
+            fps = 0
+            droppedFrames = 0
+            footprintMB = 0
+            peakFootprintMB = 0
+            footprintHistory = []
+            fpsHistory = []
+            threads = []
+            frameTimestamps = []
+            previousFrame = nil
         }
 
         /// The device's physical memory, in megabytes (MiB).

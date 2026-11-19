@@ -28,6 +28,10 @@ public struct LoadedLibrariesPlugin: DebugDrawerPlugin {
             EmptyView()
         #endif
     }
+
+    /// Has nothing to stop or drop: the plugin starts no work, and the list of images lives in
+    /// its view, read each time the view appears and gone with it.
+    @MainActor public func uninstall(from drawer: DebugDrawer) {}
 }
 
 // MARK: - Convenience installer

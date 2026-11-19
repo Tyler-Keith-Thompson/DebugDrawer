@@ -39,6 +39,12 @@
         func request(_ permission: DeclaredPermission) async {
             await readers[permission.kind]?.request(permission)
         }
+
+        func stop() {
+            for reader in readers.values {
+                reader.stop()
+            }
+        }
     }
 
     extension DeclaredPermission {

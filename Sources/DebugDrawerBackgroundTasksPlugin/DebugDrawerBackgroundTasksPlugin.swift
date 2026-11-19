@@ -7,8 +7,11 @@ import SwiftUI
 /// The identifiers the Info.plist permits, each schedulable with its LLDB commands to copy,
 /// and the pending requests, each cancellable.
 public struct BackgroundTasksPlugin: DebugDrawerPlugin {
+    /// The plugin's identity in the drawer.
+    static let pluginID = "BackgroundTasksPlugin"
+
     public var id: String {
-        "BackgroundTasksPlugin"
+        Self.pluginID
     }
 
     public var title = "Background Tasks"
@@ -53,6 +56,22 @@ public struct BackgroundTasksPlugin: DebugDrawerPlugin {
             ]
         #else
             []
+        #endif
+    }
+
+    /// Reads the pending requests again each time the app becomes active, if an uninstall stopped
+    /// it. Release builds read nothing.
+    @MainActor public func install(in drawer: DebugDrawer) {
+        #if DEBUG
+            model.install(in: ObjectIdentifier(drawer))
+        #endif
+    }
+
+    /// Once no drawer has the plugin, stops observing the app becoming active and drops the
+    /// pending requests read; the scheduler keeps the requests themselves.
+    @MainActor public func uninstall(from drawer: DebugDrawer) {
+        #if DEBUG
+            model.uninstall(from: ObjectIdentifier(drawer))
         #endif
     }
 }

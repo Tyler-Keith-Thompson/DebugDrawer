@@ -17,6 +17,12 @@
             }
         }
 
+        func unsubscribe() {
+            guard receive != nil else { return }
+            receive = nil
+            MXMetricManager.shared.remove(self)
+        }
+
         /// MetricKit calls this on a queue of its own.
         nonisolated func didReceive(_ payloads: [MXMetricPayload]) {
             deliver(payloads.map(\.received))

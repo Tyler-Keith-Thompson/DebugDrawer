@@ -45,6 +45,25 @@ public struct LocationPlugin: DebugDrawerPlugin {
             EmptyView()
         #endif
     }
+
+    /// Swaps `CLLocationManager`'s location methods for the simulator's as `drawer` adds the
+    /// plugin, so spoofing kept from the last launch is in effect at once. Release builds swap
+    /// nothing.
+    @MainActor public func install(in drawer: DebugDrawer) {
+        #if DEBUG
+            LocationInstallation.install(for: drawer)
+        #endif
+    }
+
+    /// Once no drawer holds the plugin, stops a route playing, hands every manager the simulator
+    /// tracked back to Core Location (one given a simulated location gets its real updates
+    /// started again) and gives each swapped method its original implementation back. The switch
+    /// and the coordinate stay saved for the next install.
+    @MainActor public func uninstall(from drawer: DebugDrawer) {
+        #if DEBUG
+            LocationInstallation.uninstall(for: drawer)
+        #endif
+    }
 }
 
 // MARK: - Convenience installer
@@ -57,13 +76,32 @@ public extension DebugDrawer {
     /// before it isn't tracked. Release builds do nothing.
     func installLocation() {
         #if DEBUG
-            _ = LocationSwizzles.installed
+            // Adding the plugin installs it, which swaps the methods.
             registerGlobal(LocationPlugin())
         #endif
     }
 }
 
 #if DEBUG
+    /// What the Location plugin's install and uninstall change, counted by drawer: the methods are
+    /// swapped while any drawer holds the plugin.
+    @MainActor
+    enum LocationInstallation {
+        private static var drawers: Set<ObjectIdentifier> = []
+
+        static func install(for drawer: DebugDrawer) {
+            drawers.insert(ObjectIdentifier(drawer))
+            LocationSwizzles.install()
+        }
+
+        static func uninstall(for drawer: DebugDrawer) {
+            guard drawers.remove(ObjectIdentifier(drawer)) != nil, drawers.isEmpty else { return }
+            RoutePlayer.shared.stop()
+            LocationSimulator.shared.release()
+            LocationSwizzles.uninstall()
+        }
+    }
+
     /// Reads and writes `LocationSimulator.shared` and `RoutePlayer.shared`; `LocationForm` and
     /// `RouteSection` draw them. It presents the file importer for Import GPX….
     private struct LocationPluginView: View {

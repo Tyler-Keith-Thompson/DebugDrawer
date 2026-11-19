@@ -17,5 +17,7 @@
         /// Starts delivering payloads to `receive`, on the main actor: first the ones the system
         /// still holds, then each new one.
         func subscribe(_ receive: @escaping @MainActor ([ReceivedMetricKitPayload]) -> Void)
+        /// Stops delivering payloads until the next ``subscribe(_:)``.
+        func unsubscribe()
     }
 #endif

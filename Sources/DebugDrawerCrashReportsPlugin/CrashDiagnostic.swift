@@ -12,8 +12,11 @@
     /// later launch, often a day after the crash.
     @MainActor
     protocol CrashDiagnosticSource: AnyObject {
-        /// Starts delivering diagnostics to `receive`, on the main actor.
+        /// Starts delivering diagnostics to `receive`, on the main actor, in place of the one given
+        /// before.
         func subscribe(_ receive: @escaping @MainActor ([CrashDiagnostic]) -> Void)
+        /// Stops delivering diagnostics until the next ``subscribe(_:)``.
+        func unsubscribe()
     }
 
     extension CrashDiagnostic {

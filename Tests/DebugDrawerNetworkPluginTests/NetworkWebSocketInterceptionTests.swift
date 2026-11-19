@@ -14,7 +14,7 @@
     struct NetworkWebSocketInterceptionTests {
         @Test("Text sent and echoed back is listed under one connection, the sent frame then the received one, with their times")
         func textEcho() async throws {
-            NetworkWebSocketInterception.install()
+            await MainActor.run { NetworkWebSocketInterception.install() }
             let server = try WebSocketEchoServer()
             defer { server.stop() }
             let port = try await server.start()
@@ -56,7 +56,7 @@
 
         @Test("A binary frame sent and received through the completion handlers is listed with its size and a hex preview")
         func binaryEchoWithCompletionHandlers() async throws {
-            NetworkWebSocketInterception.install()
+            await MainActor.run { NetworkWebSocketInterception.install() }
             let server = try WebSocketEchoServer()
             defer { server.stop() }
             let port = try await server.start()
@@ -93,7 +93,7 @@
 
         @Test("A close the server sends is recorded with its code and reason, and the app's receive still fails as it would")
         func serverClose() async throws {
-            NetworkWebSocketInterception.install()
+            await MainActor.run { NetworkWebSocketInterception.install() }
             let server = try WebSocketEchoServer()
             defer { server.stop() }
             let port = try await server.start()
@@ -122,7 +122,7 @@
 
         @Test("The app's cancel(with:reason:) is recorded with its code and reason, and the receive it cancels doesn't change it")
         func clientCancel() async throws {
-            NetworkWebSocketInterception.install()
+            await MainActor.run { NetworkWebSocketInterception.install() }
             let server = try WebSocketEchoServer()
             defer { server.stop() }
             let port = try await server.start()
@@ -152,7 +152,7 @@
 
         @Test("A connection the server drops without a close is recorded as failed, with the receive's error")
         func receiveError() async throws {
-            NetworkWebSocketInterception.install()
+            await MainActor.run { NetworkWebSocketInterception.install() }
             let server = try WebSocketEchoServer()
             defer { server.stop() }
             let port = try await server.start()
@@ -180,7 +180,7 @@
 
         @Test("A ping is recorded as sent, and its pong as received")
         func pingAndPong() async throws {
-            NetworkWebSocketInterception.install()
+            await MainActor.run { NetworkWebSocketInterception.install() }
             let server = try WebSocketEchoServer()
             defer { server.stop() }
             let port = try await server.start()
@@ -203,6 +203,7 @@
         }
 
         @Test("Every factory records one connection per task, with the subprotocols the app offered")
+        @MainActor
         func factories() throws {
             NetworkWebSocketInterception.install()
             let url = try #require(URL(string: "ws://127.0.0.1:9/factories/\(UUID().uuidString)"))
@@ -228,7 +229,7 @@
 
         @Test("A send after the connection is gone is recorded failed, and the app gets the same error")
         func sendError() async throws {
-            NetworkWebSocketInterception.install()
+            await MainActor.run { NetworkWebSocketInterception.install() }
             let server = try WebSocketEchoServer()
             defer { server.stop() }
             let port = try await server.start()
@@ -267,7 +268,7 @@
         @Test("The plugin's store shows a connection once its frames are recorded")
         @MainActor
         func storeShowsConnection() async throws {
-            NetworkWebSocketInterception.install()
+            await MainActor.run { NetworkWebSocketInterception.install() }
             let server = try WebSocketEchoServer()
             defer { server.stop() }
             let port = try await server.start()

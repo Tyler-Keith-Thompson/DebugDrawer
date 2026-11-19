@@ -148,14 +148,21 @@ import SwiftUI
         /// `installConsole()` starts one.
         private(set) var recorder: ConsoleSessionRecorder?
 
-        private var installed = false
-        private let driver = ConsoleLogDriver()
+        /// Whether the store captures: not before the first install, while installed, and no
+        /// longer once the last install is undone.
+        var capture = ConsoleCaptureState.notStarted
+        /// Whether the app asked for capture with ``install()`` and hasn't undone it.
+        var isInstalledByApp = false
+        /// The drawers the Console plugin is installed in.
+        var installedDrawers: Set<ObjectIdentifier> = []
+        let driver = ConsoleLogDriver()
+        /// The OSLogClient calls made last, which the next ones wait for: they are asynchronous,
+        /// and an uninstall must not overtake the install before it.
+        var osLogWork: Task<Void, Never>?
         /// Original stdout fd, used to write diagnostics without triggering capture loop.
-        private var originalStdoutFd: Int32 = -1
-        /// The pipes stdout and stderr are redirected into, held for as long as the store lives: a
-        /// pipe released closes its reading end, and the app's next write to either stream would
-        /// then raise SIGPIPE.
-        private var capturePipes: [Pipe] = []
+        var originalStdoutFd: Int32 = -1
+        /// stdout and stderr, each redirected into a pipe, while the store captures them.
+        var streamCaptures: [ConsoleStreamCapture] = []
         /// Subject that receives individual log lines, throttled before publishing to `lines`.
         private let lineSubject = PassthroughSubject<LogLine, Never>()
         private var cancellable: AnyCancellable?
@@ -169,7 +176,8 @@ import SwiftUI
                 .collect(.byTime(DispatchQueue.main, .milliseconds(100)))
                 .receive(on: DispatchQueue.main)
                 .sink { [weak self] batch in
-                    guard let self, !batch.isEmpty else { return }
+                    // A batch collected before an uninstall can arrive after it.
+                    guard let self, !batch.isEmpty, self.capture != .stopped else { return }
                     self.buffer.append(contentsOf: batch)
                     self.publishBuffer()
                 }
@@ -259,50 +267,11 @@ import SwiftUI
             }
         }
 
-        // MARK: - Installation
-
-        /// Redirect stdout/stderr and start polling os_log.
-        /// Call once at app startup. Safe to call multiple times (no-ops after first).
-        public func install() {
-            guard !installed else { return }
-            installed = true
-
-            // Only redirect stdout/stderr on macOS.
-            // On iOS, dup2 on stdout breaks Xcode's debugger attachment.
-            #if os(macOS)
-                originalStdoutFd = dup(STDOUT_FILENO)
-                // Swift's `print` writes through C's `stdout`, which buffers fully once it finds a
-                // pipe behind it, so printed lines would reach the console in chunks. Line
-                // buffering keeps each line whole and on time. Set before the redirect: setvbuf
-                // flushes what was buffered to where it was headed. stderr stays unbuffered.
-                setvbuf(stdout, nil, _IOLBF, 0)
-                redirectStream(source: .stdout, fd: STDOUT_FILENO)
-                redirectStream(source: .stderr, fd: STDERR_FILENO)
-            #endif
-
-            Task {
-                do {
-                    let store = try OSLogStore(scope: .currentProcessIdentifier)
-                    try await OSLogClient.initialize(pollingInterval: .custom(2), logStore: store)
-                    await OSLogClient.registerDriver(driver)
-                    await OSLogClient.startPolling()
-                } catch {
-                    logDirect("[DebugDrawer] OSLogClient init failed: \(error)\n")
-                }
-            }
-        }
-
-        /// Write directly to the original stdout fd, bypassing the pipe capture.
-        private func logDirect(_ msg: String) {
-            guard originalStdoutFd >= 0 else { return }
-            msg.withCString { ptr in
-                _ = write(originalStdoutFd, ptr, strlen(ptr))
-            }
-        }
-
         /// Writes the line to the current session at once and pushes it into the throttled pipeline that shows it.
         func ingest(_ line: LogLine) {
-            guard ingestFilter.keeps(line) else { return }
+            // Before the first install lines are kept for when it comes; after the last
+            // uninstall, nothing is captured.
+            guard capture != .stopped, ingestFilter.keeps(line) else { return }
             // Recorded before the pipeline's batching, so a crash costs only what the recorder's
             // queue hadn't written yet.
             recorder?.record(line)
@@ -337,50 +306,6 @@ import SwiftUI
             previousPage = nil
             if source == .previous {
                 source = .captured
-            }
-        }
-
-        private func redirectStream(source: LogLine.Source, fd: Int32) {
-            let pipe = Pipe()
-            capturePipes.append(pipe)
-            let originalFd = dup(fd)
-            dup2(pipe.fileHandleForWriting.fileDescriptor, fd)
-            // A read ends wherever the pipe cut the stream, inside a line or a character, so the
-            // stream's bytes go through one assembler that keeps what follows the last newline.
-            // The handler's calls come one at a time, but it is a Sendable closure; the lock is
-            // never contended. `OSAllocatedUnfairLock` rather than `Mutex`, which needs iOS 18;
-            // switch once iOS 18 is the minimum.
-            let assembler = OSAllocatedUnfairLock(initialState: ConsoleLineAssembler())
-
-            pipe.fileHandleForReading.readabilityHandler = { [weak self] handle in
-                let data = handle.availableData
-                let texts: [String]
-                if data.isEmpty {
-                    // The end of the stream: its last line shows even without a newline.
-                    handle.readabilityHandler = nil
-                    texts = assembler.withLock { $0.flush() }.map { [$0] } ?? []
-                } else {
-                    // Forward to original destination.
-                    if originalFd >= 0 {
-                        data.withUnsafeBytes { buf in
-                            if let ptr = buf.baseAddress {
-                                _ = write(originalFd, ptr, data.count)
-                            }
-                        }
-                    }
-                    texts = assembler.withLock { $0.lines(in: data) }
-                }
-                let logLines = texts
-                    .filter { !$0.isEmpty }
-                    .map { LogLine(timestamp: Date(), text: $0, source: source, level: source == .stderr ? .error : .info) }
-                guard !logLines.isEmpty else { return }
-
-                Task { @MainActor [weak self] in
-                    guard let self else { return }
-                    for line in logLines {
-                        self.ingest(line)
-                    }
-                }
             }
         }
 

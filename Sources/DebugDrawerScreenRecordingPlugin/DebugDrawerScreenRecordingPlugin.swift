@@ -71,6 +71,22 @@ public struct ScreenRecordingPlugin: DebugDrawerPlugin {
             []
         #endif
     }
+
+    /// Lists the saved recordings again if an uninstall dropped them. Release builds record
+    /// nothing.
+    @MainActor public func install(in drawer: DebugDrawer) {
+        #if DEBUG
+            model.install(in: ObjectIdentifier(drawer))
+        #endif
+    }
+
+    /// Once no drawer has the plugin, stops a recording in progress, saving its movie, and drops
+    /// the list of recordings. The recordings on disk and the Show Touches setting stay.
+    @MainActor public func uninstall(from drawer: DebugDrawer) {
+        #if DEBUG
+            model.uninstall(from: ObjectIdentifier(drawer))
+        #endif
+    }
 }
 
 /// The HUD readout: reads the model and hands its state to `ScreenRecordingHUDButton`.

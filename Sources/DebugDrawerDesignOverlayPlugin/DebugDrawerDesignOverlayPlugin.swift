@@ -34,6 +34,22 @@ public struct DesignOverlayPlugin: DebugDrawerPlugin {
         #endif
     }
 
+    /// Counts `drawer` as one that holds the plugin.
+    @MainActor public func install(in drawer: DebugDrawer) {
+        #if DEBUG
+            model.install(in: ObjectIdentifier(drawer))
+        #endif
+    }
+
+    /// Once the last drawer that held the plugin removes it, ends Move, so the window gets its
+    /// touches back, and takes the mockup off the app. The mockup and settings saved in Caches
+    /// stay for the next install.
+    @MainActor public func uninstall(from drawer: DebugDrawer) {
+        #if DEBUG
+            model.uninstall(from: ObjectIdentifier(drawer))
+        #endif
+    }
+
     /// Show or Hide with the opacity, and Done while Move is on, so the mockup can be checked
     /// against the app with the drawer closed.
     public var hud: DesignOverlayHUD? {

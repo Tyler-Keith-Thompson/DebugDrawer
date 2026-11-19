@@ -6,42 +6,57 @@
     /// connections `URLSession` creates, the messages and pings sent and received on them, and how
     /// each closed, into ``NetworkWebSocketRecorder/shared``.
     ///
-    /// Only `install()` changes anything, once per process, and only public selectors of
+    /// Only `install()` changes anything, until `uninstall()` puts it back, and only public selectors of
     /// `NSURLSession` and of the class `URLSession`'s web socket tasks are: the three
     /// `webSocketTask…` factories, then `sendMessage:completionHandler:`,
     /// `receiveMessageWithCompletionHandler:`, `sendPingWithPongReceiveHandler:` and
     /// `cancelWithCloseCode:reason:`. Each replacement calls the implementation it replaced with
     /// the same arguments, and wraps a completion handler only to record what it is handed before
     /// handing the app the same message or error: nothing is consumed, reordered or delayed.
+    /// While uninstalled, a replacement other code kept in place calls straight through.
     enum NetworkWebSocketInterception {
         /// Starts recording WebSocket traffic; calling it again changes nothing.
+        @MainActor
         static func install() {
-            _ = installation
+            guard let taskClass else { return }
+            interceptCreation()
+            interceptSend(on: taskClass)
+            interceptReceive(on: taskClass)
+            interceptPing(on: taskClass)
+            interceptCancel(on: taskClass)
         }
+
+        /// Gives every replaced method its original implementation back, unless other code
+        /// replaced it again since.
+        @MainActor
+        static func uninstall() {
+            replacements.restore()
+        }
+
+        @MainActor private static let replacements = MethodReplacements()
 
         /// The recorder the replacements write to.
         private static var recorder: NetworkWebSocketRecorder {
             .shared
         }
 
-        // A static's initializer runs once, under a lock, however many threads ask for it.
-        private static let installation: Void = {
-            // `URLSessionWebSocketTask` is a class cluster: the tasks a session makes are of a
-            // class that doesn't inherit from it, so its own methods are never called and
-            // replacing them would record nothing. The class is taken from a task that is never
-            // resumed, made before the factories are replaced so it isn't recorded, and only the
-            // public selectors above are replaced on it.
-            guard let probeURL = URL(string: "ws://127.0.0.1") else { return }
+        // `URLSessionWebSocketTask` is a class cluster: the tasks a session makes are of a class
+        // that doesn't inherit from it, so its own methods are never called and replacing them
+        // would record nothing. The class is taken, once, from a task that is never resumed, made
+        // before the factories are first replaced so it isn't recorded, and only the public
+        // selectors above are replaced on it.
+        @MainActor private static let taskClass: AnyClass? = {
+            guard let probeURL = URL(string: "ws://127.0.0.1") else { return nil }
             let session = URLSession(configuration: .ephemeral)
             let taskClass: AnyClass = type(of: session.webSocketTask(with: probeURL))
             session.invalidateAndCancel()
-
-            interceptCreation()
-            interceptSend(on: taskClass)
-            interceptReceive(on: taskClass)
-            interceptPing(on: taskClass)
-            interceptCancel(on: taskClass)
+            return taskClass
         }()
+
+        /// Whether the replacements record: installed, rather than left in place by an uninstall.
+        private static var isRecording: Bool {
+            !NetworkInterception.isUninstalled
+        }
 
         // MARK: - Creation
 
@@ -51,31 +66,49 @@
 
         /// Records a connection for each task the factories make. The factories are
         /// `NSURLSession`'s own, which its subclasses inherit.
+        @MainActor
         private static func interceptCreation() {
+            // Every replacement block is `@Sendable`: made on the main actor, it runs on whatever
+            // thread the app calls the method from, so it must not take the main actor's isolation.
             let withURL = NSSelectorFromString("webSocketTaskWithURL:")
-            if let (method, original) = implementation(of: withURL, on: URLSession.self, as: MakeWithURL.self) {
-                let replacement: @convention(block) (URLSession, NSURL) -> URLSessionWebSocketTask = { session, url in
-                    opened(original(session, withURL, url), url: url as URL, protocols: [])
+            if let method = class_getInstanceMethod(URLSession.self, withURL) {
+                replacements.replace(method) { implementation in
+                    let original = unsafeBitCast(implementation, to: MakeWithURL.self)
+                    let replacement: @Sendable @convention(block) (URLSession, NSURL) -> URLSessionWebSocketTask = { session, url in
+                        let task = original(session, withURL, url)
+                        return isRecording ? opened(task, url: url as URL, protocols: []) : task
+                    }
+                    return imp_implementationWithBlock(replacement)
                 }
-                method_setImplementation(method, imp_implementationWithBlock(replacement))
             }
 
             let withProtocols = NSSelectorFromString("webSocketTaskWithURL:protocols:")
-            if let (method, original) = implementation(of: withProtocols, on: URLSession.self, as: MakeWithURLAndProtocols.self) {
-                let replacement: @convention(block) (URLSession, NSURL, NSArray) -> URLSessionWebSocketTask = { session, url, protocols in
-                    opened(original(session, withProtocols, url, protocols), url: url as URL, protocols: protocols.compactMap { $0 as? String })
+            if let method = class_getInstanceMethod(URLSession.self, withProtocols) {
+                replacements.replace(method) { implementation in
+                    let original = unsafeBitCast(implementation, to: MakeWithURLAndProtocols.self)
+                    typealias Factory = @Sendable @convention(block) (URLSession, NSURL, NSArray) -> URLSessionWebSocketTask
+                    let replacement: Factory = { session, url, protocols in
+                        let task = original(session, withProtocols, url, protocols)
+                        guard isRecording else { return task }
+                        return opened(task, url: url as URL, protocols: protocols.compactMap { $0 as? String })
+                    }
+                    return imp_implementationWithBlock(replacement)
                 }
-                method_setImplementation(method, imp_implementationWithBlock(replacement))
             }
 
             let withRequest = NSSelectorFromString("webSocketTaskWithRequest:")
-            if let (method, original) = implementation(of: withRequest, on: URLSession.self, as: MakeWithRequest.self) {
-                let replacement: @convention(block) (URLSession, NSURLRequest) -> URLSessionWebSocketTask = { session, request in
-                    let offered = request.value(forHTTPHeaderField: "Sec-WebSocket-Protocol") ?? ""
-                    let protocols = offered.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
-                    return opened(original(session, withRequest, request), url: request.url?.webSocketScheme, protocols: protocols)
+            if let method = class_getInstanceMethod(URLSession.self, withRequest) {
+                replacements.replace(method) { implementation in
+                    let original = unsafeBitCast(implementation, to: MakeWithRequest.self)
+                    let replacement: @Sendable @convention(block) (URLSession, NSURLRequest) -> URLSessionWebSocketTask = { session, request in
+                        let task = original(session, withRequest, request)
+                        guard isRecording else { return task }
+                        let offered = request.value(forHTTPHeaderField: "Sec-WebSocket-Protocol") ?? ""
+                        let protocols = offered.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
+                        return opened(task, url: request.url?.webSocketScheme, protocols: protocols)
+                    }
+                    return imp_implementationWithBlock(replacement)
                 }
-                method_setImplementation(method, imp_implementationWithBlock(replacement))
             }
         }
 
@@ -100,88 +133,106 @@
 
         /// Records each message the app sends when it sends it, and marks it failed if the send
         /// fails. Swift's `send(_:)`, async or with a completion handler, calls this method.
+        @MainActor
         private static func interceptSend(on taskClass: AnyClass) {
             let selector = NSSelectorFromString("sendMessage:completionHandler:")
-            guard let (method, original) = implementation(of: selector, on: taskClass, as: Send.self) else { return }
-            typealias Replacement = @convention(block) (URLSessionWebSocketTask, __NSURLSessionWebSocketMessage, SendCompletion?) -> Void
-            let replacement: Replacement = { task, message, completion in
-                guard let id = connectionID(of: task) else {
-                    original(task, selector, message, completion)
-                    return
-                }
-                let frame = NetworkWebSocketFrame(message, direction: .sent, timestamp: Date())
-                recorder.record(frame, on: id)
-                original(task, selector, message) { [weak task] error in
-                    if let error {
-                        recorder.fail(frame.id, on: id, error.localizedDescription)
-                        ended(task, id, by: error)
+            guard let method = ownMethod(selector, on: taskClass) else { return }
+            replacements.replace(method) { implementation in
+                let original = unsafeBitCast(implementation, to: Send.self)
+                typealias Replacement = @Sendable @convention(block) (
+                    URLSessionWebSocketTask, __NSURLSessionWebSocketMessage, SendCompletion?
+                ) -> Void
+                let replacement: Replacement = { task, message, completion in
+                    guard isRecording, let id = connectionID(of: task) else {
+                        original(task, selector, message, completion)
+                        return
                     }
-                    completion?(error)
+                    let frame = NetworkWebSocketFrame(message, direction: .sent, timestamp: Date())
+                    recorder.record(frame, on: id)
+                    original(task, selector, message) { [weak task] error in
+                        if let error {
+                            recorder.fail(frame.id, on: id, error.localizedDescription)
+                            ended(task, id, by: error)
+                        }
+                        completion?(error)
+                    }
                 }
+                return imp_implementationWithBlock(replacement)
             }
-            class_replaceMethod(taskClass, selector, imp_implementationWithBlock(replacement), method_getTypeEncoding(method))
         }
 
         /// Records each message the app receives, and how the connection ended when a receive
         /// fails. Swift's `receive()`, async or with a completion handler, calls this method.
+        @MainActor
         private static func interceptReceive(on taskClass: AnyClass) {
             let selector = NSSelectorFromString("receiveMessageWithCompletionHandler:")
-            guard let (method, original) = implementation(of: selector, on: taskClass, as: Receive.self) else { return }
-            let replacement: @convention(block) (URLSessionWebSocketTask, ReceiveCompletion?) -> Void = { task, completion in
-                guard let id = connectionID(of: task) else {
-                    original(task, selector, completion)
-                    return
-                }
-                original(task, selector) { [weak task] message, error in
-                    if let message {
-                        recorder.record(NetworkWebSocketFrame(message, direction: .received, timestamp: Date()), on: id)
+            guard let method = ownMethod(selector, on: taskClass) else { return }
+            replacements.replace(method) { implementation in
+                let original = unsafeBitCast(implementation, to: Receive.self)
+                let replacement: @Sendable @convention(block) (URLSessionWebSocketTask, ReceiveCompletion?) -> Void = { task, completion in
+                    guard isRecording, let id = connectionID(of: task) else {
+                        original(task, selector, completion)
+                        return
                     }
-                    if let error {
-                        ended(task, id, by: error)
+                    original(task, selector) { [weak task] message, error in
+                        if let message {
+                            recorder.record(NetworkWebSocketFrame(message, direction: .received, timestamp: Date()), on: id)
+                        }
+                        if let error {
+                            ended(task, id, by: error)
+                        }
+                        completion?(message, error)
                     }
-                    completion?(message, error)
                 }
+                return imp_implementationWithBlock(replacement)
             }
-            class_replaceMethod(taskClass, selector, imp_implementationWithBlock(replacement), method_getTypeEncoding(method))
         }
 
         /// Records each ping the app sends, and the pong that answers it.
+        @MainActor
         private static func interceptPing(on taskClass: AnyClass) {
             let selector = #selector(URLSessionWebSocketTask.sendPing(pongReceiveHandler:))
-            guard let (method, original) = implementation(of: selector, on: taskClass, as: Ping.self) else { return }
-            let replacement: @convention(block) (URLSessionWebSocketTask, SendCompletion?) -> Void = { task, completion in
-                guard let id = connectionID(of: task) else {
-                    original(task, selector, completion)
-                    return
-                }
-                let ping = NetworkWebSocketFrame(direction: .sent, kind: .ping, timestamp: Date())
-                recorder.record(ping, on: id)
-                original(task, selector) { [weak task] error in
-                    if let error {
-                        recorder.fail(ping.id, on: id, error.localizedDescription)
-                        ended(task, id, by: error)
-                    } else {
-                        recorder.record(NetworkWebSocketFrame(direction: .received, kind: .pong, timestamp: Date()), on: id)
+            guard let method = ownMethod(selector, on: taskClass) else { return }
+            replacements.replace(method) { implementation in
+                let original = unsafeBitCast(implementation, to: Ping.self)
+                let replacement: @Sendable @convention(block) (URLSessionWebSocketTask, SendCompletion?) -> Void = { task, completion in
+                    guard isRecording, let id = connectionID(of: task) else {
+                        original(task, selector, completion)
+                        return
                     }
-                    completion?(error)
+                    let ping = NetworkWebSocketFrame(direction: .sent, kind: .ping, timestamp: Date())
+                    recorder.record(ping, on: id)
+                    original(task, selector) { [weak task] error in
+                        if let error {
+                            recorder.fail(ping.id, on: id, error.localizedDescription)
+                            ended(task, id, by: error)
+                        } else {
+                            recorder.record(NetworkWebSocketFrame(direction: .received, kind: .pong, timestamp: Date()), on: id)
+                        }
+                        completion?(error)
+                    }
                 }
+                return imp_implementationWithBlock(replacement)
             }
-            class_replaceMethod(taskClass, selector, imp_implementationWithBlock(replacement), method_getTypeEncoding(method))
         }
 
         /// Records the app's close, with its code and reason, before the task sends it.
+        @MainActor
         private static func interceptCancel(on taskClass: AnyClass) {
             let selector = #selector(URLSessionWebSocketTask.cancel(with:reason:))
-            guard let (method, original) = implementation(of: selector, on: taskClass, as: Cancel.self) else { return }
-            let replacement: @convention(block) (URLSessionWebSocketTask, Int, NSData?) -> Void = { task, code, reason in
-                if let id = connectionID(of: task) {
-                    let reason = NetworkWebSocketClose.reason(reason as Data?)
-                    let close = NetworkWebSocketClose(side: .app, code: code, reason: reason, timestamp: Date())
-                    recorder.end(id, .closed(close))
+            guard let method = ownMethod(selector, on: taskClass) else { return }
+            replacements.replace(method) { implementation in
+                let original = unsafeBitCast(implementation, to: Cancel.self)
+                let replacement: @Sendable @convention(block) (URLSessionWebSocketTask, Int, NSData?) -> Void = { task, code, reason in
+                    if isRecording, let id = connectionID(of: task) {
+                        let reason = NetworkWebSocketClose.reason(reason as Data?)
+                        let close = NetworkWebSocketClose(side: .app, code: code, reason: reason, timestamp: Date())
+                        recorder.end(id, .closed(close))
+                    }
+                    original(task, selector, code, reason)
                 }
-                original(task, selector, code, reason)
+                return imp_implementationWithBlock(replacement)
             }
-            class_replaceMethod(taskClass, selector, imp_implementationWithBlock(replacement), method_getTypeEncoding(method))
         }
 
         /// Records how the connection ended when a send, receive or ping fails with `error`: the
@@ -203,11 +254,14 @@
 
         // MARK: - Runtime
 
-        /// The method `selector` names on `type`, its own or inherited, and its implementation as
-        /// a function of type `Function`.
-        private static func implementation<Function>(of selector: Selector, on type: AnyClass, as _: Function.Type) -> (Method, Function)? {
-            guard let method = class_getInstanceMethod(type, selector) else { return nil }
-            return (method, unsafeBitCast(method_getImplementation(method), to: Function.self))
+        /// The method `selector` names on `type` itself: one it inherits is first added to `type`
+        /// with the inherited implementation, so replacing it changes `type` alone, as
+        /// `class_replaceMethod` would, and putting it back leaves `type` running the inherited
+        /// code.
+        private static func ownMethod(_ selector: Selector, on type: AnyClass) -> Method? {
+            guard let inherited = class_getInstanceMethod(type, selector) else { return nil }
+            class_addMethod(type, selector, method_getImplementation(inherited), method_getTypeEncoding(inherited))
+            return class_getInstanceMethod(type, selector)
         }
 
         /// The id of the connection recorded for `task`, kept on the task itself so it lives and

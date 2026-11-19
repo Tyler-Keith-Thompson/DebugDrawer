@@ -22,6 +22,10 @@
                 self.onTurnEnd = onTurnEnd
             }
 
+            func stop() {
+                onTurnEnd = nil
+            }
+
             func wakeUp() {}
         }
 

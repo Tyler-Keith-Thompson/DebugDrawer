@@ -8,8 +8,11 @@ import SwiftUI
 /// sends a pasted APNs payload as a local notification, and the pending and delivered
 /// notifications, each removable.
 public struct NotificationsPlugin: DebugDrawerPlugin {
+    /// The plugin's identity in the drawer.
+    static let pluginID = "NotificationsPlugin"
+
     public var id: String {
-        "NotificationsPlugin"
+        Self.pluginID
     }
 
     public var title = "Notifications"
@@ -48,6 +51,23 @@ public struct NotificationsPlugin: DebugDrawerPlugin {
             ]
         #else
             []
+        #endif
+    }
+
+    /// Reads the notification center again each time the app becomes active, if an uninstall
+    /// stopped it. Release builds read nothing.
+    @MainActor public func install(in drawer: DebugDrawer) {
+        #if DEBUG
+            model.install(in: ObjectIdentifier(drawer))
+        #endif
+    }
+
+    /// Once no drawer has the plugin, stops observing the app becoming active and drops what was
+    /// read: the settings and the pending and delivered notifications. The token the app reported
+    /// stays, as do the notifications themselves.
+    @MainActor public func uninstall(from drawer: DebugDrawer) {
+        #if DEBUG
+            model.uninstall(from: ObjectIdentifier(drawer))
         #endif
     }
 }

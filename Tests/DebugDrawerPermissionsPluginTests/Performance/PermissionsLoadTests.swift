@@ -24,11 +24,15 @@
                 }
 
                 func request(_: DeclaredPermission) async {}
+
+                func stop() {}
             }
             /// Reports no changes.
             @MainActor
             final class SilentChanges: PermissionChangeSource {
                 func observe(_: @escaping @MainActor () async -> Void) {}
+
+                func stop() {}
             }
             var infoDictionary: [String: Any] = Dictionary(uniqueKeysWithValues: (0 ..< 1950).map { ("Key\($0)", "Value \($0)" as Any) })
             for key in PermissionKind.recognized.flatMap(\.keys) {

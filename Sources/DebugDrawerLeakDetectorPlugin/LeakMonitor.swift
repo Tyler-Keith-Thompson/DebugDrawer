@@ -36,6 +36,14 @@
             tracker.suspects
         }
 
+        /// Stops observing the run loop's turns and forgets every object it counted and every
+        /// view controller it was waiting to check. Calling it again does nothing.
+        func stop() {
+            turns.stop()
+            tracker = LeakTracker()
+            viewControllers = [:]
+        }
+
         /// Counts `object` among the live instances of its class, of which at most `maxCount`
         /// should be alive, until it deallocates. From any thread; off the main thread, it is
         /// counted once the main queue gets to it.

@@ -7,11 +7,17 @@
     /// once per hang, and lets the observer report it when the thread gets going again.
     ///
     /// The observer runs on the watched thread, so all it does is read the clock and take an
-    /// uncontended lock. The monitor stops (its observers removed, its watcher thread ended) when
-    /// it is released.
+    /// uncontended lock. The monitor stops (its observers removed, its watcher thread ended) on
+    /// ``stop()``, or when it is released.
     final class HangMonitor {
+        /// The watcher thread's name.
+        static let watcherName = "DebugDrawer hang watcher"
+
         private let state: HangMonitorState
-        private let observers: [CFRunLoopObserver]
+        /// The observers on the watched run loop: one that starts each stretch, one that ends it.
+        let observers: [CFRunLoopObserver]
+        /// The watcher thread, until ``stop()`` has joined it.
+        private var watcher: pthread_t?
 
         /// Starts watching `runLoop`, whose thread `sampler` samples.
         ///
@@ -45,23 +51,56 @@
                 CFRunLoopAddObserver(runLoop, observer, .commonModes)
             }
             let started = DispatchSemaphore(value: 0)
-            let watcher = Thread {
-                Thread.current.name = "DebugDrawer hang watcher"
+            watcher = Self.startWatcher {
                 started.signal()
                 state.watch(sampler)
             }
-            // It must run while the watched thread is stuck, so it outranks the app's other work.
-            watcher.qualityOfService = .userInteractive
-            watcher.start()
             // Returns once the watcher runs, so a hang right after install is watched.
-            started.wait()
+            if watcher != nil {
+                started.wait()
+            }
         }
 
         deinit {
+            stop()
+        }
+
+        /// Stops watching: removes the observers from the run loop, wakes the watcher thread and
+        /// waits for it to end. Calling it again does nothing.
+        func stop() {
             for observer in observers {
                 CFRunLoopObserverInvalidate(observer)
             }
             state.stop()
+            guard let watcher else { return }
+            self.watcher = nil
+            // Not long: the stop wakes the watcher, which then finds itself stopped and returns.
+            pthread_join(watcher, nil)
+        }
+
+        /// Starts the watcher thread running `body`.
+        ///
+        /// A POSIX thread rather than a `Thread`, so ``stop()`` can join it: once it returns, the
+        /// thread is gone, not merely about to end.
+        private static func startWatcher(_ body: @escaping @Sendable () -> Void) -> pthread_t? {
+            var attributes = pthread_attr_t()
+            pthread_attr_init(&attributes)
+            defer { pthread_attr_destroy(&attributes) }
+            // It must run while the watched thread is stuck, so it outranks the app's other work.
+            pthread_attr_set_qos_class_np(&attributes, QOS_CLASS_USER_INTERACTIVE, 0)
+            let context = Unmanaged.passRetained(WatcherBody(run: body)).toOpaque()
+            var thread: pthread_t?
+            let result = pthread_create(&thread, &attributes, { context in
+                let body = Unmanaged<WatcherBody>.fromOpaque(context).takeRetainedValue()
+                pthread_setname_np(HangMonitor.watcherName)
+                body.run()
+                return nil
+            }, context)
+            guard result == 0 else {
+                Unmanaged<WatcherBody>.fromOpaque(context).release()
+                return nil
+            }
+            return thread
         }
 
         /// The shortest stretch that counts as a hang, from the next checkpoint on. Traps unless
@@ -69,6 +108,15 @@
         var threshold: Duration {
             get { state.threshold }
             set { state.threshold = newValue }
+        }
+    }
+
+    /// What the watcher thread runs, handed to it through `pthread_create`'s context pointer.
+    private final class WatcherBody {
+        let run: @Sendable () -> Void
+
+        init(run: @escaping @Sendable () -> Void) {
+            self.run = run
         }
     }
 #endif

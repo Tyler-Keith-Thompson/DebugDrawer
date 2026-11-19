@@ -18,6 +18,8 @@
         @Published var filter = ""
 
         private nonisolated let jar: any CookieJar
+        /// The drawers the plugin is installed in; the last to remove it drops the cookies read.
+        private var installations: Set<ObjectIdentifier> = []
 
         nonisolated init(jar: any CookieJar) {
             self.jar = jar
@@ -37,6 +39,18 @@
         /// How many cookies the filter shows, of how many there are.
         var count: CookieCount {
             CookieCount(shown: shownCookies.count, total: allCookies.count)
+        }
+
+        /// Counts `drawer` as one the plugin is installed in.
+        func install(in drawer: ObjectIdentifier) {
+            installations.insert(drawer)
+        }
+
+        /// Uncounts `drawer`; once no drawer holds the plugin, drops the cookies read, so the next
+        /// show reads the stores again. The filter stays.
+        func uninstall(from drawer: ObjectIdentifier) {
+            guard installations.remove(drawer) != nil, installations.isEmpty else { return }
+            contents = .unread
         }
 
         /// Reads every store again.

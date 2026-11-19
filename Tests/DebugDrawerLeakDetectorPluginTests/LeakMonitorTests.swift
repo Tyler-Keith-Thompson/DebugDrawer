@@ -19,6 +19,10 @@
                 self.onTurnEnd = onTurnEnd
             }
 
+            func stop() {
+                onTurnEnd = nil
+            }
+
             func wakeUp() {
                 wakeUps += 1
             }
@@ -154,6 +158,25 @@
             #expect(flagged == expected)
             #expect(changes == [LeakChange(suspects: expected, flagged: expected), LeakChange(suspects: [], flagged: [])])
             #expect(sut.suspects.isEmpty)
+        }
+
+        @Test("Stopping stops observing the turns and forgets the objects counted, so a suspect is gone")
+        func stopForgets() {
+            let turns = ManualTurns()
+            let sut = LeakMonitor(turns: turns) { _ in }
+            let models = [ProfileModel(), ProfileModel()]
+            for model in models {
+                sut.track(model, maxCount: 1)
+            }
+            let suspectsBeforeStop = sut.suspects.count
+
+            sut.stop()
+            sut.stop()
+
+            #expect(suspectsBeforeStop == 1)
+            #expect(sut.suspects.isEmpty)
+            #expect(turns.onTurnEnd == nil)
+            withExtendedLifetime(models) {}
         }
 
         @Test("An object tracked twice is counted once")

@@ -34,6 +34,24 @@ public struct MetricKitPlugin: DebugDrawerPlugin {
         #endif
     }
 
+    /// Keeps what MetricKit delivers from now on: subscribes to `MXMetricManager`, unless another
+    /// drawer already did, and reads the payloads again if ``uninstall(from:)`` dropped them.
+    /// Release builds subscribe to nothing.
+    @MainActor public func install(in drawer: DebugDrawer) {
+        #if DEBUG
+            MetricKitPayloadsInstallation.start(store, in: drawer)
+        #endif
+    }
+
+    /// Unsubscribes from `MXMetricManager` once no drawer holds the plugin, after which
+    /// `MetricKitPayloads.add(json:kind:)` keeps nothing. Drops the payloads from memory; their
+    /// files stay for the next install.
+    @MainActor public func uninstall(from drawer: DebugDrawer) {
+        #if DEBUG
+            MetricKitPayloadsInstallation.stop(store, from: drawer)
+        #endif
+    }
+
     /// Delete All, found by "metrics" and "diagnostics" too.
     public var actions: [DebugDrawerAction] {
         #if DEBUG

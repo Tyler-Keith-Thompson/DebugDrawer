@@ -31,6 +31,21 @@ public struct ColorVisionPlugin: DebugDrawerPlugin {
         #endif
     }
 
+    /// Counts `drawer` as one that holds the plugin.
+    @MainActor public func install(in drawer: DebugDrawer) {
+        #if DEBUG
+            model.install(in: ObjectIdentifier(drawer))
+        #endif
+    }
+
+    /// Once the last drawer that held the plugin removes it, turns the simulation off, so the
+    /// views under `debugColorVision()` show the app's own colors again.
+    @MainActor public func uninstall(from drawer: DebugDrawer) {
+        #if DEBUG
+            model.uninstall(from: ObjectIdentifier(drawer))
+        #endif
+    }
+
     /// The simulation on, which a tap moves to the next, so they can be compared with the
     /// drawer closed.
     public var hud: ColorVisionHUD? {

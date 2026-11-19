@@ -25,6 +25,8 @@
             /// changes until then report nothing, so a burst of events is one reload.
             var isChangeReported = false
             var onChange: (@Sendable () -> Void)?
+            /// The identity of the observer `onChange` belongs to; the next one gets the one after.
+            var observerID = 0
         }
 
         private let state: OSAllocatedUnfairLock<State>
@@ -108,11 +110,32 @@
 
         /// Calls `onChange` after each change, from the thread that made it, until ``events`` is
         /// read; then again on the next change. Replaces the observer before it.
-        func observe(_ onChange: @escaping @Sendable () -> Void) {
+        ///
+        /// - Returns: The observer's identity, which ``stopObserving(_:)`` takes.
+        @discardableResult
+        func observe(_ onChange: @escaping @Sendable () -> Void) -> Int {
             state.withLock { state in
                 state.onChange = onChange
                 state.isChangeReported = false
+                state.observerID += 1
+                return state.observerID
             }
+        }
+
+        /// Stops calling the observer `observerID` names, unless another has replaced it since:
+        /// that one keeps being called.
+        ///
+        /// - Parameter observerID: What ``observe(_:)`` returned.
+        func stopObserving(_ observerID: Int) {
+            state.withLock { state in
+                guard state.observerID == observerID else { return }
+                state.onChange = nil
+            }
+        }
+
+        /// Whether an observer is called on each change.
+        var isObserved: Bool {
+            state.withLock { $0.onChange != nil }
         }
     }
 

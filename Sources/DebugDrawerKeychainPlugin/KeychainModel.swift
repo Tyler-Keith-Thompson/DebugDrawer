@@ -56,9 +56,27 @@
         @Published private(set) var issue: KeychainIssue?
 
         private let keychain: any Keychain
+        /// The drawers the plugin is installed in; the last to remove it drops what was read.
+        private var installations: Set<ObjectIdentifier> = []
 
         init(keychain: any Keychain) {
             self.keychain = keychain
+        }
+
+        /// Counts `drawer` as one the plugin is installed in.
+        func install(in drawer: ObjectIdentifier) {
+            installations.insert(drawer)
+        }
+
+        /// Uncounts `drawer`; once no drawer holds the plugin, drops the items read, the open item
+        /// with its password, the form and its draft, and the last refusal, so no secret stays in
+        /// memory. The filter stays.
+        func uninstall(from drawer: ObjectIdentifier) {
+            guard installations.remove(drawer) != nil, installations.isEmpty else { return }
+            contents = .unread
+            selection = nil
+            editor = nil
+            issue = nil
         }
 
         /// The items the filter lets through.

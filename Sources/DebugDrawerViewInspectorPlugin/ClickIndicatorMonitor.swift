@@ -48,24 +48,32 @@
     #elseif os(iOS)
 
         /// Touch indicators through a `UIWindow.sendEvent(_:)` swizzle that observes touches and
-        /// never consumes them. `installViewInspector()` installs it once; the swizzled method
-        /// shows ripples only while ``ViewBorderController/isClickIndicatorEnabled`` is on.
+        /// never consumes them. The View Inspector plugin's install swaps it in and its uninstall
+        /// puts UIKit's implementation back; the swizzled method shows ripples only while
+        /// ``ViewBorderController/isClickIndicatorEnabled`` is on, which the uninstall turns off,
+        /// so a swap other code made on top since, which keeps it in the chain, draws nothing.
         @MainActor
         enum ClickIndicatorMonitor {
-            private static var isInstalled = false
+            private static let replacements = MethodReplacements()
 
-            /// Swaps `UIWindow.sendEvent(_:)` for `dd_sendEvent(_:)`; later calls do nothing, so
-            /// the swap is never undone.
+            /// Swaps `UIWindow.sendEvent(_:)` for `dd_sendEvent(_:)`; a second call does nothing
+            /// until ``uninstall()``.
             static func install() {
-                guard !isInstalled else { return }
-                isInstalled = true
-
                 let original = #selector(UIWindow.sendEvent(_:))
                 let swizzled = #selector(UIWindow.dd_sendEvent(_:))
                 guard let originalMethod = class_getInstanceMethod(UIWindow.self, original),
                       let swizzledMethod = class_getInstanceMethod(UIWindow.self, swizzled)
                 else { return }
-                method_exchangeImplementations(originalMethod, swizzledMethod)
+                replacements.exchange(originalMethod, with: swizzledMethod)
+            }
+
+            /// Gives `UIWindow.sendEvent(_:)` its original implementation back, unless other code
+            /// swapped it again since.
+            ///
+            /// - Returns: How many swaps were left in place.
+            @discardableResult
+            static func uninstall() -> Int {
+                replacements.restore()
             }
         }
 

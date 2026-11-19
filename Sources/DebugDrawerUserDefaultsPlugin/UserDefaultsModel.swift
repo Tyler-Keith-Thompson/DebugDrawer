@@ -26,6 +26,8 @@
         private var observation: AnyCancellable?
         /// How many shown views follow the changes.
         private var observers = 0
+        /// The drawers the plugin is installed in; the last to remove it stops the observation.
+        private var installations: Set<ObjectIdentifier> = []
 
         /// - Parameters:
         ///   - suites: The suite names beyond the standard defaults, such as app groups'. A
@@ -105,6 +107,21 @@
         func stopObservingChanges() {
             observers = max(observers - 1, 0)
             if observers == 0 { observation = nil }
+        }
+
+        /// Counts `drawer` as one the plugin is installed in.
+        func install(in drawer: ObjectIdentifier) {
+            installations.insert(drawer)
+        }
+
+        /// Uncounts `drawer`; once no drawer holds the plugin, stops following the app's writes,
+        /// whatever views still count as showing it, and drops the keys read. The filters and the
+        /// suite shown stay.
+        func uninstall(from drawer: ObjectIdentifier) {
+            guard installations.remove(drawer) != nil, installations.isEmpty else { return }
+            observers = 0
+            observation = nil
+            entries = []
         }
 
         /// Writes `value` for `key` in the shown suite's persistent domain.

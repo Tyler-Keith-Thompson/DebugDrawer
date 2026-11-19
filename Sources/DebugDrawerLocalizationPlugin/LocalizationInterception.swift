@@ -1,6 +1,7 @@
 #if DEBUG
     import Foundation
     import ObjectiveC
+    import os
 
     /// Replaces `Bundle`'s public string lookups with ones that record untranslated keys and apply
     /// the mode to the app's bundles.
@@ -16,17 +17,28 @@
     /// A lookup in a bundle that isn't the app's (``AppBundles``) returns what Foundation returns,
     /// untouched and unrecorded.
     enum LocalizationInterception {
-        /// Replaces the lookups, once for the life of the app; later calls do nothing.
-        static func install() {
-            _ = installation
-        }
+        // Behind a lock rather than main-actor state: lookups read it on whatever thread they
+        // run, synchronously.
+        /// Whether the replaced lookups apply the mode and record; until ``install()`` and after
+        /// ``uninstall()``, one other code replaced again since, which stays in place, calls
+        /// straight through to Foundation's.
+        private static let isIntercepting = OSAllocatedUnfairLock(initialState: false)
+        @MainActor private static let replacements = MethodReplacements()
 
-        /// The replacement, made the first time ``install()`` is called. A `static let` is
-        /// initialized once, atomically, however many threads ask.
-        private static let installation: Void = {
+        /// Replaces the lookups, unless they are replaced already, and starts intercepting.
+        @MainActor static func install() {
+            isIntercepting.withLock { $0 = true }
             replaceLookup()
             replaceLocalizationsLookup()
-        }()
+        }
+
+        /// Stops intercepting and puts Foundation's lookups back, but for one other code replaced
+        /// again since, under which the drawer's calls straight through. Calling it again does
+        /// nothing.
+        @MainActor static func uninstall() {
+            isIntercepting.withLock { $0 = false }
+            replacements.restore()
+        }
 
         /// What a lookup that returned `result` returns once `mode` applies, for a key that isn't
         /// a plural: as it is, its key, or pseudo-localized.
@@ -45,39 +57,45 @@
         typealias LocalizationsLookup = @convention(c) (Bundle, Selector, NSString?, NSString?, NSString?, NSArray) -> NSString
         typealias LocalizationsReplacement = @convention(block) (Bundle, NSString?, NSString?, NSString?, NSArray) -> NSString
 
-        private static func replaceLookup() {
+        @MainActor private static func replaceLookup() {
             let selector = #selector(Bundle.localizedString(forKey:value:table:))
             guard let method = class_getInstanceMethod(Bundle.self, selector) else { return }
-            let original = unsafeBitCast(method_getImplementation(method), to: Lookup.self)
-            let replacement: @convention(block) (Bundle, NSString?, NSString?, NSString?) -> NSString = { bundle, key, value, table in
-                outermost {
-                    original(bundle, selector, key, value, table)
-                } intercept: { result in
-                    intercept(BundleLookupArguments(bundle: bundle, key: key, value: value, table: table), result: result) { plurals in
-                        original(plurals, selector, key, value, table)
+            replacements.replace(method) { implementation in
+                let original = unsafeBitCast(implementation, to: Lookup.self)
+                let replacement: @convention(block) (Bundle, NSString?, NSString?, NSString?) -> NSString = { bundle, key, value, table in
+                    guard isIntercepting.withLock({ $0 }) else { return original(bundle, selector, key, value, table) }
+                    return outermost {
+                        original(bundle, selector, key, value, table)
+                    } intercept: { result in
+                        intercept(BundleLookupArguments(bundle: bundle, key: key, value: value, table: table), result: result) { plurals in
+                            original(plurals, selector, key, value, table)
+                        }
                     }
                 }
+                return imp_implementationWithBlock(replacement)
             }
-            method_setImplementation(method, imp_implementationWithBlock(replacement))
         }
 
-        private static func replaceLocalizationsLookup() {
+        @MainActor private static func replaceLocalizationsLookup() {
             // Public since macOS 15.4 and iOS 18.4 (NSBundle.h), but refined for Swift, so it has no
             // #selector spelling; on an earlier system the method doesn't exist and nothing is
             // replaced.
             let selector = NSSelectorFromString("localizedStringForKey:value:table:localizations:")
             guard let method = class_getInstanceMethod(Bundle.self, selector) else { return }
-            let original = unsafeBitCast(method_getImplementation(method), to: LocalizationsLookup.self)
-            let replacement: LocalizationsReplacement = { bundle, key, value, table, localizations in
-                outermost {
-                    original(bundle, selector, key, value, table, localizations)
-                } intercept: { result in
-                    intercept(BundleLookupArguments(bundle: bundle, key: key, value: value, table: table), result: result) { plurals in
-                        original(plurals, selector, key, value, table, localizations)
+            replacements.replace(method) { implementation in
+                let original = unsafeBitCast(implementation, to: LocalizationsLookup.self)
+                let replacement: LocalizationsReplacement = { bundle, key, value, table, localizations in
+                    guard isIntercepting.withLock({ $0 }) else { return original(bundle, selector, key, value, table, localizations) }
+                    return outermost {
+                        original(bundle, selector, key, value, table, localizations)
+                    } intercept: { result in
+                        intercept(BundleLookupArguments(bundle: bundle, key: key, value: value, table: table), result: result) { plurals in
+                            original(plurals, selector, key, value, table, localizations)
+                        }
                     }
                 }
+                return imp_implementationWithBlock(replacement)
             }
-            method_setImplementation(method, imp_implementationWithBlock(replacement))
         }
 
         /// Records an untranslated lookup of one of the app's strings and applies the mode;

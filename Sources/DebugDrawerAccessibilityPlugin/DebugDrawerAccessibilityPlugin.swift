@@ -27,7 +27,34 @@ public struct AccessibilityPlugin: DebugDrawerPlugin {
             EmptyView()
         #endif
     }
+
+    /// Counts `drawer` as holding the plugin, so its overrides stay until the last drawer removes
+    /// it. Release builds override nothing.
+    @MainActor public func install(in drawer: DebugDrawer) {
+        #if DEBUG
+            AccessibilityInstallation.drawers.insert(ObjectIdentifier(drawer))
+        #endif
+    }
+
+    /// Clears every override (``AccessibilityOverrides/reset()``) once no drawer holds the plugin,
+    /// so the views under `.debugAccessibilityOverrides()` get the system's values again.
+    @MainActor public func uninstall(from drawer: DebugDrawer) {
+        #if DEBUG
+            guard AccessibilityInstallation.drawers.remove(ObjectIdentifier(drawer)) != nil,
+                  AccessibilityInstallation.drawers.isEmpty
+            else { return }
+            AccessibilityOverrides.shared.reset()
+        #endif
+    }
 }
+
+#if DEBUG
+    /// The drawers holding the Accessibility plugin; its overrides apply while there is one.
+    @MainActor
+    enum AccessibilityInstallation {
+        static var drawers: Set<ObjectIdentifier> = []
+    }
+#endif
 
 // MARK: - Convenience installer
 

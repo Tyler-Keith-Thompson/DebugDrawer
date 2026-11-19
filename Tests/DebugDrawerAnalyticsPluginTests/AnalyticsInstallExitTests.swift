@@ -66,6 +66,26 @@
             }
         }
 
+        @Test("Unregistering the installed plugin stops reading the shared log and clears its badge; installing again reads it")
+        func uninstall() async {
+            await #expect(processExitsWith: .success) {
+                AnalyticsEvents.record("app_launched")
+                let isExpected = await MainActor.run {
+                    let model = AnalyticsEventsInstallation.install(capacity: 10)
+                    let badgeWhileInstalled = DebugDrawer.shared.badges["AnalyticsPlugin"]
+                    DebugDrawer.shared.unregisterGlobal(id: "AnalyticsPlugin")
+                    let isUninstalled = !AnalyticsEventLog.shared.isObserved && model.events.isEmpty
+                        && DebugDrawer.shared.badges["AnalyticsPlugin"] == nil
+                    AnalyticsEvents.record("while_uninstalled")
+                    let reinstalled = AnalyticsEventsInstallation.install(capacity: 10)
+                    return badgeWhileInstalled == 1 && isUninstalled
+                        && reinstalled.events.map(\.name) == ["while_uninstalled", "app_launched"]
+                        && DebugDrawer.shared.badges["AnalyticsPlugin"] == 2
+                }
+                exit(isExpected ? EXIT_SUCCESS : EXIT_FAILURE)
+            }
+        }
+
         @Test("Before install the newest thousand events are kept, and the plugin isn't registered")
         func recordBeforeInstall() async {
             await #expect(processExitsWith: .success) {

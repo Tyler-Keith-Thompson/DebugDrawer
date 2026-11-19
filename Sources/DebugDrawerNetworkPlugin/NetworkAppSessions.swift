@@ -26,15 +26,23 @@
         private init() {}
 
         /// Notes every session made from now on, and the shared session; a second call does
-        /// nothing.
+        /// nothing until ``uninstall()``.
+        @MainActor
         static func install() {
-            _ = installation
+            guard let methods = URLSession.sessionFactoryMethods else { return }
+            replacements.exchange(methods.factory, with: methods.replacement)
+            shared.register(.shared)
         }
 
-        private static let installation: Void = {
-            URLSession.swizzleSessionFactory()
-            shared.register(.shared)
-        }()
+        /// Gives the session factory its original implementation back, unless other code replaced
+        /// it again since; the sessions noted so far stay noted, as their requests may still be in
+        /// flight.
+        @MainActor
+        static func uninstall() {
+            replacements.restore()
+        }
+
+        @MainActor private static let replacements = MethodReplacements()
 
         /// Notes `session` as one of the app's, unless it is one of the plugin's own forwarding
         /// sessions.
@@ -117,17 +125,17 @@
         }
     }
 
-    // MARK: - URLSession factory swizzle
+    // MARK: - URLSession factory replacement
 
     extension URLSession {
-        /// Swizzles the factory every session is made through
-        /// (`+sessionWithConfiguration:delegate:delegateQueue:`, which Swift's initializers call),
-        /// so each session made from now on is noted in ``NetworkAppSessions``.
-        fileprivate static func swizzleSessionFactory() {
-            guard let original = class_getClassMethod(self, NSSelectorFromString("sessionWithConfiguration:delegate:delegateQueue:")),
-                  let swizzled = class_getClassMethod(self, #selector(debugDrawerSession(configuration:delegate:delegateQueue:)))
-            else { return }
-            method_exchangeImplementations(original, swizzled)
+        /// The factory every session is made through
+        /// (`+sessionWithConfiguration:delegate:delegateQueue:`, which Swift's initializers call)
+        /// and its replacement, which notes each session in ``NetworkAppSessions``.
+        static var sessionFactoryMethods: (factory: Method, replacement: Method)? {
+            guard let factory = class_getClassMethod(self, NSSelectorFromString("sessionWithConfiguration:delegate:delegateQueue:")),
+                  let replacement = class_getClassMethod(self, #selector(debugDrawerSession(configuration:delegate:delegateQueue:)))
+            else { return nil }
+            return (factory, replacement)
         }
 
         @objc private class func debugDrawerSession(

@@ -125,6 +125,8 @@
 
                 func request(_: DeclaredPermission) async {}
 
+                func stop() {}
+
                 /// Returns once the first read is held at the gate.
                 func firstReadArrived() async {
                     guard gate == nil else { return }

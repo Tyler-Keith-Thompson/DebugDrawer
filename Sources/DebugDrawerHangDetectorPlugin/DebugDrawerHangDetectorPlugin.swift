@@ -47,6 +47,24 @@ public struct HangDetectorPlugin: DebugDrawerPlugin {
         #endif
     }
 
+    /// Watches the main thread from now on: adds the observers to the main run loop, starts the
+    /// watcher thread and subscribes to MetricKit's hang diagnostics, unless another drawer
+    /// already did. Release builds start nothing.
+    @MainActor public func install(in drawer: DebugDrawer) {
+        #if DEBUG
+            HangDetectorInstallation.start(store, in: drawer)
+        #endif
+    }
+
+    /// Stops watching once no drawer holds the plugin: removes the run-loop observers, ends the
+    /// watcher thread and unsubscribes from MetricKit. Forgets the hangs it caught; the threshold
+    /// stays for the next install.
+    @MainActor public func uninstall(from drawer: DebugDrawer) {
+        #if DEBUG
+            HangDetectorInstallation.stop(store, from: drawer)
+        #endif
+    }
+
     /// Clear All, found by "hang" and "main thread" too.
     public var actions: [DebugDrawerAction] {
         #if DEBUG

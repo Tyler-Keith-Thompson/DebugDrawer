@@ -32,6 +32,24 @@ public struct ConsolePlugin: DebugDrawerPlugin {
             EmptyView()
         #endif
     }
+
+    /// Starts capture into ``ConsoleLogStore/shared``, if nothing has: the process's os_log
+    /// entries and, on macOS, stdout and stderr. Release builds capture nothing.
+    @MainActor public func install(in drawer: DebugDrawer) {
+        #if DEBUG
+            ConsoleLogStore.shared.install(in: ObjectIdentifier(drawer))
+        #endif
+    }
+
+    /// Once no drawer has the plugin and the app hasn't called ``ConsoleLogStore/install()``,
+    /// stops capture: stdout and stderr write to where they did before, the console's os_log
+    /// driver is removed, and the captured lines are dropped. Earlier sessions on disk and the
+    /// mutes stay.
+    @MainActor public func uninstall(from drawer: DebugDrawer) {
+        #if DEBUG
+            ConsoleLogStore.shared.uninstall(from: ObjectIdentifier(drawer))
+        #endif
+    }
 }
 
 // MARK: - Convenience installer
@@ -61,7 +79,7 @@ public extension DebugDrawer {
                 ConsoleLogStore.shared.persist(to: recorder)
                 Task { await ConsoleSessionsModel.shared.start(recorder) }
             }
-            ConsoleLogStore.shared.install()
+            // The plugin's install starts capture.
             registerGlobal(ConsolePlugin())
         #endif
     }

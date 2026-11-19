@@ -60,6 +60,22 @@ public struct EnergyPlugin: DebugDrawerPlugin {
             (monitor ?? .shared).removeViewer()
         #endif
     }
+
+    /// Counts `drawer` as one that holds the plugin; nothing is sampled until it is shown.
+    @MainActor public func install(in drawer: DebugDrawer) {
+        #if DEBUG
+            (monitor ?? .shared).install(in: ObjectIdentifier(drawer))
+        #endif
+    }
+
+    /// Once the last drawer that held the plugin removes it, stops the sampling the drawers asked
+    /// for and, unless the app's ``EnergyMonitor/start()`` keeps it sampling, drops the CPU and
+    /// battery history and the last readings.
+    @MainActor public func uninstall(from drawer: DebugDrawer) {
+        #if DEBUG
+            (monitor ?? .shared).uninstall(from: ObjectIdentifier(drawer))
+        #endif
+    }
 }
 
 // MARK: - Convenience installer
@@ -153,6 +169,8 @@ public extension EnergyMonitor {
         /// asked for it.
         private var viewers = 0
         private var isStartedByApp = false
+        /// The drawers the Energy plugin is installed in; the last to remove it drops the history.
+        private var installations: Set<ObjectIdentifier> = []
 
         /// Turned on while monitoring (iOS reports no battery level otherwise), then put back.
         private let batteryMonitoring: BatteryMonitoringSwitch?
@@ -196,6 +214,27 @@ public extension EnergyMonitor {
             guard viewers > 0 else { return }
             viewers -= 1
             updateSampling()
+        }
+
+        /// Counts `drawer` as one the Energy plugin is installed in.
+        func install(in drawer: ObjectIdentifier) {
+            installations.insert(drawer)
+        }
+
+        /// Uncounts `drawer`; once no drawer holds the plugin, drops the drawers' demand for
+        /// samples and, unless the app's ``start()`` keeps sampling, every reading and its history.
+        func uninstall(from drawer: ObjectIdentifier) {
+            guard installations.remove(drawer) != nil, installations.isEmpty else { return }
+            viewers = 0
+            updateSampling()
+            guard !isStartedByApp else { return }
+            batteryLevel = -1
+            isCharging = false
+            powerSource = "Unknown"
+            thermalState = .nominal
+            cpuUsage = 0
+            batteryHistory = []
+            cpuHistory = []
         }
 
         private func updateSampling() {
@@ -264,34 +303,6 @@ public extension EnergyMonitor {
             if cpuHistory.count > historySize {
                 cpuHistory.removeFirst()
             }
-        }
-
-        static func processCPUUsage() -> Double {
-            var threadList: thread_act_array_t?
-            var threadCount: mach_msg_type_number_t = 0
-
-            guard task_threads(mach_task_self_, &threadList, &threadCount) == KERN_SUCCESS,
-                  let threads = threadList
-            else { return 0 }
-
-            var totalUsage: Double = 0
-            for index in 0 ..< Int(threadCount) {
-                var info = thread_basic_info()
-                var count = mach_msg_type_number_t(MemoryLayout<thread_basic_info_data_t>.size / MemoryLayout<natural_t>.size)
-                let result = withUnsafeMutablePointer(to: &info) { ptr in
-                    ptr.withMemoryRebound(to: integer_t.self, capacity: Int(count)) { intPtr in
-                        thread_info(threads[index], thread_flavor_t(THREAD_BASIC_INFO), intPtr, &count)
-                    }
-                }
-                if result == KERN_SUCCESS, info.flags & TH_FLAGS_IDLE == 0 {
-                    totalUsage += Double(info.cpu_usage) / Double(TH_USAGE_SCALE) * 100
-                }
-                // task_threads hands us a send right on each thread; release it.
-                mach_port_deallocate(mach_task_self_, threads[index])
-            }
-
-            vm_deallocate(mach_task_self_, vm_address_t(bitPattern: threads), vm_size_t(Int(threadCount) * MemoryLayout<thread_act_t>.size))
-            return totalUsage
         }
 
         /// The thermal state in a word.

@@ -18,7 +18,8 @@ public enum HangDetector {
     /// Call it once at startup. A hang counts from the first time the main run loop waits, so
     /// the launch before it isn't one. Each hang raises the plugin's badge and posts a toast
     /// ("Main thread hung for 612 ms"). Calling it again changes the threshold and starts nothing
-    /// more.
+    /// more. Removing the plugin from the drawer stops the watching; calling this again then
+    /// starts it over.
     ///
     /// - Parameter threshold: The shortest time the main thread must go without turning its run
     ///   loop to count as a hang; the drawer can change it while the app runs. Traps in debug

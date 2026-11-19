@@ -34,6 +34,13 @@
         /// The movie being recorded, from Record until it is written out.
         private var writer: (any MovieWriter)?
         private var recordingURL: URL?
+        /// The drawers the plugin over this model is installed in.
+        private var installedDrawers: Set<ObjectIdentifier> = []
+        /// Whether the last drawer uninstalled the plugin, dropping the list, and none has
+        /// installed it since.
+        private(set) var isUninstalled = false
+        /// Writing out the recording an uninstall stopped, until its movie is saved.
+        private(set) var savingAfterUninstall: Task<Void, Never>?
 
         /// - Parameters:
         ///   - folder: Where recordings are saved.
@@ -90,22 +97,65 @@
         /// the one the bug report carries; the oldest past ``capacity`` are deleted. A recording
         /// that can't be saved leaves no file and says why.
         func stop() async {
-            guard state.isRecording, let writer, let url = recordingURL else { return }
+            guard case let (writer, url)? = endCapture() else { return }
+            await save(writer, at: url)
+        }
+
+        /// Stops the frames of the recording in progress, if there is one.
+        ///
+        /// - Returns: Its writer and where it writes, for ``save(_:at:)``.
+        private func endCapture() -> (any MovieWriter, URL)? {
+            guard state.isRecording, let writer, let url = recordingURL else { return nil }
             frameSource.stop()
             self.writer = nil
             recordingURL = nil
             state = .finishing
+            return (writer, url)
+        }
+
+        /// Writes the movie out and lists it, unless the plugin was uninstalled meanwhile: then
+        /// the movie is saved (and the oldest past ``capacity`` deleted) without being listed.
+        private func save(_ writer: any MovieWriter, at url: URL) async {
             do throws(RecordingFailure) {
                 _ = try await writer.finish()
                 let saved = folder.prune(await folder.recordings(), keeping: capacity)
+                guard !isUninstalled else {
+                    state = .idle
+                    return
+                }
                 recordings = saved
                 let recording = saved.first { $0.id == url.lastPathComponent }
                 includedInReport = Set(recording.map { [$0.id] } ?? [])
                 state = .finished(recording?.url ?? url)
             } catch {
                 folder.delete(url)
-                state = .failed(error)
+                state = isUninstalled ? .idle : .failed(error)
             }
+        }
+
+        /// Counts `drawer` as one the plugin is installed in, and lists the saved recordings
+        /// again if an uninstall dropped them.
+        func install(in drawer: ObjectIdentifier) {
+            installedDrawers.insert(drawer)
+            guard isUninstalled else { return }
+            isUninstalled = false
+            Task { await load() }
+        }
+
+        /// Uncounts `drawer`. Once no drawer has the plugin, stops a recording in progress (its
+        /// movie is still saved, in ``savingAfterUninstall``) and drops the list; the recordings
+        /// on disk and Show Touches stay.
+        func uninstall(from drawer: ObjectIdentifier) {
+            installedDrawers.remove(drawer)
+            guard installedDrawers.isEmpty, !isUninstalled else { return }
+            isUninstalled = true
+            if case let (writer, url)? = endCapture() {
+                savingAfterUninstall = Task { await save(writer, at: url) }
+            } else if state != .finishing {
+                state = .idle
+            }
+            recordings = []
+            includedInReport = []
         }
 
         /// Starts recording, or stops it while it records: the HUD's one button.

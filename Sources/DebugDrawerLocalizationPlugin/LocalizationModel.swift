@@ -70,6 +70,16 @@
             reloadLookups()
         }
 
+        /// Shows the system's translations again and drops what the model holds: the tables read
+        /// and the untranslated lookups recorded. The settings stored for the next launch stay;
+        /// ``refresh()`` reads the tables again.
+        func unload() {
+            mode = .standard
+            state.removeLookups()
+            bundles = []
+            reloadLookups()
+        }
+
         /// Stores `option` for the next launch, or removes it.
         func setNextLaunch(_ option: NextLaunchOption, isOn: Bool) {
             guard let nextLaunchDefaults else { return }

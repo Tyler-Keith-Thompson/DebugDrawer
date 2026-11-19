@@ -15,9 +15,11 @@
             authority: any PermissionAuthority = SystemPermissionAuthority(),
             changes: any PermissionChangeSource = SystemPermissionChangeSource()
         ) -> PermissionsModel {
+            // Before the new model observes anything: removing the plugin installed before
+            // uninstalls it, which stops its own model.
+            DebugDrawer.shared.unregisterGlobal(id: PermissionsPlugin.pluginID)
             let model = PermissionsModel(permissions: DeclaredPermission.declared(in: infoDictionary), authority: authority, changes: changes)
             let plugin = PermissionsPlugin(model: model)
-            DebugDrawer.shared.unregisterGlobal(id: plugin.id)
             DebugDrawer.shared.registerGlobal(plugin)
             Task { await model.refresh() }
             return model

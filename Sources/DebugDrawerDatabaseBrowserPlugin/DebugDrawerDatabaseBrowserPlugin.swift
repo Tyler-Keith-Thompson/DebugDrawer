@@ -31,6 +31,22 @@ public struct DatabaseBrowserPlugin: DebugDrawerPlugin {
         #endif
     }
 
+    /// Looks for the app's stores once the first drawer holds the plugin, so their count shows
+    /// before it is opened. Release builds look for nothing.
+    @MainActor public func install(in drawer: DebugDrawer) {
+        #if DEBUG
+            model.install(in: ObjectIdentifier(drawer))
+        #endif
+    }
+
+    /// Once the last drawer that held the plugin removes it, drops the stores found, their
+    /// schemas and the reader of each, and any read still running. The databases are untouched.
+    @MainActor public func uninstall(from drawer: DebugDrawer) {
+        #if DEBUG
+            model.uninstall(from: ObjectIdentifier(drawer))
+        #endif
+    }
+
     /// How many stores were found, so the count shows while the plugin is closed.
     public var headerAccessory: some View {
         #if DEBUG

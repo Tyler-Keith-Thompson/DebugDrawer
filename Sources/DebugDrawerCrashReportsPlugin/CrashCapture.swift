@@ -1,6 +1,7 @@
 #if DEBUG
     import Darwin
     import Foundation
+    import os
 
     // The crash handlers, in Swift rather than a C target: Swift that touches only raw pointers
     // allocated in advance, integers and libc calls compiles to the same loads, stores and calls C
@@ -25,9 +26,10 @@
     // The uncaught-exception handler runs as an ordinary function before the runtime aborts, so it
     // may use Foundation.
 
-    /// Installs the handlers that write the crash file as the app crashes: one for uncaught
-    /// Objective-C exceptions and one for the fatal signals, each calling the handler that was
-    /// installed before it, so a crash SDK the app also uses still sees the crash.
+    /// Installs the handlers that write the crash file as the app crashes, and puts back the ones
+    /// they replaced: one for uncaught Objective-C exceptions and one for the fatal signals, each
+    /// calling the handler that was installed before it, so a crash SDK the app also uses still
+    /// sees the crash.
     enum CrashCapture {
         /// The signals that end the app on a crash. Swift's runtime failures (a force unwrap of
         /// `nil`, an index out of range, `fatalError`) arrive as `SIGTRAP` on arm64 and as `SIGILL`
@@ -40,10 +42,23 @@
         /// The alternate stack the handler runs on, so a stack overflow can still be written.
         static let alternateStackSize = 128 * 1024
 
-        /// Writes the crash file at `crashFile` when the app crashes, from now on.
+        private static let logger = Logger(subsystem: "DebugDrawer", category: "CrashCapture")
+
+        /// The signals whose chain of actions holds the plugin's handler: its own action, or one
+        /// a crash SDK installed since and that calls it.
+        @MainActor private static var chainedSignals: Set<Int32> = []
+        /// Whether the chain of uncaught-exception handlers holds the plugin's.
+        @MainActor private static var isExceptionHandlerChained = false
+        /// The alternate stack ``install(crashFile:appVersion:)`` gave the main thread, while the
+        /// plugin owns it.
+        @MainActor private static var alternateStack: UnsafeMutableRawPointer?
+
+        /// Writes the crash file at `crashFile` when the app crashes, from now on, until
+        /// ``uninstall()``.
         ///
-        /// The first call installs the handlers; a later call only points them at its file, as
-        /// installing again would make each handler its own previous handler.
+        /// A call installs the handlers that aren't installed yet and points every handler at its
+        /// file; a handler already in a chain isn't installed again, which would make it its own
+        /// previous handler.
         ///
         /// - Parameters:
         ///   - crashFile: Where the crash file is written; its directory must exist.
@@ -53,21 +68,79 @@
             let header = Array("\(CrashFile.magic)\n\(appVersion.map { "app \($0)\n" } ?? "")".utf8)
             let headerBytes = UnsafeMutablePointer<UInt8>.allocate(capacity: header.count)
             headerBytes.initialize(from: header, count: header.count)
-            if let state = crashHandlerState {
-                // The old path and header are leaked rather than freed: a handler on another
-                // thread may be reading them.
-                state.pointee.path = path
-                state.pointee.header = headerBytes
-                state.pointee.headerCount = header.count
-                return
+            let state = crashHandlerState ?? makeState()
+            // The old path and header are leaked rather than freed: a handler on another thread
+            // may be reading them. The path goes last, as it is what turns writing on.
+            state.pointee.header = headerBytes
+            state.pointee.headerCount = header.count
+            state.pointee.path = path
+            installAlternateStack()
+
+            var action = sigaction()
+            action.__sigaction_u.__sa_sigaction = handleCrashSignal
+            action.sa_flags = SA_SIGINFO | SA_ONSTACK
+            action.sa_mask = 0
+            for signal in signals where !chainedSignals.contains(signal) {
+                sigaction(signal, &action, state.pointee.previousActions + Int(signal))
+                chainedSignals.insert(signal)
             }
+            if !isExceptionHandlerChained {
+                previousExceptionHandler = NSGetUncaughtExceptionHandler()
+                NSSetUncaughtExceptionHandler(handleUncaughtException)
+                isExceptionHandlerChained = true
+            }
+        }
+
+        /// Stops writing crash files: puts back the action each signal had before the plugin, the
+        /// uncaught-exception handler and the main thread's alternate stack, wherever the plugin's
+        /// is still the current one. Calling it again does nothing.
+        ///
+        /// A handler a crash SDK installed since, which calls the plugin's, is left in place, and
+        /// so is the plugin's under it: taking it out would cut the SDK's chain. It then writes
+        /// nothing and hands each crash straight on to the handler installed before it.
+        ///
+        /// - Returns: How many handlers were left in place under another's.
+        @MainActor @discardableResult
+        static func uninstall() -> Int {
+            guard let state = crashHandlerState else { return 0 }
+            state.pointee.path = nil
+            for signal in chainedSignals.sorted() {
+                var current = sigaction()
+                sigaction(signal, nil, &current)
+                guard current.handlerAddress == handlerAddress else { continue }
+                sigaction(signal, state.pointee.previousActions + Int(signal), nil)
+                chainedSignals.remove(signal)
+            }
+            let currentExceptionHandler = NSGetUncaughtExceptionHandler().map { address(of: $0) }
+            if isExceptionHandlerChained, currentExceptionHandler == address(of: handleUncaughtException) {
+                NSSetUncaughtExceptionHandler(previousExceptionHandler)
+                isExceptionHandlerChained = false
+            }
+            removeAlternateStack()
+            let kept = chainedSignals.count + (isExceptionHandlerChained ? 1 : 0)
+            if kept > 0 {
+                logger.notice("\(kept, privacy: .public) crash handlers were replaced by other code since; left in place, passing crashes on")
+            }
+            return kept
+        }
+
+        /// The address of the plugin's signal handler, as `sigaction(2)` reports it.
+        private static let handlerAddress: UInt = {
+            var action = sigaction()
+            action.__sigaction_u.__sa_sigaction = handleCrashSignal
+            return action.handlerAddress
+        }()
+
+        /// The buffers the handlers use, made once and kept for the life of the app: a handler
+        /// left in a crash SDK's chain may read them at any time.
+        @MainActor private static func makeState() -> UnsafeMutablePointer<CrashHandlerState> {
             let previousActions = UnsafeMutablePointer<sigaction>.allocate(capacity: signalCount)
             previousActions.initialize(repeating: sigaction(), count: signalCount)
             let state = UnsafeMutablePointer<CrashHandlerState>.allocate(capacity: 1)
             state.initialize(to: CrashHandlerState(
-                path: path,
-                header: headerBytes,
-                headerCount: header.count,
+                path: nil,
+                header: .allocate(capacity: 0),
+                headerCount: 0,
                 previousActions: previousActions,
                 frames: .allocate(capacity: maximumFrames),
                 digits: .allocate(capacity: CrashHandlerState.digitCapacity),
@@ -75,28 +148,49 @@
                 owner: nil
             ))
             crashHandlerState = state
-            installAlternateStack()
-
-            var action = sigaction()
-            action.__sigaction_u.__sa_sigaction = handleCrashSignal
-            action.sa_flags = SA_SIGINFO | SA_ONSTACK
-            action.sa_mask = 0
-            for signal in signals {
-                sigaction(signal, &action, previousActions + Int(signal))
-            }
-            previousExceptionHandler = NSGetUncaughtExceptionHandler()
-            NSSetUncaughtExceptionHandler(handleUncaughtException)
+            return state
         }
 
-        /// Gives the installing thread an alternate signal stack, unless it has one (a crash SDK's),
-        /// so the handler can run after a stack overflow. Other threads keep running handlers on
-        /// their own stacks: a stack overflow there ends the app unrecorded.
-        private static func installAlternateStack() {
+        /// Gives the installing thread an alternate signal stack, unless it has one (a crash SDK's,
+        /// or the plugin's own), so the handler can run after a stack overflow. Other threads keep
+        /// running handlers on their own stacks: a stack overflow there ends the app unrecorded.
+        @MainActor private static func installAlternateStack() {
             var current = stack_t()
-            guard sigaltstack(nil, &current) == 0, current.ss_flags & SS_DISABLE != 0,
+            guard alternateStack == nil, sigaltstack(nil, &current) == 0, current.ss_flags & SS_DISABLE != 0,
                   let memory = malloc(alternateStackSize) else { return }
             var stack = stack_t(ss_sp: memory, ss_size: alternateStackSize, ss_flags: 0)
-            sigaltstack(&stack, nil)
+            guard sigaltstack(&stack, nil) == 0 else {
+                free(memory)
+                return
+            }
+            alternateStack = memory
+        }
+
+        /// Turns the plugin's alternate stack off and frees it, if it is still the thread's: the
+        /// thread had none before. One another library put in its place since keeps the plugin's
+        /// allocated, as that library may put it back as the stack it found.
+        @MainActor private static func removeAlternateStack() {
+            var current = stack_t()
+            guard let memory = alternateStack, sigaltstack(nil, &current) == 0, current.ss_sp == memory,
+                  current.ss_flags & SS_ONSTACK == 0 else { return }
+            // Darwin checks the size before the flag, so a disabling stack still names one.
+            var disabled = stack_t(ss_sp: memory, ss_size: alternateStackSize, ss_flags: SS_DISABLE)
+            guard sigaltstack(&disabled, nil) == 0 else { return }
+            free(memory)
+            alternateStack = nil
+        }
+
+        /// The address of an uncaught-exception handler, to compare it with the plugin's.
+        private static func address(of handler: @convention(c) (NSException) -> Void) -> UInt {
+            unsafeBitCast(handler, to: UInt.self)
+        }
+    }
+
+    extension sigaction {
+        /// The address of the action's handler, whichever member it is in; 0 for `SIG_DFL`, 1 for
+        /// `SIG_IGN`.
+        fileprivate var handlerAddress: UInt {
+            unsafeBitCast(__sigaction_u.__sa_handler, to: UInt.self)
         }
     }
 
@@ -105,7 +199,8 @@
         /// Room for a 64-bit number in decimal with its sign.
         static let digitCapacity = 24
 
-        /// The crash file's path, NUL-terminated.
+        /// The crash file's path, NUL-terminated; `nil` while uninstalled, when a handler left in
+        /// another's chain writes nothing and hands the crash straight on.
         var path: UnsafeMutablePointer<CChar>?
         /// The crash file's first lines: the magic and the app's version.
         var header: UnsafeMutablePointer<UInt8>

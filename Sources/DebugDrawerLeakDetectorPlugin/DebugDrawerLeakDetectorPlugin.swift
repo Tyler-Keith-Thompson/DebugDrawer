@@ -34,6 +34,26 @@ public struct LeakDetectorPlugin: DebugDrawerPlugin {
         #endif
     }
 
+    /// Watches the app's view controllers from now on: exchanges `viewDidDisappear` and observes
+    /// the main run loop's turns, unless another drawer already did. Release builds exchange
+    /// nothing.
+    @MainActor public func install(in drawer: DebugDrawer) {
+        #if DEBUG
+            LeakDetectorInstallation.start(in: drawer)
+        #endif
+    }
+
+    /// Stops watching once no drawer holds the plugin: puts `viewDidDisappear` back (one other code
+    /// replaced again since stays, and the plugin's under it calls straight through), stops
+    /// observing the run loop, and forgets the suspects and every object counted.
+    /// `LeakDetector.trackLifetime(of:maxCount:)` then counts nothing until the plugin is installed
+    /// again. The classes ignored this run stay ignored.
+    @MainActor public func uninstall(from drawer: DebugDrawer) {
+        #if DEBUG
+            LeakDetectorInstallation.stop(from: drawer)
+        #endif
+    }
+
     /// Stop Ignoring, found by "leak" and "retain cycle" too.
     public var actions: [DebugDrawerAction] {
         #if DEBUG

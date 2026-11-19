@@ -37,6 +37,24 @@
             }
         }
 
+        @Test("Installing again keeps the plugin installed rather than uninstalling it; installing after an unregister lists it again")
+        func installAgainKeepsItInstalled() async {
+            await #expect(processExitsWith: .success) {
+                let isExpected = await MainActor.run {
+                    let model = ScreenRecordingInstallation.install(capacity: 5)
+                    ScreenRecordingInstallation.install(capacity: 5)
+                    let isKeptInstalled = !model.isUninstalled
+                    DebugDrawer.shared.unregisterGlobal(id: ScreenRecordingPlugin.pluginID)
+                    let isUninstalled = model.isUninstalled
+                        && !DebugDrawer.shared.globalPlugins.contains { $0.id == ScreenRecordingPlugin.pluginID }
+                    let reinstalled = ScreenRecordingInstallation.install(capacity: 5)
+                    return isKeptInstalled && isUninstalled && reinstalled === model && !model.isUninstalled
+                        && DebugDrawer.shared.globalPlugins.count { $0.id == ScreenRecordingPlugin.pluginID } == 1
+                }
+                exit(isExpected ? EXIT_SUCCESS : EXIT_FAILURE)
+            }
+        }
+
         @Test("Installing with a capacity below one traps")
         func zeroCapacityTraps() async {
             await #expect(processExitsWith: .failure) {

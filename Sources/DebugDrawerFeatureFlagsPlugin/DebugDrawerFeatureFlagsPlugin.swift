@@ -33,6 +33,23 @@ public struct FeatureFlagsPlugin: DebugDrawerPlugin {
         #endif
     }
 
+    /// Applies every stored override to the provider once the first drawer holds the plugin, so
+    /// the app reads them from its next read on. Release builds apply nothing.
+    @MainActor public func install(in drawer: DebugDrawer) {
+        #if DEBUG
+            store.install(in: ObjectIdentifier(drawer))
+        #endif
+    }
+
+    /// Once the last drawer that held the plugin removes it, clears every stored override from
+    /// the provider, so the app reads the live values again. The overrides stay in storage and
+    /// are applied again by the next install.
+    @MainActor public func uninstall(from drawer: DebugDrawer) {
+        #if DEBUG
+            store.uninstall(from: ObjectIdentifier(drawer))
+        #endif
+    }
+
     /// Reset All, found by "flags" and "overrides" too.
     public var actions: [DebugDrawerAction] {
         #if DEBUG
@@ -52,7 +69,9 @@ public extension DebugDrawer {
     /// applies every stored override to `provider`.
     ///
     /// Call it once at startup, before the app reads a flag, so the stored overrides are in
-    /// place from the first read. Calling it again replaces the provider and the storage.
+    /// place from the first read. Calling it again replaces the provider and the storage, first
+    /// clearing the overrides from the provider installed before. Unregistering the plugin
+    /// clears them from `provider` too; they stay in `storage`.
     ///
     /// - Parameters:
     ///   - provider: The adapter over the app's flag service.

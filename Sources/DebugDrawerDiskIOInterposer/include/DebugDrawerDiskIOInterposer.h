@@ -35,6 +35,11 @@
     /// - Returns: Whether dyld applied the interposing tuples, so the calls reach `handler`. It
     ///   doesn't when the library was loaded after launch (`dlopen`) or the process is restricted.
     bool DebugDrawerDiskIOInterposerStart(DebugDrawerDiskIOInterposerHandler handler);
+
+    /// Hands no more calls to the handler: the interposed functions call the system's straight
+    /// through again, as before `DebugDrawerDiskIOInterposerStart`. dyld's interposing, applied at
+    /// launch, stays. A later `DebugDrawerDiskIOInterposerStart` hands calls to its handler again.
+    void DebugDrawerDiskIOInterposerStop(void);
 #endif
 
 #endif

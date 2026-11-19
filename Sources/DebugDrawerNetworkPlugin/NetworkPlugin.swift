@@ -44,6 +44,23 @@ public struct NetworkPlugin: DebugDrawerPlugin {
             nil
         #endif
     }
+
+    /// Starts capturing (``NetworkStore/install()``) as `drawer` adds the plugin. Release
+    /// builds capture nothing.
+    @MainActor public func install(in drawer: DebugDrawer) {
+        #if DEBUG
+            NetworkInterception.install(for: drawer)
+        #endif
+    }
+
+    /// Stops capturing and forgets the captured requests (``NetworkStore/uninstall()``) once
+    /// no drawer holds the plugin: the URL protocol is unregistered and every replaced method
+    /// gets its original implementation back.
+    @MainActor public func uninstall(from drawer: DebugDrawer) {
+        #if DEBUG
+            NetworkInterception.uninstall(for: drawer)
+        #endif
+    }
 }
 
 public extension DebugDrawer {
@@ -87,7 +104,7 @@ public extension DebugDrawer {
                 NetworkStore.shared.persist(to: recorder)
                 Task { await NetworkSessionsModel.shared.start(recorder) }
             }
-            NetworkStore.shared.install()
+            // Adding the plugin installs it, which starts capturing.
             registerGlobal(NetworkPlugin())
         #endif
     }

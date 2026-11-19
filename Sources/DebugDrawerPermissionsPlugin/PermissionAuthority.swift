@@ -10,5 +10,9 @@
         /// answered. Called only while the status is `notDetermined` and the Info.plist declares
         /// what the request needs.
         func request(_ permission: DeclaredPermission) async
+
+        /// Lets go of what reading and requesting took (the frameworks' managers), and has any
+        /// request still waiting for an answer return. Reading again starts afresh.
+        func stop()
     }
 #endif

@@ -9,7 +9,8 @@
         private static var model: ScreenRecordingModel?
 
         /// Registers the plugin over the recordings in `RecordingFolder.standard`, kept to
-        /// `capacity`, replacing one installed before, and lists the recordings already saved.
+        /// `capacity`, and lists the recordings already saved. Installed before, the plugin stays
+        /// registered: it shows the same model, so a recording in progress goes on.
         ///
         /// - Returns: The plugin's model.
         @discardableResult
@@ -22,9 +23,9 @@
             )
             model.capacity = capacity
             self.model = model
-            let plugin = ScreenRecordingPlugin(model: model)
-            DebugDrawer.shared.unregisterGlobal(id: plugin.id)
-            DebugDrawer.shared.registerGlobal(plugin)
+            // Not removed first: that would uninstall it, stopping a recording in progress. A
+            // plugin over the same model already registered makes this register nothing.
+            DebugDrawer.shared.registerGlobal(ScreenRecordingPlugin(model: model))
             Task { await model.load() }
             return model
         }

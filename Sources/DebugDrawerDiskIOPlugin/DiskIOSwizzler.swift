@@ -3,7 +3,8 @@
     import ObjectiveC
 
     /// Swaps the file methods the plugin records for ones that time the call, call the original
-    /// and record it (``DiskIOCall``). Installed once, by `installDiskIO()`.
+    /// and record it (``DiskIOCall``). Installed by `DiskIOStore.install()`, and put back, each
+    /// method's original implementation set again, by `DiskIOStore.uninstall()`.
     ///
     /// What it reaches: `FileManager`'s path and URL methods that read, create, list, stat, copy,
     /// move and delete; `NSData`'s `write(to:)`/`write(toFile:)` methods and its
@@ -13,12 +14,28 @@
     ///
     /// The methods' parameters and results are Foundation's reference types (`NSData`, `NSArray`)
     /// rather than Swift's, so a swizzled call doesn't copy what it passes through.
+    @MainActor
     enum DiskIOSwizzler {
-        static func install() {
-            _ = installation
+        private static let replacements = MethodReplacements()
+
+        /// Gives every swapped method its original implementation back, except one other code
+        /// swapped again since, which stays and keeps calling the original; the recorder then
+        /// drops what it records.
+        ///
+        /// - Returns: How many replacements were left in place.
+        @discardableResult
+        static func uninstall() -> Int {
+            replacements.restore()
         }
 
-        private static let installation: Void = {
+        /// Swaps the methods in; a second call changes only the ones put back since.
+        static func install() {
+            installFileManager()
+            installData()
+            installFileHandle()
+        }
+
+        private static func installFileManager() {
             let fileManager: [(Selector, Selector)] = [
                 (#selector(FileManager.contents(atPath:)), #selector(FileManager.dd_contents(atPath:))),
                 (
@@ -49,7 +66,9 @@
             for (original, replacement) in fileManager {
                 exchange(original, with: replacement, in: FileManager.self)
             }
+        }
 
+        private static func installData() {
             let data: [(Selector, Selector)] = [
                 (#selector(NSData.write(toFile:atomically:)), #selector(NSData.dd_write(toFile:atomically:))),
                 (#selector(NSData.write(to:atomically:)), #selector(NSData.dd_write(to:atomically:))),
@@ -63,7 +82,9 @@
             replaceInitializer(NSSelectorFromString("initWithContentsOfURL:"), argumentIsURL: true)
             replaceThrowingInitializer(NSSelectorFromString("initWithContentsOfFile:options:error:"), argumentIsURL: false)
             replaceThrowingInitializer(NSSelectorFromString("initWithContentsOfURL:options:error:"), argumentIsURL: true)
+        }
 
+        private static func installFileHandle() {
             // `FileHandle` is a class cluster: the handles Foundation makes are a subclass that
             // implements the reads and writes itself, so they are swapped on that subclass, found
             // from a handle rather than by name.
@@ -81,13 +102,13 @@
             for (original, replacement) in fileHandle {
                 exchange(NSSelectorFromString(original), with: replacement, in: handleClass)
             }
-        }()
+        }
 
         private static func exchange(_ original: Selector, with replacement: Selector, in cls: AnyClass) {
             guard let originalMethod = class_getInstanceMethod(cls, original),
                   let replacementMethod = class_getInstanceMethod(cls, replacement)
             else { return }
-            method_exchangeImplementations(originalMethod, replacementMethod)
+            replacements.exchange(originalMethod, with: replacementMethod)
         }
 
         // The initializers are replaced with blocks over raw pointers rather than swapped with
@@ -98,8 +119,14 @@
         /// Replaces `initWithContentsOfFile:` or `initWithContentsOfURL:`.
         private static func replaceInitializer(_ selector: Selector, argumentIsURL: Bool) {
             guard let method = class_getInstanceMethod(NSData.self, selector) else { return }
+            replacements.replace(method) { implementation in
+                initializer(replacing: implementation, selector, argumentIsURL: argumentIsURL)
+            }
+        }
+
+        private nonisolated static func initializer(replacing implementation: IMP, _ selector: Selector, argumentIsURL: Bool) -> IMP {
             typealias Initializer = @convention(c) (UnsafeRawPointer, Selector, UnsafeRawPointer?) -> UnsafeRawPointer?
-            let original = unsafeBitCast(method_getImplementation(method), to: Initializer.self)
+            let original = unsafeBitCast(implementation, to: Initializer.self)
             let replacement: @convention(block) (UnsafeRawPointer, UnsafeRawPointer?) -> UnsafeRawPointer? = { receiver, location in
                 guard let call = DiskIOCall.begin() else { return original(receiver, selector, location) }
                 let result = original(receiver, selector, location)
@@ -110,16 +137,22 @@
                 )
                 return result
             }
-            method_setImplementation(method, imp_implementationWithBlock(replacement))
+            return imp_implementationWithBlock(replacement)
         }
 
         /// Replaces `initWithContentsOfFile:options:error:` or `initWithContentsOfURL:options:error:`.
         private static func replaceThrowingInitializer(_ selector: Selector, argumentIsURL: Bool) {
             guard let method = class_getInstanceMethod(NSData.self, selector) else { return }
+            replacements.replace(method) { implementation in
+                throwingInitializer(replacing: implementation, selector, argumentIsURL: argumentIsURL)
+            }
+        }
+
+        private nonisolated static func throwingInitializer(replacing implementation: IMP, _ selector: Selector, argumentIsURL: Bool) -> IMP {
             typealias Initializer = @convention(c) (
                 UnsafeRawPointer, Selector, UnsafeRawPointer?, UInt, UnsafeMutableRawPointer?
             ) -> UnsafeRawPointer?
-            let original = unsafeBitCast(method_getImplementation(method), to: Initializer.self)
+            let original = unsafeBitCast(implementation, to: Initializer.self)
             let replacement: @convention(block) (
                 UnsafeRawPointer, UnsafeRawPointer?, UInt, UnsafeMutableRawPointer?
             ) -> UnsafeRawPointer? = { receiver, location, options, error in
@@ -134,11 +167,11 @@
                 call.end(path == nil ? nil : .read, path: path ?? "", size: result.map(length) ?? 0, error: reported)
                 return result
             }
-            method_setImplementation(method, imp_implementationWithBlock(replacement))
+            return imp_implementationWithBlock(replacement)
         }
 
         /// The path an initializer's argument names, or `nil` for a URL that isn't a file's.
-        private static func filePath(_ location: UnsafeRawPointer?, isURL: Bool) -> String? {
+        private nonisolated static func filePath(_ location: UnsafeRawPointer?, isURL: Bool) -> String? {
             guard let location else { return nil }
             if isURL {
                 let url = Unmanaged<NSURL>.fromOpaque(location).takeUnretainedValue()
@@ -147,7 +180,7 @@
             return Unmanaged<NSString>.fromOpaque(location).takeUnretainedValue() as String
         }
 
-        private static func length(_ data: UnsafeRawPointer) -> Int64 {
+        private nonisolated static func length(_ data: UnsafeRawPointer) -> Int64 {
             Int64(Unmanaged<NSData>.fromOpaque(data).takeUnretainedValue().length)
         }
     }

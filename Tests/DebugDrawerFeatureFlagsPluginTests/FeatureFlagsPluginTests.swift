@@ -37,8 +37,9 @@
 
             DebugDrawer.shared.installFeatureFlags(provider: provider, storage: storage)
 
+            let actual = provider.currentValue(forKey: "newCheckout")
             DebugDrawer.shared.unregisterGlobal(id: "FeatureFlagsPlugin")
-            #expect(provider.currentValue(forKey: "newCheckout") == .bool(true))
+            #expect(actual == .bool(true))
         }
 
         @Test("The drawer's search offers clearing every override, found by \"flags\" too")

@@ -83,10 +83,19 @@
             buffer.removeAll()
         }
 
+        // Its own lock rather than a field of `state`: the buffer is appended before the totals
+        // are counted, and the check must come before both.
+
+        /// Whether ``record(_:)`` keeps what it is given: from the start, and between an install
+        /// and an uninstall. A swizzle other code made on top of the plugin's keeps the plugin's
+        /// method in the chain after an uninstall, and its calls are dropped here.
+        let isRecording = OSAllocatedUnfairLock(initialState: true)
+
         /// Keeps `event` and counts it into the next batch's totals.
         ///
         /// - Complexity: Amortized O(1).
         func record(_ event: IOEvent) {
+            guard isRecording.withLock({ $0 }) else { return }
             buffer.append(event)
             let schedulesDelivery = state.withLock { state in
                 state.totals.add(event)

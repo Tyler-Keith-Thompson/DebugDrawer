@@ -31,7 +31,10 @@ public extension View {
         let evaluation: RenderEvaluation
 
         func body(content: Content) -> some View {
-            let count = RenderTracker.shared.record(name)
+            // The overlay stays while uninstalled, at a trigger that never changes, so the view
+            // keeps its identity and nothing flashes.
+            let tracker = RenderTracker.shared
+            let count = tracker.isTracking ? tracker.record(name) : 0
             return content.overlay { RenderFlash(trigger: count) }
         }
     }

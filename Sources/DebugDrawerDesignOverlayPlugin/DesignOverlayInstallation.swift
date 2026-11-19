@@ -5,13 +5,16 @@
     /// What `DesignOverlay.install(mockup:)` does in debug builds.
     @MainActor
     enum DesignOverlayInstallation {
-        /// Reads what `model` saved, shows `mockup` in place of the saved one, and registers the
-        /// plugin over `model`, replacing one installed before.
+        /// Removes a plugin installed before, reads what `model` saved, shows `mockup` in place of
+        /// the saved one, and registers the plugin over `model`.
         ///
         /// - Precondition: `mockup` is `nil` or the data of an image.
         /// - Returns: The plugin's model.
         @discardableResult
         static func install(mockup: Data?, model: DesignOverlayModel = .shared) -> DesignOverlayModel {
+            let plugin = DesignOverlayPlugin(model: model)
+            // First, so the old plugin's uninstall can't take away the mockup loaded here.
+            DebugDrawer.shared.unregisterGlobal(id: plugin.id)
             model.load()
             if let mockup {
                 do {
@@ -22,8 +25,6 @@
                     preconditionFailure("DesignOverlay.install(mockup:) takes the data of an image")
                 }
             }
-            let plugin = DesignOverlayPlugin(model: model)
-            DebugDrawer.shared.unregisterGlobal(id: plugin.id)
             DebugDrawer.shared.registerGlobal(plugin)
             return model
         }

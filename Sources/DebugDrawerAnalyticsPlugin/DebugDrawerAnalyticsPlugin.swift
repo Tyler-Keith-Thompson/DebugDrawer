@@ -56,6 +56,23 @@ public struct AnalyticsPlugin: DebugDrawerPlugin {
             []
         #endif
     }
+
+    /// Reads the log into the plugin's list after each event, again if an uninstall stopped it.
+    /// Release builds read nothing.
+    @MainActor public func install(in drawer: DebugDrawer) {
+        #if DEBUG
+            model.install(in: ObjectIdentifier(drawer))
+        #endif
+    }
+
+    /// Once no drawer has the plugin, stops reading the log and drops the events the list held,
+    /// clearing the badge. The log goes on keeping the newest events `AnalyticsEvents.record`
+    /// sends, as it does before install, so installing again shows them.
+    @MainActor public func uninstall(from drawer: DebugDrawer) {
+        #if DEBUG
+            model.uninstall(from: ObjectIdentifier(drawer))
+        #endif
+    }
 }
 
 #if DEBUG

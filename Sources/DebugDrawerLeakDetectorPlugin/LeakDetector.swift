@@ -11,7 +11,8 @@ public enum LeakDetector {
     /// Adds the Leaks plugin and watches the app's view controllers from now on: in debug builds
     /// only; in release it does nothing.
     ///
-    /// Call it once at startup; calling it again does nothing more. It exchanges
+    /// Call it once at startup; calling it again does nothing more, unless the plugin was removed
+    /// from the drawer, which puts the original back: then it starts over. It exchanges
     /// `viewDidDisappear` on `UIViewController` (`NSViewController` on macOS) for an
     /// implementation that calls the original, then notes a view controller of the app's own
     /// classes that is being dismissed or removed from its container. At the end of the next
@@ -33,7 +34,8 @@ public enum LeakDetector {
     /// Call it once per object, usually from its initializer: `LeakDetector.trackLifetime(of:
     /// self)`. Calling it again for the same object changes nothing. It holds no reference to the
     /// object: it attaches an object of its own, whose release tells it when `object` deallocates.
-    /// It can be called from any thread, and before ``install()``, which shows what it found.
+    /// It can be called from any thread, and before ``install()``, which shows what it found. Once
+    /// the plugin has been removed from the drawer, it counts nothing until it is installed again.
     ///
     /// - Parameters:
     ///   - object: The object to count.

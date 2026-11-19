@@ -44,6 +44,9 @@
         private var requestBodyFile: NetworkBodyFile?
 
         override static func canInit(with request: URLRequest) -> Bool {
+            // A session made while capturing still lists the protocol once the plugin is
+            // uninstalled; its requests then go to the system's protocols.
+            guard !NetworkInterception.isUninstalled else { return false }
             guard URLProtocol.property(forKey: handledKey, in: request) == nil else { return false }
             return request.url?.scheme == "http" || request.url?.scheme == "https"
         }

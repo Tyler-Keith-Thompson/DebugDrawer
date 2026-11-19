@@ -10,6 +10,8 @@
         var answers: [PermissionKind: PermissionStatus] = [:]
         private(set) var requested: [PermissionKind] = []
         private(set) var reads = 0
+        /// How many times the model let go of what reading took.
+        private(set) var stops = 0
 
         init(statuses: [PermissionKind: PermissionStatus]) {
             self.statuses = statuses
@@ -26,6 +28,10 @@
                 statuses[permission.kind] = answer
             }
         }
+
+        func stop() {
+            stops += 1
+        }
     }
 
     /// Holds the model's callback so the test can report a change, as the app becoming active
@@ -36,6 +42,19 @@
 
         func observe(_ onChange: @escaping @MainActor () async -> Void) {
             self.onChange = onChange
+        }
+
+        /// How many times the model stopped observing.
+        private(set) var stops = 0
+
+        /// Whether the model is observing: it called `observe` and hasn't stopped since.
+        var isObserving: Bool {
+            onChange != nil
+        }
+
+        func stop() {
+            stops += 1
+            onChange = nil
         }
 
         /// Reports a change and returns once the model has handled it.

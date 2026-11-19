@@ -61,6 +61,10 @@
             entries = []
         }
 
+        /// Whether `.trackRenders(_:)` counts: from launch, and again once the View Inspector
+        /// plugin is installed after an uninstall turned it off.
+        var isTracking = true
+
         private func publish() {
             isPublishPending = false
             entries = Entry.busiestFirst(counts)

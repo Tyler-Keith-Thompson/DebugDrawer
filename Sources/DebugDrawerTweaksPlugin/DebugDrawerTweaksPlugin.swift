@@ -36,6 +36,11 @@ public struct TweaksPlugin: DebugDrawerPlugin {
         #endif
     }
 
+    /// Has nothing to stop or drop. The storage `installTweaks(storage:_:)` gave stays in use:
+    /// the app reads its tweaks' values through it whether or not the drawer lists the plugin,
+    /// and going back to the default storage would change what it reads. Stored values stay.
+    @MainActor public func uninstall(from drawer: DebugDrawer) {}
+
     /// Each section's actions, found by their titles or their section's.
     public var actions: [DebugDrawerAction] {
         #if DEBUG
@@ -67,8 +72,8 @@ public extension DebugDrawer {
     ) {
         #if DEBUG
             let plugin = TweaksPlugin(sections: sections())
-            TweakStore.shared.use(storage)
             unregisterGlobal(id: plugin.id)
+            TweakStore.shared.use(storage)
             registerGlobal(plugin)
         #endif
     }

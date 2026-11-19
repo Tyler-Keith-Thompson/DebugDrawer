@@ -44,6 +44,8 @@
 
         let appState: AppState
         let process: any AppProcess
+        /// The drawers the plugin is installed in; the last to remove it drops the plan.
+        private var installations: Set<ObjectIdentifier> = []
 
         /// - Parameters:
         ///   - appState: The app's state, behind its seams.
@@ -68,6 +70,19 @@
             } else {
                 state = .ready(plan)
             }
+        }
+
+        /// Counts `drawer` as one the plugin is installed in.
+        func install(in drawer: ObjectIdentifier) {
+            installations.insert(drawer)
+        }
+
+        /// Uncounts `drawer`; once no drawer holds the plugin, drops the plan read, so the next
+        /// show reads it again. A reset under way finishes, and the selection stays.
+        func uninstall(from drawer: ObjectIdentifier) {
+            guard installations.remove(drawer) != nil, installations.isEmpty else { return }
+            if case .resetting = state { return }
+            state = .loading
         }
 
         /// Reads the plan the first time the plugin is shown.

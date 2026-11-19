@@ -26,7 +26,8 @@ public enum CrashReports {
     /// handlers, so the plugin hands each crash on to them. It reads the report the last run
     /// left, keeps it with the others (the newest ten), raises the plugin's badge for every report
     /// not yet opened, and posts a toast for a new one. Calling it again moves where the next
-    /// crash is written and installs no second handler.
+    /// crash is written and installs no second handler. Removing the plugin from the drawer puts
+    /// back the handlers it found.
     ///
     /// On macOS, AppKit catches an exception raised on the main thread while it handles an event,
     /// logs it and carries on, so no uncaught exception reaches the handler; set the

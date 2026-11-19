@@ -168,6 +168,26 @@
             simulatedLocation ?? service.location(of: manager)
         }
 
+        // MARK: - Uninstall
+
+        /// Lets go of every manager: one still updating while a location was simulated gets its
+        /// real updates started again, as turning spoofing off does, and the route's point is
+        /// forgotten. The switch and the coordinate stay saved for the next install.
+        ///
+        /// Called before the swizzles are put back, while ``CoreLocationService`` still reaches
+        /// Core Location's code through the exchanged selectors.
+        func release() {
+            let wasSimulating = simulatedLocation != nil
+            let managers = updatingManagers()
+            state.withLockUnchecked { state in
+                state.updating = []
+                state.route = nil
+            }
+            if wasSimulating {
+                managers.forEach(service.startUpdatingLocation)
+            }
+        }
+
         // MARK: - Delivery
 
         /// Makes a change to what is simulated, then moves the updating managers to the result:

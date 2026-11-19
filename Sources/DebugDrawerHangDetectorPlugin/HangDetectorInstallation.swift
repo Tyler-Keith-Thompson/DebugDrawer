@@ -3,57 +3,94 @@
     import DebugDrawer
     import Foundation
 
-    /// What `HangDetector.install(threshold:)` does in debug builds.
+    /// What `HangDetector.install(threshold:)` does in debug builds, and what the plugin's
+    /// ``HangDetectorPlugin/install(in:)`` and ``HangDetectorPlugin/uninstall(from:)`` start and
+    /// stop: the monitor on the main run loop and the MetricKit subscriber, shared by every drawer
+    /// the plugin is in.
     @MainActor
     enum HangDetectorInstallation {
-        /// The monitor and the store of the first install, kept for the life of the app.
-        private static var installed: (monitor: HangMonitor, store: HangStore)?
-        /// The MetricKit subscriber, kept for the life of the app once subscribed.
+        /// The store `install(threshold:)` made first, kept so a later call changes its threshold.
+        private static var installedStore: HangStore?
+        /// The store of each drawer the plugin is installed in, by the drawer's identity. The
+        /// monitor runs while there is one.
+        private static var stores: [ObjectIdentifier: HangStore] = [:]
+        /// The store hangs are recorded in: the latest installed.
+        private static var current: HangStore?
+        /// Watches the main thread while a drawer holds the plugin.
+        private static var monitor: HangMonitor?
+        /// The MetricKit subscriber, made at the first install.
         private static var diagnostics: (any HangDiagnosticSource)?
 
         static func install(threshold: Duration) {
             precondition(threshold > .zero, "The hang threshold must be positive")
-            if let installed {
-                installed.store.threshold = threshold
+            let store = installedStore ?? HangStore(threshold: threshold) { monitor?.threshold = $0 } onUnseenCountChange: { count in
+                DebugDrawer.shared.setBadge(count, forPlugin: HangDetectorPlugin.pluginID)
+            }
+            installedStore = store
+            store.threshold = threshold
+            // Registered already, this adds nothing; after the plugin was removed, it adds it again.
+            DebugDrawer.shared.registerGlobal(HangDetectorPlugin(store: store))
+        }
+
+        /// Records hangs into `store` while `drawer` holds the plugin; the first drawer starts the
+        /// monitor and subscribes to MetricKit.
+        static func start(_ store: HangStore, in drawer: DebugDrawer) {
+            stores[ObjectIdentifier(drawer)] = store
+            current = store
+            if let monitor {
+                monitor.threshold = store.threshold
                 return
             }
-            let monitor = HangMonitor(
+            monitor = HangMonitor(
                 runLoop: CFRunLoopGetMain(),
                 // Called on the main thread, so the sampler it makes is the main thread's.
                 sampler: MachThreadStackSampler.currentThread(),
-                threshold: threshold
+                threshold: store.threshold
             ) { hang in
                 // Recorded after the observer returns, rather than inside it, where the run loop
                 // is about to sleep or is starting work: naming the frames and updating the
                 // drawer is work of its own.
                 Task { @MainActor in record(hang) }
             }
-            let store = HangStore(threshold: threshold) { monitor.threshold = $0 } onUnseenCountChange: { count in
-                DebugDrawer.shared.setBadge(count, forPlugin: HangDetectorPlugin.pluginID)
-            }
-            installed = (monitor, store)
-            subscribeToDiagnostics(store)
-            DebugDrawer.shared.registerGlobal(HangDetectorPlugin(store: store))
+            #if canImport(MetricKit)
+                let source = diagnostics ?? MetricKitHangDiagnosticSource()
+                diagnostics = source
+                source.subscribe { current?.receive($0) }
+            #endif
         }
 
-        /// Keeps `hang` with its frames named, and posts a toast of it.
+        /// Stops what ``start(_:in:)`` began for `drawer`, and forgets `store`'s hangs unless
+        /// another drawer shows them; the last drawer stops the monitor (its observers removed,
+        /// its watcher thread ended) and unsubscribes from MetricKit. A drawer that isn't
+        /// recording changes nothing.
+        static func stop(_ store: HangStore, from drawer: DebugDrawer) {
+            guard stores.removeValue(forKey: ObjectIdentifier(drawer)) != nil else { return }
+            if !stores.values.contains(where: { $0 === store }) {
+                store.clear()
+            }
+            if let remaining = stores.values.first {
+                if current === store {
+                    current = remaining
+                    monitor?.threshold = remaining.threshold
+                }
+                return
+            }
+            current = nil
+            monitor?.stop()
+            monitor = nil
+            diagnostics?.unsubscribe()
+        }
+
+        /// Keeps `hang` with its frames named, and posts a toast of it; dropped once no drawer
+        /// holds the plugin.
         private static func record(_ hang: DetectedHang) {
-            guard let store = installed?.store else { return }
+            guard let store = current else { return }
             let event = HangEvent(
                 id: UUID(), date: hang.date, duration: hang.duration, frames: Symbolicator.lines(for: hang.addresses),
                 source: .detected, isSeen: false
             )
             store.add(event)
             HangDetectorPlugin(store: store).postToast("Main thread hung for \(event.durationText)")
-        }
-
-        /// Hands MetricKit's hang diagnostics to `store`.
-        private static func subscribeToDiagnostics(_ store: HangStore) {
-            #if canImport(MetricKit)
-                let source = MetricKitHangDiagnosticSource()
-                diagnostics = source
-                source.subscribe { [weak store] in store?.receive($0) }
-            #endif
         }
     }
 #endif

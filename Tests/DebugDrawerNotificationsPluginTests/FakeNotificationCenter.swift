@@ -84,6 +84,19 @@
             self.onChange = onChange
         }
 
+        /// How many times the model stopped observing.
+        private(set) var stops = 0
+
+        /// Whether the model is observing: it called `observe` and hasn't stopped since.
+        var isObserving: Bool {
+            onChange != nil
+        }
+
+        func stop() {
+            stops += 1
+            onChange = nil
+        }
+
         /// Reports a change and returns once the model has handled it.
         func change() async {
             await onChange?()

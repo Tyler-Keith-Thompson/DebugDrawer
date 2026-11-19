@@ -32,7 +32,8 @@
         int __llvm_profile_runtime = 0;
     #endif
 
-    // NULL until DebugDrawerDiskIOInterposerStart: every hook then calls straight through.
+    // NULL until DebugDrawerDiskIOInterposerStart and after DebugDrawerDiskIOInterposerStop: every
+    // hook then calls straight through.
     static _Atomic(DebugDrawerDiskIOInterposerHandler) handler = NULL;
 
     // Marks a thread inside a recorded call, so whatever the handler does that reads or writes a
@@ -115,6 +116,10 @@
         atomic_store_explicit(&handler, newHandler, memory_order_release);
         // dlsym answers with the replacement exactly when dyld applied the tuples.
         return dlsym(RTLD_DEFAULT, "write") == (void *)interposedWrite;
+    }
+
+    void DebugDrawerDiskIOInterposerStop(void) {
+        atomic_store_explicit(&handler, NULL, memory_order_release);
     }
 
     // dyld's tuple: the replacement, then the function it replaces.

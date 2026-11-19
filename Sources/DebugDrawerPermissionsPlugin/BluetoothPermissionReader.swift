@@ -22,6 +22,13 @@
             }
         }
 
+        func stop() {
+            manager?.delegate = nil
+            manager = nil
+            answered?.resume()
+            answered = nil
+        }
+
         func centralManagerDidUpdateState(_: CBCentralManager) {
             guard CBManager.authorization != .notDetermined else { return }
             answered?.resume()

@@ -10,15 +10,34 @@
     final class FeatureFlagStore: ObservableObject {
         let provider: any FeatureFlagProvider
         let storage: any FeatureFlagOverrideStorage
+        /// The drawers the plugin is installed in; the stored overrides are applied to the
+        /// provider while there is one.
+        private var installations: Set<ObjectIdentifier> = []
 
-        /// A store over `provider` and `storage`, which applies every stored override to
-        /// `provider`, so the app reads them from its first read on.
+        /// A store over `provider` and `storage`. Nothing is applied to `provider` until
+        /// ``install(in:)``.
         init(provider: some FeatureFlagProvider, storage: some FeatureFlagOverrideStorage) {
             self.provider = provider
             self.storage = storage
+        }
+
+        /// Counts `drawer` as one the plugin is installed in; the first one applies every stored
+        /// override to the provider, so the app reads them from its next read on.
+        func install(in drawer: ObjectIdentifier) {
+            guard installations.insert(drawer).inserted, installations.count == 1 else { return }
             // Sorted, so the adapter sees the same calls in the same order every launch.
             for (key, value) in storage.overrides().sorted(by: { $0.key < $1.key }) {
                 provider.setOverride(value, forKey: key)
+            }
+        }
+
+        /// Uncounts `drawer`; once no drawer holds the plugin, clears every stored override from
+        /// the provider, so the app reads the live values again. The overrides stay in storage
+        /// for the next install.
+        func uninstall(from drawer: ObjectIdentifier) {
+            guard installations.remove(drawer) != nil, installations.isEmpty else { return }
+            for key in storage.overrides().keys.sorted() {
+                provider.clearOverride(forKey: key)
             }
         }
 

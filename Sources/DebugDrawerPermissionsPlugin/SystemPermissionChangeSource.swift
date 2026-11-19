@@ -20,6 +20,7 @@
         private var onChange: (@MainActor () async -> Void)?
 
         func observe(_ onChange: @escaping @MainActor () async -> Void) {
+            stop()
             self.onChange = onChange
             observer = NotificationCenter.default.addObserver(forName: Self.didBecomeActive, object: nil, queue: .main) { [weak self] _ in
                 // Posted on the main thread and delivered on the main queue.
@@ -33,6 +34,21 @@
             let manager = CLLocationManager()
             manager.delegate = self
             locationManager = manager
+        }
+
+        func stop() {
+            if let observer {
+                NotificationCenter.default.removeObserver(observer)
+                self.observer = nil
+            }
+            locationManager?.delegate = nil
+            locationManager = nil
+            onChange = nil
+        }
+
+        /// Whether the source is observing the app becoming active and Location's authorization.
+        var isObserving: Bool {
+            observer != nil || locationManager != nil
         }
 
         func locationManagerDidChangeAuthorization(_: CLLocationManager) {

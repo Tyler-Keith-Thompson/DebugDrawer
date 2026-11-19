@@ -5,21 +5,31 @@
         import AppKit
 
         /// Tells the leak detector when one of the app's view controllers leaves the screen for
-        /// good, through `viewDidDisappear`, exchanged for the drawer's own at install.
+        /// good, through `viewDidDisappear`, exchanged for the drawer's own at install and put
+        /// back at uninstall.
         @MainActor
         enum ViewControllerLifecycle {
             private static var onDismiss: (@MainActor (NSViewController) -> Void)?
+            private static let replacements = MethodReplacements()
 
             /// Calls `onDismiss` with each of the app's view controllers whose view leaves its
-            /// window from now on. The first call exchanges `viewDidDisappear`; later ones change
-            /// nothing.
+            /// window from now on, until ``uninstall()``. The first call exchanges
+            /// `viewDidDisappear`; later ones change nothing.
             static func install(onDismiss: @escaping @MainActor (NSViewController) -> Void) {
                 guard self.onDismiss == nil else { return }
                 self.onDismiss = onDismiss
                 guard let original = class_getInstanceMethod(NSViewController.self, #selector(NSViewController.viewDidDisappear)),
                       let replacement = class_getInstanceMethod(NSViewController.self, #selector(NSViewController.dd_leakDetectorViewDidDisappear))
                 else { return }
-                method_exchangeImplementations(original, replacement)
+                replacements.exchange(original, with: replacement)
+            }
+
+            /// Puts `viewDidDisappear` back, unless other code replaced it again since, and stops
+            /// calling what ``install(onDismiss:)`` was given: a replacement left in place calls
+            /// straight through. Calling it again does nothing.
+            static func uninstall() {
+                onDismiss = nil
+                replacements.restore()
             }
 
             /// Whether `object`, a view controller, is off screen for good: neither it nor the container it is
@@ -31,8 +41,8 @@
             }
 
             fileprivate static func didDisappear(_ viewController: NSViewController) {
-                guard ClassOrigin(of: type(of: viewController)) == .app else { return }
-                onDismiss?(viewController)
+                guard let onDismiss, ClassOrigin(of: type(of: viewController)) == .app else { return }
+                onDismiss(viewController)
             }
         }
 
@@ -57,14 +67,16 @@
         // how one is dismissed, so this path serves all of them.
 
         /// Tells the leak detector when one of the app's view controllers leaves the screen for
-        /// good, through `viewDidDisappear(_:)`, exchanged for the drawer's own at install.
+        /// good, through `viewDidDisappear(_:)`, exchanged for the drawer's own at install and
+        /// put back at uninstall.
         @MainActor
         enum ViewControllerLifecycle {
             private static var onDismiss: (@MainActor (UIViewController) -> Void)?
+            private static let replacements = MethodReplacements()
 
             /// Calls `onDismiss` with each of the app's view controllers dismissed, or removed
-            /// from its container, from now on, as it disappears. The first call exchanges
-            /// `viewDidDisappear(_:)`; later ones change nothing.
+            /// from its container, from now on, as it disappears, until ``uninstall()``. The
+            /// first call exchanges `viewDidDisappear(_:)`; later ones change nothing.
             static func install(onDismiss: @escaping @MainActor (UIViewController) -> Void) {
                 guard self.onDismiss == nil else { return }
                 self.onDismiss = onDismiss
@@ -73,7 +85,15 @@
                 guard let original = class_getInstanceMethod(UIViewController.self, originalSelector),
                       let replacement = class_getInstanceMethod(UIViewController.self, replacementSelector)
                 else { return }
-                method_exchangeImplementations(original, replacement)
+                replacements.exchange(original, with: replacement)
+            }
+
+            /// Puts `viewDidDisappear(_:)` back, unless other code replaced it again since, and
+            /// stops calling what ``install(onDismiss:)`` was given: a replacement left in place
+            /// calls straight through. Calling it again does nothing.
+            static func uninstall() {
+                onDismiss = nil
+                replacements.restore()
             }
 
             /// Whether `object`, a view controller, is off screen for good: neither it nor the container it is
@@ -84,8 +104,8 @@
             }
 
             fileprivate static func didDisappear(_ viewController: UIViewController) {
-                guard viewController.isLeavingForGood, ClassOrigin(of: type(of: viewController)) == .app else { return }
-                onDismiss?(viewController)
+                guard let onDismiss, viewController.isLeavingForGood, ClassOrigin(of: type(of: viewController)) == .app else { return }
+                onDismiss(viewController)
             }
         }
 

@@ -19,6 +19,11 @@
         private let onUnseenCountChange: @MainActor (Int) -> Void
         /// The number last handed to `onUnseenCountChange`.
         private var reportedUnseenCount = 0
+        /// The log's identity for this model's observer, while the model reads the log.
+        private var observation: Int?
+        /// The drawers the plugin over this model is installed in; the last to uninstall it stops
+        /// the reading.
+        private var installedDrawers: Set<ObjectIdentifier> = []
 
         /// Reads `log` now and after each change it reports.
         ///
@@ -30,7 +35,36 @@
             self.log = log
             self.onUnseenCountChange = onUnseenCountChange
             seenThrough = 0
-            log.observe { [weak self] in
+            startReading()
+        }
+
+        /// Whether the model reads the log after each change it reports.
+        var isReading: Bool {
+            observation != nil
+        }
+
+        /// Counts `drawer` as one the plugin is installed in, and reads the log again from now on
+        /// if an uninstall stopped it.
+        func install(in drawer: ObjectIdentifier) {
+            installedDrawers.insert(drawer)
+            startReading()
+        }
+
+        /// Uncounts `drawer`. Once no drawer has the plugin, stops reading the log and drops the
+        /// events read, which clears the badge. The log keeps what `AnalyticsEvents.record` sends
+        /// it, as it does before install, so installing again shows them.
+        func uninstall(from drawer: ObjectIdentifier) {
+            installedDrawers.remove(drawer)
+            guard installedDrawers.isEmpty, let observation else { return }
+            log.stopObserving(observation)
+            self.observation = nil
+            events = []
+            reportUnseenCount()
+        }
+
+        private func startReading() {
+            guard observation == nil else { return }
+            observation = log.observe { [weak self] in
                 // The change came from whichever thread recorded the event.
                 Task { @MainActor in self?.reload() }
             }
@@ -44,6 +78,8 @@
 
         /// Reads the log's events.
         func reload() {
+            // A change reported before an uninstall can arrive after it.
+            guard isReading else { return }
             events = log.events
             if isShowing {
                 markAllSeen()

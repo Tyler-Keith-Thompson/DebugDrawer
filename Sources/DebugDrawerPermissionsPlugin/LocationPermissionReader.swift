@@ -7,12 +7,29 @@
     final class LocationPermissionReader: NSObject, SystemPermissionReader, @preconcurrency CLLocationManagerDelegate {
         /// Reading the status needs an instance; creating one doesn't prompt. Created on the
         /// main thread, so its delegate is called there, as its isolation needs.
-        private lazy var manager: CLLocationManager = {
+        private var manager: CLLocationManager {
+            if let createdManager { return createdManager }
             let manager = CLLocationManager()
             manager.delegate = self
+            createdManager = manager
             return manager
-        }()
+        }
+
+        /// The manager once a read or request made it, until ``stop()``.
+        private var createdManager: CLLocationManager?
         private var answered: CheckedContinuation<Void, Never>?
+
+        /// Whether the reader holds a manager.
+        var isHoldingManager: Bool {
+            createdManager != nil
+        }
+
+        func stop() {
+            createdManager?.delegate = nil
+            createdManager = nil
+            answered?.resume()
+            answered = nil
+        }
 
         func status(of _: DeclaredPermission) async -> PermissionStatus {
             PermissionStatus(manager.authorizationStatus)

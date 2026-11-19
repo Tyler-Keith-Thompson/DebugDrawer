@@ -13,8 +13,11 @@
     /// later launch, up to a day after the hang.
     @MainActor
     protocol HangDiagnosticSource: AnyObject {
-        /// Starts delivering diagnostics to `receive`, on the main actor.
+        /// Starts delivering diagnostics to `receive`, on the main actor, in place of the one given
+        /// before.
         func subscribe(_ receive: @escaping @MainActor ([HangDiagnostic]) -> Void)
+        /// Stops delivering diagnostics until the next ``subscribe(_:)``.
+        func unsubscribe()
     }
 
     extension HangDiagnostic {

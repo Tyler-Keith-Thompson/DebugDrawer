@@ -71,6 +71,23 @@ public struct AppInfoPlugin: DebugDrawerPlugin {
             (metrics ?? .shared).removeViewer()
         #endif
     }
+
+    /// Starts watching the network's reachability, for the Network fact, the bug report and Copy
+    /// Info, once the first drawer holds the plugin. Release builds watch nothing.
+    @MainActor public func install(in drawer: DebugDrawer) {
+        #if DEBUG
+            (metrics ?? .shared).install(in: ObjectIdentifier(drawer))
+        #endif
+    }
+
+    /// Stops watching the network once the last drawer that held the plugin removes it, and
+    /// forgets the status it read. The build metadata, signing and process facts are read again
+    /// when shown, and nothing is kept on disk.
+    @MainActor public func uninstall(from drawer: DebugDrawer) {
+        #if DEBUG
+            (metrics ?? .shared).uninstall(from: ObjectIdentifier(drawer))
+        #endif
+    }
 }
 
 // MARK: - Convenience installer
@@ -78,7 +95,8 @@ public struct AppInfoPlugin: DebugDrawerPlugin {
 public extension DebugDrawer {
     /// Adds the App Info plugin, replacing one added before.
     ///
-    /// Nothing is read until the plugin is shown or a report is made.
+    /// Only the network's reachability is watched from here on; the rest is read when the plugin
+    /// is shown or a report is made.
     ///
     /// - Parameter buildMetadata: The commit, branch and CI build to show; each one `nil` is
     ///   read from the main bundle's Info.plist (``AppInfoBuildMetadata``).
@@ -131,9 +149,9 @@ public extension DebugDrawer {
     /// and the network's reachability.
     ///
     /// The refresh timer runs from the first drawer showing the plugin to the last. The network
-    /// path monitor runs from the shared metrics' first use: it costs nothing between changes,
-    /// and the bug report and Copy Info read the network status while the drawer may be closed,
-    /// which a monitor started only then would not yet know.
+    /// path watcher runs from the first drawer installing the plugin to the last removing it: it
+    /// costs nothing between changes, and the bug report and Copy Info read the network status
+    /// while the drawer may be closed, which a watcher started only then would not yet know.
     @MainActor
     final class AppMetrics: ObservableObject {
         static let shared = AppMetrics()
@@ -148,24 +166,58 @@ public extension DebugDrawer {
 
         private let now: () -> Date
         private let timer: any SamplingTimer
+        private let pathWatcher: any NetworkPathWatcher
         /// The drawers showing the plugin; the timer runs while there is one.
         private var viewers = 0
-        private let pathMonitor = NWPathMonitor()
+        /// The drawers the plugin is installed in; the path watcher runs while there is one.
+        private var installations: Set<ObjectIdentifier> = []
 
         private convenience init() {
             self.init(processStart: .current(), now: Date.init, timer: RunLoopSamplingTimer(interval: 2))
-            startNetworkMonitoring()
         }
 
         /// - Parameters:
         ///   - processStart: the process's start, from `ProcessStart.current()`.
         ///   - now: the wall clock. Injected in tests.
         ///   - timer: what calls ``refresh()`` while a drawer shows the plugin. Injected in tests.
-        init(processStart: ProcessStart?, now: @escaping () -> Date, timer: any SamplingTimer = RunLoopSamplingTimer(interval: 2)) {
+        ///   - pathWatcher: what reports the network status while a drawer holds the plugin.
+        ///     Injected in tests.
+        init(
+            processStart: ProcessStart?,
+            now: @escaping () -> Date,
+            timer: any SamplingTimer = RunLoopSamplingTimer(interval: 2),
+            pathWatcher: any NetworkPathWatcher = NWPathNetworkWatcher()
+        ) {
             self.processStart = processStart
             self.now = now
             self.timer = timer
+            self.pathWatcher = pathWatcher
             refresh()
+        }
+
+        /// Counts `drawer` as one the plugin is installed in; the first one starts watching the
+        /// network path.
+        func install(in drawer: ObjectIdentifier) {
+            guard installations.insert(drawer).inserted, installations.count == 1 else { return }
+            pathWatcher.start { [weak self] status in
+                Task { @MainActor [weak self] in
+                    // A status that arrives after the last uninstall is dropped.
+                    guard let self, !self.installations.isEmpty else { return }
+                    self.networkStatus = status
+                }
+            }
+        }
+
+        /// Uncounts `drawer`; once no drawer holds the plugin, stops watching the network path,
+        /// forgets its status, and stops the refresh timer should a drawer still count as showing it.
+        func uninstall(from drawer: ObjectIdentifier) {
+            guard installations.remove(drawer) != nil, installations.isEmpty else { return }
+            pathWatcher.stop()
+            networkStatus = "Unknown"
+            if viewers > 0 {
+                viewers = 0
+                timer.stop()
+            }
         }
 
         /// Counts a drawer showing the plugin; the first one refreshes now and starts the timer.
@@ -186,29 +238,6 @@ public extension DebugDrawer {
         func refresh() {
             footprintMB = MemoryFootprint.currentMB()
             uptime = processStart.map { now().timeIntervalSince($0.date) }
-        }
-
-        private func startNetworkMonitoring() {
-            pathMonitor.pathUpdateHandler = { [weak self] path in
-                let status: String
-                if path.status == .satisfied {
-                    if path.usesInterfaceType(.wifi) {
-                        status = "WiFi"
-                    } else if path.usesInterfaceType(.cellular) {
-                        status = "Cellular"
-                    } else if path.usesInterfaceType(.wiredEthernet) {
-                        status = "Ethernet"
-                    } else {
-                        status = "Online"
-                    }
-                } else {
-                    status = "Offline"
-                }
-                Task { @MainActor [weak self] in
-                    self?.networkStatus = status
-                }
-            }
-            pathMonitor.start(queue: DispatchQueue(label: "com.debugdrawer.network-monitor"))
         }
 
     }

@@ -130,7 +130,9 @@ the *default* sections below where they differ:
   folded into another.
 - **Nothing reaches end-user builds.** Every drawer entry point is under `#if DEBUG`, and every
   public API keeps a stand-in so callers compile unchanged in release. Swizzling and interception
-  (DiskIO, Network, render tracking, Location) are installed only by the plugin's `install*()`.
+  (DiskIO, Network, render tracking, Location) are installed only as a drawer installs the plugin
+  (`install(in:)`, which its `install*()` call leads to), and its `uninstall(from:)` puts back each
+  original implementation it replaced (`MethodReplacements`, copied into each plugin that swizzles).
 - **No timing hacks.** No `DispatchQueue.asyncAfter` or `Task.sleep` to wait for some other event;
   use events (Combine, callbacks, notifications, `onAppear`).
 - **SwiftUI first.** AppKit or UIKit only where SwiftUI can't do it (swizzling, URLProtocol,

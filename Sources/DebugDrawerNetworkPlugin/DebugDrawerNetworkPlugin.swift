@@ -196,19 +196,25 @@ public extension NetworkStore {
         }
 
         /// Starts capturing: registers the plugin's URL protocol for `URLSession.shared`, adds it
-        /// to every `URLSessionConfiguration` made from then on, and records WebSocket tasks.
-        /// `installNetwork()` calls it; a second call does nothing.
+        /// to every `URLSessionConfiguration` read from then on, and records WebSocket tasks. A
+        /// drawer that adds the Network plugin calls it; a second call does nothing.
         public func install() {
             guard !installed else { return }
             installed = true
-            // Register for URLSession.shared
-            URLProtocol.registerClass(DebugNetworkProtocol.self)
-            // Swizzle URLSessionConfiguration so custom sessions also get intercepted
-            URLSessionConfiguration.swizzleProtocolClasses()
-            // Note each session the app makes, so its requests are sent with its configuration.
-            NetworkAppSessions.install()
-            // WebSocket tasks bypass URL protocols, so their traffic is recorded on the tasks.
-            NetworkWebSocketInterception.install()
+            NetworkInterception.start()
+        }
+
+        /// Stops capturing what ``install()`` started and forgets the captured requests and
+        /// connections: the URL protocol is unregistered, every method the plugin replaced gets
+        /// its original implementation back, and a session made while capturing sends its
+        /// requests past the plugin. The mock rules, conditioning profiles, ignore list and
+        /// earlier sessions stay saved for the next install. A drawer that removes the Network
+        /// plugin, and holds it in no other drawer, calls it; a second call does nothing.
+        public func uninstall() {
+            guard installed else { return }
+            installed = false
+            NetworkInterception.stop()
+            clear()
         }
 
         func recordStart(_ entry: NetworkEntry) {
@@ -383,6 +389,9 @@ public extension NetworkStore {
 
         /// Does nothing: release builds intercept nothing.
         public func install() {}
+
+        /// Does nothing: release builds intercept nothing.
+        public func uninstall() {}
 
         /// Does nothing.
         public func clear() {}

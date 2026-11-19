@@ -197,6 +197,17 @@ drawer.registerGlobal(SocketPlugin(monitor: monitor)) // install(in:): the monit
 drawer.unregisterGlobal(id: SocketPlugin(monitor: monitor).id) // uninstall(from:): it stops
 ```
 
+Every shipped plugin starts its work in `install(in:)` and undoes it in `uninstall(from:)`, so
+`unregisterGlobal(id:)` takes a plugin out of the app as well as out of the drawer. Network, Disk
+I/O, Location and View Inspector give each method they swizzled its original implementation back
+and unregister the URL protocol; Accessibility clears its overrides; the plugins that watch the
+app stop their observers, handlers and threads and let go of what they captured. What a plugin
+saved to disk or to `UserDefaults` (mock rules, earlier sessions, reports, settings) stays for the
+next install, and installing again starts it all over. Work a plugin does for every app window is
+counted by drawer: it stops once the last drawer holding the plugin removes it. A method other code
+swizzled again on top of the plugin's can't be put back without breaking that code, so it is left
+in place and calls straight through, recording nothing, until the plugin is installed again.
+
 ### Grouping, pinning and ordering
 
 The drawer lists global plugins by `category`, a string a plugin may declare; one that declares

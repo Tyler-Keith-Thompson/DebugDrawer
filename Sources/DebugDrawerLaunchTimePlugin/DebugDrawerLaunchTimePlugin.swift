@@ -18,13 +18,43 @@ public struct LaunchTimePlugin: DebugDrawerPlugin {
     public var category = "Performance"
     public var icon = "timer"
 
-    public init() {}
+    #if DEBUG
+        /// The tracker the plugin shows and measures with, or `nil` for the shared one.
+        private let tracker: LaunchTimeTracker?
+
+        public init() {
+            tracker = nil
+        }
+
+        /// - Parameter tracker: The tracker to show and measure with in place of the shared one.
+        init(tracker: LaunchTimeTracker) {
+            self.tracker = tracker
+        }
+    #else
+        public init() {}
+    #endif
 
     public var body: some View {
         #if DEBUG
-            LaunchTimePluginView()
+            LaunchTimePluginView(tracker: tracker ?? .shared)
         #else
             EmptyView()
+        #endif
+    }
+
+    /// Waits for the first frame: the first time the main run loop goes idle from now on, unless
+    /// one is already recorded. Release builds measure nothing.
+    @MainActor public func install(in drawer: DebugDrawer) {
+        #if DEBUG
+            (tracker ?? .shared).install(in: ObjectIdentifier(drawer))
+        #endif
+    }
+
+    /// Once no drawer has the plugin, stops waiting for the first frame if it hasn't come yet,
+    /// removing the run-loop observer. The times already measured stay: a launch happens once.
+    @MainActor public func uninstall(from drawer: DebugDrawer) {
+        #if DEBUG
+            (tracker ?? .shared).uninstall(from: ObjectIdentifier(drawer))
         #endif
     }
 }
@@ -37,7 +67,9 @@ public extension DebugDrawer {
     /// the first frame is the first time the main run loop goes idle afterwards.
     func installLaunchTime() {
         #if DEBUG
-            LaunchTimeTracker.shared.observeFirstFrame()
+            // Made now, so app init is measured here; the plugin's install waits for the first
+            // frame.
+            _ = LaunchTimeTracker.shared
             registerGlobal(LaunchTimePlugin())
         #endif
     }
@@ -70,7 +102,10 @@ public extension DebugDrawer {
         /// System uptime when the first frame was committed.
         @Published private(set) var firstFrameUptime: TimeInterval?
 
-        private var firstFrameObserver: CFRunLoopObserver?
+        /// Waits for the first frame, from install until the run loop first goes idle.
+        private(set) var firstFrameObserver: CFRunLoopObserver?
+        /// The drawers the plugin is installed in; the last to uninstall it stops the wait.
+        private var installedDrawers: Set<ObjectIdentifier> = []
 
         init(clock: @escaping () -> TimeInterval = { ProcessInfo.processInfo.systemUptime },
              processStartUptime: TimeInterval? = LaunchTimeTracker.processStartUptimeFromKernel()) {
@@ -92,11 +127,28 @@ public extension DebugDrawer {
             CFRunLoopAddObserver(CFRunLoopGetMain(), observer, .commonModes)
         }
 
+        /// Counts `drawer` as one the plugin is installed in, and waits for the first frame.
+        func install(in drawer: ObjectIdentifier) {
+            installedDrawers.insert(drawer)
+            observeFirstFrame()
+        }
+
+        /// Uncounts `drawer`; once no drawer has the plugin, stops waiting for the first frame.
+        func uninstall(from drawer: ObjectIdentifier) {
+            installedDrawers.remove(drawer)
+            guard installedDrawers.isEmpty else { return }
+            stopObservingFirstFrame()
+        }
+
+        /// Removes the run-loop observer if it is still waiting.
+        func stopObservingFirstFrame() {
+            guard let observer = firstFrameObserver else { return }
+            CFRunLoopObserverInvalidate(observer)
+            firstFrameObserver = nil
+        }
+
         func recordFirstFrame() {
-            if let observer = firstFrameObserver {
-                CFRunLoopObserverInvalidate(observer)
-                firstFrameObserver = nil
-            }
+            stopObservingFirstFrame()
             guard firstFrameUptime == nil else { return }
             firstFrameUptime = clock()
         }
@@ -140,7 +192,7 @@ public extension DebugDrawer {
     }
 
     struct LaunchTimePluginView: View {
-        @ObservedObject var tracker = LaunchTimeTracker.shared
+        @ObservedObject var tracker: LaunchTimeTracker
 
         var body: some View {
             VStack(alignment: .leading, spacing: 0) {

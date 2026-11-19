@@ -19,10 +19,12 @@
             client: any NotificationCenterClient = SystemNotificationCenterClient(),
             changes: any NotificationChangeSource = AppActivationChangeSource()
         ) -> NotificationsModel {
+            // Before the new model observes anything: removing the plugin installed before
+            // uninstalls it, which stops its own model.
+            DebugDrawer.shared.unregisterGlobal(id: NotificationsPlugin.pluginID)
             let model = NotificationsModel(registration: registration, client: client, changes: changes)
             Self.model = model
             let plugin = NotificationsPlugin(model: model)
-            DebugDrawer.shared.unregisterGlobal(id: plugin.id)
             DebugDrawer.shared.registerGlobal(plugin)
             Task { await model.refresh() }
             return model

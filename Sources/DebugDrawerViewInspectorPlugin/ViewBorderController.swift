@@ -146,6 +146,16 @@
             refreshOverlays()
         }
 
+        /// Turns every overlay and the slowed animations off: the overlay windows go, the run-loop
+        /// observer and the click monitor stop, and every window's layer gets its own speed back.
+        /// The grid's spacing, color and opacity stay as set.
+        func turnEverythingOff() {
+            isBordersEnabled = false
+            isGridEnabled = false
+            isClickIndicatorEnabled = false
+            animationSpeed = 1
+        }
+
         /// Records a view `.debugGrid()` placed behind its content, held weakly, whose frame is
         /// where the grid is drawn.
         func addGridProbe(_ probe: GridProbeView) {

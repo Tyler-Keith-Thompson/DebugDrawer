@@ -33,6 +33,21 @@ public struct UserDefaultsPlugin: DebugDrawerPlugin {
         #endif
     }
 
+    /// Counts `drawer` as one that holds the plugin; nothing is read until it is shown.
+    @MainActor public func install(in drawer: DebugDrawer) {
+        #if DEBUG
+            model.install(in: ObjectIdentifier(drawer))
+        #endif
+    }
+
+    /// Once the last drawer that held the plugin removes it, stops observing the defaults'
+    /// changes and drops the keys it read. The defaults themselves are untouched.
+    @MainActor public func uninstall(from drawer: DebugDrawer) {
+        #if DEBUG
+            model.uninstall(from: ObjectIdentifier(drawer))
+        #endif
+    }
+
     /// How many keys the filters let through ("12 keys").
     public var headerAccessory: some View {
         #if DEBUG

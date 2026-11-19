@@ -29,6 +29,24 @@ public struct ViewInspectorPlugin: DebugDrawerPlugin {
             EmptyView()
         #endif
     }
+
+    /// Counts renders with `.trackRenders(_:)` and, on iOS, swaps `UIWindow.sendEvent(_:)` so the
+    /// click indicators switch can show touches, as `drawer` adds the plugin. Release builds do
+    /// nothing.
+    @MainActor public func install(in drawer: DebugDrawer) {
+        #if DEBUG
+            ViewInspectorInstallation.install(for: drawer)
+        #endif
+    }
+
+    /// Once no drawer holds the plugin, turns the borders, grid, click indicators, render flashes
+    /// and slowed animations off, removes the overlay windows, forgets the render counts and stops
+    /// counting, and on iOS gives `UIWindow.sendEvent(_:)` UIKit's implementation back.
+    @MainActor public func uninstall(from drawer: DebugDrawer) {
+        #if DEBUG
+            ViewInspectorInstallation.uninstall(for: drawer)
+        #endif
+    }
 }
 
 // MARK: - Convenience installer
@@ -40,16 +58,42 @@ public extension DebugDrawer {
     /// so the click indicators switch can show touches; the swap forwards every event unchanged.
     func installViewInspector() {
         #if DEBUG
+            // Adding the plugin installs it, which swaps the touch method on iOS.
+            registerGlobal(ViewInspectorPlugin())
+        #endif
+    }
+}
+
+#if DEBUG
+    /// What the View Inspector plugin's install and uninstall change, counted by drawer: it works
+    /// while any drawer holds the plugin.
+    @MainActor
+    enum ViewInspectorInstallation {
+        private static var drawers: Set<ObjectIdentifier> = []
+
+        static func install(for drawer: DebugDrawer) {
+            drawers.insert(ObjectIdentifier(drawer))
+            RenderTracker.shared.isTracking = true
             #if os(iOS)
                 // Mac Catalyst is os(iOS) here on purpose: its windows are UIWindows, which take
                 // touches and clicks through sendEvent(_:), so the iOS swizzle is the right path.
                 // macOS observes clicks with an NSEvent monitor that the switch starts and stops.
                 ClickIndicatorMonitor.install()
             #endif
-            registerGlobal(ViewInspectorPlugin())
-        #endif
+        }
+
+        static func uninstall(for drawer: DebugDrawer) {
+            guard drawers.remove(ObjectIdentifier(drawer)) != nil, drawers.isEmpty else { return }
+            ViewBorderController.shared.turnEverythingOff()
+            RenderFlashSetting.shared.isOn = false
+            RenderTracker.shared.isTracking = false
+            RenderTracker.shared.reset()
+            #if os(iOS)
+                ClickIndicatorMonitor.uninstall()
+            #endif
+        }
     }
-}
+#endif
 
 #if DEBUG
     #if os(macOS)

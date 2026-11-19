@@ -16,9 +16,14 @@
         private let discovery: StoreDiscovery
         private let busyTimeout: Duration
         /// One actor per store, made when the store is first read.
-        private var openStores: [DatabaseStore.ID: SQLiteStore] = [:]
+        private(set) var openStores: [DatabaseStore.ID: SQLiteStore] = [:]
         /// Counts reads, so one that finishes after a later one began is dropped.
         private var latestRead = 0
+        /// The drawers the plugin is installed in; the first looks for stores, the last to remove
+        /// it drops them.
+        private var installations: Set<ObjectIdentifier> = []
+        /// The look for stores the first install began, until it ends or the plugin is removed.
+        private(set) var installRefresh: Task<Void, Never>?
 
         /// - Parameters:
         ///   - discovery: Where to look for stores.
@@ -33,6 +38,25 @@
             if case let .loaded(listings) = stores { listings } else { [] }
         }
 
+        /// Counts `drawer` as one the plugin is installed in; the first one looks for stores, so
+        /// the header's count shows before the plugin is opened.
+        func install(in drawer: ObjectIdentifier) {
+            guard installations.insert(drawer).inserted, installations.count == 1 else { return }
+            installRefresh = Task { await refresh() }
+        }
+
+        /// Uncounts `drawer`; once no drawer holds the plugin, drops the stores found and their
+        /// ``SQLiteStore``s, and any read still running.
+        func uninstall(from drawer: ObjectIdentifier) {
+            guard installations.remove(drawer) != nil, installations.isEmpty else { return }
+            installRefresh?.cancel()
+            installRefresh = nil
+            // A read that finishes from now on is dropped.
+            latestRead += 1
+            openStores = [:]
+            stores = .loading
+        }
+
         /// Looks for stores again and reads each one's schema.
         func refresh() async {
             latestRead += 1
@@ -41,6 +65,8 @@
             let found = await Task.detached(priority: .utility) { discovery.stores() }.value
             var listings: [StoreListing] = []
             for store in found {
+                // A read overtaken, or dropped by uninstall, opens no more stores.
+                guard read == latestRead, !Task.isCancelled else { return }
                 do throws(DatabaseError) {
                     listings.append(StoreListing(store: store, schema: .success(try await sqliteStore(for: store).schema())))
                 } catch {
@@ -48,7 +74,7 @@
                     listings.append(StoreListing(store: store, schema: .failure(error.reading(store))))
                 }
             }
-            guard read == latestRead else {
+            guard read == latestRead, !Task.isCancelled else {
                 Self.logger.debug("Dropped a read that a later one overtook")
                 return
             }

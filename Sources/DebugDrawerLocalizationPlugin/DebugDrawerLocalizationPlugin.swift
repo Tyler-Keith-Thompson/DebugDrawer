@@ -8,8 +8,11 @@ import SwiftUI
 /// translations a language is missing, and Apple's launch arguments for the rest. The header
 /// counts the translations missing for the language the app runs in, after a pending relaunch.
 public struct LocalizationPlugin: DebugDrawerPlugin {
+    /// The plugin's identity in the drawer.
+    static let pluginID = "LocalizationPlugin"
+
     public var id: String {
-        "LocalizationPlugin"
+        Self.pluginID
     }
 
     public var title = "Localization"
@@ -39,6 +42,24 @@ public struct LocalizationPlugin: DebugDrawerPlugin {
             LocalizationHeaderAccessory(model: model)
         #else
             EmptyView()
+        #endif
+    }
+
+    /// Intercepts the app's string lookups from now on, unless another drawer already does, and
+    /// reads the app's tables. Release builds intercept nothing.
+    @MainActor public func install(in drawer: DebugDrawer) {
+        #if DEBUG
+            LocalizationInstallation.start(model, in: drawer)
+        #endif
+    }
+
+    /// Stops intercepting once no drawer holds the plugin: puts `Bundle`'s lookups back (one other
+    /// code replaced again since stays, and the plugin's under it calls straight through), so the
+    /// app's strings show their translations again, and drops the tables read and the
+    /// untranslated lookups recorded. The settings stored for the next launch stay.
+    @MainActor public func uninstall(from drawer: DebugDrawer) {
+        #if DEBUG
+            LocalizationInstallation.stop(model, from: drawer)
         #endif
     }
 

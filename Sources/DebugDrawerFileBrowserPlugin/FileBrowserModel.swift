@@ -28,12 +28,28 @@
         let roots: FileRoots
         private static let logger = Logger(subsystem: "DebugDrawerFileBrowserPlugin", category: "FileBrowserModel")
         private let fileSystem: any FileSystem
+        /// The drawers the plugin is installed in; the last to remove it drops what was read.
+        private var installations: Set<ObjectIdentifier> = []
 
         /// A browser of `roots`, read from and changed through `fileSystem`.
         init(roots: FileRoots, fileSystem: any FileSystem = LocalFileSystem()) {
             self.roots = roots
             self.fileSystem = fileSystem
             screen = .roots(roots, isEmpty: false)
+        }
+
+        /// Counts `drawer` as one the plugin is installed in.
+        func install(in drawer: ObjectIdentifier) {
+            installations.insert(drawer)
+        }
+
+        /// Uncounts `drawer`; once no drawer holds the plugin, goes back to the list of roots,
+        /// dropping the listing, preview and folder totals read, and any failure. A read still
+        /// running is for a place no longer shown, so it changes nothing.
+        func uninstall(from drawer: ObjectIdentifier) {
+            guard installations.remove(drawer) != nil, installations.isEmpty else { return }
+            folderSizes = [:]
+            show(.roots)
         }
 
         /// Shows `place`, loading until `load(_:)` reads it.

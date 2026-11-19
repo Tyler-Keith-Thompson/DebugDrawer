@@ -16,8 +16,11 @@
         static let limit = 50
 
         let directory: URL
-        /// Every payload kept, the latest period first.
+        /// Every payload kept, the latest period first; empty while unloaded.
         @Published private(set) var payloads: [MetricKitPayload] = []
+        /// Whether ``payloads`` holds what the directory does, rather than being dropped by
+        /// ``unload()``.
+        private(set) var isLoaded = true
         /// Called with the number of unseen payloads whenever the payloads change.
         private let onUnseenCountChange: @MainActor (Int) -> Void
 
@@ -34,6 +37,21 @@
                 try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
                 return Self.load(from: directory)
             }
+        }
+
+        /// Reads the payloads from the directory again, after ``unload()``; does nothing while
+        /// they are loaded.
+        func load() {
+            guard !isLoaded else { return }
+            isLoaded = true
+            update(DebugDrawerActivity.$isDrawerWork.withValue(true) { Self.load(from: directory) })
+        }
+
+        /// Drops the payloads from memory, leaving their files, until ``load()``.
+        func unload() {
+            guard isLoaded else { return }
+            isLoaded = false
+            update([])
         }
 
         /// How many payloads the developer hasn't opened.

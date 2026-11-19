@@ -15,11 +15,13 @@
             client: any BackgroundTaskSchedulerClient,
             changes: any BackgroundTaskChangeSource = AppActivationChangeSource()
         ) -> BackgroundTasksModel {
+            // Before the new model observes anything: removing the plugin installed before
+            // uninstalls it, which stops its own model.
+            DebugDrawer.shared.unregisterGlobal(id: BackgroundTasksPlugin.pluginID)
             let model = BackgroundTasksModel(
                 declaration: BackgroundTaskDeclaration(infoDictionary: infoDictionary), client: client, changes: changes
             )
             let plugin = BackgroundTasksPlugin(model: model)
-            DebugDrawer.shared.unregisterGlobal(id: plugin.id)
             DebugDrawer.shared.registerGlobal(plugin)
             Task { await model.refresh() }
             return model

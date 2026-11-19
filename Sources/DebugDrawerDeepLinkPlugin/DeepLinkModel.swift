@@ -24,6 +24,8 @@
         private let openURL: (@MainActor (URL) -> Bool)?
         private let system: any SystemURLOpening
         private let defaults: UserDefaults
+        /// The drawers the plugin is installed in; the last to remove it forgets the outcome.
+        private var installations: Set<ObjectIdentifier> = []
 
         /// - Parameters:
         ///   - presets: The URLs listed under Presets.
@@ -49,6 +51,18 @@
             // History written by another version that no longer decodes starts empty.
             activities = defaults.data(forKey: Self.activitiesKey)
                 .flatMap { try? JSONDecoder().decode([DeepLinkActivity].self, from: $0) } ?? []
+        }
+
+        /// Counts `drawer` as one the plugin is installed in.
+        func install(in drawer: ObjectIdentifier) {
+            installations.insert(drawer)
+        }
+
+        /// Uncounts `drawer`; once no drawer holds the plugin, forgets what came of the last send.
+        /// The history stays, here and in the defaults.
+        func uninstall(from drawer: ObjectIdentifier) {
+            guard installations.remove(drawer) != nil, installations.isEmpty else { return }
+            outcome = nil
         }
 
         /// Hands `url` to the `openURL` handler, or without one opens it as the system opens a

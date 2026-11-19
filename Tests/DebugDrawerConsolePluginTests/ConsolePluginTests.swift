@@ -58,15 +58,7 @@
             #expect(!plugin.id.isEmpty)
         }
 
-        @Test("Registering the plugin globally lists it among the drawer's global plugins")
-        func consolePluginRegistration() {
-            let drawer = DebugDrawer.shared
-            for plugin in drawer.globalPlugins { drawer.unregisterGlobal(id: plugin.id) }
-
-            // Register the plugin directly without installing stdout capture
-            // (install() redirects stdout which breaks the test runner)
-            drawer.registerGlobal(ConsolePlugin())
-            #expect(drawer.globalPlugins.contains(where: { $0.title == "Console" }))
-        }
+        // Registering the plugin now starts capture, which redirects stdout, so the registration
+        // test is ConsoleUninstallExitTests.registration, in a child process.
     }
 #endif

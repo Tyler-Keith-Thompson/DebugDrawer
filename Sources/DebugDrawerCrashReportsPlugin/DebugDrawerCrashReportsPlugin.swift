@@ -47,6 +47,26 @@ public struct CrashReportsPlugin: DebugDrawerPlugin {
         #endif
     }
 
+    /// Captures crashes from now on: installs the signal and uncaught-exception handlers, each
+    /// calling the one installed before it, and subscribes to MetricKit's crash diagnostics, unless
+    /// another drawer already did; reads the reports again if ``uninstall(from:)`` dropped them.
+    /// Release builds install nothing.
+    @MainActor public func install(in drawer: DebugDrawer) {
+        #if DEBUG
+            CrashReportsInstallation.start(store, in: drawer)
+        #endif
+    }
+
+    /// Stops capturing once no drawer holds the plugin: puts back the handlers the app had before
+    /// (a crash SDK's installed on top since stays, and the plugin's under it hands crashes straight
+    /// on), the main thread's alternate stack, and unsubscribes from MetricKit. Drops the reports
+    /// from memory; their files stay for the next install.
+    @MainActor public func uninstall(from drawer: DebugDrawer) {
+        #if DEBUG
+            CrashReportsInstallation.stop(store, from: drawer)
+        #endif
+    }
+
     /// Delete All, found by "crash" and "reports" too.
     public var actions: [DebugDrawerAction] {
         #if DEBUG
