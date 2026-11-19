@@ -20,7 +20,7 @@ Catalyst.
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/Tyler-Keith-Thompson/DebugDrawer", from: "0.1.2"),
+    .package(url: "https://github.com/Tyler-Keith-Thompson/DebugDrawer", from: "0.1.3"),
 ],
 ```
 
