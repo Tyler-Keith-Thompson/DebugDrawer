@@ -73,16 +73,9 @@
                     }
                 }
 
-                DebugDrawerCodeBlock {
-                    ConsoleTextView(
-                        lines: visibleLines,
-                        isFollowing: $isFollowing,
-                        perform: perform
-                    )
+                ConsoleLinesWell(lines: visibleLines, isFollowing: $isFollowing, perform: perform)
                     // A new text view for each source and session, so each opens at its end.
                     .id(shownSession(log))
-                    .frame(minHeight: 120, maxHeight: 300)
-                }
 
                 switch log.source {
                 case .captured:
@@ -183,6 +176,23 @@
             .accessibilityLabel("Lowest level shown")
             .accessibilityElement(children: .contain)
             .fixedSize()
+        }
+    }
+
+    /// The lines in their well, which scrolls once they are taller than it.
+    struct ConsoleLinesWell: View {
+        let lines: [LogLine]
+        @Binding var isFollowing: Bool
+        var perform: (ConsoleLineAction) -> Void = { _ in }
+        /// The shortest and tallest the well is drawn; both scale with Dynamic Type, as the lines do.
+        @ScaledMetric(relativeTo: .body) private var minimumHeight: CGFloat = 120
+        @ScaledMetric(relativeTo: .body) private var maximumHeight: CGFloat = 300
+
+        var body: some View {
+            DebugDrawerCodeBlock {
+                ConsoleTextView(lines: lines, isFollowing: $isFollowing, perform: perform)
+                    .frame(minHeight: minimumHeight, maxHeight: maximumHeight)
+            }
         }
     }
 #endif

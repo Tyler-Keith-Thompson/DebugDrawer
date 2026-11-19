@@ -31,6 +31,9 @@
         @State private var selectedProfile: NetworkConditionProfile.ID?
         @State private var screen = Screen.requests
         @State private var isImporting = false
+        /// The tallest the request list grows before it scrolls; scales with Dynamic Type, as its
+        /// rows do.
+        @ScaledMetric(relativeTo: .body) private var listHeight: CGFloat = 300
 
         /// - Parameter transport: Joins the view to the model; made once, for the view's lifetime.
         init(transport: @escaping @autoclosure () -> DebugDrawerPluginTransport<NetworkSnapshot, NetworkCommand>) {
@@ -162,7 +165,7 @@
                 "Filter URL...",
                 text: binding(\.log.filterText) { .log(.setFilterText($0)) },
                 accessibilityLabel: "Filter requests by URL, method, GraphQL operation or response",
-                maxHeight: 300
+                maxHeight: listHeight
             ) {
                 // An earlier session's and an imported file's requests are read-only: they can
                 // be mocked, but not resent, since their credentials are masked and a replay

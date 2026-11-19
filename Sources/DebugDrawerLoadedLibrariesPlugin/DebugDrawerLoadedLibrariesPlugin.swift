@@ -157,14 +157,6 @@ public extension DebugDrawer {
             return result
         }
 
-        private var grouped: [(LibraryCategory, [LoadedLibrary])] {
-            let dict = Dictionary(grouping: filtered, by: \.category)
-            return LibraryCategory.allCases.compactMap { cat in
-                guard let libs = dict[cat], !libs.isEmpty else { return nil }
-                return (cat, libs)
-            }
-        }
-
         var body: some View {
             DebugDrawerRow("\(libraries.count) libraries loaded", accessory: {
                 Picker("Category", selection: $selectedCategory) {
@@ -181,18 +173,7 @@ public extension DebugDrawer {
                 .debugDrawerTextFieldStyle()
                 .accessibilityLabel("Filter libraries by name or path")
 
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: 0) {
-                    ForEach(grouped, id: \.0) { category, libs in
-                        DebugDrawerSection("\(category.rawValue) (\(libs.count))") {
-                            ForEach(libs) { lib in
-                                LoadedLibraryRow(library: lib)
-                            }
-                        }
-                    }
-                }
-            }
-            .frame(maxHeight: 300)
+            LoadedLibraryList(libraries: filtered)
 
             DebugDrawerActionRow {
                 DebugDrawerCopyButton("Copy List") { report }
@@ -206,7 +187,7 @@ public extension DebugDrawer {
         private var report: String {
             var report = "Loaded Libraries (\(libraries.count))\n"
             report += String(repeating: "=", count: 40) + "\n"
-            for (cat, libs) in grouped {
+            for (cat, libs) in filtered.byCategory {
                 report += "\n\(cat.rawValue) (\(libs.count)):\n"
                 for lib in libs {
                     report += "  \(lib.name)\(lib.version.map { " \($0)" } ?? "")\n    \(lib.path)\n"
@@ -214,6 +195,40 @@ public extension DebugDrawer {
                 }
             }
             return report
+        }
+    }
+
+    /// The libraries under a section per category, in a list that scrolls once it is taller than
+    /// its cap.
+    struct LoadedLibraryList: View {
+        let libraries: [LoadedLibrary]
+        /// The tallest the list grows before it scrolls; scales with Dynamic Type, as its rows do.
+        @ScaledMetric(relativeTo: .body) private var listHeight: CGFloat = 300
+
+        var body: some View {
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 0) {
+                    ForEach(libraries.byCategory, id: \.0) { category, libs in
+                        DebugDrawerSection("\(category.rawValue) (\(libs.count))") {
+                            ForEach(libs) { lib in
+                                LoadedLibraryRow(library: lib)
+                            }
+                        }
+                    }
+                }
+            }
+            .frame(maxHeight: listHeight)
+        }
+    }
+
+    extension [LoadedLibrary] {
+        /// The libraries by category, in `LibraryCategory`'s order, leaving out empty categories.
+        fileprivate var byCategory: [(LibraryCategory, [LoadedLibrary])] {
+            let dict = Dictionary(grouping: self, by: \.category)
+            return LibraryCategory.allCases.compactMap { cat in
+                guard let libs = dict[cat], !libs.isEmpty else { return nil }
+                return (cat, libs)
+            }
         }
     }
 

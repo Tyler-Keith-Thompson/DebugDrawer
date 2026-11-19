@@ -33,16 +33,7 @@
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .debugDrawerRowPadding()
                     } else {
-                        DebugDrawerCodeBlock {
-                            ScrollView {
-                                LazyVStack(alignment: .leading, spacing: 0) {
-                                    ForEach(store.filteredEvents) { event in
-                                        IOEventRow(event: event)
-                                    }
-                                }
-                            }
-                            .frame(maxHeight: 250)
-                        }
+                        DiskIOCallList(events: store.filteredEvents)
                     }
                 }
 
@@ -105,6 +96,27 @@
                     )
                     DebugDrawerKeyValueRow("Free", value: volume.free.byteLabel)
                 }
+            }
+        }
+    }
+
+    /// The recorded calls that pass the filter, newest first, in a well that scrolls once they are
+    /// taller than it.
+    struct DiskIOCallList: View {
+        let events: [IOEvent]
+        /// The tallest the list grows before it scrolls; scales with Dynamic Type, as its rows do.
+        @ScaledMetric(relativeTo: .body) private var listHeight: CGFloat = 250
+
+        var body: some View {
+            DebugDrawerCodeBlock {
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 0) {
+                        ForEach(events) { event in
+                            IOEventRow(event: event)
+                        }
+                    }
+                }
+                .frame(maxHeight: listHeight)
             }
         }
     }
