@@ -6,7 +6,10 @@ import Foundation
     // The keychain is read and changed through `Keychain`, whose `SecItem` calls answer at once,
     // so every command lands before `perform(_:)` returns: commands take effect in the order sent,
     // and the filter bound through a direct transport reads back what was typed. The model holds
-    // values only; a password is read when its item is opened or edited, never by listing.
+    // values only; a password is read when its item is opened or edited, never by listing, and is
+    // kept in the process: the snapshot says only whether it was read, and the plugin's own view
+    // gets it through `revealedValue(for:)`, which no transport can call. A save still carries the
+    // new password in its command, since that goes into the app, not out of it.
 
     /// The Keychain plugin's state and behavior, without its views: the app's keychain items, the
     /// filter, the open item with its password, the add or edit form and the last refusal, read as
@@ -41,7 +44,19 @@ import Foundation
         }
 
         public var snapshot: KeychainSnapshot {
-            KeychainSnapshot(contents: contents, filter: filter, selection: selection, editor: editor, issue: issue)
+            KeychainSnapshot(contents: contents, filter: filter, selection: selection.map(KeychainOpenItem.init), editor: editor, issue: issue)
+        }
+
+        /// The password read for the item `id` names: the open item's, or the one the edit form
+        /// started from; `nil` when none was read. For the plugin's own view, in the app's process:
+        /// no snapshot or command carries it, so no transport can reach it.
+        ///
+        /// - Parameter id: The item's persistent reference.
+        /// - Returns: The password's bytes, or `nil`.
+        func revealedValue(for id: KeychainItem.ID) -> Data? {
+            if let selection, selection.item.id == id, case let .success(data) = selection.value { return data }
+            if case let .editing(item, draft) = editor, item.id == id { return Data(draft.value.utf8) }
+            return nil
         }
 
         public func perform(_ command: KeychainCommand) {

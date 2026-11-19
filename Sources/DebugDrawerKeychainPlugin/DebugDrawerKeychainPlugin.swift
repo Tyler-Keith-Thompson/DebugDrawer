@@ -40,7 +40,10 @@ public struct KeychainPlugin: DebugDrawerPlugin {
 
     public var body: some View {
         #if DEBUG
-            KeychainPluginView(transport: .direct(to: model ?? .shared))
+            let shown = model ?? .shared
+            // The passwords reach the view from the model in this process, never through the
+            // transport, which could carry them out of the app.
+            KeychainPluginView(transport: .direct(to: shown), revealedValue: { shown.revealedValue(for: $0) })
         #else
             EmptyView()
         #endif

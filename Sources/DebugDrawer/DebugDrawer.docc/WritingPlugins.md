@@ -301,7 +301,10 @@ built this way (`NetworkModel`, `ConsoleModel`, `ViewInspectorModel`, `Accessibi
 `LaunchTimeModel`, `CookiesModel`, `FileBrowserModel`, `LoadedLibrariesModel`, `DeepLinkModel`,
 `ScreenshotModel`, `LocationModel`, `UserDefaultsModel`, `KeychainModel`). A plugin that acts
 on the app's live windows, as the View Inspector does, keeps its windows and views behind a service
-the model takes at init and puts only values read from them in its snapshot.
+the model takes at init and puts only values read from them in its snapshot. A model that reads
+secrets, as Keychain reads passwords, keeps them out of its snapshot: the snapshot says a value
+was read, and the plugin's own view asks the model for it in the process, so no transport can
+carry it out of the app.
 
 ### Reaching a model from another process
 

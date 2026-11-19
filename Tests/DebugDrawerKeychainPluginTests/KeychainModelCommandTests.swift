@@ -40,7 +40,7 @@
             #expect(actual.shownItems.first?.accessGroup == "TEAMID.com.example.app")
             #expect(actual.shownItems.first?.created == Date(timeIntervalSinceReferenceDate: 800_000_000))
             #expect(actual.shownItems.first?.modified == Date(timeIntervalSinceReferenceDate: 800_086_400))
-            #expect(actual.selection?.value == .success(Data("s3cr3t".utf8)))
+            #expect(actual.selection == KeychainOpenItem(item: actual.allItems[0], value: .held))
             #expect(actual.editor == .adding(GenericPassword(accessGroup: "TEAMID.com.example.app")))
             #expect(actual.issue == KeychainIssue(action: "Couldn't save", error: KeychainError(status: errSecDuplicateItem)))
         }
@@ -54,9 +54,9 @@
             unavailable.perform(KeychainCommand(.reload))
             let unreadable = KeychainSnapshot(
                 contents: .items([KeychainFixtures.password]),
-                selection: KeychainSelection(item: KeychainFixtures.password, value: .failure(KeychainError(status: errSecInteractionNotAllowed)))
+                selection: KeychainOpenItem(item: KeychainFixtures.password, value: .refused(KeychainError(status: errSecInteractionNotAllowed)))
             )
-            let noValue = KeychainSnapshot(selection: KeychainSelection(item: KeychainFixtures.certificate, value: .success(nil)))
+            let noValue = KeychainSnapshot(selection: KeychainOpenItem(item: KeychainFixtures.certificate, value: .empty))
             let expected = [unread, unavailable.snapshot, unreadable, noValue]
 
             let actual = try expected.map { try JSONDecoder().decode(KeychainSnapshot.self, from: JSONEncoder().encode($0)) }
@@ -156,31 +156,37 @@
             #expect(sut.snapshot.accessGroups == ["TEAMID.com.example.app", "TEAMID.com.example.shared"])
         }
 
-        @Test("Toggling an item reveals its password as Data, a refused read as the refusal, and toggling again closes it")
+        @Test("Toggling an item reveals its password in the process alone, a refused read as the refusal, and toggling again closes it")
         func reveal() throws {
             let keychain = FakeKeychain()
             let ada = keychain.seed(
                 .genericPassword, [kSecAttrService as String: "com.example.App", kSecAttrAccount as String: "ada"], value: Data("s3cr3t".utf8)
             )
             let bob = keychain.seed(.genericPassword, [kSecAttrService as String: "com.example.App", kSecAttrAccount as String: "bob"])
-            let sut = DebugDrawerPluginTransport.direct(to: KeychainModel(keychain: keychain))
+            let model = KeychainModel(keychain: keychain)
+            let sut = DebugDrawerPluginTransport.direct(to: model)
             sut.send(KeychainCommand(.reload))
             let readsBeforeOpening = keychain.valueReads
 
             sut.send(KeychainCommand(.toggle(ada)))
             let revealed = sut.snapshot.selection
+            let revealedValue = model.revealedValue(for: ada)
             sut.send(KeychainCommand(.toggle(ada)))
             let closed = sut.snapshot.selection
+            let valueOnceClosed = model.revealedValue(for: ada)
             keychain.refusal = KeychainError(status: errSecInteractionNotAllowed)
             sut.send(KeychainCommand(.toggle(bob)))
             let refused = sut.snapshot.selection
 
             #expect(readsBeforeOpening.isEmpty)
             #expect(revealed?.item.id == ada)
-            #expect(revealed?.value == .success(Data("s3cr3t".utf8)))
+            #expect(revealed?.value == .held)
+            #expect(revealedValue == Data("s3cr3t".utf8))
             #expect(closed == nil)
+            #expect(valueOnceClosed == nil)
             #expect(refused?.item.id == bob)
-            #expect(refused?.value == .failure(KeychainError(status: errSecInteractionNotAllowed)))
+            #expect(refused?.value == .refused(KeychainError(status: errSecInteractionNotAllowed)))
+            #expect(model.revealedValue(for: bob) == nil)
         }
 
         @Test("A command naming an item that isn't listed does nothing")
@@ -206,15 +212,17 @@
                 kSecAttrService as String: "com.example.App", kSecAttrAccount as String: "ada", kSecAttrLabel as String: "Token",
                 kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlock as String
             ], value: Data("old".utf8))
-            let sut = DebugDrawerPluginTransport.direct(to: KeychainModel(keychain: keychain))
+            let model = KeychainModel(keychain: keychain)
+            let sut = DebugDrawerPluginTransport.direct(to: model)
             sut.send(KeychainCommand(.reload))
             let expectedDraft = GenericPassword(
-                service: "com.example.App", account: "ada", label: "Token", value: "old",
+                service: "com.example.App", account: "ada", label: "Token",
                 accessGroup: "TEAMID.com.example.app", accessibility: .afterFirstUnlock
             )
 
             sut.send(KeychainCommand(.startEditing(ada)))
             let draft = sut.snapshot.editor?.draft
+            let startingValue = model.revealedValue(for: ada)
             var changed = try #require(draft)
             changed.account = "ada.lovelace"
             changed.value = "new"
@@ -222,6 +230,7 @@
             let edited = sut.snapshot.allItems.first { $0.id == ada }
 
             #expect(draft == expectedDraft)
+            #expect(startingValue == Data("old".utf8))
             #expect(sut.snapshot.editor == nil)
             #expect(edited?.account == "ada.lovelace")
             #expect(keychain.records.first?.value == Data("new".utf8))
