@@ -9,7 +9,8 @@ public extension DebugDrawerReceiverCapability {
     /// The analytics events `AnalyticsEvents.record` records while a sidecar's session is open,
     /// redacted in the app by `redaction` before they are kept or written anywhere: a sidecar sees
     /// them in ``AnalyticsEventsMirror/Snapshot`` as they arrive. Nothing recorded before the
-    /// session opens, or after it ends or expires, reaches it.
+    /// session opens, or after it ends or expires, reaches it. Under a grant policy only a
+    /// session whose grant lists ``AnalyticsEventsMirror/pluginID`` is mirrored events.
     ///
     /// ```swift
     /// receiver.enable(.analyticsEvents(sessions: sessions, redaction: .standard.adding(keys: ["customer_name"])))

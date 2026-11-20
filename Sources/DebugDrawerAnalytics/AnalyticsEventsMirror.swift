@@ -8,7 +8,9 @@ import Foundation
 // recorded while its session was open, and nothing from before or after. Rejected: buffering events
 // recorded before a session for the sidecar to read once it opens one (whatever the app sent while
 // nobody was debugging would leave the process), and keeping a session's events after it ends (the
-// store would hold them with no session open).
+// store would hold them with no session open). Under a grant policy a session whose grant doesn't
+// list the capability is mirrored nothing: the sessions only check grants against commands, and
+// this capability's point is what it serves.
 
 /// The analytics events recorded during the open sidecar session, redacted, as the receiver
 /// serves them under ``pluginID``.
@@ -149,18 +151,18 @@ public final class AnalyticsEventsMirror: DebugDrawerPluginModel {
         }
     }
 
-    /// Starts a session's list as it opens, and empties it as it ends or expires.
+    /// Starts a session's list as a session opens whose grant, if it has one, lists the
+    /// capability, and empties it as the session ends or expires. A session whose grant doesn't
+    /// list it is mirrored nothing: its inbox stays closed, so its events aren't even redacted.
     private func follow(_ state: DebugDrawerSessionState) {
-        switch state.session {
-        case let session? where session.id != snapshot.sessionID:
+        let session = state.session
+        guard session?.id != snapshot.sessionID else { return }
+        if let session, session.allows(Self.pluginID) {
             inbox.open(session)
-            snapshot = Snapshot(sessionID: session.id, events: [])
-        case nil where snapshot.sessionID != nil:
+        } else {
             inbox.close()
-            snapshot = Snapshot(sessionID: nil, events: [])
-        default:
-            break
         }
+        snapshot = Snapshot(sessionID: session?.id, events: [])
     }
 
     /// Adds the events waiting in the inbox for the open session.

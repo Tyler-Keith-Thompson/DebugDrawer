@@ -11,7 +11,8 @@ public extension DebugDrawerReceiverCapability {
     /// those MetricKit still holds from before: each redacted by `redaction` and kept in
     /// `directory` across launches, the newest `capacity`, and served to a sidecar in
     /// ``MetricKitPayloadsMirror/Snapshot`` while its session is open. A crash's diagnostic, which
-    /// MetricKit delivers on a later launch, so reaches the next session.
+    /// MetricKit delivers on a later launch, so reaches the next session. Under a grant policy
+    /// only a session whose grant lists ``MetricKitPayloadsMirror/pluginID`` is served them.
     ///
     /// Making it subscribes to `MXMetricManager`; nothing is kept before. Where MetricKit doesn't
     /// exist, nothing arrives.

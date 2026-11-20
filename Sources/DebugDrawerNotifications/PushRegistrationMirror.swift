@@ -177,7 +177,7 @@ public final class PushRegistrationMirror: DebugDrawerPluginModel {
         let session = state.session
         guard session?.id != snapshot.sessionID else { return }
         settingsRead?.cancel()
-        guard let session, session.grant.map({ $0.capabilities.contains(Self.pluginID) }) ?? true else {
+        guard let session, session.allows(Self.pluginID) else {
             snapshot = Snapshot(sessionID: session?.id, registration: nil, environment: nil, settings: nil)
             return
         }

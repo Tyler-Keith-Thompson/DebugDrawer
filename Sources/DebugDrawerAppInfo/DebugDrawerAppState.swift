@@ -208,7 +208,7 @@ public final class DebugDrawerAppState: DebugDrawerPluginModel {
     private func follow(_ state: DebugDrawerSessionState) {
         let session = state.session
         guard session?.id != snapshot.sessionID else { return }
-        guard let session, session.grant.map({ $0.capabilities.contains(Self.pluginID) }) ?? true else {
+        guard let session, session.allows(Self.pluginID) else {
             snapshot = Snapshot(sessionID: session?.id, state: nil)
             return
         }

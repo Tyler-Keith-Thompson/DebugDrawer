@@ -194,8 +194,8 @@ grant lists it:
   network mocking (the allowed hosts) and app state reset (the allowed categories).
 - Served only during a session: diagnostics capture, bug reports, analytics events, MetricKit
   payloads, performance traces, the app state reset listing, the push registration and the app
-  state snapshot. Of these, only the push registration and the app state snapshot also check
-  that the session's grant lists them.
+  state snapshot. Of these, analytics events, MetricKit payloads, the push registration and the
+  app state snapshot also check that the session's grant lists them.
 
 So list in an adapter or allowlist only what you're content for any app of the group to read.
 
@@ -220,10 +220,10 @@ receiver, as network mocking always does.
 | Environments | High | Session, always | Under a policy |
 | Allowlisted UserDefaults | Medium | Session by default, or persistent | Under a policy |
 | Tweaks | The tweaks' | Persistent by default, or session | Under a policy |
-| Analytics events | Low | Nothing to revert | Under a policy (commands only) |
+| Analytics events | Low | Nothing to revert | Under a policy, to be served too |
 | Localization review | Low | Session, always | Under a policy |
 | Accessibility overrides | Low | Session, always | Under a policy |
-| Crash reports and MetricKit payloads | Low | Persistent (deletions) | Under a policy (commands only) |
+| Crash reports and MetricKit payloads | Low | Persistent (deletions) | Under a policy, to be served too |
 | Network mocking | High | Session, always | Always |
 | Push token | Low to medium | Nothing to revert | Under a policy, to be served too |
 | App state reset | Medium (data loss) | Persistent (can't be undone) | Under a policy |
@@ -323,8 +323,8 @@ or set a value the tweak doesn't offer. **Limits:** persistent by default; with
 `AnalyticsEventsMirror` (`.analyticsEvents(sessions:redaction:capacity:)`,
 `DebugDrawerAnalytics`). **Can:** read the events the app records during their session, redacted.
 **Can't:** read events from before the session or after it, or unredacted values. **Limits:**
-add redaction rules for your own event properties; under a grant policy the mirror serves any
-open session, whether or not its grant lists it.
+add redaction rules for your own event properties; under a grant policy the mirror serves only a
+session whose grant lists it, and mirrors nothing to any other.
 
 ### Localization review and accessibility overrides
 
@@ -341,7 +341,7 @@ the MetricKit payloads the app kept (metrics, crashes, hangs, the system's stack
 session, and delete the app's copies. **Can't:** read an Objective-C exception's reason, which is
 masked by default, or install any handler: the capability only subscribes to MetricKit.
 **Limits:** kept in the app's own Application Support, not the group, and served only during a
-session; under a grant policy it serves any open session, whether or not its grant lists it.
+session; under a grant policy it serves only a session whose grant lists it.
 
 ### Network mocking
 
@@ -399,8 +399,6 @@ but after a kill only if the model keeps a record of what it changed and reverts
   `scope: .session(revertWith: .resetAll)` are stored values, and nothing reverts them at the
   next launch when the app was killed during the session. The same holds for an app's own model
   enabled with a session scope, unless it records and reverts its own leftovers.
-- **Analytics events and MetricKit payloads ignore the grant's list.** Under a grant policy they
-  are served to any open session, while their commands need a grant that lists them.
 - **Snapshots aren't gated.** See "What a sidecar can read without a session".
 - **A grant can open one more session after a relaunch.** See "Signed grants".
 - **The audit log is in memory.** Forward it, or it goes with the process.

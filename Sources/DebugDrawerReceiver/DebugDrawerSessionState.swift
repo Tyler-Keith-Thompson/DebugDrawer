@@ -60,6 +60,21 @@ public struct DebugDrawerSession: Codable, Equatable, Sendable {
     }
 }
 
+// The sessions check a grant only against commands; a capability whose point is what it serves
+// (push registration, app state, analytics events, MetricKit payloads) asks this before serving a
+// session anything, so a grant meant for one capability doesn't expose another's data. Without a
+// grant (no policy) every session is served, as every command in one is applied.
+extension DebugDrawerSession {
+    /// Whether `capability` may serve this session what it holds: always for a session without a
+    /// grant, and otherwise only when its grant lists `capability`.
+    ///
+    /// - Parameter capability: The ID the capability's model is served under.
+    /// - Returns: Whether to serve the session.
+    package func allows(_ capability: String) -> Bool {
+        grant.map { $0.capabilities.contains(capability) } ?? true
+    }
+}
+
 /// What a sidecar asks of ``DebugDrawerSessions``.
 public enum DebugDrawerSessionCommand: Codable, Equatable, Sendable {
     /// Opens a session lasting `duration` seconds, or the host's maximum if that is shorter.

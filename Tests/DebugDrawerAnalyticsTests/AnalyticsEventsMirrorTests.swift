@@ -31,6 +31,21 @@ private final class IdleTimer: SessionTimer {
     func cancel() {}
 }
 
+/// Accepts every token as a grant for `audience` listing `capabilities`, valid at any time, under
+/// an ID of the token itself, so each token opens one session: it stands in for a company's grant
+/// server.
+private struct AcceptingGrantVerifier: DebugDrawerGrantVerifier {
+    let audience: String
+    let capabilities: [String]
+
+    func verify(_ token: String) throws(DebugDrawerGrantVerificationError) -> DebugDrawerGrant {
+        DebugDrawerGrant(
+            id: token, subject: "employee@example.com", audiences: [audience], capabilities: capabilities,
+            notBefore: .distantPast, expires: .distantFuture
+        )
+    }
+}
+
 @MainActor
 @Suite(.timeLimit(.minutes(1)))
 struct AnalyticsEventsMirrorTests {
@@ -165,5 +180,53 @@ struct AnalyticsEventsMirrorTests {
 
         #expect(snapshot.events.first?.properties == expected)
         #expect(decoded == snapshot)
+    }
+
+    @Test("Under a grant policy, a session whose grant doesn't list the capability is mirrored no events: its inbox never opens")
+    func grantWithoutCapability() {
+        let clock = MovableClock(Self.start)
+        let inboxes = AnalyticsMirrorInboxes()
+        let policy = DebugDrawerGrantPolicy(
+            verifier: AcceptingGrantVerifier(audience: "com.example.app", capabilities: ["DebugDrawer.FeatureFlagOverrides"]),
+            audience: "com.example.app"
+        )
+        let sessions = DebugDrawerSessions(maximumDuration: 300, auditCapacity: 10, grantPolicy: policy, clock: clock, timer: IdleTimer())
+        let sut = AnalyticsEventsMirror(sessions: sessions, redaction: .none, capacity: 10, inboxes: inboxes) { clock.now }
+
+        sessions.perform(.open(duration: 60, grant: "flags-only"))
+        let isMirroring = inboxes.isMirroring
+        inboxes.deliver(name: "checkout_completed", properties: ["plan": "pro"], source: nil)
+
+        #expect(sessions.snapshot.isActive)
+        #expect(!isMirroring)
+        let expected = AnalyticsEventsMirror.Snapshot(sessionID: sessions.snapshot.session?.id, events: [])
+        #expect(sut.snapshot == expected)
+    }
+
+    @Test("Under a grant policy, a session whose grant lists the capability is mirrored its events")
+    func grantWithCapability() async {
+        let clock = MovableClock(Self.start)
+        let inboxes = AnalyticsMirrorInboxes()
+        let policy = DebugDrawerGrantPolicy(
+            verifier: AcceptingGrantVerifier(audience: "com.example.app", capabilities: [AnalyticsEventsMirror.pluginID]),
+            audience: "com.example.app"
+        )
+        let sessions = DebugDrawerSessions(maximumDuration: 300, auditCapacity: 10, grantPolicy: policy, clock: clock, timer: IdleTimer())
+        let sut = AnalyticsEventsMirror(sessions: sessions, redaction: .none, capacity: 10, inboxes: inboxes) { clock.now }
+        let (published, publish) = AsyncStream<AnalyticsEventsMirror.Snapshot>.makeStream()
+        let subscription = sut.$snapshot.sink { publish.yield($0) }
+        defer { subscription.cancel() }
+        var changes = published.makeAsyncIterator()
+        let expected = ["checkout_completed"]
+
+        sessions.perform(.open(duration: 60, grant: "analytics"))
+        inboxes.deliver(name: "checkout_completed", properties: ["plan": "pro"], source: nil)
+        var actual = sut.snapshot
+        while actual.events.isEmpty, let next = await changes.next() {
+            actual = next
+        }
+
+        #expect(actual.sessionID == sessions.snapshot.session?.id)
+        #expect(actual.events.map(\.name) == expected)
     }
 }

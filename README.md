@@ -2800,9 +2800,9 @@ AnalyticsEvents.record("checkout_completed", properties: ["plan": "pro", "seats"
   expires the list empties and nothing more is mirrored, even an event recorded after the expiry
   date before the system's timer fires. The snapshot keeps the session's newest 1,000 events
   (`capacity:`); `AnalyticsEventsMirror.Command.clear` drops those already read. While no session
-  is open, `record` in a release build evaluates none of its arguments. Under a grant policy the
-  events are served to any open session, whether or not its grant lists
-  `AnalyticsEventsMirror.pluginID`; only `clear` needs a grant that does.
+  is open, `record` in a release build evaluates none of its arguments. Under a grant policy only
+  a session whose grant lists `AnalyticsEventsMirror.pluginID` is mirrored events; a session whose
+  grant doesn't is served its ID and no events, and nothing recorded during it is kept.
 - **Redacted in the app.** Each event is redacted on the thread that records it, before it is kept
   anywhere, so no unredacted value reaches the snapshot, the store's files or the audit log
   (which never holds an event). `AnalyticsRedaction.standard` masks the value of any property
@@ -2960,9 +2960,9 @@ final class ProductionDiagnostics {
   period, arrival and JSON. While no session is open it holds none, and it empties as the session
   ends or expires. Within a session `MetricKitPayloadsMirror.Command.delete(id:)` and `deleteAll`
   delete the app's copies, such as once the sidecar has sent them on, and MetricKit delivering one
-  again doesn't bring it back. Under a grant policy the payloads are served to any open session,
-  whether or not its grant lists `MetricKitPayloadsMirror.pluginID`; only deleting needs a grant
-  that does.
+  again doesn't bring it back. Under a grant policy the payloads are served only to a session
+  whose grant lists `MetricKitPayloadsMirror.pluginID`; a session whose grant doesn't is served its
+  ID and no payloads.
 - **Bounded.** A payload whose JSON is larger than a megabyte once redacted is dropped, so the
   snapshot holds at most a megabyte per payload of its capacity.
 - **Redacted in the app.** MetricKit's payloads are the system's measurements: numbers,

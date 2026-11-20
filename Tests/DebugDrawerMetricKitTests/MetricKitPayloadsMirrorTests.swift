@@ -35,6 +35,21 @@
         }
     }
 
+    /// Accepts every token as a grant for `audience` listing `capabilities`, valid at any time,
+    /// under an ID of the token itself, so each token opens one session: it stands in for a
+    /// company's grant server.
+    private struct AcceptingGrantVerifier: DebugDrawerGrantVerifier {
+        let audience: String
+        let capabilities: [String]
+
+        func verify(_ token: String) throws(DebugDrawerGrantVerificationError) -> DebugDrawerGrant {
+            DebugDrawerGrant(
+                id: token, subject: "employee@example.com", audiences: [audience], capabilities: capabilities,
+                notBefore: .distantPast, expires: .distantFuture
+            )
+        }
+    }
+
     @MainActor
     @Suite
     struct MetricKitPayloadsMirrorTests {
@@ -204,6 +219,47 @@
             sut = nil
 
             #expect(source.unsubscriptions == 1)
+        }
+
+        @Test("Under a grant policy, a session whose grant doesn't list the capability is served no payloads, kept or arriving")
+        func grantWithoutCapability() {
+            let directory = FileManager.default.temporaryDirectory.appending(path: "MetricKitPayloadsMirrorTests-\(UUID().uuidString)")
+            let policy = DebugDrawerGrantPolicy(
+                verifier: AcceptingGrantVerifier(audience: "com.example.app", capabilities: ["DebugDrawer.FeatureFlagOverrides"]),
+                audience: "com.example.app"
+            )
+            let sessions = DebugDrawerSessions(maximumDuration: 300, grantPolicy: policy)
+            let source = FakeSource(held: [ReceivedMetricKitPayload(kind: .diagnostics, json: MetricKitFixtures.crashDiagnosticPayload)])
+            let sut = MetricKitPayloadsMirror(sessions: sessions, directory: directory, redaction: .standard, capacity: 10, source: source)
+
+            sessions.perform(.open(duration: 60, grant: "flags-only"))
+            let opened = sut.snapshot
+            source.deliver([ReceivedMetricKitPayload(kind: .metrics, json: MetricKitFixtures.metricPayload)])
+
+            #expect(sessions.snapshot.isActive)
+            let expected = MetricKitPayloadsMirror.Snapshot(sessionID: sessions.snapshot.session?.id, payloads: [])
+            #expect(opened == expected)
+            #expect(sut.snapshot == expected)
+        }
+
+        @Test("Under a grant policy, a session whose grant lists the capability is served the payloads kept and those arriving")
+        func grantWithCapability() {
+            let directory = FileManager.default.temporaryDirectory.appending(path: "MetricKitPayloadsMirrorTests-\(UUID().uuidString)")
+            let policy = DebugDrawerGrantPolicy(
+                verifier: AcceptingGrantVerifier(audience: "com.example.app", capabilities: [MetricKitPayloadsMirror.pluginID]),
+                audience: "com.example.app"
+            )
+            let sessions = DebugDrawerSessions(maximumDuration: 300, grantPolicy: policy)
+            let source = FakeSource(held: [ReceivedMetricKitPayload(kind: .diagnostics, json: MetricKitFixtures.crashDiagnosticPayload)])
+            let sut = MetricKitPayloadsMirror(sessions: sessions, directory: directory, redaction: .standard, capacity: 10, source: source)
+
+            sessions.perform(.open(duration: 60, grant: "metrickit"))
+            let opened = sut.snapshot.payloads.map(\.kind)
+            source.deliver([ReceivedMetricKitPayload(kind: .metrics, json: MetricKitFixtures.metricPayload)])
+
+            #expect(sut.snapshot.sessionID == sessions.snapshot.session?.id)
+            #expect(opened == [.diagnostics])
+            #expect(Set(sut.snapshot.payloads.map(\.kind)) == [.diagnostics, .metrics])
         }
     }
 #endif

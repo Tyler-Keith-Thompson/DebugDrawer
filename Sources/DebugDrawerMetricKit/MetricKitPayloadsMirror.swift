@@ -9,7 +9,9 @@ import Foundation
 // emptied as it ends or expires. The sessions' rule that commands outside a session are refused
 // is about changing the app; serving is a separate choice, and this one makes it the same way:
 // nothing leaves the app's own storage for the shared container until someone is debugging, so a
-// sidecar installed beside the app, or any app in the group, reads nothing between sessions.
+// sidecar installed beside the app, or any app in the group, reads nothing between sessions. Under
+// a grant policy a session whose grant doesn't list the capability is served nothing either, as the
+// sessions only check grants against commands.
 // Rejected: serving whenever enabled (crash data in the shared container all the time, though no
 // one asked for it); keeping payloads in the app group's container (the same, at rest); serving
 // only what arrives during a session, as the analytics capability does (a crash would never
@@ -130,6 +132,9 @@ public final class MetricKitPayloadsMirror: DebugDrawerPluginModel {
     private let source: (any MetricKitPayloadSource)?
     private let now: () -> Date
     private var sessionObservation: AnyCancellable?
+    /// Whether the open session is served: one is open, and its grant, if it has one, lists the
+    /// capability.
+    private var isServing = false
 
     /// A mirror that keeps what `source` delivers in `directory` and serves it during `sessions`'
     /// open session.
@@ -193,15 +198,17 @@ public final class MetricKitPayloadsMirror: DebugDrawerPluginModel {
         }
     }
 
-    /// Serves the payloads as a session opens, and none as it ends or expires.
+    /// Serves the payloads as a session opens whose grant, if it has one, lists the capability,
+    /// and none as it ends or expires.
     private func follow(_ state: DebugDrawerSessionState) {
-        let sessionID = state.session?.id
-        guard sessionID != snapshot.sessionID else { return }
-        snapshot = Snapshot(sessionID: sessionID, payloads: sessionID == nil ? [] : archive.payloads)
+        let session = state.session
+        guard session?.id != snapshot.sessionID else { return }
+        isServing = session?.allows(Self.pluginID) ?? false
+        snapshot = Snapshot(sessionID: session?.id, payloads: isServing ? archive.payloads : [])
     }
 
     private func publish() {
-        guard snapshot.sessionID != nil else { return }
+        guard isServing else { return }
         snapshot.payloads = archive.payloads
     }
 }
