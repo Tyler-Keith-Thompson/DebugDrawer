@@ -63,6 +63,9 @@
             let directory = store.deletingLastPathComponent().appending(path: "Reports")
 
             let hosted = try await sut.host(.bugReports)
+            // Bug Reports keeps its type's default ID, unlike its model's: hosting it again
+            // still finds the one shown (DD-269).
+            _ = try await sut.host(.bugReports)
             try hosted.body.inspect().find(ViewType.TextField.self).setInput("Tapped Pay twice")
             let archive = try sut.createReport(in: directory)
 
@@ -79,7 +82,7 @@
             for await snapshot in reports.$snapshot.values where !snapshot.exports.isEmpty {
                 break
             }
-            #expect(sut.hosted.map(\.id) == [DebugDrawerBugReports.pluginID])
+            #expect(sut.hosted.map(\.title) == ["Bug Reports"])
             #expect(throws: Never.self) { try hosted.body.inspect().find(text: "Checkout froze") }
             #expect(screenshot == Self.png)
             #expect(note.contains("Note: Checkout froze"))

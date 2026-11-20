@@ -42,6 +42,10 @@ import Foundation
         @Published public private(set) var hosted: [AnyDebugDrawerPlugin] = []
 
         private let transport: DebugDrawerSidecarTransport
+        /// The plugins shown so far, by the ``DebugDrawerSidecarPlugin/id`` they were asked for:
+        /// the made plugin's own `id` may differ (a type's default is its type name), so it can't
+        /// be what ``host(_:)`` finds them by.
+        private var hostedByPluginID: [String: AnyDebugDrawerPlugin] = [:]
         private var channelForwarding: AnyCancellable?
         /// Waits for the sessions' first snapshot.
         private var connectingSessions: Task<Void, Never>?
@@ -94,7 +98,8 @@ import Foundation
         }
 
         /// The plugin over a transport to the app's model of it, once the model's first snapshot
-        /// arrives: the one made before, if the plugin was shown already.
+        /// arrives: the one made before, if a plugin with the same ``DebugDrawerSidecarPlugin/id``
+        /// was shown already, whatever the made plugin's own `id` is.
         ///
         /// It waits while the app doesn't serve the model, and throws `cancelled` if the task
         /// waiting is cancelled first.
@@ -105,10 +110,11 @@ import Foundation
         ///   plugin's ID has other types, `disconnected` once ``close()`` is called, and
         ///   `cancelled`.
         public func host(_ plugin: DebugDrawerSidecarPlugin) async throws(DebugDrawerTransportError) -> AnyDebugDrawerPlugin {
-            if let shown = hosted.first(where: { $0.id == plugin.id }) { return shown }
+            if let shown = hostedByPluginID[plugin.id] { return shown }
             let made = try await plugin.connect(transport)
             // Another call may have made it while this one waited: the first stays.
-            if let shown = hosted.first(where: { $0.id == plugin.id }) { return shown }
+            if let shown = hostedByPluginID[plugin.id] { return shown }
+            hostedByPluginID[plugin.id] = made
             hosted.append(made)
             return made
         }

@@ -51,9 +51,6 @@ import SwiftUI
     struct BugReportsPlugin: DebugDrawerPlugin, DebugDrawerReportContributor {
         let transport: DebugDrawerPluginTransport<DebugDrawerBugReports.Snapshot, DebugDrawerBugReports.Command>
         let review: BugReportReview
-        // The capability's ID, as Console's and Network's are their models', so the connection
-        // finds the plugin it hosted under the ID it was asked for.
-        let id = DebugDrawerBugReports.pluginID
         let title = "Bug Reports"
         let icon = "ladybug"
 
@@ -238,7 +235,6 @@ import SwiftUI
 
     /// Draws nothing.
     struct BugReportsPlugin: DebugDrawerPlugin {
-        let id = DebugDrawerBugReports.pluginID
         let title = "Bug Reports"
         let icon = "ladybug"
 
