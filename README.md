@@ -1974,7 +1974,8 @@ the plugin shows, and nothing is deleted. So does a simulator build whose entitl
 `application-identifier`, which Xcode adds and Bazel's rules_apple doesn't. A Mac app that isn't
 sandboxed shares Documents, Application Support, Caches and the temporary directory with every other
 app, so there Files clears only Application Support's folder named after the app, and Caches only
-Caches' one. The plugin builds for macOS, iOS, Mac Catalyst, visionOS and tvOS.
+Caches' one. The plugin builds for macOS, iOS, Mac Catalyst, visionOS and tvOS. A production build
+resets the same categories from a sidecar: see Resetting the app's state, under Production builds.
 
 ### View Inspector: which views keep re-rendering
 
@@ -2609,6 +2610,68 @@ final class ProductionAuthActions {
 In the sidecar, the kit's `DebugDrawerSidecarPlugin.authActions` lists the actions with a button
 each, which sends the request and then opens the app, and each action's last run: running,
 succeeded, or failed with the app's message.
+
+**Resetting the app's state: defaults, files, caches and cookies.** To get a production build back
+to a fresh install on an employee's own device without reinstalling it, the app allows the
+categories a sidecar may clear, the same ones the Reset App State plugin clears in a debug build;
+the sidecar lists what each holds, confirms exactly that, and the app clears it as it next comes to
+the foreground. It lives in `DebugDrawerAppStateReset`, which a release build links beside the
+receiver (it links WebKit for the cookies; the receiver doesn't):
+
+```swift
+import DebugDrawerAppStateReset
+import DebugDrawerReceiver
+
+@MainActor
+final class ProductionReset {
+    let sessions = DebugDrawerSessions(maximumDuration: 15 * 60)
+    let receiver: DebugDrawerReceiver
+
+    init(container: URL) throws {
+        receiver = DebugDrawerReceiver(directory: container.appending(path: "DebugDrawer"), sessions: sessions)
+        receiver.enable(.appStateReset(AppStateResetRequests(
+            sessions: sessions,
+            allowing: [.userDefaults, .caches, .urlCache, .cookies],
+            launchURL: URL(string: "shop-internal://")
+        )))
+        try receiver.start()
+    }
+}
+```
+
+- **The risk: data loss.** A reset deletes what the app holds on the device it runs on, and it can't
+  be brought back: a tester's drafts, downloads and sign-in go with it. Allow only the categories a
+  tester needs; an app that allows only `.caches` (and `.urlCache`) lets a sidecar clear its caches
+  and nothing else. Consider `.requiringGrant()` on the capability, so only a sidecar your server
+  vouches for may reset.
+- **Off by default.** Until the app enables `.appStateReset(_:)`, a request is refused as
+  `commandRefused(.unknownCapability)`, even inside a session; a category the app didn't allow as
+  `commandRefused(.notExposed)`, deleting nothing.
+- **The keychain only when asked for by name.** `.all` holds every category but the keychain, and
+  naming `.keychain` in `allowing:` traps; the app allows it with `allowingKeychain: true` alone,
+  and then the listing names each item by its service or label, never its account.
+- **The confirmation lists what will be deleted, and nothing else is.** Nothing is read until the
+  sidecar asks, in a session. The snapshot lists each category's keys, top-level files and folders
+  with their sizes, cookie domains and keychain services (at most 500 a category, with a count of
+  the rest), never a value. A reset carries the categories confirmed and the revision of each that
+  the confirmation showed; one at another revision is refused as
+  `commandRefused(.staleConfirmation)`, and when what a category holds changes before the reset
+  runs, the app deletes nothing and reports the categories that changed. A size changing doesn't
+  count; a key, file, domain or item coming or going does.
+- **On the next foreground, then reported.** A confirmed reset waits until the app is in the
+  foreground, runs at once when it already is, and is dropped when the session ends first or the
+  app quits; the sidecar opens `launchURL` (on the Mac, the app by its bundle identifier) to bring
+  it there. The snapshot's `lastReset` reports what each category cleared and what it couldn't
+  delete, and why. The app keeps running; restart it yourself if it caches what was cleared.
+- **What stays.** DebugDrawer's own state (the keys starting `com.debugdrawer.` or `DebugDrawer.`
+  and the files named `DebugDrawer…`), and the receiver's store, so the session, its audit log and
+  the sidecar's view of the app survive the reset. A request is performed only in an open session
+  and audited.
+
+In the sidecar, the kit's `DebugDrawerSidecarPlugin.appStateReset` lists the allowed categories
+with a checkbox each and what it would clear; Review Reset… opens a confirmation listing every
+item, and Reset sends it and then opens the app (`DebugDrawerSidecarApp.open(url:)`). While the
+reset waits for the app it can be canceled; then the plugin shows what was cleared.
 
 **Turning it off remotely.** To shut every sidecar out without a release (a leaked sidecar app,
 say), give the receiver a gate backed by your own remote configuration, and a capability one of
@@ -3318,8 +3381,8 @@ DebugDrawerSidecarView(groupIdentifier: "group.com.example.debug", sessionDurati
 
 Below it, a picker shows the plugins the app serves, drawn by the plugins' own views over the
 transport: `.console` and `.network` by default, `.bugReports` for an app that serves bug
-reports, `.scenarios` for one that registers scenarios and `.authActions` for one that registers
-auth actions (above). A plugin of your own whose model adopts
+reports, `.scenarios` for one that registers scenarios, `.authActions` for one that registers
+auth actions and `.appStateReset` for one that allows a reset (above). A plugin of your own whose model adopts
 `DebugDrawerPluginModel` joins them with `DebugDrawerSidecarPlugin(id:title:icon:snapshot:command:plugin:)`,
 whose closure makes the plugin's view over the transport the kit hands it. Create Report writes the
 hosted plugins' report contributions, redacted by `DebugDrawer.shared.redaction`, under a summary
@@ -3526,7 +3589,7 @@ ContentView()
 | Module | Holds |
 |---|---|
 | `DebugDrawer` | The drawer: its window, the plugin protocol and registry, the views plugins are built from, and release-build stand-ins |
-| `DebugDrawerReceiver` | The one product a release build may link: serves a sidecar app, over the app group's store, only the capabilities the app enables (feature flag and experiment overrides, log level elevation, diagnostics capture, bug reports the app triggers, scenarios the app registers, or any plugin model) within sessions the sidecar opens, refusing and auditing everything else; UI-less, no interception |
+| `DebugDrawerReceiver` | The one product a release build may link: serves a sidecar app, over the app group's store, only the capabilities the app enables (feature flag and experiment overrides, log level elevation, diagnostics capture, bug reports the app triggers, scenarios the app registers, auth actions, or any plugin model) within sessions the sidecar opens, refusing and auditing everything else; UI-less, no interception |
 | `DebugDrawerConsolePlugin` | `os_log` entries (stdout and stderr on macOS) and an app logger's lines through `ConsoleLogSink`, with metadata: level filter, text or regular-expression search, subsystem and category mutes, time range, auto-follow, copy, lines kept across launches |
 | `DebugDrawerViewInspectorPlugin` | View borders by depth, alignment grid, click indicators, animation speed, render counts of the views an app tracks with `.trackRenders(_:)`, hierarchy snapshot |
 | `DebugDrawerAccessibility` | The receiver capability (`.accessibilityEnvironmentOverrides()`) that lets a sidecar override Dynamic Type, Increase Contrast and Reduce Motion for its session, and the modifier the app's root view applies them with (`.accessibilityEnvironmentOverrides()`); no drawer, so a release build links it beside the receiver |
@@ -3567,9 +3630,10 @@ ContentView()
 | `DebugDrawerScreenRecordingPlugin` | The app's windows recorded as a QuickTime movie without the drawer, its HUD or its toasts, started and stopped from the drawer or the HUD, with touch indicators on iOS: the saved recordings to share or delete, and the newest in the bug report |
 | `DebugDrawerDesignOverlayPlugin` | A design mockup over the app's content, picked from Photos or Files on iOS or a file or the pasteboard on macOS: opacity, an offset set by steppers or by dragging in Move mode, the scale, and a difference blend that shows pixel drift; touches pass through to the app |
 | `DebugDrawerColorVisionPlugin` | Protanopia, deuteranopia, tritanopia and grayscale simulated live over the views marked `.debugColorVision()`, in linear RGB with Machado et al.'s matrices, picked in the drawer or cycled from the HUD, while the drawer keeps its colors |
-| `DebugDrawerAppStateResetPlugin` | The app's state cleared as a fresh install leaves it, by category: UserDefaults, keychain items, the container's files, caches, cookies, the URL cache and the app's own cleanup, each listed before a confirmation, then relaunched on macOS or quit elsewhere |
+| `DebugDrawerAppStateReset` | The receiver capability (`.appStateReset(_:)`) that lets a sidecar reset the categories a production app allows (never the keychain unless it opts in), listed and confirmed by revision, applied on the next foreground; no drawer, so a release build links it beside the receiver |
+| `DebugDrawerAppStateResetPlugin` | The app's state cleared as a fresh install leaves it, by category: UserDefaults, keychain items, the container's files, caches, cookies, the URL cache and the app's own cleanup, each listed before a confirmation, then relaunched on macOS or quit elsewhere; re-exports `DebugDrawerAppStateReset` |
 | `DebugDrawerRemote` | Plugin models served to a viewer on another device over the local network: an opt-in Network.framework server advertised over Bonjour, each viewer paired with a six-digit code the device shows, and the viewer's transport and browser |
-| `DebugDrawerSidecarKit` | A sidecar app, as a library: `DebugDrawerSidecarView` lists the apps in the group that serve a sidecar, opens their sessions (with a grant the company's server gives, when they require one), shows their Console, Network, Bug Reports, Scenarios, Auth and other model-backed plugins over the socket or the store, and makes and uploads a report of them; iOS, iPadOS and macOS, debug builds |
+| `DebugDrawerSidecarKit` | A sidecar app, as a library: `DebugDrawerSidecarView` lists the apps in the group that serve a sidecar, opens their sessions (with a grant the company's server gives, when they require one), shows their Console, Network, Bug Reports, Scenarios, Auth, Reset App State and other model-backed plugins over the socket or the store, and makes and uploads a report of them; iOS, iPadOS and macOS, debug builds |
 
 ## Development
 

@@ -13,6 +13,7 @@ swift_library(
     module_name = "DebugDrawerAppStateResetPlugin",
     deps = [
         "//Sources/DebugDrawer",
+        "//Sources/DebugDrawerAppStateReset",
     ],
     visibility = ["//visibility:public"],
 )
@@ -24,6 +25,7 @@ docc_archive(
     catalog = glob(["*.docc/**"], allow_empty = True),
     deps = [
         "//Sources/DebugDrawer:DebugDrawerDocumentation",
+        "//Sources/DebugDrawerAppStateReset:DebugDrawerAppStateResetDocumentation",
     ],
     tags = ["manual"],
     visibility = ["//visibility:public"],

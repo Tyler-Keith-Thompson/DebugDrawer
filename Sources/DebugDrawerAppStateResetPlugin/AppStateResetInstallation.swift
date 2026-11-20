@@ -1,5 +1,6 @@
 #if DEBUG
     import DebugDrawer
+    import DebugDrawerAppStateReset
     import Foundation
 
     /// What `AppStateReset.install(appGroups:directories:cleanup:)` does in debug builds.
@@ -14,7 +15,7 @@
             let bundleID = Bundle.main.bundleIdentifier ?? ProcessInfo.processInfo.processName
             var groups = AppGroupEntitlements.identifiers()
             groups += appGroups.filter { !groups.contains($0) }
-            let appState = AppState(
+            var appState = AppState(
                 domains: [bundleID] + groups,
                 preferences: _PreferenceStore(appDomain: bundleID),
                 keychain: _Keychain(),
@@ -24,11 +25,20 @@
                 cleanup: cleanup,
                 debugDrawerDomain: UserDefaults.debugDrawerSuiteName
             )
+            appState.container.ownWork = DrawerFileWork()
             let model = AppStateResetModel(appState: appState, process: _AppProcess())
             let plugin = AppStateResetPlugin(model: model)
             DebugDrawer.shared.unregisterGlobal(id: plugin.id)
             DebugDrawer.shared.registerGlobal(plugin)
             return model
+        }
+    }
+
+    /// Marks the container's walks and deletions as the drawer's own work, which Disk I/O leaves
+    /// out.
+    struct DrawerFileWork: FileWorkScope {
+        func perform<Result>(_ body: () -> Result) -> Result {
+            DebugDrawerActivity.$isDrawerWork.withValue(true, operation: body)
         }
     }
 #endif

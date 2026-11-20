@@ -1,6 +1,7 @@
 #if DEBUG
     import Foundation
     @testable import DebugDrawerAppStateResetPlugin
+    @testable import DebugDrawerAppStateReset
 
     /// A plan with something in every category, for the views.
     enum ResetPlanFixture {

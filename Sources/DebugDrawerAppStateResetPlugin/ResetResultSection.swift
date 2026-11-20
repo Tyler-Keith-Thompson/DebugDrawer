@@ -1,5 +1,6 @@
 #if DEBUG
     import DebugDrawer
+    import DebugDrawerAppStateReset
     import SwiftUI
 
     /// What the last reset did: each category cleared, or what in it couldn't be deleted and why,
@@ -41,7 +42,7 @@
         }
 
         /// "12 keys deleted", or `nil` for a category that clears as a whole.
-        private func clearedText(_ count: Int, _ category: ResetCategory) -> String? {
+        private func clearedText(_ count: Int, _ category: AppStateReset.Category) -> String? {
             category.noun.map { "\(ResetPlan.count(count, $0, none: "Nothing")) deleted" }
         }
     }

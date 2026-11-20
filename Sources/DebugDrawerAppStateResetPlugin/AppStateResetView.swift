@@ -1,5 +1,6 @@
 #if DEBUG
     import DebugDrawer
+    import DebugDrawerAppStateReset
     import SwiftUI
 
     /// The plugin's body: the last reset's results, a checkbox per category with what it will
@@ -7,7 +8,7 @@
     /// confirmation. It keeps whether the confirmation is open.
     struct AppStateResetView: View {
         let state: ResetState
-        @Binding var selection: Set<ResetCategory>
+        @Binding var selection: Set<AppStateReset.Category>
         @Binding var includesDebugDrawer: Bool
         let restartStyle: RestartStyle
         let refresh: () -> Void
@@ -80,7 +81,7 @@
         }
 
         /// The selected categories this app has, in the drawer's order.
-        var selected: [ResetCategory] {
+        var selected: [AppStateReset.Category] {
             (state.plan?.categories ?? []).filter(selection.contains)
         }
 
@@ -96,7 +97,7 @@
             reset(restarting)
         }
 
-        private func isSelected(_ category: ResetCategory) -> Binding<Bool> {
+        private func isSelected(_ category: AppStateReset.Category) -> Binding<Bool> {
             Binding {
                 selection.contains(category)
             } set: { isOn in

@@ -1,7 +1,10 @@
-#if DEBUG
-    /// A kind of state the plugin clears, each one a checkbox of its own.
-    enum ResetCategory: String, CaseIterable, Hashable, Sendable, Identifiable {
-        /// The keys of the app's UserDefaults domain and of each app group's suite.
+import Foundation
+
+extension AppStateReset {
+    /// A kind of state a reset clears, each one a checkbox of its own.
+    public enum Category: String, CaseIterable, Codable, Hashable, Sendable, Identifiable {
+        /// The keys of the app's UserDefaults domain and of each app group's suite, less
+        /// DebugDrawer's own.
         case userDefaults
         /// The keychain items the app can read, of every class.
         case keychain
@@ -14,15 +17,16 @@
         case cookies
         /// URLCache.shared's responses, on disk and in memory.
         case urlCache
-        /// The cleanup the app supplied to `AppStateReset.install(cleanup:)`.
+        /// The cleanup of the app's own, ``AppStateReset/Cleanup``.
         case appCleanup
 
-        var id: Self {
+        /// The category itself.
+        public var id: Self {
             self
         }
 
-        /// The category's name in the drawer.
-        var title: String {
+        /// The category's name, as the drawer and a sidecar list it ("URL cache").
+        public var title: String {
             switch self {
             case .userDefaults: "UserDefaults"
             case .keychain: "Keychain"
@@ -34,8 +38,8 @@
             }
         }
 
-        /// The SF Symbol beside it.
-        var systemImage: String {
+        /// The SF Symbol a list shows beside it.
+        public var systemImage: String {
             switch self {
             case .userDefaults: "list.bullet.rectangle"
             case .keychain: "key"
@@ -48,7 +52,7 @@
         }
 
         /// What the category counts ("key"), `nil` for one that clears as a whole.
-        var noun: String? {
+        package var noun: String? {
             switch self {
             case .userDefaults: "key"
             case .keychain, .files, .caches: "item"
@@ -59,6 +63,19 @@
 
         /// The order a reset runs in. The app's cleanup goes first, so it can close a database
         /// before its file is deleted, and the URL cache before Caches, which holds its store.
-        static let resetOrder: [ResetCategory] = [.appCleanup, .keychain, .userDefaults, .cookies, .urlCache, .caches, .files]
+        package static let resetOrder: [Self] = [.appCleanup, .keychain, .userDefaults, .cookies, .urlCache, .caches, .files]
     }
-#endif
+}
+
+// The keychain is never among `.all`: it holds the app's credentials, and clearing it signs the
+// employee out of everything, so a host allows it on its own, by name
+// (`AppStateResetRequests(sessions:allowing:allowingKeychain:...)`), rather than as one member of a
+// set it may write as "everything".
+extension Set<AppStateReset.Category> {
+    /// Every category but the keychain, which a host allows only on its own: UserDefaults, files,
+    /// caches, cookies, the URL cache and the app's cleanup (offered only when the host supplies
+    /// one).
+    public static var all: Self {
+        Set(AppStateReset.Category.allCases.filter { $0 != .keychain })
+    }
+}

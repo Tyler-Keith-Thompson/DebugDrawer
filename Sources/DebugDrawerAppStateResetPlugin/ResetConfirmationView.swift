@@ -1,5 +1,6 @@
 #if DEBUG
     import DebugDrawer
+    import DebugDrawerAppStateReset
     import SwiftUI
 
     /// The confirmation: exactly what the reset will delete, category by category and line by
@@ -7,7 +8,7 @@
     struct ResetConfirmationView: View {
         let plan: ResetPlan
         /// The categories selected, in the drawer's order.
-        let categories: [ResetCategory]
+        let categories: [AppStateReset.Category]
         let restartStyle: RestartStyle
         let cancel: () -> Void
         let reset: () -> Void
@@ -66,7 +67,7 @@
 
     /// One category in the confirmation: its name and summary, then every line it will delete.
     struct ConfirmationCategorySection: View {
-        let category: ResetCategory
+        let category: AppStateReset.Category
         let summary: String
         let lines: [PlanLine]
 

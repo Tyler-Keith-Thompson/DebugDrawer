@@ -1,5 +1,6 @@
 #if DEBUG
     @testable import DebugDrawerAppStateResetPlugin
+    @testable import DebugDrawerAppStateReset
 
     /// UserDefaults domains in memory: each domain's keys, and every removal asked for.
     @MainActor

@@ -21,6 +21,7 @@ swift_library(
     visibility = ["//:__pkg__"],
     deps = [
         "//Sources/DebugDrawerAppStateResetPlugin",
+        "//Sources/DebugDrawerAppStateReset",
         "//Sources/DebugDrawer",
     ] + select({
         # Apple-only packages (APPLE_ONLY_PACKAGES in scripts/modules.py).
@@ -88,6 +89,7 @@ swift_library(
     visibility = ["//:__pkg__"],
     deps = [
         "//Sources/DebugDrawerAppStateResetPlugin",
+        "//Sources/DebugDrawerAppStateReset",
         "//Sources/DebugDrawer",
     ] + select({
         # Apple-only packages (APPLE_ONLY_PACKAGES in scripts/modules.py).

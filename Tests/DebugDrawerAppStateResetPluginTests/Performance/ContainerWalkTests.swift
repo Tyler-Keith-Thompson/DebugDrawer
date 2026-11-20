@@ -3,6 +3,7 @@
 // ReleaseInstallTests instead.
 #if DEBUG
     @testable import DebugDrawerAppStateResetPlugin
+    @testable import DebugDrawerAppStateReset
     import Foundation
     import Testing
 

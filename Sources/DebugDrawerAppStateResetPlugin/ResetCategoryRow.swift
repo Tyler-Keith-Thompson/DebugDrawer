@@ -1,11 +1,12 @@
 #if DEBUG
     import DebugDrawer
+    import DebugDrawerAppStateReset
     import SwiftUI
 
     /// A category with its checkbox and what it will delete in a few words, and, opened, line by
     /// line. It keeps whether the lines are shown.
     struct ResetCategoryRow: View {
-        let category: ResetCategory
+        let category: AppStateReset.Category
         let summary: String
         let lines: [PlanLine]
         /// Why the category can't be read, such as the keychain's error; `nil` when it can.

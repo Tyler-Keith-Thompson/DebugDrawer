@@ -1,6 +1,7 @@
 #if DEBUG
     import DebugDrawer
     @testable import DebugDrawerAppStateResetPlugin
+    @testable import DebugDrawerAppStateReset
     import Testing
 
     @MainActor
@@ -22,11 +23,11 @@
 
         @Test("Every category has a title and a symbol of its own")
         func categories() {
-            let titles = ResetCategory.allCases.map(\.title)
-            let symbols = ResetCategory.allCases.map(\.systemImage)
+            let titles = AppStateReset.Category.allCases.map(\.title)
+            let symbols = AppStateReset.Category.allCases.map(\.systemImage)
 
             #expect(titles == ["UserDefaults", "Keychain", "Files", "Caches", "Cookies", "URL cache", "App cleanup"])
-            #expect(Set(symbols).count == ResetCategory.allCases.count)
+            #expect(Set(symbols).count == AppStateReset.Category.allCases.count)
         }
     }
 #endif

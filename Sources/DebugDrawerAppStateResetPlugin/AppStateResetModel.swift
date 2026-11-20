@@ -1,5 +1,6 @@
 #if DEBUG
     import Combine
+    import DebugDrawerAppStateReset
     import Foundation
 
     /// Where the plugin is: one case per thing that can be true.
@@ -38,7 +39,7 @@
     final class AppStateResetModel: ObservableObject {
         @Published private(set) var state = ResetState.loading
         /// The categories a reset clears: all of them until some are unticked.
-        @Published var selection: Set<ResetCategory>
+        @Published var selection: Set<AppStateReset.Category>
         /// Whether DebugDrawer's own keys and files are cleared too. Off unless turned on.
         @Published private(set) var includesDebugDrawer = false
 
@@ -53,7 +54,7 @@
         init(appState: AppState, process: any AppProcess) {
             self.appState = appState
             self.process = process
-            selection = Set(ResetCategory.allCases.filter { $0 != .appCleanup || appState.cleanup != nil })
+            selection = Set(AppStateReset.Category.allCases.filter { $0 != .appCleanup || appState.cleanup != nil })
         }
 
         /// How the app starts over after Reset and Relaunch (or Quit).

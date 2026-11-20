@@ -1,5 +1,6 @@
 #if DEBUG
     @testable import DebugDrawerAppStateResetPlugin
+    @testable import DebugDrawerAppStateReset
 
     /// A process that records each restart instead of ending, and can fail to relaunch.
     @MainActor

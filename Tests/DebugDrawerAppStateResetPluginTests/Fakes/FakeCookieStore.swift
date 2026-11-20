@@ -1,5 +1,6 @@
 #if DEBUG
     @testable import DebugDrawerAppStateResetPlugin
+    @testable import DebugDrawerAppStateReset
 
     /// Cookie stores in memory, and every deletion asked for.
     @MainActor

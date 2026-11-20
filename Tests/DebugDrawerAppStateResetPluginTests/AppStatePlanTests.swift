@@ -1,6 +1,7 @@
 #if DEBUG
     import Foundation
     @testable import DebugDrawerAppStateResetPlugin
+    @testable import DebugDrawerAppStateReset
     import Security
     import Testing
 
@@ -232,13 +233,13 @@
             #expect(actual.lines(of: .urlCache) == expected)
             #expect(actual.summary(of: .urlCache) == "\(ResetPlan.bytes(2_000_000)) on disk")
             #expect(actual.lines(of: .appCleanup) == [PlanLine(text: "Close the orders database", detail: nil)])
-            #expect(actual.categories == ResetCategory.allCases)
+            #expect(actual.categories == AppStateReset.Category.allCases)
         }
 
         @Test("Without a cleanup from the app, there is no App Cleanup category")
         func noCleanup() {
             let sut = ResetPlan(defaults: [], keychain: .items([]), files: [], caches: [], cookies: [], urlCache: URLCacheUsage(disk: 0, memory: 0))
-            let expected: [ResetCategory] = [.userDefaults, .keychain, .files, .caches, .cookies, .urlCache]
+            let expected: [AppStateReset.Category] = [.userDefaults, .keychain, .files, .caches, .cookies, .urlCache]
 
             #expect(sut.categories == expected)
             #expect(sut.lines(of: .appCleanup).isEmpty)

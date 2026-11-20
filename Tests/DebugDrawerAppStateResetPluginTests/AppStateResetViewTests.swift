@@ -2,6 +2,7 @@
 #if os(macOS)
     @testable import DebugDrawer
     @testable import DebugDrawerAppStateResetPlugin
+    @testable import DebugDrawerAppStateReset
     import Foundation
     import SwiftUI
     import Testing
@@ -12,7 +13,7 @@
     struct AppStateResetViewTests {
         @Test("Each category is a row with its summary and a checkbox; unticking one takes it out of the selection")
         func rows() throws {
-            var selection = Set(ResetCategory.allCases)
+            var selection = Set(AppStateReset.Category.allCases)
             let binding = Binding(get: { selection }, set: { selection = $0 })
             let sut = AppStateResetView(
                 state: .ready(ResetPlanFixture.plan), selection: binding, includesDebugDrawer: .constant(false),
@@ -27,9 +28,9 @@
             try rows[1].find(ViewType.Toggle.self).tap()
 
             #expect(rows.count == 7)
-            #expect(try rows.map { try $0.actualView().category } == ResetCategory.allCases)
+            #expect(try rows.map { try $0.actualView().category } == AppStateReset.Category.allCases)
             #expect(summaries == expectedSummaries)
-            #expect(selection == Set(ResetCategory.allCases).subtracting([.keychain]))
+            #expect(selection == Set(AppStateReset.Category.allCases).subtracting([.keychain]))
         }
 
         @Test("Reset… opens the confirmation, and is unavailable with nothing selected or while loading")
@@ -123,7 +124,7 @@
         @Test("The confirmation lists exactly the selected categories' lines, in order, and nothing of the others")
         func confirmationListsSelection() throws {
             let plan = ResetPlanFixture.plan
-            let categories: [ResetCategory] = [.userDefaults, .cookies, .urlCache]
+            let categories: [AppStateReset.Category] = [.userDefaults, .cookies, .urlCache]
             let sut = ResetConfirmationView(plan: plan, categories: categories, restartStyle: .relaunch, cancel: {}, reset: {}, resetAndRestart: {})
             let expected = categories.flatMap { plan.lines(of: $0) }
 

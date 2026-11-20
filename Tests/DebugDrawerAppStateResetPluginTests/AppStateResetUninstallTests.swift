@@ -1,6 +1,7 @@
 #if DEBUG
     @testable import DebugDrawer
     @testable import DebugDrawerAppStateResetPlugin
+    @testable import DebugDrawerAppStateReset
     import Foundation
     import Testing
 

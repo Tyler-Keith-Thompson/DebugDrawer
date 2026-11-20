@@ -6,6 +6,7 @@
 #if DEBUG && os(iOS) && targetEnvironment(simulator)
     import Foundation
     @testable import DebugDrawerAppStateResetPlugin
+    @testable import DebugDrawerAppStateReset
     import Security
     import Testing
 

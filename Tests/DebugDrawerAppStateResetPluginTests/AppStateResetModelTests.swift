@@ -1,6 +1,7 @@
 #if DEBUG
     import Foundation
     @testable import DebugDrawerAppStateResetPlugin
+    @testable import DebugDrawerAppStateReset
     import Security
     import Testing
 
@@ -20,7 +21,7 @@
             await sut.loadIfNeeded()
 
             #expect(initial == .loading)
-            #expect(sut.selection == Set(ResetCategory.allCases))
+            #expect(sut.selection == Set(AppStateReset.Category.allCases))
             #expect(loaded.plan?.summary(of: .userDefaults) == "3 keys")
             #expect(sut.state == loaded)
         }

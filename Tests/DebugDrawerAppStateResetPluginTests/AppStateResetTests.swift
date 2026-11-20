@@ -1,14 +1,15 @@
 #if DEBUG
     import Foundation
     @testable import DebugDrawerAppStateResetPlugin
+    @testable import DebugDrawerAppStateReset
     import Security
     import Testing
 
     @MainActor
     @Suite(.timeLimit(.minutes(1)))
     struct AppStateResetTests {
-        @Test("Resetting one category deletes what it listed and leaves every other category as it was", arguments: ResetCategory.allCases)
-        func oneCategory(category: ResetCategory) async throws {
+        @Test("Resetting one category deletes what it listed and leaves every other category as it was", arguments: AppStateReset.Category.allCases)
+        func oneCategory(category: AppStateReset.Category) async throws {
             let seeded = try SeededAppState()
             defer { seeded.remove() }
             let plan = await seeded.appState.plan(includingDebugDrawer: false)
@@ -35,12 +36,12 @@
             let seeded = try SeededAppState()
             defer { seeded.remove() }
             let plan = await seeded.appState.plan(includingDebugDrawer: false)
-            let expected: [ResetCategory: ResetOutcome] = [
+            let expected: [AppStateReset.Category: ResetOutcome] = [
                 .userDefaults: .cleared(3), .keychain: .cleared(3), .files: .cleared(7), .caches: .cleared(2),
                 .cookies: .cleared(3), .urlCache: .cleared(1), .appCleanup: .cleared(1)
             ]
 
-            let actual = await seeded.appState.reset(Set(ResetCategory.allCases), of: plan)
+            let actual = await seeded.appState.reset(Set(AppStateReset.Category.allCases), of: plan)
 
             #expect(actual.outcomes == expected)
             #expect(!actual.hasFailures)
@@ -61,7 +62,7 @@
                 "Outside", "Outside/secret.txt"
             ]
 
-            _ = await seeded.appState.reset(Set(ResetCategory.allCases), of: plan)
+            _ = await seeded.appState.reset(Set(AppStateReset.Category.allCases), of: plan)
             let actual = seeded.paths()
 
             #expect(actual == expected)
@@ -98,7 +99,7 @@
                 "Outside", "Outside/secret.txt"
             ]
 
-            _ = await seeded.appState.reset(Set(ResetCategory.allCases), of: plan)
+            _ = await seeded.appState.reset(Set(AppStateReset.Category.allCases), of: plan)
             let actual = seeded.paths()
 
             #expect(actual == expected)
@@ -110,10 +111,10 @@
         // 256 together, which a loaded simulator took past a minute.
         @Test(
             "Whatever is selected, the reset deletes exactly what the plan lists: every subset of categories, with and without DebugDrawer's own",
-            arguments: [false, true], 0 ..< (1 << ResetCategory.allCases.count)
+            arguments: [false, true], 0 ..< (1 << AppStateReset.Category.allCases.count)
         )
         func deletesExactlyThePlan(includesDebugDrawer: Bool, mask: Int) async throws {
-            let categories = ResetCategory.allCases
+            let categories = AppStateReset.Category.allCases
             let selection = Set(categories.indices.filter { mask & (1 << $0) != 0 }.map { categories[$0] })
             let seeded = try SeededAppState()
             defer { seeded.remove() }
@@ -232,11 +233,11 @@
             let seeded = try SeededAppState()
             defer { seeded.remove() }
             let plan = await seeded.appState.plan(includingDebugDrawer: false)
-            let expected: [ResetCategory] = [.appCleanup, .keychain, .userDefaults, .cookies, .urlCache, .caches, .files]
+            let expected: [AppStateReset.Category] = [.appCleanup, .keychain, .userDefaults, .cookies, .urlCache, .caches, .files]
 
-            #expect(ResetCategory.resetOrder == expected)
-            #expect(Set(ResetCategory.resetOrder) == Set(ResetCategory.allCases))
-            _ = await seeded.appState.reset(Set(ResetCategory.allCases), of: plan)
+            #expect(AppStateReset.Category.resetOrder == expected)
+            #expect(Set(AppStateReset.Category.resetOrder) == Set(AppStateReset.Category.allCases))
+            _ = await seeded.appState.reset(Set(AppStateReset.Category.allCases), of: plan)
             #expect(seeded.cleanupCounter.runs == 1)
         }
 

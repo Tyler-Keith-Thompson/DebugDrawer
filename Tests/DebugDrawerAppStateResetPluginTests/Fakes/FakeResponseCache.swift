@@ -1,5 +1,6 @@
 #if DEBUG
     @testable import DebugDrawerAppStateResetPlugin
+    @testable import DebugDrawerAppStateReset
 
     /// A URL cache that reports the usage it is given and counts its clears.
     @MainActor

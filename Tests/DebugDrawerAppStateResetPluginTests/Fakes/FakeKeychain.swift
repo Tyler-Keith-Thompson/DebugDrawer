@@ -2,6 +2,7 @@
     import Foundation
     import Security
     @testable import DebugDrawerAppStateResetPlugin
+    @testable import DebugDrawerAppStateReset
 
     /// A keychain in memory that can refuse to be read, or to delete chosen items.
     @MainActor

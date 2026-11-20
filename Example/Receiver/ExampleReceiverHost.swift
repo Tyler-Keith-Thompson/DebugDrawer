@@ -2,6 +2,7 @@ import Combine
 import CryptoKit
 import DebugDrawerAccessibility
 import DebugDrawerAnalytics
+import DebugDrawerAppStateReset
 import DebugDrawerLocalization
 import DebugDrawerMetricKit
 import DebugDrawerNetwork
@@ -18,7 +19,7 @@ import os
 /// session is open, the session whose requests a sidecar may mock, the diagnostics capture the
 /// app hands its log lines and requests, the bug reports its Report a Bug trigger takes, the
 /// push registration the app delegate hands the APNs device token, the scenarios a sidecar
-/// launches it into, and the actions a sidecar takes on its sign-in.
+/// launches it into, the actions a sidecar takes on its sign-in, and the state a sidecar may reset.
 ///
 /// Everything here is in the release build too: a production app links the receiver and the
 /// capability modules, never the drawer.
@@ -35,6 +36,8 @@ final class ExampleReceiverHost: ObservableObject {
     let scenarios = ProductionScenarios()
     /// The sign-in a sidecar's auth actions expire, refresh and end.
     let signIn = ProductionSignIn()
+    /// The defaults and caches a sidecar may reset.
+    let appState: ProductionAppState
     let sessions: DebugDrawerSessions
     /// Keeps the app running while a session is open: a background task on iOS, an App Nap
     /// activity on the Mac.
@@ -69,6 +72,17 @@ final class ExampleReceiverHost: ObservableObject {
 
     private static let logger = Logger(subsystem: "com.debugdrawer.example.receiver", category: "Sidecar")
     private let receiver: DebugDrawerReceiver
+    /// Sessions of at most 15 minutes, opened only with a grant signed by the example's key.
+    private static func sessions() -> DebugDrawerSessions {
+        DebugDrawerSessions(
+            maximumDuration: 15 * 60,
+            grantPolicy: DebugDrawerGrantPolicy(
+                verifier: DebugDrawerSignedGrantVerifier(keys: [.ed25519(ExampleGrantKey.publicKey)]),
+                audience: Bundle.main.bundleIdentifier ?? "com.debugdrawer.example.receiver"
+            )
+        )
+    }
+
     /// The app's session for its own API, listing the mocking protocol first so a sidecar's rules
     /// can answer it; `URLSession.shared` is never touched.
     private let apiSession: URLSession
@@ -78,18 +92,13 @@ final class ExampleReceiverHost: ObservableObject {
         let flags = ProductionFlags()
         let experiments = ProductionExperiments()
         let logging = ProductionLogging()
-        let sessions = DebugDrawerSessions(
-            maximumDuration: 15 * 60,
-            grantPolicy: DebugDrawerGrantPolicy(
-                verifier: DebugDrawerSignedGrantVerifier(keys: [.ed25519(ExampleGrantKey.publicKey)]),
-                audience: Bundle.main.bundleIdentifier ?? "com.debugdrawer.example.receiver"
-            )
-        )
+        let sessions = Self.sessions()
         let receiver = DebugDrawerReceiver(directory: ExampleSidecarStore.directory, sessions: sessions)
         let mocking = NetworkMocking(sessions: sessions, allowedHosts: [.exact("api.example.com")])
         let diagnostics = DebugDrawerDiagnosticsCapture(sessions: sessions)
         let bugReports = Self.bugReports(sessions: sessions, diagnostics: diagnostics, flags: flags, experiments: experiments)
         let pushRegistration = Self.pushRegistration(sessions: sessions)
+        let appState = ProductionAppState(sessions: sessions)
         receiver.enable(.featureFlagOverrides(flags))
         receiver.enable(.experimentOverrides(experiments))
         receiver.enable(.logLevels(logging))
@@ -102,6 +111,7 @@ final class ExampleReceiverHost: ObservableObject {
         receiver.enable(.diagnosticsCapture(diagnostics))
         receiver.enable(.bugReports(bugReports))
         receiver.enable(.pushRegistration(pushRegistration))
+        receiver.enable(.appStateReset(appState.requests))
         self.flags = flags
         self.experiments = experiments
         self.logging = logging
@@ -111,6 +121,7 @@ final class ExampleReceiverHost: ObservableObject {
         self.diagnostics = diagnostics
         self.bugReports = bugReports
         self.pushRegistration = pushRegistration
+        self.appState = appState
         keeper = DebugDrawerBackgroundKeeper(sessions: sessions)
         apiSession = Self.apiSession()
         receiver.enable(.scenarios(scenarios.scenarios, launchURL: ProductionScenarios.launchURL))

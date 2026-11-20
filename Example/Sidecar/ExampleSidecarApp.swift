@@ -19,7 +19,7 @@ struct ExampleSidecarApp: App {
                 plugins: [
                     .featureFlagOverrides, .experimentOverrides, .logLevels, .tweaks, .localizationReview, .accessibilityEnvironment,
                     .analyticsEvents, .metricKitPayloads, .networkMocking, .diagnosticsCapture, .bugReports, .pushRegistration,
-                    .scenarios, .authActions, .console, .network
+                    .scenarios, .authActions, .appStateReset, .console, .network
                 ]
             ) { app in
                 try ExampleGrantServer.grant(for: app)

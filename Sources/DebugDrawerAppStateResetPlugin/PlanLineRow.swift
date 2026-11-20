@@ -1,5 +1,6 @@
 #if DEBUG
     import DebugDrawer
+    import DebugDrawerAppStateReset
     import SwiftUI
 
     /// One thing a category will delete: its name, cut in the middle to fit, and its size, count

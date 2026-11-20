@@ -2,6 +2,7 @@
 #if os(macOS)
     import AppKit
     @testable import DebugDrawerAppStateResetPlugin
+    @testable import DebugDrawerAppStateReset
     import SnapshotTesting
     import SwiftUI
     import Testing
@@ -77,7 +78,7 @@
         func openedRows(colorScheme: ColorScheme) throws {
             let plan = ResetPlanFixture.plan
             let sut = VStack(alignment: .leading, spacing: 0) {
-                ForEach([ResetCategory.files, .keychain, .cookies]) { category in
+                ForEach([AppStateReset.Category.files, .keychain, .cookies]) { category in
                     ResetCategoryRow(
                         category: category, summary: plan.summary(of: category), lines: plan.lines(of: category), problem: nil,
                         isSelected: .constant(category != .cookies), isExpanded: true

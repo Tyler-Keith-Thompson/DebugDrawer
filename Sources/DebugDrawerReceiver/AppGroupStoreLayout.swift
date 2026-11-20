@@ -76,6 +76,12 @@ package struct AppGroupStoreLayout: Sendable {
     }
 
     /// The directory holding every app's directory in the group's store in `store`.
+    /// The group's store a snapshot file of an app's directory, `snapshotFile(for:)`, is in:
+    /// `<store>/apps/<bundle ID>/snapshots/<file>`.
+    package static func store(ofSnapshotFile file: URL) -> URL {
+        file.deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+    }
+
     package static func appsDirectory(inStore store: URL) -> URL {
         store.appending(path: "apps", directoryHint: .isDirectory)
     }

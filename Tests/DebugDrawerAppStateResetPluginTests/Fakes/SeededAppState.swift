@@ -1,6 +1,7 @@
 #if DEBUG
     import Foundation
     @testable import DebugDrawerAppStateResetPlugin
+    @testable import DebugDrawerAppStateReset
 
     /// An app's state to reset, as fixture data: a container laid out in a temporary directory,
     /// with DebugDrawer's own files, a link out of it and an app group, and fakes for the other

@@ -41,8 +41,9 @@ public struct DebugDrawerReceiverCapability {
     /// for a model that must delete it itself, and how to apply a change the host asks for itself,
     /// through the receiver's gates and the sessions as a sidecar's command goes (it returns why the
     /// change was refused, or `nil`), for a model whose changes can start in the app
-    /// (``diagnosticsCapture(_:)``, ``bugReports(_:)``); `nil` for most.
-    var enabled: (
+    /// (``diagnosticsCapture(_:)``, ``bugReports(_:)``), or for one that must know where the
+    /// store is (`appStateReset(_:)`, which keeps it); `nil` for most.
+    package var enabled: (
         @MainActor (
             _ snapshotFile: URL,
             _ applyHostChange: @escaping @MainActor (_ change: () -> DebugDrawerAuditEntry.Refusal?) -> DebugDrawerAuditEntry.Refusal?

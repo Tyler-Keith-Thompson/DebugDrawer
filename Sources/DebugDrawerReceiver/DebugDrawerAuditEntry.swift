@@ -108,6 +108,11 @@ public struct DebugDrawerAuditEntry: Codable, Equatable, Sendable {
         /// The host turned this capability off: the gate it was enabled with,
         /// ``DebugDrawerReceiver/enable(_:isAllowed:)``, returned `false`.
         case capabilityDisabled
+        /// The command confirmed what the capability showed, and what it would act on has changed
+        /// since, so it would act on something the sidecar never showed: an app state reset whose
+        /// listing changed after the sidecar's confirmation, say. The sidecar shows the new
+        /// listing to confirm again.
+        case staleConfirmation
     }
 
     /// When it happened.

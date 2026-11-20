@@ -3,6 +3,7 @@
 // can't lead the simulator to the references (BAZEL_TESTED_PLATFORM_EXCLUDED_PACKAGES).
 #if os(iOS) && !targetEnvironment(macCatalyst) && canImport(SnapshotTesting)
     @testable import DebugDrawerAppStateResetPlugin
+    @testable import DebugDrawerAppStateReset
     import SnapshotTesting
     import SwiftUI
     import Testing

@@ -13,6 +13,7 @@ struct ExampleReceiverScreen: View {
     @ObservedObject var logging: ProductionLogging
     @ObservedObject var scenarios: ProductionScenarios
     @ObservedObject var signIn: ProductionSignIn
+    @ObservedObject var appState: ProductionAppState
     @ObservedObject var sessions: DebugDrawerSessions
     @ObservedObject var keeper: DebugDrawerBackgroundKeeper
     @ObservedObject var mocking: NetworkMocking
@@ -49,6 +50,16 @@ struct ExampleReceiverScreen: View {
                 Text("Auth Actions")
             } footer: {
                 Text("The sidecar expires, refreshes or ends the sign-in; it never sees the token.")
+            }
+            Section {
+                LabeledContent("Seeded", value: appState.summary)
+                    .accessibilityIdentifier("AppStateSeeded")
+                Button("Seed Data", action: appState.seed)
+                    .accessibilityHint("Writes defaults keys and cached thumbnails for a sidecar's reset to clear")
+            } header: {
+                Text("App State Reset")
+            } footer: {
+                Text("The sidecar may clear the app's UserDefaults and caches; the app clears what it confirms as it next comes to the foreground.")
             }
             Section("Feature Flag Overrides") {
                 LabeledContent("Checkout", value: flags.value(forKey: "new-checkout") == .bool(true) ? "New" : "Legacy")
