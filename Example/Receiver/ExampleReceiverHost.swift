@@ -26,6 +26,7 @@ final class ExampleReceiverHost: ObservableObject {
 
     let flags: ProductionFlags
     let experiments: ProductionExperiments
+    let logging: ProductionLogging
     let sessions: DebugDrawerSessions
     /// Keeps the app running while a session is open: a background task on iOS, an App Nap
     /// activity on the Mac.
@@ -56,6 +57,7 @@ final class ExampleReceiverHost: ObservableObject {
     init() {
         let flags = ProductionFlags()
         let experiments = ProductionExperiments()
+        let logging = ProductionLogging()
         let sessions = DebugDrawerSessions(
             maximumDuration: 15 * 60,
             grantPolicy: DebugDrawerGrantPolicy(
@@ -67,6 +69,7 @@ final class ExampleReceiverHost: ObservableObject {
         let mocking = NetworkMocking(sessions: sessions, allowedHosts: [.exact("api.example.com")])
         receiver.enable(.featureFlagOverrides(flags))
         receiver.enable(.experimentOverrides(experiments))
+        receiver.enable(.logLevels(logging))
         receiver.enable(.tweaks(ProductionTweaks.greeting, ProductionTweaks.diagnostics))
         receiver.enable(.localizationReview())
         receiver.enable(.accessibilityEnvironmentOverrides())
@@ -77,6 +80,7 @@ final class ExampleReceiverHost: ObservableObject {
         configuration.protocolClasses = [NetworkMockingURLProtocol.self] + (configuration.protocolClasses ?? [])
         self.flags = flags
         self.experiments = experiments
+        self.logging = logging
         self.sessions = sessions
         self.receiver = receiver
         self.mocking = mocking

@@ -9,6 +9,7 @@ struct ExampleReceiverScreen: View {
     @ObservedObject var host: ExampleReceiverHost
     @ObservedObject var flags: ProductionFlags
     @ObservedObject var experiments: ProductionExperiments
+    @ObservedObject var logging: ProductionLogging
     @ObservedObject var sessions: DebugDrawerSessions
     @ObservedObject var keeper: DebugDrawerBackgroundKeeper
     @ObservedObject var mocking: NetworkMocking
@@ -39,6 +40,14 @@ struct ExampleReceiverScreen: View {
                         : "Excluded from \(experiments.analyticsExclusions.joined(separator: ", "))"
                 )
                 .accessibilityIdentifier("ExperimentAnalyticsExclusion")
+            }
+            Section("Log Levels") {
+                LabeledContent("Checkout", value: logging.level(of: ProductionLogging.checkout))
+                LabeledContent("Sync", value: logging.level(of: ProductionLogging.sync))
+                Button("Log Checkout Step") { logging.logCheckoutStep(customer: "jane@example.com") }
+                    .accessibilityHint("Logs a line at each level; the checkout subsystem's level decides which are written")
+                LabeledContent("Last Written", value: logging.lastWritten.isEmpty ? "Nothing yet" : logging.lastWritten.joined(separator: ", "))
+                    .accessibilityIdentifier("LogLevelsLastWritten")
             }
             Section("Tweaks") {
                 LabeledContent("Greeting", value: greeting)

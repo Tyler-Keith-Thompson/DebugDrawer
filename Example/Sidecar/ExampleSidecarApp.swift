@@ -17,7 +17,7 @@ struct ExampleSidecarApp: App {
             DebugDrawerSidecarView(
                 apps: DebugDrawerSidecarAppList(storeDirectory: ExampleSidecarStore.directory),
                 plugins: [
-                    .featureFlagOverrides, .experimentOverrides, .tweaks, .localizationReview, .accessibilityEnvironment,
+                    .featureFlagOverrides, .experimentOverrides, .logLevels, .tweaks, .localizationReview, .accessibilityEnvironment,
                     .analyticsEvents, .metricKitPayloads, .networkMocking, .console, .network
                 ]
             ) { app in

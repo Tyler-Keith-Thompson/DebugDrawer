@@ -2274,7 +2274,8 @@ What the receiver does:
   log (`commandRefused(.unknownCapability)`).
 - **Capabilities are models.** `.featureFlagOverrides(adapter)` overrides the flags the adapter
   lists, and only with a value of the kind the flag has (`.experimentOverrides(adapter)`, below,
-  forces the experiments it lists into one of their variants); `clearAllOverrides` clears only the
+  forces the experiments it lists into one of their variants, and `.logLevels(adapter)` raises the
+  log subsystems it lists); `clearAllOverrides` clears only the
   overrides it set, never the app's own. `.model(_:id:scope:)` serves any
   `DebugDrawerPluginModel` of the app's. A command decodes into the model's own `Command` type or
   is refused as malformed; nothing received is run or evaluated, and a sidecar reads only the
@@ -2320,6 +2321,35 @@ experiment doesn't have as `commandRefused(.malformedCommand)`, and neither reac
 Audit, foreground delivery, scopes and the keys kept across launches work as for feature flag
 overrides: by default the overrides are cleared, and the exclusion lifted, as the session ends;
 with `scope: .persistent` the device stays excluded across launches until a sidecar clears them.
+
+**Log levels in production.** To read what a release build logs at a verbose level while an
+employee reproduces a problem, a sidecar can raise chosen subsystems of the app's own logger for
+its session. An app can't change the level unified logging (os_log) keeps for its subsystems; its
+logger can, so the hook is the app's: `enable(.logLevels(adapter))` serves a sidecar the subsystems
+the app's `DebugDrawerLogLevelAdapter` lists in `elevatableSubsystems()`, each a
+`DebugDrawerLogSubsystem` with the levels a sidecar may set (the logger's own names, such as
+`"info"`, `"debug"`, `"trace"`) and the level it logs at now, and within a session sets one
+(`DebugDrawerLogLevels.Command.setLevel(subsystem:level:)`), calling the adapter's
+`setLevel(_:forSubsystem:)`; `reset(subsystem:)` and `resetAll` call `resetLevel(forSubsystem:)`
+for the subsystems it raised, never one the app raised itself.
+
+- **The risk: personal data in verbose lines.** Verbose levels log more of what the app handles.
+  The receiver captures no log line and sends none to the sidecar: the raised lines go where the
+  app's logger already writes them, through the redaction it applies to every line (os_log's
+  `privacy: .private` interpolations, a swift-log handler that masks fields), so keep that
+  redaction on at the verbose levels too. In a debug build, a logger bridged to the Console
+  through `ConsoleLogSink` shows the raised lines in the drawer as logged.
+- **Off by default, and only what the app lists.** Until the app enables it, a command to it is
+  refused as `commandRefused(.unknownCapability)`, even inside a session. A subsystem the adapter
+  doesn't list is refused as `commandRefused(.notExposed)`, a level the subsystem doesn't list as
+  `commandRefused(.malformedCommand)`, and neither reaches the adapter. Each change is audited as
+  `commandApplied`.
+- **For the session, always.** As the session ends, expires (at the sessions' maximum duration or
+  the grant's expiry) or a gate turns it off, the adapter is told to reset each subsystem the
+  sidecar raised, audited as `changeReverted`; there is no persistent scope. `DebugDrawerLogLevels`
+  keeps the names of the subsystems it raised (never their levels) in the standard defaults, or in
+  those passed to `init(adapter:defaults:)`, so levels a session left when the app quit or was
+  killed are reset as the next launch makes the capability: make it at startup.
 
 **Turning it off remotely.** To shut every sidecar out without a release (a leaked sidecar app,
 say), give the receiver a gate backed by your own remote configuration, and a capability one of
@@ -2992,6 +3022,7 @@ capability has something in the host that changes:
 |---|---|
 | Flags | Checkout (`new-checkout`) and Button Color, through the host's `DebugDrawerFeatureFlagAdapter` |
 | Experiments | Checkout Flow and Onboarding's variants, through the host's `DebugDrawerExperimentAdapter`, and Analytics, which reads "Excluded from" the forced experiments until they are cleared |
+| Log Levels | The Checkout and Sync subsystems' levels, through the host's `DebugDrawerLogLevelAdapter`, and Last Written, the levels Log Checkout Step wrote lines at; back to `notice` as the session ends |
 | Tweaks | The greeting, a production-safe tweak; the Diagnostics tweak isn't, so the sidecar never lists it |
 | Strings | The Localization Review strings, pseudo-localized or shown as keys |
 | Accessibility | The window's Dynamic Type, contrast and Reduce Motion, read back beside them |
@@ -3168,7 +3199,7 @@ ContentView()
 | Module | Holds |
 |---|---|
 | `DebugDrawer` | The drawer: its window, the plugin protocol and registry, the views plugins are built from, and release-build stand-ins |
-| `DebugDrawerReceiver` | The one product a release build may link: serves a sidecar app, over the app group's store, only the capabilities the app enables (feature flag and experiment overrides, or any plugin model) within sessions the sidecar opens, refusing and auditing everything else; UI-less, no interception |
+| `DebugDrawerReceiver` | The one product a release build may link: serves a sidecar app, over the app group's store, only the capabilities the app enables (feature flag and experiment overrides, log level elevation, or any plugin model) within sessions the sidecar opens, refusing and auditing everything else; UI-less, no interception |
 | `DebugDrawerConsolePlugin` | `os_log` entries (stdout and stderr on macOS) and an app logger's lines through `ConsoleLogSink`, with metadata: level filter, text or regular-expression search, subsystem and category mutes, time range, auto-follow, copy, lines kept across launches |
 | `DebugDrawerViewInspectorPlugin` | View borders by depth, alignment grid, click indicators, animation speed, render counts of the views an app tracks with `.trackRenders(_:)`, hierarchy snapshot |
 | `DebugDrawerAccessibility` | The receiver capability (`.accessibilityEnvironmentOverrides()`) that lets a sidecar override Dynamic Type, Increase Contrast and Reduce Motion for its session, and the modifier the app's root view applies them with (`.accessibilityEnvironmentOverrides()`); no drawer, so a release build links it beside the receiver |
