@@ -2,15 +2,18 @@ import DebugDrawerReceiver
 import SwiftUI
 
 /// The host's indicator for a sidecar session: a bar along the bottom for as long as one is open,
-/// saying who holds its grant, until when, and what keeps the app running meanwhile, with End
+/// saying who holds its grant, until when, which backend a switch points the app at, and what
+/// keeps the app running meanwhile, with End
 /// Session for the person holding the device and Keep Running for before they switch to the
 /// sidecar. The library draws no indicator: the host styles its own.
 struct ExampleReceiverSessionIndicator: View {
     @ObservedObject var sessions: DebugDrawerSessions
     @ObservedObject var keeper: DebugDrawerBackgroundKeeper
+    @ObservedObject var environments: DebugDrawerEnvironments
     let keepRunning: () -> Void
 
     var body: some View {
+        // A switched environment lasts only for the session, so the bar is up for as long as it is.
         if let session = sessions.snapshot.session {
             HStack(spacing: 12) {
                 Image(systemName: "antenna.radiowaves.left.and.right")
@@ -20,6 +23,11 @@ struct ExampleReceiverSessionIndicator: View {
                         .font(.headline)
                     Text("\(session.grant?.subject ?? "No grant") · ends at \(session.expires, style: .time)")
                         .font(.footnote)
+                    if environments.snapshot.isSwitched {
+                        Label("Backend: \(environments.snapshot.activeTitle)", systemImage: "server.rack")
+                            .font(.footnote.bold())
+                            .accessibilityIdentifier("SidecarSessionEnvironment")
+                    }
                     Text("In the background: \(keeper.request.exampleDescription)")
                         .font(.footnote)
                 }

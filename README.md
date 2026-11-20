@@ -3106,6 +3106,103 @@ struct NetworkMockingIndicator: View {
 }
 ```
 
+**Switching environments in production.** To dogfood a production build against a staging or
+canary backend, a sidecar can point the app at one of the backends the app allowlists, for its
+session. It is off unless the app enables it, and it is high risk, so the allowlist is mandatory
+and is all a sidecar can pick from. The app lists its environments, each an ID, a title and a
+summary, and maps the ID to its own configuration in an adapter:
+
+```swift
+import CryptoKit
+import DebugDrawerReceiver
+import Foundation
+import SwiftUI
+
+@MainActor
+final class BackendSwitcher: DebugDrawerEnvironmentAdapter {
+    private(set) var baseURL = "https://api.example.com"
+
+    func activate(_ environment: DebugDrawerEnvironment) {
+        switch environment.id {
+        case "staging": baseURL = "https://staging.api.example.com"
+        case "canary": baseURL = "https://canary.api.example.com"
+        default: baseURL = "https://api.example.com"
+        }
+    }
+}
+
+@MainActor
+final class ProductionEnvironments {
+    let sessions: DebugDrawerSessions
+    let environments: DebugDrawerEnvironments
+    let receiver: DebugDrawerReceiver
+
+    init(grantServerKey: Curve25519.Signing.PublicKey, backend: BackendSwitcher, container: URL) throws {
+        sessions = DebugDrawerSessions(maximumDuration: 15 * 60, grantPolicy: DebugDrawerGrantPolicy(
+            verifier: DebugDrawerSignedGrantVerifier(keys: [.ed25519(grantServerKey)]),
+            audience: "com.example.MyApp"
+        ))
+        environments = DebugDrawerEnvironments(
+            default: DebugDrawerEnvironment("production", title: "Production"),
+            allowing: DebugDrawerEnvironment("staging", title: "Staging", summary: "Yesterday's server build"),
+            DebugDrawerEnvironment("canary", title: "Canary"),
+            adapter: backend
+        )
+        receiver = DebugDrawerReceiver(directory: container.appending(path: "DebugDrawer"), sessions: sessions)
+        receiver.enable(.environments(environments))
+        try receiver.start()
+    }
+}
+
+struct EnvironmentIndicator: View {
+    @ObservedObject var environments: DebugDrawerEnvironments
+
+    var body: some View {
+        let snapshot = environments.snapshot
+        if snapshot.isSwitched, let active = snapshot.environments.first(where: { $0.id == snapshot.activeEnvironment }) {
+            Label("Backend: \(active.title)", systemImage: "server.rack")
+        }
+    }
+}
+```
+
+- **The risk: high.** Whoever holds the sidecar, a leaked copy included, can send the app's
+  traffic, the signed-in account's credentials with it, to another backend. Only a backend the app
+  lists can be chosen, so the worst a leak does is point the app at your own staging.
+- **The allowlist is mandatory and holds no URL.** `DebugDrawerEnvironments` and
+  `.environments(default:allowing:_:adapter:)` take the default and at least one allowed
+  environment as separate parameters, so an empty allowlist doesn't compile; an allowed
+  environment repeating another's ID (the default's included) traps, as does an empty ID. Write the
+  list in the app's source, not from remote configuration, which a leak would target next. A
+  `DebugDrawerEnvironment` has an ID, a title and a summary and nothing else: base URLs, hosts and
+  keys stay in the adapter, and no command or snapshot has a field an address could travel in.
+- **Only by ID, only listed ones.** The sidecar connects to `DebugDrawerEnvironments.pluginID` with
+  `DebugDrawerEnvironments.Snapshot` (the environments, the default's ID and the active one's) and
+  `DebugDrawerEnvironments.Command`: `activate(environment:)`, with an ID, and `reset`. An ID the
+  app didn't list (an address among them) is refused as `commandRefused(.notExposed)` and changes
+  nothing; the adapter is handed the app's own `DebugDrawerEnvironment`, never one decoded from the
+  sidecar. Until the app enables `.environments(_:)`, a switch is refused as
+  `commandRefused(.unknownCapability)`, even inside a session.
+- **A grant when a verifier is configured.** With a `DebugDrawerGrantPolicy` on the sessions, as
+  above, a switch needs a session whose grant lists `DebugDrawerEnvironments.pluginID`: without a
+  grant no session opens, and a grant for other capabilities is refused as
+  `commandRefused(.capabilityNotGranted)`. Grants stay optional (without a policy a switch needs
+  only a session); add `.requiringGrant()` to the capability to refuse switches as
+  `commandRefused(.grantMissing)` in any session without one.
+- **For the session, always.** As the session ends, expires or the receiver's or the capability's
+  gate turns off, the adapter is told to activate the default, audited as `changeReverted`. The
+  environment a session switched to is recorded in the defaults before the adapter is told, so
+  when the app is killed during a session the next launch activates the default as it makes the
+  capability: make it as the app starts, before the first request, and keep the switch itself in
+  memory in the adapter.
+- **The app shows it.** `environments.snapshot.isSwitched` is `true` while the app is pointed
+  anywhere but its default, which is only ever during a session: show the backend in the session
+  indicator, as `EnvironmentIndicator` does, so the person holding the device knows their traffic
+  isn't going to production.
+
+In the sidecar, the kit's `DebugDrawerSidecarPlugin.environments` lists the environments under a
+high-risk warning, the active one marked, with Switch for each other one and Reset to Default.
+
 In a debug build the receiver runs beside the drawer: show the same model in a plugin through
 `DebugDrawerPluginTransport.direct(to:)`, and pass it to `.featureFlagOverrides(_:)` or
 `.model(_:id:scope:)`, so what a sidecar does is seen in the app's own drawer. `DebugDrawer`
@@ -3382,7 +3479,7 @@ DebugDrawerSidecarView(groupIdentifier: "group.com.example.debug", sessionDurati
 Below it, a picker shows the plugins the app serves, drawn by the plugins' own views over the
 transport: `.console` and `.network` by default, `.bugReports` for an app that serves bug
 reports, `.scenarios` for one that registers scenarios, `.authActions` for one that registers
-auth actions and `.appStateReset` for one that allows a reset (above). A plugin of your own whose model adopts
+auth actions, `.appStateReset` for one that allows a reset and `.environments` for one that lets a sidecar switch its backend (above). A plugin of your own whose model adopts
 `DebugDrawerPluginModel` joins them with `DebugDrawerSidecarPlugin(id:title:icon:snapshot:command:plugin:)`,
 whose closure makes the plugin's view over the transport the kit hands it. Create Report writes the
 hosted plugins' report contributions, redacted by `DebugDrawer.shared.redaction`, under a summary
@@ -3419,6 +3516,7 @@ capability has something in the host that changes:
 | Diagnostics | Start Capture, then Log Sign-In and Fetch Greeting: the line and the request appear in the sidecar, the email, session ID and token redacted, and the host shows "Capturing diagnostics for a sidecar"; Create Report adds them to the report, and Stop and Delete or the session's end deletes them in the host |
 | Scenarios | Open Order, Show Paywall and Onboarding Step, each with its parameters: Launch brings the host forward (its `debugdrawer-receiver-example://` scheme on iOS, its bundle identifier on the Mac) and opens the scenario's screen, such as "Order #456" |
 | Auth | Expire Access Token, Force Token Refresh and Log Out: the host's Sign-In reads "Signed in, access token expired", "Signed in" or "Signed out" (Sign In signs in again), and the sidecar shows each action's result, such as "Failed: Not signed in"; the host's fake token is never shown or sent |
+| Environment | Switch to Staging or Canary: the host's Environment section shows its title and base URL (kept in the host; the sidecar sees only IDs and titles) and the session indicator names the backend; back to Production as the session ends |
 
 While the session is open the host shows its own indicator (who holds the grant, until when, and
 what keeps it running in the background, End Session, and Keep Running on iOS), and its Sidecar
@@ -3589,7 +3687,7 @@ ContentView()
 | Module | Holds |
 |---|---|
 | `DebugDrawer` | The drawer: its window, the plugin protocol and registry, the views plugins are built from, and release-build stand-ins |
-| `DebugDrawerReceiver` | The one product a release build may link: serves a sidecar app, over the app group's store, only the capabilities the app enables (feature flag and experiment overrides, log level elevation, diagnostics capture, bug reports the app triggers, scenarios the app registers, auth actions, or any plugin model) within sessions the sidecar opens, refusing and auditing everything else; UI-less, no interception |
+| `DebugDrawerReceiver` | The one product a release build may link: serves a sidecar app, over the app group's store, only the capabilities the app enables (feature flag and experiment overrides, log level elevation, diagnostics capture, bug reports the app triggers, scenarios the app registers, auth actions, environment switching among the backends the app allowlists, or any plugin model) within sessions the sidecar opens, refusing and auditing everything else; UI-less, no interception |
 | `DebugDrawerConsolePlugin` | `os_log` entries (stdout and stderr on macOS) and an app logger's lines through `ConsoleLogSink`, with metadata: level filter, text or regular-expression search, subsystem and category mutes, time range, auto-follow, copy, lines kept across launches |
 | `DebugDrawerViewInspectorPlugin` | View borders by depth, alignment grid, click indicators, animation speed, render counts of the views an app tracks with `.trackRenders(_:)`, hierarchy snapshot |
 | `DebugDrawerAccessibility` | The receiver capability (`.accessibilityEnvironmentOverrides()`) that lets a sidecar override Dynamic Type, Increase Contrast and Reduce Motion for its session, and the modifier the app's root view applies them with (`.accessibilityEnvironmentOverrides()`); no drawer, so a release build links it beside the receiver |
@@ -3633,7 +3731,7 @@ ContentView()
 | `DebugDrawerAppStateReset` | The receiver capability (`.appStateReset(_:)`) that lets a sidecar reset the categories a production app allows (never the keychain unless it opts in), listed and confirmed by revision, applied on the next foreground; no drawer, so a release build links it beside the receiver |
 | `DebugDrawerAppStateResetPlugin` | The app's state cleared as a fresh install leaves it, by category: UserDefaults, keychain items, the container's files, caches, cookies, the URL cache and the app's own cleanup, each listed before a confirmation, then relaunched on macOS or quit elsewhere; re-exports `DebugDrawerAppStateReset` |
 | `DebugDrawerRemote` | Plugin models served to a viewer on another device over the local network: an opt-in Network.framework server advertised over Bonjour, each viewer paired with a six-digit code the device shows, and the viewer's transport and browser |
-| `DebugDrawerSidecarKit` | A sidecar app, as a library: `DebugDrawerSidecarView` lists the apps in the group that serve a sidecar, opens their sessions (with a grant the company's server gives, when they require one), shows their Console, Network, Bug Reports, Scenarios, Auth, Reset App State and other model-backed plugins over the socket or the store, and makes and uploads a report of them; iOS, iPadOS and macOS, debug builds |
+| `DebugDrawerSidecarKit` | A sidecar app, as a library: `DebugDrawerSidecarView` lists the apps in the group that serve a sidecar, opens their sessions (with a grant the company's server gives, when they require one), shows their Console, Network, Bug Reports, Scenarios, Auth, Reset App State, Environment and other model-backed plugins over the socket or the store, and makes and uploads a report of them; iOS, iPadOS and macOS, debug builds |
 
 ## Development
 

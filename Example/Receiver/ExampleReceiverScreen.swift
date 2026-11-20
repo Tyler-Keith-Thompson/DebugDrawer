@@ -18,6 +18,8 @@ struct ExampleReceiverScreen: View {
     @ObservedObject var keeper: DebugDrawerBackgroundKeeper
     @ObservedObject var mocking: NetworkMocking
     @ObservedObject var diagnostics: DebugDrawerDiagnosticsCapture
+    @ObservedObject var backend: ProductionBackend
+    @ObservedObject var environments: DebugDrawerEnvironments
     @State private var greeting = ProductionTweaks.greeting.value
 
     var body: some View {
@@ -60,6 +62,19 @@ struct ExampleReceiverScreen: View {
                 Text("App State Reset")
             } footer: {
                 Text("The sidecar may clear the app's UserDefaults and caches; the app clears what it confirms as it next comes to the foreground.")
+            }
+            Section {
+                LabeledContent("Environment", value: environments.snapshot.activeTitle)
+                    .accessibilityIdentifier("EnvironmentActive")
+                LabeledContent("Base URL", value: backend.baseURL)
+                    .accessibilityIdentifier("EnvironmentBaseURL")
+            } header: {
+                Text("Environment")
+            } footer: {
+                Text(
+                    "A sidecar may switch to Staging or Canary for its session; the app is back on Production as it ends. "
+                        + "The base URLs stay in the app."
+                )
             }
             Section("Feature Flag Overrides") {
                 LabeledContent("Checkout", value: flags.value(forKey: "new-checkout") == .bool(true) ? "New" : "Legacy")
@@ -162,7 +177,9 @@ struct ExampleReceiverScreen: View {
             ExampleScenarioScreen(screen: screen) { scenarios.screen = nil }
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            ExampleReceiverSessionIndicator(sessions: sessions, keeper: keeper, keepRunning: host.keepRunningInBackground)
+            ExampleReceiverSessionIndicator(
+                sessions: sessions, keeper: keeper, environments: environments, keepRunning: host.keepRunningInBackground
+            )
         }
     }
 }
@@ -210,6 +227,13 @@ extension DebugDrawerFeatureFlagValue {
         case let .number(value): value.formatted()
         case let .string(value): value
         }
+    }
+}
+
+extension DebugDrawerEnvironments.Snapshot {
+    /// The title of the environment the app is pointed at, as the screen and the indicator say it.
+    var activeTitle: String {
+        environments.first { $0.id == activeEnvironment }?.title ?? activeEnvironment
     }
 }
 

@@ -103,7 +103,7 @@ public struct DebugDrawerReceiverCapability {
     /// ``DebugDrawerAuditEntry/Refusal/grantMissing``.
     ///
     /// ```swift
-    /// receiver.enable(.model(environments, id: "MyApp.Environment", scope: .session(revertWith: .reset)).requiringGrant())
+    /// receiver.enable(.environments(environments).requiringGrant())
     /// ```
     ///
     /// - Returns: The capability, requiring a grant.

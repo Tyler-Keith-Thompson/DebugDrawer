@@ -31,7 +31,8 @@ struct ExampleReceiverApp: App {
             ExampleReceiverScreen(
                 host: host, flags: host.flags, experiments: host.experiments, logging: host.logging, scenarios: host.scenarios,
                 signIn: host.signIn, appState: host.appState, sessions: host.sessions,
-                keeper: host.keeper, mocking: host.mocking, diagnostics: host.diagnostics
+                keeper: host.keeper, mocking: host.mocking, diagnostics: host.diagnostics,
+                backend: host.environments.backend, environments: host.environments.model
             )
             .localizationReview()
             .accessibilityEnvironmentOverrides()
