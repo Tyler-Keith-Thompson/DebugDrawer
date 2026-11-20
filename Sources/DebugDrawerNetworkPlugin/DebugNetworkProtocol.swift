@@ -1,4 +1,5 @@
 #if DEBUG
+    import DebugDrawerNetwork
     import Foundation
 
     // MARK: - URLProtocol interceptor

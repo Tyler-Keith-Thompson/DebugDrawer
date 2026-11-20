@@ -1,4 +1,5 @@
 #if DEBUG
+    import DebugDrawerNetwork
     import Foundation
 
     /// Where the interception keeps what it captures and reads the rules it applies: the stores of

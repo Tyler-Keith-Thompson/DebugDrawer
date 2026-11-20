@@ -1,3 +1,4 @@
+import DebugDrawerNetwork
 import Foundation
 
 // Public because it is `NetworkModel`'s `Snapshot`, and opaque: its fields stay internal, so the

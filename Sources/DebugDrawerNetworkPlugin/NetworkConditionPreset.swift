@@ -1,4 +1,6 @@
 #if DEBUG
+    import DebugDrawerNetwork
+
     /// A profile's effect, ready-made, that the editor fills its fields from.
     ///
     /// The figures follow the Network Link Conditioner's profiles of the same names: their

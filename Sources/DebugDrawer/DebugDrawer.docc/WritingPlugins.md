@@ -531,7 +531,11 @@ is written to the store as it is. Data that arrives before any session can, such
 MetricKit diagnostic on a later launch, is kept in the app's own storage instead and put in the
 snapshot only while a session is open: `DebugDrawerMetricKit` holds the MetricKit subscriber and
 `.metricKitPayloads(sessions:directory:redaction:capacity:)`, which captures through MetricKit
-alone, never a crash handler, so nothing intercepts in the build that ships. The receiver's module holds
+alone, never a crash handler, so nothing intercepts in the build that ships. A capability that
+changes how the app talks to its servers takes the same care: `DebugDrawerNetwork` holds
+`.networkMocking(_:)`, whose rules answer only the `URLSession`s the host lists
+`NetworkMockingURLProtocol` in, only for the hosts it allows, only within a session whose grant
+lists it, and registers nothing with URL loading and replaces no method. The receiver's module holds
 `DebugDrawerPluginModel`, the sessions and the store's wire format, real in every build, and
 `DebugDrawer` re-exports it; it serves no socket and holds no view. The README's "Production
 builds: the receiver" shows the setup.

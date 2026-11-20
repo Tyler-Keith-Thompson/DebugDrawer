@@ -1,5 +1,6 @@
 #if DEBUG
     import DebugDrawer
+    import DebugDrawerNetwork
     import SwiftUI
 
     /// The Conditions section: the profiles in the order they are tried, each with its switch, then

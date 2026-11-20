@@ -1,5 +1,6 @@
 #if DEBUG
     import DebugDrawer
+    import DebugDrawerNetwork
     import SwiftUI
     import UniformTypeIdentifiers
 

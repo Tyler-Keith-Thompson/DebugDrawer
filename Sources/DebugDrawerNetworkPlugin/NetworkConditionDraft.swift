@@ -1,4 +1,5 @@
 #if DEBUG
+    import DebugDrawerNetwork
     import Foundation
 
     /// A profile as the editor holds it while it is changed: text for every number, checked when

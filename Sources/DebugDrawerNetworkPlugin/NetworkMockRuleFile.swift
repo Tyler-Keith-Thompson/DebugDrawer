@@ -1,4 +1,5 @@
 #if DEBUG
+    import DebugDrawerNetwork
     import Foundation
 
     /// The rules as the plugin saves them: JSON with a format version, so a later format can

@@ -1,4 +1,5 @@
 #if DEBUG
+    import DebugDrawerNetwork
     import Foundation
 
     /// The profiles as the plugin saves them: JSON with a format version, so a later format can

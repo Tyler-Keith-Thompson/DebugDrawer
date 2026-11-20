@@ -1,13 +1,7 @@
 #if DEBUG
+    import DebugDrawerNetwork
     import Foundation
     import os
-
-    /// How one request is conditioned: the effect to apply, decided when the request starts, and
-    /// the scheduler that times it.
-    struct NetworkConditionPlan: Sendable {
-        let effect: NetworkConditionEffect
-        let scheduler: any NetworkConditionScheduler
-    }
 
     /// The profiles the URL protocol conditions requests by: the enabled ones that compile, in
     /// order, with the scheduler that times their latency and bandwidth and the random source that
@@ -65,25 +59,6 @@
             }
             guard let match else { return nil }
             return NetworkConditionPlan(effect: match.effect(failing: random), scheduler: scheduler)
-        }
-    }
-
-    extension NetworkConditionProfile {
-        /// The profile's effect on one request, rolling `random` for whether it fails when the rate
-        /// is neither 0 nor 100.
-        fileprivate func effect(failing random: any NetworkConditionRandomSource) -> NetworkConditionEffect {
-            let fails = switch failureRate {
-            case ...0: false
-            case 100...: true
-            default: random.rollPercent() < failureRate
-            }
-            return NetworkConditionEffect(
-                profileName: name,
-                latency: max(latency, .zero),
-                // A failed request has no body to cap.
-                bandwidth: fails ? nil : bandwidth.flatMap { $0 > 0 ? $0 : nil },
-                failure: fails ? failure : nil
-            )
         }
     }
 #endif

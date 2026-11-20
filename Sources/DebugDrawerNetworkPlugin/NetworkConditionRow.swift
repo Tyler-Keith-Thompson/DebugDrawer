@@ -1,5 +1,6 @@
 #if DEBUG
     import DebugDrawer
+    import DebugDrawerNetwork
     import SwiftUI
 
     /// A conditioning profile in the Conditions section: a switch that turns it on and off, its

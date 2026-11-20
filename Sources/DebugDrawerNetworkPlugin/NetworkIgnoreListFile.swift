@@ -1,4 +1,5 @@
 #if DEBUG
+    import DebugDrawerNetwork
     import Foundation
 
     /// The ignore list as the plugin saves it, in `ignored.json`: JSON with a format version, so a

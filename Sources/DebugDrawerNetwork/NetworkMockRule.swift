@@ -2,7 +2,8 @@ import Foundation
 
 /// A canned response for the requests a matcher picks: once `installNetwork()` has run, a
 /// request the first enabled rule matches is answered from the rule, without reaching the
-/// network, and shows as mocked in the Network plugin's log.
+/// network, and shows as mocked in the Network plugin's log. In a production build a sidecar sets
+/// rules for the session through ``NetworkMocking``, for the hosts the app allows.
 ///
 /// Rules are kept in a list the drawer orders; the first enabled rule that matches answers.
 /// A request that no rule matches reaches the network unchanged.

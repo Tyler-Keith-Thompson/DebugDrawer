@@ -837,7 +837,8 @@ one segment (`/users/*`) and `**` across segments (`/users/**`). Hosts ignore ca
 compared percent-decoded. The rules are tried in the order the drawer lists them, and the first
 that is on and matches answers, with no request sent; `Content-Length` is always the body's length.
 A request no rule matches reaches the network unchanged. Rules apply only once `installNetwork()`
-has run.
+has run. A production build gets none of this; a sidecar can set rules there for its session,
+through the sessions the app configures, as "Network mocks in production" below shows.
 
 The Mocks section, below the request log, lists each rule with a switch, its methods, pattern and
 status; selecting one offers Edit, Move Up, Move Down and Delete, and the plugin's header counts the
@@ -2212,8 +2213,9 @@ A release build gets none of the drawer. To let an employee-only sidecar app rea
 app, the app links one more product, `DebugDrawerReceiver`: UI-less, with no interception, no
 plugin and no dependency on the drawer (and, to offer tweaks, `DebugDrawerTweaks`, to mirror
 analytics events, `DebugDrawerAnalytics`, for translators and accessibility reviewers,
-`DebugDrawerLocalization` and `DebugDrawerAccessibility`, or to forward crash reports and
-MetricKit payloads, `DebugDrawerMetricKit`, below). It serves a sidecar, over the app group's store, only the
+`DebugDrawerLocalization` and `DebugDrawerAccessibility`, to forward crash reports and
+MetricKit payloads, `DebugDrawerMetricKit`, or to mock responses for a session, `DebugDrawerNetwork`,
+below). It serves a sidecar, over the app group's store, only the
 capabilities the app enables, within sessions the sidecar opens, and refuses everything else:
 
 ```swift
@@ -2549,6 +2551,101 @@ final class ProductionDiagnostics {
   `arguments`, at any depth, before the payload is kept anywhere, and keeps its `formatString`,
   the code's own text. `adding(keys:)` masks more of MetricKit's keys (matched exactly, as MetricKit
   spells them), and `.none` keeps payloads whole. A masked value becomes `"[REDACTED]"`.
+
+**Network mocks in production.** To reproduce a server's edge case on the build that ships (an
+outage, an empty list, a slow or failing endpoint), a sidecar can answer some of the app's requests
+with mock rules, for its session, on hosts the app allows. It is off unless the app enables it, and
+it requires a grant (see "Signed grants" below). Link `DebugDrawerNetwork`
+(`.product(name: "DebugDrawerNetwork", package: "DebugDrawer")`) beside the receiver, the UI-free
+half of the Network plugin, which holds `NetworkMockRule` and `NetworkConditionProfile`; make the
+model with the hosts a sidecar may mock, enable the capability, and list the capability's URL
+protocol in each session whose requests may be mocked:
+
+```swift
+import CryptoKit
+import DebugDrawerNetwork
+import DebugDrawerReceiver
+import Foundation
+
+@MainActor
+final class ProductionNetworkMocking {
+    let sessions: DebugDrawerSessions
+    let receiver: DebugDrawerReceiver
+    let mocking: NetworkMocking
+    let apiSession: URLSession
+
+    init(grantServerKey: Curve25519.Signing.PublicKey, container: URL) throws {
+        sessions = DebugDrawerSessions(maximumDuration: 15 * 60, grantPolicy: DebugDrawerGrantPolicy(
+            verifier: DebugDrawerSignedGrantVerifier(keys: [.ed25519(grantServerKey)]),
+            audience: "com.example.MyApp"
+        ))
+        mocking = NetworkMocking(sessions: sessions, allowedHosts: [.exact("api.example.com"), .domain("staging.example.com")])
+        receiver = DebugDrawerReceiver(directory: container.appending(path: "DebugDrawer"), sessions: sessions)
+        receiver.enable(.networkMocking(mocking))
+        try receiver.start()
+
+        let configuration = URLSessionConfiguration.default
+        configuration.protocolClasses = [NetworkMockingURLProtocol.self] + (configuration.protocolClasses ?? [])
+        apiSession = URLSession(configuration: configuration)
+    }
+}
+```
+
+The sidecar, in a session whose grant lists `NetworkMocking.pluginID`, sends the rules:
+
+```swift
+// In the sidecar, once its session is open:
+mocks.send(.setRules([NetworkMockRule(
+    name: "Orders outage",
+    matcher: .init(methods: ["GET"], host: .exact("api.example.com"), path: .wildcard("/v1/orders/**")),
+    response: .init(status: 503, body: .text(#"{"error":"maintenance"}"#), contentType: "application/json")
+)]))
+```
+
+- **Only the sessions the app configures.** Nothing is registered with URL loading and no method is
+  replaced: `NetworkMockingURLProtocol` answers only for a `URLSession` whose configuration lists it,
+  as above, and `URLSession.shared` and every other session are never touched. It claims only a
+  request that a rule of the open session matches, over HTTP or HTTPS, to an allowed host, and
+  declines the rest, which load as if it weren't listed. It never sends a request or reads a
+  server's response, and an answer never enters the session's cache.
+- **Only allowed hosts.** `allowedHosts` is the app's, fixed as it makes the model: `.exact(_:)`
+  allows one host, and `.domain(_:)` the domain and every host under it (`.domain("example.com")`
+  allows `api.example.com`, not `badexample.com`), ignoring case. A request to any other host is
+  never answered, whatever a rule matches; with an empty list nothing is.
+- **Only during a granted session.** The sidecar connects to `NetworkMocking.pluginID` with
+  `NetworkMocking.Snapshot` (the open session's ID, the allowed hosts, its rules and profiles) and
+  `NetworkMocking.Command`: `setRules(_:)` and `setConditions(_:)` replace the session's rules or
+  profiles, and `reset` removes them. The capability requires a grant listing it even in a receiver
+  without a grant policy, where its commands are refused as `commandRefused(.grantMissing)`; under a
+  policy, a session whose grant doesn't list it is refused as `.capabilityNotGranted`. Each session
+  starts with no rules, and as it ends, expires (from the expiry date, before the system's timer
+  fires) or the receiver's or the capability's gate turns off, every request reaches the server
+  again.
+- **Rules as the plugin's, with two limits.** A rule matches and answers as in "Network mocks"
+  above, the first that is on answering. A sidecar's rule may not use a regular expression or a
+  file body: either is refused as `commandRefused(.malformedCommand)`, as no received expression is
+  evaluated in the app and the sidecar can't place a file in its storage; use exact and wildcard
+  patterns and a text body.
+- **Conditioning shapes the answers.** A profile from `setConditions(_:)` (as in "Network
+  conditions" above) delays a rule's answer by its latency, delivers its body no faster than its
+  bandwidth, or fails it with its failure and rate. It applies only to the requests a rule answers:
+  a request no rule matches goes to the server as it is, unslowed, as the app never sends one
+  through the library.
+- **The app shows it.** `mocking.snapshot.isActive` is `true` while a session is open with a rule on
+  and a host allowed: show it with the session indicator, so the person holding the device knows
+  the responses may not be the server's:
+
+```swift
+struct NetworkMockingIndicator: View {
+    @ObservedObject var mocking: NetworkMocking
+
+    var body: some View {
+        if mocking.snapshot.isActive {
+            Label("Network mocking active", systemImage: "exclamationmark.icloud")
+        }
+    }
+}
+```
 
 In a debug build the receiver runs beside the drawer: show the same model in a plugin through
 `DebugDrawerPluginTransport.direct(to:)`, and pass it to `.featureFlagOverrides(_:)` or
@@ -2947,7 +3044,8 @@ ContentView()
 | `DebugDrawerAccessibilityPlugin` | Runtime overrides of color scheme, Dynamic Type, layout direction, locale and the system accessibility settings SwiftUI exposes, the accessibility settings each beside the system's value; re-exports `DebugDrawerAccessibility` |
 | `DebugDrawerPerformancePlugin` | Live FPS, dropped frames and memory footprint with its peak, sparkline graphs, CPU per thread, and on iOS a simulated memory warning, sampled only while a drawer shows its view or HUD readout |
 | `DebugDrawerEnergyPlugin` | Battery level and charging, power source, CPU load and thermal state, sampled while a drawer shows its view or between `EnergyMonitor.shared.start()` and `stop()` |
-| `DebugDrawerNetworkPlugin` | URLProtocol HTTP interception: method, URL, status, timing, headers, body, cURL export, mock responses by rule, slow and failing networks per host, replay and edit-and-resend, HAR export and import, WebSocket frames, requests kept across launches, ignored hosts, GraphQL operation names |
+| `DebugDrawerNetwork` | `NetworkMockRule` and `NetworkConditionProfile`, real in every build, and the receiver capability (`.networkMocking(_:)`) that answers the requests a URLSession the app configured with `NetworkMockingURLProtocol` sends to the hosts it allows from a sidecar's rules, conditioned by its profiles, during a session whose grant lists it; nothing registered globally and no drawer, so a release build links it beside the receiver |
+| `DebugDrawerNetworkPlugin` | URLProtocol HTTP interception: method, URL, status, timing, headers, body, cURL export, mock responses by rule, slow and failing networks per host, replay and edit-and-resend, HAR export and import, WebSocket frames, requests kept across launches, ignored hosts, GraphQL operation names; re-exports `DebugDrawerNetwork` |
 | `DebugDrawerDiskIOPlugin` | FileManager, NSData and FileHandle file calls, flagging main-thread I/O and failures |
 | `DebugDrawerDiskIOInterposer` | A dynamic library, linked only to opt in: dyld interposing tuples for `read`, `write`, `pread` and `pwrite`, which `unsafeInstallDiskIOWithInterposing()` turns on so Disk I/O records Swift's `Data` and `FileHandle` calls |
 | `DebugDrawerAppInfoPlugin` | Build (version, commit, branch, CI build), provisioning profile, entitlements, OS, memory, uptime, process, debugger, screen and reachability facts |

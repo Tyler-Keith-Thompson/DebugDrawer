@@ -99,6 +99,10 @@ MODULES = [
     # The MetricKit plugin's payload kinds and MXMetricManager subscriber, and the receiver
     # capability that keeps the payloads (crash diagnostics among them) for a sidecar's session.
     ("DebugDrawerMetricKit", "Capabilities", "MetricKit's payload kinds and subscriber, real in every build, and the receiver capability that keeps the payloads the app receives, crash diagnostics among them, redacted and across launches, and serves them while a sidecar's session is open; UI-free.", ["DebugDrawerReceiver"]),
+    # The Network plugin's mock rules and conditioning profiles, their matcher and conditioned
+    # delivery, and the receiver capability that answers a sidecar's mocks during its session,
+    # through a URL protocol the host lists in its own sessions' configurations.
+    ("DebugDrawerNetwork", "Capabilities", "Mock rules and conditioning profiles, real in every build, and the receiver capability that answers the requests the host's own URLSession configurations send to the hosts it allows from a sidecar's rules during a grant-holding session, through a URL protocol the host lists; nothing registered globally, UI-free.", ["DebugDrawerReceiver"]),
     # Plugins
     ("DebugDrawerConsolePlugin", "Plugins", "Captures os_log entries (stdout and stderr on macOS) and an app logger's lines through ConsoleLogSink, with metadata: level filter, text or regular-expression search, subsystem and category mutes, time range, auto-follow, copy, lines kept across launches.", ["DebugDrawer", "oslogclient/OSLogClient"]),
     ("DebugDrawerViewInspectorPlugin", "Plugins", "View borders by depth, alignment grid, click indicators, animation speed, render tracking, hierarchy snapshot.", ["DebugDrawer"]),
@@ -106,7 +110,7 @@ MODULES = [
     ("DebugDrawerAppInfoPlugin", "Plugins", "Build (version, commit, branch, CI build), provisioning profile, entitlements, OS, memory, uptime, process, debugger, screen and reachability facts.", ["DebugDrawer"]),
     ("DebugDrawerUserDefaultsPlugin", "Plugins", "Browse, search, add, edit, copy and delete UserDefaults keys of the standard defaults and app group suites, values of every property-list type edited at any depth, the list following the app's writes.", ["DebugDrawer"]),
     ("DebugDrawerPerformancePlugin", "Plugins", "Live FPS, dropped frames and memory with sparkline graphs, CPU per thread, and a simulated memory warning, sampled only while shown.", ["DebugDrawer"]),
-    ("DebugDrawerNetworkPlugin", "Plugins", "URLProtocol HTTP interception: requests, responses, timing, cURL export, mock responses, slow and failing networks per host, replay and edit-and-resend, HAR export and import, WebSocket frames, requests kept across launches, ignored hosts, GraphQL operation names.", ["DebugDrawer"]),
+    ("DebugDrawerNetworkPlugin", "Plugins", "URLProtocol HTTP interception: requests, responses, timing, cURL export, mock responses, slow and failing networks per host, replay and edit-and-resend, HAR export and import, WebSocket frames, requests kept across launches, ignored hosts, GraphQL operation names.", ["DebugDrawer", "DebugDrawerNetwork"]),
     ("DebugDrawerKeychainPlugin", "Plugins", "Browse generic and internet passwords, certificates and keys with every attribute, filter by access group, and add, edit and delete generic passwords.", ["DebugDrawer"]),
     ("DebugDrawerScreenshotPlugin", "Plugins", "Capture the app window to a file or the clipboard.", ["DebugDrawer"]),
     ("DebugDrawerFileBrowserPlugin", "Plugins", "The app's Documents, Library, tmp, bundle and app group containers, with folder totals and dates, previews of text, JSON, property lists and images, and files imported, renamed, deleted and shared, the bundle read-only.", ["DebugDrawer"]),
@@ -204,7 +208,7 @@ CATALYST_MODULES = ["DebugDrawerReceiver", "DebugDrawerTweaks", "DebugDrawerAnal
 # fails on one that has none (tools/documentation_coverage.py, run by docc_archive's
 # `require_documentation`). Checked against the debug build's symbol graph, which holds the drawer
 # as well as the API that exists in every build.
-DOCUMENTED_MODULES = ["DebugDrawerReceiver", "DebugDrawerTweaks", "DebugDrawerAnalytics", "DebugDrawerLocalization", "DebugDrawerAccessibility", "DebugDrawerMetricKit", "DebugDrawer", "DebugDrawerSidecarKit"]
+DOCUMENTED_MODULES = ["DebugDrawerReceiver", "DebugDrawerTweaks", "DebugDrawerAnalytics", "DebugDrawerLocalization", "DebugDrawerAccessibility", "DebugDrawerMetricKit", "DebugDrawerNetwork", "DebugDrawer", "DebugDrawerSidecarKit"]
 
 # Dynamic libraries: (name, description). Each is C sources under Sources/<name> (headers in
 # include/) with no dependencies, shipped as a `.dynamic` library product in Package.swift and as
@@ -237,7 +241,8 @@ TEST_TARGETS = [
     ("DebugDrawerAppInfoPluginTests", ["DebugDrawerAppInfoPlugin", "DebugDrawer", "viewinspector/ViewInspector", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
     ("DebugDrawerUserDefaultsPluginTests", ["DebugDrawerUserDefaultsPlugin", "DebugDrawer", "viewinspector/ViewInspector", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
     ("DebugDrawerPerformancePluginTests", ["DebugDrawerPerformancePlugin", "DebugDrawer", "viewinspector/ViewInspector", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
-    ("DebugDrawerNetworkPluginTests", ["DebugDrawerNetworkPlugin", "DebugDrawer", "DebugDrawerInterceptionContract", "DebugDrawerTestSupport", "viewinspector/ViewInspector", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
+    ("DebugDrawerNetworkTests", ["DebugDrawerNetwork", "DebugDrawerReceiver", "DebugDrawer"]),
+    ("DebugDrawerNetworkPluginTests", ["DebugDrawerNetworkPlugin", "DebugDrawerNetwork", "DebugDrawer", "DebugDrawerInterceptionContract", "DebugDrawerTestSupport", "viewinspector/ViewInspector", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
     ("DebugDrawerKeychainPluginTests", ["DebugDrawerKeychainPlugin", "DebugDrawer", "viewinspector/ViewInspector", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
     ("DebugDrawerScreenshotPluginTests", ["DebugDrawerScreenshotPlugin", "DebugDrawer", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
     ("DebugDrawerFileBrowserPluginTests", ["DebugDrawerFileBrowserPlugin", "DebugDrawer", "viewinspector/ViewInspector", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
@@ -266,7 +271,7 @@ TEST_TARGETS = [
     ("DebugDrawerDesignOverlayPluginTests", ["DebugDrawerDesignOverlayPlugin", "DebugDrawer", "viewinspector/ViewInspector", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
     ("DebugDrawerColorVisionPluginTests", ["DebugDrawerColorVisionPlugin", "DebugDrawer", "viewinspector/ViewInspector", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
     ("DebugDrawerAppStateResetPluginTests", ["DebugDrawerAppStateResetPlugin", "DebugDrawer", "viewinspector/ViewInspector", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
-    ("DebugDrawerRemoteTests", ["DebugDrawerRemote", "DebugDrawer", "DebugDrawerReceiver", "DebugDrawerNetworkPlugin", "DebugDrawerConsolePlugin"]),
+    ("DebugDrawerRemoteTests", ["DebugDrawerRemote", "DebugDrawer", "DebugDrawerReceiver", "DebugDrawerNetworkPlugin", "DebugDrawerNetwork", "DebugDrawerConsolePlugin"]),
     ("DebugDrawerSidecarKitTests", ["DebugDrawerSidecarKit", "DebugDrawer", "DebugDrawerReceiver", "DebugDrawerNetworkPlugin", "DebugDrawerConsolePlugin", "viewinspector/ViewInspector"]),
 ]
 
@@ -320,6 +325,7 @@ PERFORMANCE_TESTS = [
     "DebugDrawerColorVisionPluginTests",
     "DebugDrawerAppStateResetPluginTests",
     "DebugDrawerNetworkPluginTests",
+    "DebugDrawerNetworkTests",
     "DebugDrawerConsolePluginTests",
 ]
 

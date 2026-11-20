@@ -1,3 +1,4 @@
+import DebugDrawerNetwork
 import Foundation
 
 // Public because it is `NetworkModel`'s `Command`, and opaque: the actions it wraps stay internal,

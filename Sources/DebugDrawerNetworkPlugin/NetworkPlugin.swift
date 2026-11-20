@@ -1,4 +1,5 @@
 import DebugDrawer
+import DebugDrawerNetwork
 import SwiftUI
 
 // The public API compiles in every configuration; the implementation under `#if DEBUG` in the

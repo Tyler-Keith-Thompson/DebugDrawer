@@ -1,5 +1,6 @@
 #if DEBUG
     import DebugDrawer
+    import DebugDrawerNetwork
     import SwiftUI
 
     /// A conditioning profile's fields: its name and switch; the hosts it applies to; and what it

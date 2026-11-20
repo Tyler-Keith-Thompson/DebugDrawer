@@ -1,5 +1,6 @@
 #if DEBUG
     import DebugDrawer
+    import DebugDrawerNetwork
     import SwiftUI
 
     /// A mock rule in the Mocks section: a switch that turns it on and off, its name and status,

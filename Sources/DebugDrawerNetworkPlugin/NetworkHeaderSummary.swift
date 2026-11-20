@@ -1,5 +1,6 @@
 #if DEBUG
     import DebugDrawer
+    import DebugDrawerNetwork
     import SwiftUI
 
     /// The Network plugin's header accessory, drawn from the model's snapshots as the plugin's body

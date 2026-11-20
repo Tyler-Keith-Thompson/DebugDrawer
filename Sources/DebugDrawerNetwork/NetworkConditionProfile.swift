@@ -3,7 +3,9 @@ import Foundation
 /// A slow or failing network for one host, or for every host: once `installNetwork()` has run,
 /// a request the first enabled profile matches waits out the profile's latency, may fail with
 /// its error, and otherwise gets its answer (a mock's or the server's) no faster than its
-/// bandwidth allows. The Network plugin's log marks each request a profile conditioned.
+/// bandwidth allows. The Network plugin's log marks each request a profile conditioned. In a
+/// production build a sidecar sets profiles for the session through ``NetworkMocking``, where
+/// they condition only the requests a mock rule answers.
 ///
 /// Profiles are kept in a list the drawer orders; the first enabled profile whose host matches
 /// applies. A request to a host no profile matches is untouched.
@@ -117,7 +119,7 @@ extension NetworkConditionProfile: Codable {
     }
 }
 
-extension Duration {
+package extension Duration {
     /// The duration in whole milliseconds, rounded toward zero; past what an `Int64` holds,
     /// its largest or smallest value.
     var milliseconds: Int64 {

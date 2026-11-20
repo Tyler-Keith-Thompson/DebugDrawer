@@ -1,3 +1,4 @@
+import DebugDrawerNetwork
 import Foundation
 
 /// A request the log holds: what the app sent, and once it completes, what came back.
