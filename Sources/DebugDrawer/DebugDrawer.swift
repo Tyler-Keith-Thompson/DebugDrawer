@@ -1,4 +1,5 @@
 #if DEBUG
+    import Combine
     import os
     import SwiftUI
 
@@ -123,12 +124,25 @@
         /// the app, or a second drawer's, so its layout stays apart from ``shared``'s.
         ///
         /// - Parameter defaults: Where the drawer saves its state.
-        public init(defaults: UserDefaults) {
+        public convenience init(defaults: UserDefaults) {
+            // The main queue rather than the main run loop: a run loop timer waits while a menu
+            // or a drag tracks the mouse, and the toast would stay up through it.
+            self.init(defaults: defaults, toastScheduler: DispatchQueue.main)
+        }
+
+        /// Makes a drawer that saves to `defaults` and times its toasts on `toastScheduler`, which
+        /// must run its actions on the main thread.
+        ///
+        /// - Parameters:
+        ///   - defaults: Where the drawer saves its state.
+        ///   - toastScheduler: What counts down ``toastLifetime`` after each post.
+        init(defaults: UserDefaults, toastScheduler: some Scheduler) {
             self.defaults = defaults
             hudLayout = HUDLayout(from: defaults)
             noticesMutedPlugins = Set(defaults.stringArray(forKey: Self.noticesMutedDefaultsKey) ?? [])
             // Here rather than at the property: `self` can't be passed until every property is set.
             detachedPresentation.drawer = self
+            toastExpiry = expireToasts(on: toastScheduler)
         }
 
         // MARK: - Global
@@ -326,6 +340,13 @@
 
         /// The notice shown while the drawer is closed, if a plugin has raised one.
         @Published public internal(set) var toast: DebugDrawerToast?
+
+        /// What keeps the toast up past ``toastLifetime``: the pointer over it, or accessibility
+        /// focus on it. A subject rather than `@Published`, since no view draws it.
+        let toastHolds = CurrentValueSubject<Set<DrawerToastHold>, Never>([])
+
+        /// Removes the toast ``toastLifetime`` after its last post while nothing holds it.
+        private var toastExpiry: AnyCancellable?
 
         /// The IDs of the plugins whose badges and toasts are silenced, saved in ``defaults``.
         @Published var noticesMutedPlugins: Set<String>

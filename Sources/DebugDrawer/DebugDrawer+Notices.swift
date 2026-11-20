@@ -1,9 +1,14 @@
 #if DEBUG
+    import Combine
     import Foundation
 
     // MARK: - Badges and toasts
 
     public extension DebugDrawer {
+        /// How long a toast stays up after its last post, in seconds, while the pointer isn't over
+        /// it and accessibility focus isn't on it.
+        static let toastLifetime: TimeInterval = 6
+
         /// Shows `count` on the plugin's section header; zero or less clears it. While the plugin's
         /// notices are silenced (``setNoticesMuted(_:forPlugin:)``) it shows nothing.
         ///
@@ -23,6 +28,10 @@
         /// one toast; a post from another plugin replaces the toast. While the drawer is open the
         /// post is dropped: the drawer is on screen, and a badge is the lasting signal. A post from
         /// a plugin whose notices are silenced (``setNoticesMuted(_:forPlugin:)``) is dropped too.
+        ///
+        /// The toast goes away by itself ``toastLifetime`` seconds after its last post; each post
+        /// starts the countdown again. It stays while the pointer is over it or accessibility
+        /// focus is on it, and the countdown starts again once they leave.
         ///
         /// - Parameters:
         ///   - message: What the toast says.
@@ -81,6 +90,43 @@
     }
 
     extension DebugDrawer {
+        /// Starts or ends a hold on the toast. While any hold lasts the toast stays; as the last
+        /// ends, its countdown of ``toastLifetime`` starts again.
+        ///
+        /// - Parameters:
+        ///   - isHeld: Whether the hold starts or ends.
+        ///   - hold: What holds the toast.
+        func setToastHeld(_ isHeld: Bool, by hold: DrawerToastHold) {
+            var holds = toastHolds.value
+            let changed = isHeld ? holds.insert(hold).inserted : holds.remove(hold) != nil
+            // Only a change is sent: a repeated release would restart the countdown.
+            if changed { toastHolds.send(holds) }
+        }
+
+        /// Removes the toast ``toastLifetime`` after the last change to it, unless a hold lasts
+        /// through then.
+        ///
+        /// Every post changes the toast (its count, or its plugin), so each restarts the
+        /// debounce. A hold sends `nil`, which removes nothing when it comes due; the hold's
+        /// release sends the toast again, starting a new countdown.
+        ///
+        /// - Parameter scheduler: Where the countdown runs; its actions must run on the main
+        ///   thread.
+        /// - Returns: The subscription, which the drawer holds for its life.
+        func expireToasts(on scheduler: some Scheduler) -> AnyCancellable {
+            $toast.combineLatest(toastHolds)
+                .map { toast, holds in holds.isEmpty ? toast : nil }
+                .debounce(for: .seconds(Self.toastLifetime), scheduler: scheduler)
+                .sink { [weak self] expired in
+                    MainActor.assumeIsolated {
+                        // The toast may have changed since: dismissed, opened, or replaced by a
+                        // post the debounce hasn't seen yet.
+                        guard let self, let expired, self.toast == expired else { return }
+                        self.toast = nil
+                    }
+                }
+        }
+
         /// A plugin the key window's drawer should show the next time it can.
         var revealRequest: String? {
             get { keyPresentation.revealRequest }
@@ -94,6 +140,10 @@
     import Foundation
 
     public extension DebugDrawer {
+        /// How long a toast would stay up after its last post, in seconds; release builds raise
+        /// no toasts.
+        static let toastLifetime: TimeInterval = 6
+
         /// Does nothing.
         ///
         /// - Parameters:

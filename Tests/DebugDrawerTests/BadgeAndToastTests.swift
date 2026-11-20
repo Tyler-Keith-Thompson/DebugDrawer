@@ -148,6 +148,42 @@
                 #expect(dismissed == 1)
             }
 
+            // tvOS moves focus between the toast's buttons, so its dismiss button keeps its place
+            // in the row and has no hit area to grow.
+            #if !os(tvOS)
+                @Test("The dismiss button's hit area is 44 points square on a touch screen and 22 on the Mac, at the toast's top trailing corner")
+                func theDismissButtonsHitArea() throws {
+                    let toast = DebugDrawerToast(pluginID: "DebugDrawerTests.NoticePlugin", message: "failed", count: 1)
+                    let sut = DrawerToastView(toast: toast, plugin: nil, open: {}, dismiss: {})
+                    #if os(macOS)
+                        let expected: CGFloat = 22
+                    #else
+                        let expected: CGFloat = 44
+                    #endif
+
+                    let button = try sut.inspect().find(ViewType.Button.self) { try $0.accessibilityLabel().string() == "Dismiss" }
+                    let actual = try button.find(ViewType.Image.self).flexFrame()
+
+                    #expect(actual.minWidth == expected)
+                    #expect(actual.minHeight == expected)
+                    #expect(actual.alignment == .topTrailing)
+                }
+            #endif
+
+            @Test("A toast leaving the screen ends the pointer's hold on it")
+            func disappearingEndsThePointersHold() throws {
+                var holds: [String] = []
+                let toast = DebugDrawerToast(pluginID: "DebugDrawerTests.NoticePlugin", message: "failed", count: 1)
+                let sut = DrawerToastView(toast: toast, plugin: nil, open: {}, dismiss: {}, hold: { hold, isHeld in
+                    holds.append("\(hold) \(isHeld)")
+                })
+                let expected = ["pointer false"]
+
+                try sut.inspect().hStack().callOnDisappear()
+
+                #expect(holds == expected)
+            }
+
             @Test("A section header shows its plugin's badge count")
             func aHeaderShowsTheBadge() throws {
                 let sut = PluginHeaderLabel(plugin: AnyDebugDrawerPlugin(NoticePlugin()), isExpanded: false, isPinned: false, badge: 7)

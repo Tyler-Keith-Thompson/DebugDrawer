@@ -108,8 +108,10 @@ struct SessionPlugin: DebugDrawerPlugin {
 A plugin can raise a problem while the drawer is closed. ``DebugDrawerPlugin/setBadge(_:)`` puts
 a count on its header until ``DebugDrawerPlugin/clearBadge()``, and
 ``DebugDrawerPlugin/postToast(_:)`` shows a toast in the window's corner that opens the drawer at
-the plugin when tapped. Posts from one plugin coalesce into one toast that counts them. These are
-methods on the plugin, so they compile in release, where they do nothing.
+the plugin when tapped. Posts from one plugin coalesce into one toast that counts them, and the
+toast goes away by itself ``DebugDrawer/DebugDrawer/toastLifetime`` seconds after the last post,
+staying while the pointer is over it or accessibility focus is on it. These are methods on the
+plugin, so they compile in release, where they do nothing.
 
 ```swift
 let uploads = UploadsPlugin()

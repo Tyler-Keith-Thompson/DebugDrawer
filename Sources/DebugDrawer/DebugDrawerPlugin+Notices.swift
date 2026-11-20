@@ -14,7 +14,9 @@ public extension DebugDrawerPlugin {
     }
 
     /// Raises a toast while the drawer is closed; tapping it opens the drawer at this plugin.
-    /// Posts from one plugin coalesce into one toast that counts them.
+    /// Posts from one plugin coalesce into one toast that counts them. The toast goes away by
+    /// itself ``DebugDrawer/toastLifetime`` seconds after the last post, and stays while the
+    /// pointer is over it or accessibility focus is on it.
     @MainActor func postToast(_ message: String) {
         #if DEBUG
             DebugDrawer.shared.postToast(message, fromPlugin: id)
