@@ -24,9 +24,15 @@ import Foundation
 // A closure can't say when it changes, so the receiver asks at the events it already has: each
 // command, its start, the app coming to the foreground and each snapshot it is about to write;
 // and the host calls `reevaluateGates()` as its configuration changes, which ends an open session
-// with no command needed. Rejected: polling the gate on a timer (work while nothing happens, and
-// still late); a Combine publisher or async sequence of the flag (a host's remote configuration
-// rarely offers one, and a closure is what every one of them can give); a gate on
+// with no command needed. Every ask but a command's own goes through `reevaluateGates()`, which
+// performs the commands already waiting in the store first (DD-262): a command sent before the
+// gate turned off is refused inside the session it was sent in, and audited there, whichever of
+// the store's watcher, the foreground, a snapshot write or the host reaches the main actor first.
+// Rejected there: leaving the order to chance, with tests that accept either (a refusal audited
+// outside its session hides from that session's log which command the switch cut off).
+// Rejected: polling the gate on a timer (work while nothing happens, and still late); a Combine
+// publisher or async sequence of the flag (a host's remote configuration rarely offers one, and a
+// closure is what every one of them can give); a gate on
 // `DebugDrawerSessions` (the sessions also gate a debug build's registry, where the drawer is the
 // developer's own and no kill switch is wanted); leaving a capability's change in place until the
 // session ends (it would outlive the switch that was meant to stop it); and stopping the sessions'
@@ -54,7 +60,11 @@ extension DebugDrawerReceiver {
     /// and stops or resumes serving each capability's snapshot. Call it as the configuration
     /// behind the gates changes; the receiver also asks at each command, as it starts and as the
     /// app comes to the foreground.
+    ///
+    /// The commands already waiting in the store are performed first, so each is refused or
+    /// applied in the session it was sent in, before a gate turned off ends that session.
     public func reevaluateGates() {
+        performWaitingCommands()
         apply(receiverAllowed: isAllowed())
     }
 

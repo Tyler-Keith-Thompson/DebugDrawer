@@ -108,6 +108,21 @@
         }
     }
 
+    /// What asks the gates again after the gate turned off, while a command sent before that waits
+    /// in the store for the receiver to read it (DD-262).
+    enum GateReevaluation: CaseIterable, Sendable {
+        /// The app coming to the foreground, or any other code in the process posting that.
+        case foreground
+        /// A snapshot write that finds its capability's gate off.
+        case pendingSnapshotWrite
+        /// The host calling `reevaluateGates()`.
+        case reevaluateGates
+        /// The host setting `isAllowed`.
+        case settingIsAllowed
+        /// The receiver starting again, with commands left while it was stopped.
+        case start
+    }
+
     @MainActor
     @Suite(.timeLimit(.minutes(1)))
     struct ReceiverGateTests {
@@ -173,6 +188,61 @@
             #expect(sut.sessions.snapshot == .inactive)
             #expect(seenBySidecar == .inactive)
             #expect(!sut.snapshotExists(logLevelsID))
+        }
+
+        @Test(
+            "A command sent before the gate turned off is refused in its session, whatever asks the gates first: then the session ends",
+            arguments: GateReevaluation.allCases
+        )
+        func waitingCommandRefusedInSession(_ reevaluation: GateReevaluation) async throws {
+            let receiverGate = RemoteSwitch(true)
+            let sut = try await Fixture(receiverGate: receiverGate, themeGate: RemoteSwitch(true))
+            defer { sut.receiver.stop() }
+            let logLevels = try await sut.control(logLevelsID)
+            let session = try await sut.openSession()
+            logLevels.send(.set("debug"))
+            _ = await sut.entries { $0.event == .commandApplied }
+            // Once the sidecar reads the change, the receiver has no snapshot write of its own left.
+            var served = logLevels.snapshots().makeAsyncIterator()
+            while let snapshot = await served.next(), snapshot.value != "debug" {}
+            let expectedTail = [
+                DebugDrawerAuditEntry(date: .distantPast, sessionID: session, capability: logLevelsID, event: .commandRefused(.receiverDisabled)),
+                DebugDrawerAuditEntry(date: .distantPast, sessionID: session, capability: logLevelsID, event: .changeReverted),
+                DebugDrawerAuditEntry(date: .distantPast, sessionID: session, capability: sessionsID, event: .sessionEnded(.disabledByHost))
+            ]
+
+            // Each case asks the gates before the store's watcher wakes the receiver for the command:
+            // all on the main actor, ahead of it.
+            switch reevaluation {
+            case .foreground:
+                receiverGate.isOn = false
+                logLevels.send(.set("trace"))
+                NotificationCenter.default.post(name: DebugDrawerReceiver.foreground, object: nil)
+            case .pendingSnapshotWrite:
+                receiverGate.isOn = false
+                let (pending, snapshot) = AsyncStream<Data>.makeStream()
+                snapshot.yield(Data())
+                sut.receiver.serve(logLevelsID, pending)
+                logLevels.send(.set("trace"))
+            case .reevaluateGates:
+                receiverGate.isOn = false
+                logLevels.send(.set("trace"))
+                sut.receiver.reevaluateGates()
+            case .settingIsAllowed:
+                logLevels.send(.set("trace"))
+                sut.receiver.isAllowed = { false }
+            case .start:
+                sut.receiver.stop()
+                receiverGate.isOn = false
+                logLevels.send(.set("trace"))
+                try sut.receiver.start()
+            }
+            let tail = await sut.entries { $0.event == .sessionEnded(.disabledByHost) }
+
+            let undated = tail.map { DebugDrawerAuditEntry(date: .distantPast, sessionID: $0.sessionID, capability: $0.capability, event: $0.event) }
+            #expect(undated == expectedTail)
+            #expect(sut.logLevels.snapshot.value == "info")
+            #expect(sut.sessions.snapshot == .inactive)
         }
 
         @Test("reevaluateGates() ends the session as the gate turns off, with no command, and a new one opens once it is back on")

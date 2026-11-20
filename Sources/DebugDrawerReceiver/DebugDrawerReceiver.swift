@@ -86,6 +86,8 @@ public final class DebugDrawerReceiver {
     var writing: [String: Task<Void, Never>] = [:]
     private var watcher: DirectoryWatcher?
     private var performing: Task<Void, Never>?
+    /// Whether ``performWaitingCommands()`` is running, so a call from within it returns at once.
+    private var isPerformingCommands = false
     private var foregroundObservation: (any NSObjectProtocol)?
     /// The gate each capability was enabled with, by ID; one enabled without a gate has none.
     var capabilityGates: [String: @MainActor () -> Bool] = [:]
@@ -176,9 +178,9 @@ public final class DebugDrawerReceiver {
         for (id, capability) in capabilities {
             serve(id, capability.snapshots())
         }
-        // Before any of those writes runs: they wait for the main actor.
+        // Before any of those writes runs: they wait for the main actor. It performs the commands
+        // left while the receiver was stopped first, each in the session it was sent in.
         reevaluateGates()
-        performWaitingCommands()
         performing = Task { [weak self] in
             for await _ in watcher.changes {
                 self?.performWaitingCommands()
@@ -188,8 +190,8 @@ public final class DebugDrawerReceiver {
         // the main thread.
         foregroundObservation = NotificationCenter.default.addObserver(forName: Self.foreground, object: nil, queue: nil) { [weak self] _ in
             MainActor.assumeIsolated {
+                // The commands waiting first, then the gates: reevaluateGates() does both.
                 self?.reevaluateGates()
-                self?.performWaitingCommands()
             }
         }
         presence = PresenceAnnouncement(directory: directory, identity: identity, capabilities: servedIDs, foreground: Self.foreground)
@@ -216,8 +218,12 @@ public final class DebugDrawerReceiver {
     }
 
     /// Performs each command file in the store, oldest first, removing it first so it runs once.
-    private func performWaitingCommands() {
-        guard isRunning else { return }
+    /// ``reevaluateGates()`` calls it before it asks the gates, so a host that re-evaluates them
+    /// from a capability's command reaches it while it runs, and leaves the rest to it.
+    func performWaitingCommands() {
+        guard isRunning, !isPerformingCommands else { return }
+        isPerformingCommands = true
+        defer { isPerformingCommands = false }
         for file in layout.messageFiles(in: layout.commands) {
             let data = try? Data(contentsOf: file)
             do {
@@ -278,7 +284,8 @@ public final class DebugDrawerReceiver {
         let file = layout.snapshotFile(for: id)
         writing[id] = Task { [weak self] in
             for await payload in snapshots {
-                // A gate turned off since the receiver last asked: stop now rather than write.
+                // A gate turned off since the receiver last asked: stop now rather than write, once
+                // the commands waiting are performed in their session (reevaluateGates()).
                 guard let self, servesSnapshot(of: id) else {
                     self?.reevaluateGates()
                     return
