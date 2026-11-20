@@ -12,6 +12,7 @@ struct ExampleReceiverScreen: View {
     @ObservedObject var experiments: ProductionExperiments
     @ObservedObject var logging: ProductionLogging
     @ObservedObject var scenarios: ProductionScenarios
+    @ObservedObject var signIn: ProductionSignIn
     @ObservedObject var sessions: DebugDrawerSessions
     @ObservedObject var keeper: DebugDrawerBackgroundKeeper
     @ObservedObject var mocking: NetworkMocking
@@ -36,6 +37,18 @@ struct ExampleReceiverScreen: View {
                 Text("Scenarios")
             } footer: {
                 Text("A scenario the sidecar launches opens its screen here.")
+            }
+            Section {
+                LabeledContent("Sign-In", value: signIn.state.title)
+                    .accessibilityIdentifier("SignInState")
+                if signIn.state == .signedOut {
+                    Button("Sign In", action: signIn.signIn)
+                        .accessibilityHint("Signs in again with a new fake token")
+                }
+            } header: {
+                Text("Auth Actions")
+            } footer: {
+                Text("The sidecar expires, refreshes or ends the sign-in; it never sees the token.")
             }
             Section("Feature Flag Overrides") {
                 LabeledContent("Checkout", value: flags.value(forKey: "new-checkout") == .bool(true) ? "New" : "Legacy")

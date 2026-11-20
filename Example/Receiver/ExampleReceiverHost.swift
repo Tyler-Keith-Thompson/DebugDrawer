@@ -17,8 +17,8 @@ import os
 /// (Example/Sidecar's stand-in for a company's), the keeper that holds the app running while a
 /// session is open, the session whose requests a sidecar may mock, the diagnostics capture the
 /// app hands its log lines and requests, the bug reports its Report a Bug trigger takes, the
-/// push registration the app delegate hands the APNs device token, and the scenarios a sidecar
-/// launches it into.
+/// push registration the app delegate hands the APNs device token, the scenarios a sidecar
+/// launches it into, and the actions a sidecar takes on its sign-in.
 ///
 /// Everything here is in the release build too: a production app links the receiver and the
 /// capability modules, never the drawer.
@@ -33,6 +33,8 @@ final class ExampleReceiverHost: ObservableObject {
     let logging: ProductionLogging
     /// The screens a sidecar's scenarios open.
     let scenarios = ProductionScenarios()
+    /// The sign-in a sidecar's auth actions expire, refresh and end.
+    let signIn = ProductionSignIn()
     let sessions: DebugDrawerSessions
     /// Keeps the app running while a session is open: a background task on iOS, an App Nap
     /// activity on the Mac.
@@ -112,6 +114,7 @@ final class ExampleReceiverHost: ObservableObject {
         keeper = DebugDrawerBackgroundKeeper(sessions: sessions)
         apiSession = Self.apiSession()
         receiver.enable(.scenarios(scenarios.scenarios, launchURL: ProductionScenarios.launchURL))
+        receiver.enable(.authActions(signIn.actions, launchURL: ProductionSignIn.launchURL))
         // The audit log goes to the app's own log, as a host would forward it to its own.
         auditLogging = sessions.auditEntries.sink { entry in
             Self.logger.notice("Audit: \(entry.capability, privacy: .public) \(String(describing: entry.event), privacy: .public)")

@@ -2539,6 +2539,77 @@ In the sidecar, the kit's `DebugDrawerSidecarPlugin.scenarios` lists the scenari
 for each parameter (a text field, a number field, a switch or a picker) and a Launch button, which
 sends the launch and then opens the app (`DebugDrawerSidecarApp.open(url:)`).
 
+**Auth actions: expired tokens, refreshes and log outs.** To test how a release build handles its
+access token expiring, a forced refresh or a log out, the app registers actions on its own sign-in,
+each a handler of its own that takes nothing and says what it came to; the sidecar lists them, a
+button each with the last result:
+
+```swift
+@MainActor
+final class AuthService {
+    private var accessToken: String? = "access-token-from-the-server"
+    private(set) var state = "Signed in"
+
+    func expireAccessToken() { state = "Expired" }
+    func refresh() async -> Bool {
+        guard accessToken != nil else { return false }
+        accessToken = "a-new-access-token"
+        state = "Signed in"
+        return true
+    }
+    func logOut() {
+        accessToken = nil
+        state = "Signed out"
+    }
+}
+
+@MainActor
+final class ProductionAuthActions {
+    let sessions = DebugDrawerSessions(maximumDuration: 15 * 60)
+    let receiver: DebugDrawerReceiver
+
+    init(auth: AuthService, container: URL) throws {
+        receiver = DebugDrawerReceiver(directory: container.appending(path: "DebugDrawer"), sessions: sessions)
+        receiver.enable(.authActions([
+            .expireAccessToken {
+                auth.expireAccessToken()
+                return .succeeded
+            },
+            .forceRefresh {
+                await auth.refresh() ? .succeeded : .failed("Not signed in")
+            },
+            .logOut {
+                auth.logOut()
+                return .succeeded
+            }
+        ], launchURL: URL(string: "shop-internal://")))
+        try receiver.start()
+    }
+}
+```
+
+- **The risk: low.** An employee holding the sidecar can expire, refresh or end the sign-in of the
+  app on their own device, and so log themselves out. An action of your own that reaches further
+  (`DebugDrawerAuthAction(_:title:summary:handler:)`, such as ending every session on the server)
+  deserves `.requiringGrant()` on the capability.
+- **Off by default.** Until the app enables `.authActions(_:)`, a request is refused as
+  `commandRefused(.unknownCapability)`, even inside a session; an action the app didn't register
+  as `commandRefused(.notExposed)`, running nothing.
+- **No credential crosses to the sidecar.** The receiver never sees a token: it runs the app's
+  handler, which receives nothing from the sidecar, and hands back only what it came to,
+  `DebugDrawerAuthActions.Status` (`running`, `succeeded`, `failed(message:)`). A failure's
+  message is a `StaticString`, text written in the app's source, so no value the app holds at run
+  time can reach the sidecar through it; write what a tester reads ("Not signed in"). The
+  snapshot holds the actions' IDs, titles, summaries and last runs, and nothing else.
+- **Within a session, audited, and not reverted.** A request is performed only in an open session
+  and audited as `commandApplied`; what the action did lasts past the session. A request left while
+  the app is in the background runs as it comes to the foreground; the sidecar opens `launchURL`
+  (on the Mac, the app by its bundle identifier) to bring it there, as for scenarios.
+
+In the sidecar, the kit's `DebugDrawerSidecarPlugin.authActions` lists the actions with a button
+each, which sends the request and then opens the app, and each action's last run: running,
+succeeded, or failed with the app's message.
+
 **Turning it off remotely.** To shut every sidecar out without a release (a leaked sidecar app,
 say), give the receiver a gate backed by your own remote configuration, and a capability one of
 its own; the library calls no configuration service itself (`RemoteConfig` here stands for yours):
@@ -3247,7 +3318,8 @@ DebugDrawerSidecarView(groupIdentifier: "group.com.example.debug", sessionDurati
 
 Below it, a picker shows the plugins the app serves, drawn by the plugins' own views over the
 transport: `.console` and `.network` by default, `.bugReports` for an app that serves bug
-reports and `.scenarios` for one that registers scenarios (above). A plugin of your own whose model adopts
+reports, `.scenarios` for one that registers scenarios and `.authActions` for one that registers
+auth actions (above). A plugin of your own whose model adopts
 `DebugDrawerPluginModel` joins them with `DebugDrawerSidecarPlugin(id:title:icon:snapshot:command:plugin:)`,
 whose closure makes the plugin's view over the transport the kit hands it. Create Report writes the
 hosted plugins' report contributions, redacted by `DebugDrawer.shared.redaction`, under a summary
@@ -3283,6 +3355,7 @@ capability has something in the host that changes:
 | Bug Reports | Start Capture in Diagnostics and Log Sign-In, then Report a Bug in the host (or Feedback > Report a Bug, Shift-Command-B): the report appears in the sidecar with the window's screenshot, the line and the host's state, its email redacted; type an annotation, then Create Report, and Send Report with an uploader set; the session's end deletes it in the host |
 | Diagnostics | Start Capture, then Log Sign-In and Fetch Greeting: the line and the request appear in the sidecar, the email, session ID and token redacted, and the host shows "Capturing diagnostics for a sidecar"; Create Report adds them to the report, and Stop and Delete or the session's end deletes them in the host |
 | Scenarios | Open Order, Show Paywall and Onboarding Step, each with its parameters: Launch brings the host forward (its `debugdrawer-receiver-example://` scheme on iOS, its bundle identifier on the Mac) and opens the scenario's screen, such as "Order #456" |
+| Auth | Expire Access Token, Force Token Refresh and Log Out: the host's Sign-In reads "Signed in, access token expired", "Signed in" or "Signed out" (Sign In signs in again), and the sidecar shows each action's result, such as "Failed: Not signed in"; the host's fake token is never shown or sent |
 
 While the session is open the host shows its own indicator (who holds the grant, until when, and
 what keeps it running in the background, End Session, and Keep Running on iOS), and its Sidecar
@@ -3496,7 +3569,7 @@ ContentView()
 | `DebugDrawerColorVisionPlugin` | Protanopia, deuteranopia, tritanopia and grayscale simulated live over the views marked `.debugColorVision()`, in linear RGB with Machado et al.'s matrices, picked in the drawer or cycled from the HUD, while the drawer keeps its colors |
 | `DebugDrawerAppStateResetPlugin` | The app's state cleared as a fresh install leaves it, by category: UserDefaults, keychain items, the container's files, caches, cookies, the URL cache and the app's own cleanup, each listed before a confirmation, then relaunched on macOS or quit elsewhere |
 | `DebugDrawerRemote` | Plugin models served to a viewer on another device over the local network: an opt-in Network.framework server advertised over Bonjour, each viewer paired with a six-digit code the device shows, and the viewer's transport and browser |
-| `DebugDrawerSidecarKit` | A sidecar app, as a library: `DebugDrawerSidecarView` lists the apps in the group that serve a sidecar, opens their sessions (with a grant the company's server gives, when they require one), shows their Console, Network, Bug Reports, Scenarios and other model-backed plugins over the socket or the store, and makes and uploads a report of them; iOS, iPadOS and macOS, debug builds |
+| `DebugDrawerSidecarKit` | A sidecar app, as a library: `DebugDrawerSidecarView` lists the apps in the group that serve a sidecar, opens their sessions (with a grant the company's server gives, when they require one), shows their Console, Network, Bug Reports, Scenarios, Auth and other model-backed plugins over the socket or the store, and makes and uploads a report of them; iOS, iPadOS and macOS, debug builds |
 
 ## Development
 
