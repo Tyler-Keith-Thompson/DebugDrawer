@@ -15,7 +15,7 @@ import Foundation
 // Its effect: with the receiver's gate off the open session ends (`disabledByHost`), reverting
 // its session-scoped changes, and no capability's snapshot is written, its file removed from the
 // store; the sessions' own snapshot stays, so the sidecar sees its session end, and it holds only
-// an ID and two dates. With one capability's gate off, that capability's snapshot goes the same
+// an ID, two dates and the grant's claims (never its token). With one capability's gate off, that capability's snapshot goes the same
 // way, and its session-scoped change in the open session is reverted at once, while the session
 // and every other capability carry on: a capability turned off is meant to stop affecting the app
 // now, not at the end of a session that may last a while. A gate turned back on serves the

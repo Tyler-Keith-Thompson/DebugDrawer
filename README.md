@@ -2230,7 +2230,13 @@ MetricKit payloads, `DebugDrawerMetricKit`, to mock responses for a session, `De
 to show the push token for test pushes, `DebugDrawerNotifications`, to record hangs and
 signposts, `DebugDrawerHangDetector`, or to show a snapshot of the app's state, `DebugDrawerAppInfo`,
 below). It serves a sidecar, over the app group's store, only the
-capabilities the app enables, within sessions the sidecar opens, and refuses everything else:
+capabilities the app enables, within sessions the sidecar opens, and refuses everything else.
+Before shipping it, read the receiver's "Security Model and Distribution" article
+([`SecurityModel.md`](Sources/DebugDrawerReceiver/DebugDrawerReceiver.docc/SecurityModel.md)): what
+the receiver trusts (the team's signature and the app group, on iOS and on the Mac), what someone
+holding the sidecar can do with each capability below, how to distribute the sidecar (TestFlight
+internal testers or a private Apple Business Manager app, never an Enterprise account or a public
+TestFlight link), and what to tell App Review.
 
 ```swift
 import DebugDrawerReceiver
@@ -2650,6 +2656,10 @@ final class ProductionReset {
 - **Off by default.** Until the app enables `.appStateReset(_:)`, a request is refused as
   `commandRefused(.unknownCapability)`, even inside a session; a category the app didn't allow as
   `commandRefused(.notExposed)`, deleting nothing.
+- **App groups too.** Files and Caches also clear the containers of the app's groups (less
+  their preferences, and the receiver's store), and other apps of a group share its container,
+  so a reset of one app deletes what they keep there. Give the app a group of its own if that
+  matters.
 - **The keychain only when asked for by name.** `.all` holds every category but the keychain, and
   naming `.keychain` in `allowing:` traps; the app allows it with `allowingKeychain: true` alone,
   and then the listing names each item by its service or label, never its account.
@@ -2745,7 +2755,9 @@ receiver.enable(.tweaks(AppTweaks.backend, AppTweaks.newCheckout))
   so make it at startup before reading tweaks; an app that never makes it reads every default, as
   before.
 - **Persistent by default.** Pass `scope: .session(revertWith: .resetAll)` to reset the
-  production-safe tweaks to their defaults when the session ends instead.
+  production-safe tweaks to their defaults when the session ends instead. A session the app was
+  killed in leaves them as the sidecar set them: unlike the other session-scoped capabilities,
+  tweaks aren't reset as the next launch makes the capability.
 
 **Analytics events in production.** While a sidecar's session is open, the events the app records
 through `AnalyticsEvents.record` can be mirrored to the sidecar, so QA can check tracking on the
@@ -2784,7 +2796,9 @@ AnalyticsEvents.record("checkout_completed", properties: ["plan": "pro", "seats"
   expires the list empties and nothing more is mirrored, even an event recorded after the expiry
   date before the system's timer fires. The snapshot keeps the session's newest 1,000 events
   (`capacity:`); `AnalyticsEventsMirror.Command.clear` drops those already read. While no session
-  is open, `record` in a release build evaluates none of its arguments.
+  is open, `record` in a release build evaluates none of its arguments. Under a grant policy the
+  events are served to any open session, whether or not its grant lists
+  `AnalyticsEventsMirror.pluginID`; only `clear` needs a grant that does.
 - **Redacted in the app.** Each event is redacted on the thread that records it, before it is kept
   anywhere, so no unredacted value reaches the snapshot, the store's files or the audit log
   (which never holds an event). `AnalyticsRedaction.standard` masks the value of any property
@@ -2942,7 +2956,9 @@ final class ProductionDiagnostics {
   period, arrival and JSON. While no session is open it holds none, and it empties as the session
   ends or expires. Within a session `MetricKitPayloadsMirror.Command.delete(id:)` and `deleteAll`
   delete the app's copies, such as once the sidecar has sent them on, and MetricKit delivering one
-  again doesn't bring it back.
+  again doesn't bring it back. Under a grant policy the payloads are served to any open session,
+  whether or not its grant lists `MetricKitPayloadsMirror.pluginID`; only deleting needs a grant
+  that does.
 - **Bounded.** A payload whose JSON is larger than a megabyte once redacted is dropped, so the
   snapshot holds at most a megabyte per payload of its capacity.
 - **Redacted in the app.** MetricKit's payloads are the system's measurements: numbers,
@@ -3617,8 +3633,9 @@ session. `startSession(duration:title:subtitle:)` is for a person's action in th
 session (or uses the open one) and, on iOS and iPadOS 26 and later, submits a
 `BGContinuedProcessingTask`, which the system shows with the session's progress and a way to stop
 it. Its identifier is `continuedProcessingIdentifierPrefix` (by default the bundle identifier and
-`.DebugDrawerSession`) plus the session's ID, so list the prefix with a wildcard in the debug
-configuration's Info.plist; no `UIBackgroundModes` entry is needed:
+`.DebugDrawerSession`) plus the session's ID, so list the prefix with a wildcard in the Info.plist
+of each configuration that makes a keeper (the debug one for the drawer, and the release one too
+when the app's receiver makes one, as below); no `UIBackgroundModes` entry is needed:
 
 ```xml
 <key>BGTaskSchedulerPermittedIdentifiers</key>
@@ -3732,6 +3749,15 @@ come and go), `DebugDrawerSidecarConnection` (one app: its channel, sessions, ho
 every report) and `DebugDrawerSidecarApp`. The kit builds for iOS, iPadOS and macOS,
 in debug builds: like the transports it is built on, a release build gets stand-ins that list no
 app, so archive a TestFlight sidecar in the Debug configuration.
+
+**Distributing it.** The sidecar must be signed by the production app's team, as an app group
+belongs to one team. TestFlight internal testers, a private Apple Business Manager app for your
+organization, development or ad hoc signing, and on the Mac a notarized Developer ID app all keep
+it with your team. An Apple Developer Enterprise Program account doesn't work (another Team ID, so
+no shared group), and a public TestFlight link or an unlisted App Store app gives it to anyone
+with the link. The receiver's "Security Model and Distribution" article
+([`SecurityModel.md`](Sources/DebugDrawerReceiver/DebugDrawerReceiver.docc/SecurityModel.md))
+has the details, and what to do if it leaks.
 
 **The example pair.** `Example/Sidecar` is a sidecar built on the kit, and `Example/Receiver` the
 production app it drives: it links only the receiver and the capability modules, and serves every
