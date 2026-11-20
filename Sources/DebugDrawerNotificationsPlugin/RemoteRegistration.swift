@@ -14,11 +14,4 @@
         /// mask any key containing `token`.
         static let redactionKey = "deviceToken"
     }
-
-    extension Data {
-        /// The bytes as lowercase hexadecimal, two digits each, as push services take a token.
-        var hexadecimal: String {
-            map { String(format: "%02x", $0) }.joined()
-        }
-    }
 #endif

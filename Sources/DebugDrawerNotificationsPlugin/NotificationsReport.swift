@@ -1,5 +1,6 @@
 #if DEBUG
     import DebugDrawer
+    import DebugDrawerNotifications
     import Foundation
 
     extension NotificationsPlugin: DebugDrawerReportContributor {

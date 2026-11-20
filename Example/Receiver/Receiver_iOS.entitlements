@@ -9,5 +9,9 @@
     <array>
         <string>group.com.debugdrawer.example</string>
     </array>
+    <!-- Lets the app register for remote notifications, so the push registration capability has a
+         device token to show the sidecar; the simulator gives a sandbox token without a profile. -->
+    <key>aps-environment</key>
+    <string>development</string>
 </dict>
 </plist>

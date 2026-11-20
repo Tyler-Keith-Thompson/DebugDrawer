@@ -553,7 +553,11 @@ alone, never a crash handler, so nothing intercepts in the build that ships. A c
 changes how the app talks to its servers takes the same care: `DebugDrawerNetwork` holds
 `.networkMocking(_:)`, whose rules answer only the `URLSession`s the host lists
 `NetworkMockingURLProtocol` in, only for the hosts it allows, only within a session whose grant
-lists it, and registers nothing with URL loading and replaces no method. The receiver's module holds
+lists it, and registers nothing with URL loading and replaces no method. A capability that shows a
+device identifier serves it only for the session: `DebugDrawerNotifications` holds
+`.pushRegistration(_:)`, whose `PushRegistrationMirror` keeps the APNs device token the host hands
+it in memory and puts it, with the push environment and the notification settings, in the snapshot
+only while a session is open, and not for a session whose grant doesn't list it. The receiver's module holds
 `DebugDrawerPluginModel`, the sessions and the store's wire format, real in every build, and
 `DebugDrawer` re-exports it; it serves no socket and holds no view. The README's "Production
 builds: the receiver" shows the setup.

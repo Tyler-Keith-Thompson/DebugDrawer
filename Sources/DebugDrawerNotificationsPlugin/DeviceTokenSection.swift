@@ -1,5 +1,6 @@
 #if DEBUG
     import DebugDrawer
+    import DebugDrawerNotifications
     import SwiftUI
 
     /// The APNs device token as hexadecimal, masked under the drawer's rules until revealed, with

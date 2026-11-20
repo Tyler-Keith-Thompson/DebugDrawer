@@ -1,5 +1,6 @@
 #if DEBUG
     import DebugDrawer
+    import DebugDrawerNotifications
     import SwiftUI
 
     /// Whether the app may notify, as an issue row, each presentation setting, Request while the

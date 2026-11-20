@@ -5,6 +5,7 @@ import DebugDrawerAnalytics
 import DebugDrawerLocalization
 import DebugDrawerMetricKit
 import DebugDrawerNetwork
+import DebugDrawerNotifications
 import DebugDrawerReceiver
 import DebugDrawerTweaks
 import ExampleSidecarStore
@@ -15,7 +16,8 @@ import os
 /// capability the library ships, sessions that need a grant signed by the example's grant server
 /// (Example/Sidecar's stand-in for a company's), the keeper that holds the app running while a
 /// session is open, the session whose requests a sidecar may mock, the diagnostics capture the
-/// app hands its log lines and requests, and the bug reports its Report a Bug trigger takes.
+/// app hands its log lines and requests, the bug reports its Report a Bug trigger takes, and the
+/// push registration the app delegate hands the APNs device token.
 ///
 /// Everything here is in the release build too: a production app links the receiver and the
 /// capability modules, never the drawer.
@@ -40,6 +42,11 @@ final class ExampleReceiverHost: ObservableObject {
     let bugReports: DebugDrawerBugReports
     /// What the last Report a Bug came to.
     @Published private(set) var lastBugReport = "None taken"
+    /// The APNs device token, push environment and notification settings, served to a sidecar
+    /// during its session so an employee can aim a test push at this device.
+    let pushRegistration: PushRegistrationMirror
+    /// What APNs answered as the app registered, as the screen says it: never the token itself.
+    @Published private(set) var pushStatus = "Registering…"
     /// Where the store is, as the screen says it.
     let storeSummary = ExampleSidecarStore.summary
     /// Why the receiver isn't serving, when it isn't.
@@ -77,6 +84,7 @@ final class ExampleReceiverHost: ObservableObject {
         let mocking = NetworkMocking(sessions: sessions, allowedHosts: [.exact("api.example.com")])
         let diagnostics = DebugDrawerDiagnosticsCapture(sessions: sessions)
         let bugReports = Self.bugReports(sessions: sessions, diagnostics: diagnostics, flags: flags, experiments: experiments)
+        let pushRegistration = Self.pushRegistration(sessions: sessions)
         receiver.enable(.featureFlagOverrides(flags))
         receiver.enable(.experimentOverrides(experiments))
         receiver.enable(.logLevels(logging))
@@ -88,6 +96,7 @@ final class ExampleReceiverHost: ObservableObject {
         receiver.enable(.networkMocking(mocking))
         receiver.enable(.diagnosticsCapture(diagnostics))
         receiver.enable(.bugReports(bugReports))
+        receiver.enable(.pushRegistration(pushRegistration))
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [NetworkMockingURLProtocol.self] + (configuration.protocolClasses ?? [])
         self.flags = flags
@@ -98,6 +107,7 @@ final class ExampleReceiverHost: ObservableObject {
         self.mocking = mocking
         self.diagnostics = diagnostics
         self.bugReports = bugReports
+        self.pushRegistration = pushRegistration
         keeper = DebugDrawerBackgroundKeeper(sessions: sessions)
         apiSession = URLSession(configuration: configuration)
         // The audit log goes to the app's own log, as a host would forward it to its own.
@@ -162,6 +172,14 @@ final class ExampleReceiverHost: ObservableObject {
         }
     }
 
+    /// The push registration the app delegate hands the device token, serving the environment the
+    /// app is signed for, read from its signature or embedded profile. A simulator build and the
+    /// Mac example, signed ad hoc, carry neither, so the host states the sandbox, which a
+    /// development build's token belongs to, and the sidecar shows it as the host's.
+    private static func pushRegistration(sessions: DebugDrawerSessions) -> PushRegistrationMirror {
+        PushRegistrationMirror(sessions: sessions, environment: PushEnvironment.detected() ?? PushEnvironment(server: .sandbox, source: .host))
+    }
+
     /// Takes a bug report for the sidecar whose session is open: the app's own trigger, a button
     /// and a menu item here, as DebugDrawer adds none. Outside a session it takes nothing.
     func reportBug() {
@@ -173,6 +191,18 @@ final class ExampleReceiverHost: ObservableObject {
         case let .refused(reason):
             lastBugReport = "Refused: \(reason.rawValue)"
         }
+    }
+
+    /// Hands the push registration capability the token APNs gave the app, from the app delegate.
+    func didRegisterForRemoteNotifications(withDeviceToken deviceToken: Data) {
+        pushRegistration.didRegisterForRemoteNotifications(withDeviceToken: deviceToken)
+        pushStatus = "Registered: a sidecar sees the token during its session"
+    }
+
+    /// Hands the push registration capability why registering failed, from the app delegate.
+    func didFailToRegisterForRemoteNotifications(withError error: any Error) {
+        pushRegistration.didFailToRegisterForRemoteNotifications(withError: error)
+        pushStatus = "Failed: \(error.localizedDescription)"
     }
 
     /// Records an analytics event as the app hands it to its analytics service: mirrored, with

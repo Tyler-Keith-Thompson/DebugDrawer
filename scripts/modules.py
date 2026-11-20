@@ -103,6 +103,10 @@ MODULES = [
     # delivery, and the receiver capability that answers a sidecar's mocks during its session,
     # through a URL protocol the host lists in its own sessions' configurations.
     ("DebugDrawerNetwork", "Capabilities", "Mock rules and conditioning profiles, real in every build, and the receiver capability that answers the requests the host's own URLSession configurations send to the hosts it allows from a sidecar's rules during a grant-holding session, through a URL protocol the host lists; nothing registered globally, UI-free.", ["DebugDrawerReceiver"]),
+    # The Notifications plugin's settings vocabulary and the receiver capability that shows a
+    # sidecar the app's APNs device token, push environment and notification settings during its
+    # session, so an employee can aim a test push at their own device.
+    ("DebugDrawerNotifications", "Capabilities", "The app's notification settings, real in every build, and the receiver capability that shows a sidecar the APNs device token the host hands it, the push environment and the notification authorization and settings, only while a session is open; read-only, UI-free.", ["DebugDrawerReceiver"]),
     # Plugins
     ("DebugDrawerConsolePlugin", "Plugins", "Captures os_log entries (stdout and stderr on macOS) and an app logger's lines through ConsoleLogSink, with metadata: level filter, text or regular-expression search, subsystem and category mutes, time range, auto-follow, copy, lines kept across launches.", ["DebugDrawer", "oslogclient/OSLogClient"]),
     ("DebugDrawerViewInspectorPlugin", "Plugins", "View borders by depth, alignment grid, click indicators, animation speed, render tracking, hierarchy snapshot.", ["DebugDrawer"]),
@@ -128,7 +132,7 @@ MODULES = [
     ("DebugDrawerLeakDetectorPlugin", "Plugins", "View controllers still alive a run-loop turn after their screen was dismissed, and opted-in classes with more live instances than allowed, listed by class with a count, a toast and a badge.", ["DebugDrawer"]),
     ("DebugDrawerMetricKitPlugin", "Plugins", "MetricKit's metric and diagnostic payloads, kept across launches and listed by date with a summary, each open as formatted JSON to copy or export; a toast and a badge for new ones.", ["DebugDrawer", "DebugDrawerMetricKit"]),
     ("DebugDrawerPermissionsPlugin", "Plugins", "Every privacy permission the app declares in its Info.plist, with its live status, a button that asks when it is undecided and one that opens Settings.", ["DebugDrawer"]),
-    ("DebugDrawerNotificationsPlugin", "Plugins", "The APNs device token to copy, notification authorization and settings, pending and delivered notifications to inspect and remove, and a pasted APNs payload sent as a local notification.", ["DebugDrawer"]),
+    ("DebugDrawerNotificationsPlugin", "Plugins", "The APNs device token to copy, notification authorization and settings, pending and delivered notifications to inspect and remove, and a pasted APNs payload sent as a local notification.", ["DebugDrawer", "DebugDrawerNotifications"]),
     ("DebugDrawerBackgroundTasksPlugin", "Plugins", "The BGTaskScheduler identifiers the Info.plist permits and the pending task requests, with their kind and earliest begin date, each cancellable; a request scheduled on demand, and the LLDB commands that simulate a launch or an expiration.", ["DebugDrawer"]),
     ("DebugDrawerAnalyticsPlugin", "Plugins", "The analytics events the app records, live, newest first, with their time and properties: search by name, key or value, each open as inspector rows and JSON to copy, all exported as a JSON file.", ["DebugDrawer", "DebugDrawerAnalytics"]),
     ("DebugDrawerDatabaseBrowserPlugin", "Plugins", "The app's SQLite, Core Data and SwiftData stores, opened read-only: tables or entities with row counts, rows paged and searched in a grid, and read-only SELECT queries, copied as CSV.", ["DebugDrawer"]),
@@ -210,7 +214,7 @@ CATALYST_MODULES = ["DebugDrawerReceiver", "DebugDrawerTweaks", "DebugDrawerAnal
 # fails on one that has none (tools/documentation_coverage.py, run by docc_archive's
 # `require_documentation`). Checked against the debug build's symbol graph, which holds the drawer
 # as well as the API that exists in every build.
-DOCUMENTED_MODULES = ["DebugDrawerReceiver", "DebugDrawerTweaks", "DebugDrawerAnalytics", "DebugDrawerLocalization", "DebugDrawerAccessibility", "DebugDrawerMetricKit", "DebugDrawerNetwork", "DebugDrawer", "DebugDrawerSidecarKit"]
+DOCUMENTED_MODULES = ["DebugDrawerReceiver", "DebugDrawerTweaks", "DebugDrawerAnalytics", "DebugDrawerLocalization", "DebugDrawerAccessibility", "DebugDrawerMetricKit", "DebugDrawerNetwork", "DebugDrawerNotifications", "DebugDrawer", "DebugDrawerSidecarKit"]
 
 # Dynamic libraries: (name, description). Each is C sources under Sources/<name> (headers in
 # include/) with no dependencies, shipped as a `.dynamic` library product in Package.swift and as
@@ -264,7 +268,8 @@ TEST_TARGETS = [
     ("DebugDrawerMetricKitTests", ["DebugDrawerMetricKit", "DebugDrawerReceiver", "DebugDrawer", "DebugDrawerTestSupport"]),
     ("DebugDrawerMetricKitPluginTests", ["DebugDrawerMetricKitPlugin", "DebugDrawerMetricKit", "DebugDrawer","viewinspector/ViewInspector", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
     ("DebugDrawerPermissionsPluginTests", ["DebugDrawerPermissionsPlugin", "DebugDrawer", "viewinspector/ViewInspector", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
-    ("DebugDrawerNotificationsPluginTests", ["DebugDrawerNotificationsPlugin", "DebugDrawer", "viewinspector/ViewInspector", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
+    ("DebugDrawerNotificationsTests", ["DebugDrawerNotifications", "DebugDrawerReceiver", "DebugDrawer"]),
+    ("DebugDrawerNotificationsPluginTests", ["DebugDrawerNotificationsPlugin", "DebugDrawerNotifications", "DebugDrawer", "viewinspector/ViewInspector", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
     ("DebugDrawerBackgroundTasksPluginTests", ["DebugDrawerBackgroundTasksPlugin", "DebugDrawer", "viewinspector/ViewInspector", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
     ("DebugDrawerAnalyticsPluginTests", ["DebugDrawerAnalyticsPlugin", "DebugDrawerAnalytics", "DebugDrawer", "viewinspector/ViewInspector", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
     ("DebugDrawerDatabaseBrowserPluginTests", ["DebugDrawerDatabaseBrowserPlugin", "DebugDrawer", "viewinspector/ViewInspector", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
@@ -320,6 +325,7 @@ PERFORMANCE_TESTS = [
     "DebugDrawerAnalyticsTests",
     "DebugDrawerLocalizationTests",
     "DebugDrawerMetricKitTests",
+    "DebugDrawerNotificationsTests",
     "DebugDrawerDatabaseBrowserPluginTests",
     "DebugDrawerLocalizationPluginTests",
     "DebugDrawerScreenRecordingPluginTests",

@@ -5,7 +5,7 @@ import Foundation
 /// pasted APNs payload sent as a local notification to exercise the app's handlers.
 ///
 /// The type exists in every build, so the calls compile unchanged in release, where they do
-/// nothing and the plugin references nothing of User Notifications.
+/// nothing and touch nothing of User Notifications.
 public enum PushNotifications {
     /// Adds the Notifications plugin: in debug builds only; in release it does nothing.
     ///

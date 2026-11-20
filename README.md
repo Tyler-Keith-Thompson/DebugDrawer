@@ -1388,8 +1388,10 @@ PushNotifications.didFailToRegisterForRemoteNotifications(withError: error)
 
 A SwiftUI app gets those delegate methods through `@UIApplicationDelegateAdaptor` (or
 `@NSApplicationDelegateAdaptor`). `PushNotifications` exists in every configuration, so the calls
-need no `#if DEBUG`: in release they do nothing, and the plugin references nothing of User
-Notifications. In debug builds the plugin shows:
+need no `#if DEBUG`: in release they do nothing, and the plugin's own code touches nothing of User
+Notifications (the binary still links the framework, through `DebugDrawerNotifications`, which the
+plugin re-exports and whose push registration capability reads the settings in release). In debug
+builds the plugin shows:
 
 - **APNs device token**: the token as hexadecimal with Copy Token, or why registering failed. It is
   a device identifier, so it is masked under the drawer's redaction rules (the standard rules mask
@@ -1422,6 +1424,11 @@ each time the app becomes active, after a request or a send and on Refresh; noth
 send a real remote notification to the simulator from the Mac instead, `xcrun simctl push
 <device> <bundle id> payload.json` takes the same JSON. A bug report carries `notifications.txt`:
 the token (masked), the settings, and every pending and delivered notification.
+
+`NotificationSettings` lives in `DebugDrawerNotifications`, the plugin's UI-free half, which the
+plugin re-exports. A release build links that module beside the receiver to show a sidecar the
+token, the push environment and the settings during its session ("Push token and environment for
+test pushes", under "Production builds: the receiver").
 
 ### Background Tasks: launching a task without waiting for the system
 
@@ -2217,8 +2224,8 @@ app, the app links one more product, `DebugDrawerReceiver`: UI-less, with no int
 plugin and no dependency on the drawer (and, to offer tweaks, `DebugDrawerTweaks`, to mirror
 analytics events, `DebugDrawerAnalytics`, for translators and accessibility reviewers,
 `DebugDrawerLocalization` and `DebugDrawerAccessibility`, to forward crash reports and
-MetricKit payloads, `DebugDrawerMetricKit`, or to mock responses for a session, `DebugDrawerNetwork`,
-below). It serves a sidecar, over the app group's store, only the
+MetricKit payloads, `DebugDrawerMetricKit`, to mock responses for a session, `DebugDrawerNetwork`,
+or to show the push token for test pushes, `DebugDrawerNotifications`, below). It serves a sidecar, over the app group's store, only the
 capabilities the app enables, within sessions the sidecar opens, and refuses everything else:
 
 ```swift
@@ -2739,6 +2746,68 @@ final class ProductionDiagnostics {
   `arguments`, at any depth, before the payload is kept anywhere, and keeps its `formatString`,
   the code's own text. `adding(keys:)` masks more of MetricKit's keys (matched exactly, as MetricKit
   spells them), and `.none` keeps payloads whole. A masked value becomes `"[REDACTED]"`.
+
+**Push token and environment for test pushes.** To aim a test push at their own device, an
+employee needs the device's APNs token, which APNs server it belongs to, and whether the app may
+show notifications at all. The app can show a sidecar all three during its session. It is off
+unless the app enables it. Link `DebugDrawerNotifications` (`.product(name:
+"DebugDrawerNotifications", package: "DebugDrawer")`) beside the receiver, the UI-free half of the
+Notifications plugin, make the mirror with the receiver's sessions, enable the capability, and hand
+the mirror the token from the app delegate:
+
+```swift
+import DebugDrawerNotifications
+import DebugDrawerReceiver
+import Foundation
+
+@MainActor
+final class ProductionPush {
+    let sessions = DebugDrawerSessions(maximumDuration: 15 * 60)
+    let receiver: DebugDrawerReceiver
+    let pushRegistration: PushRegistrationMirror
+
+    init(container: URL) throws {
+        receiver = DebugDrawerReceiver(directory: container.appending(path: "DebugDrawer"), sessions: sessions)
+        pushRegistration = PushRegistrationMirror(sessions: sessions)
+        receiver.enable(.pushRegistration(pushRegistration))
+        try receiver.start()
+    }
+
+    /// From application(_:didRegisterForRemoteNotificationsWithDeviceToken:).
+    func didRegisterForRemoteNotifications(withDeviceToken deviceToken: Data) {
+        pushRegistration.didRegisterForRemoteNotifications(withDeviceToken: deviceToken)
+    }
+}
+```
+
+- **What the sidecar sees.** It connects to `PushRegistrationMirror.pluginID`; the
+  `PushRegistrationMirror.Snapshot` holds the open session's ID, the `registration`
+  (`.registered(deviceToken:)` as lowercase hexadecimal, the form push tools take,
+  `.failed(message:)` from `didFailToRegisterForRemoteNotifications(withError:)`, or
+  `.notRegistered`), the `environment` (a `PushEnvironment`: the `server`, `.production` or
+  `.sandbox`, and its `source`), and the `settings`: the authorization status (Allowed, Denied,
+  Provisional, Not Asked) and each presentation setting, read from User Notifications as the session
+  opens and again on `PushRegistrationMirror.Command.refresh`. The app can't fetch a token itself;
+  only the delegate hears it, so the app registers for remote notifications as it does today and
+  passes the token on.
+- **The environment.** `PushEnvironment.detected()`, the default, reads the app's signature: on the
+  Mac the `com.apple.developer.aps-environment` entitlement, elsewhere `aps-environment` in the
+  embedded provisioning profile (`development` is the sandbox); an iOS app on a device with no
+  profile is an App Store or TestFlight build, which is always production. A simulator build has
+  neither, so it reads `nil`; pass `environment: PushEnvironment(server: .sandbox, source: .host)`
+  where the app knows better.
+- **The risk, and why a token may go over IPC.** The charter's rule "never expose secrets (keychain
+  values, tokens) over IPC" means credentials. A device token isn't one: it names the device to
+  APNs, and sending it a push also takes the company's APNs key or certificate, which neither the
+  app nor the sidecar holds. It is still a device identifier, so the risk is low to medium, and the
+  capability treats it as such: off by default, and served only during a session. Outside one the
+  snapshot holds nothing; under a grant policy a session whose grant doesn't list
+  `PushRegistrationMirror.pluginID` is served nothing either.
+- **Where the token is written.** Nowhere but the capability's snapshot file in the app's own
+  directory of the group's store, and only during a session: it is rewritten without the token as
+  the session ends or expires, removed as a gate turns the capability off, and rewritten or removed
+  as the receiver next starts after a launch killed during a session. The mirror keeps the token in
+  memory; nothing goes to the defaults, another file, the audit log or a log line.
 
 **Network mocks in production.** To reproduce a server's edge case on the build that ships (an
 outage, an empty list, a slow or failing endpoint), a sidecar can answer some of the app's requests
@@ -3345,7 +3414,8 @@ ContentView()
 | `DebugDrawerMetricKit` | MetricKit's payload kinds and subscriber, real in every build, and the receiver capability (`.metricKitPayloads(sessions:directory:redaction:capacity:)`) that keeps the payloads the app receives, crash diagnostics among them, redacted by `MetricKitRedaction` and across launches, and serves them while a sidecar's session is open; UI-free, so a release build links it beside the receiver |
 | `DebugDrawerMetricKitPlugin` | MetricKit's metric and diagnostic payloads, kept across launches and listed by date with a summary, each open as formatted JSON to copy or export; a toast and a badge for new ones; re-exports `DebugDrawerMetricKit` |
 | `DebugDrawerPermissionsPlugin` | Every privacy permission the app declares in its Info.plist, with its live status, a button that asks when it is undecided and one that opens Settings |
-| `DebugDrawerNotificationsPlugin` | The APNs device token to copy, notification authorization and settings, pending and delivered notifications to inspect and remove, and a pasted APNs payload sent as a local notification |
+| `DebugDrawerNotifications` | The app's notification settings, real in every build, and the receiver capability (`.pushRegistration(_:)`) that shows a sidecar the APNs device token the app hands `PushRegistrationMirror`, the push environment (`PushEnvironment`) and the notification authorization and settings, only while a session is open; read-only and UI-free, so a release build links it beside the receiver |
+| `DebugDrawerNotificationsPlugin` | The APNs device token to copy, notification authorization and settings, pending and delivered notifications to inspect and remove, and a pasted APNs payload sent as a local notification; re-exports `DebugDrawerNotifications` |
 | `DebugDrawerBackgroundTasksPlugin` | The BGTaskScheduler identifiers the Info.plist permits and the pending task requests, with their kind and earliest begin date, each cancellable; a request scheduled on demand, and the LLDB commands that simulate a launch or an expiration |
 | `DebugDrawerAnalytics` | The analytics sink (`AnalyticsEvents.record`) and `AnalyticsValue`, real in every build, and the receiver capability (`.analyticsEvents(sessions:redaction:capacity:)`) that mirrors the events recorded during a sidecar's session, redacted by `AnalyticsRedaction` in the app; UI-free, so a release build links it beside the receiver |
 | `DebugDrawerAnalyticsPlugin` | The analytics events the app records, live, newest first, with their time and properties: search by name, key or value, each open as inspector rows and JSON to copy, all exported as a JSON file; re-exports `DebugDrawerAnalytics` |

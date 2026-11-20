@@ -1,4 +1,6 @@
 #if DEBUG
+    import DebugDrawerNotifications
+
     /// The notification center calls the plugin makes: User Notifications' current center in
     /// production (`SystemNotificationCenterClient`), a fake the test steers in tests.
     @MainActor

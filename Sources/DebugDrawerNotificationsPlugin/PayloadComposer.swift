@@ -1,5 +1,6 @@
 #if DEBUG
     import DebugDrawer
+    import DebugDrawerNotifications
     import SwiftUI
 
     /// An editor for an APNs payload, checked as it is typed, a delay, and Send, which delivers it

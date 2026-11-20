@@ -1,5 +1,6 @@
 import DebugDrawerLocalization
 import DebugDrawerNetwork
+import DebugDrawerNotifications
 import DebugDrawerReceiver
 import SwiftUI
 
@@ -100,6 +101,15 @@ struct ExampleReceiverScreen: View {
                     .accessibilityIdentifier("BugReportResult")
             }
             Section {
+                LabeledContent("APNs", value: host.pushStatus)
+                    .accessibilityIdentifier("PushRegistrationStatus")
+                LabeledContent("Environment", value: host.pushRegistration.environment.map(\.summary) ?? "Not signed for push")
+            } header: {
+                Text("Push Registration")
+            } footer: {
+                Text("The sidecar sees the device token, the environment and the notification settings only during its session.")
+            }
+            Section {
                 Button("Crash", role: .destructive) {
                     // A deliberate crash, for the person checking MetricKit forwarding.
                     fatalError("Crashed from the example's Crash button")
@@ -142,6 +152,19 @@ extension DebugDrawerFeatureFlagValue {
         case let .bool(value): String(value)
         case let .number(value): value.formatted()
         case let .string(value): value
+        }
+    }
+}
+
+extension PushEnvironment {
+    /// The server and where the environment came from, as the screen says it.
+    fileprivate var summary: String {
+        let server = server == .production ? "Production" : "Sandbox"
+        return switch source {
+        case .host: "\(server) (stated by the app)"
+        case .entitlement: "\(server) (entitlement)"
+        case .provisioningProfile: "\(server) (provisioning profile)"
+        case .appStoreDistribution: "\(server) (App Store build)"
         }
     }
 }

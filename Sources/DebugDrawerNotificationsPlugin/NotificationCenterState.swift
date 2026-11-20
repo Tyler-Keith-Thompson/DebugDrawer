@@ -1,4 +1,6 @@
 #if DEBUG
+    import DebugDrawerNotifications
+
     /// What the plugin last read from the notification center.
     enum NotificationCenterState: Equatable, Sendable {
         /// Not read yet.
