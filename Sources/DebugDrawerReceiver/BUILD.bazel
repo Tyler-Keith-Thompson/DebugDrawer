@@ -7,7 +7,7 @@ load("//tools:catalyst.bzl", "catalyst_build_test")
 load("//tools:docc.bzl", "docc_archive")
 load("//tools:swift_rules.bzl", "swift_library")
 
-# The release-build sidecar receiver: serves a sidecar app, over the app group's store, only the capabilities the host enables (feature flag overrides, or any plugin model), within sessions the sidecar opens, refusing and auditing everything else; UI-less, with no interception.
+# The release-build sidecar receiver: serves a sidecar app, over the app group's store, only the capabilities the host enables (feature flag and experiment overrides, or any plugin model), within sessions the sidecar opens, refusing and auditing everything else; UI-less, with no interception.
 swift_library(
     name = "DebugDrawerReceiver",
     srcs = glob(["**/*.swift"]),

@@ -2273,7 +2273,8 @@ What the receiver does:
   refused even inside an open session. Each refusal is logged and written to the sessions' audit
   log (`commandRefused(.unknownCapability)`).
 - **Capabilities are models.** `.featureFlagOverrides(adapter)` overrides the flags the adapter
-  lists, and only with a value of the kind the flag has; `clearAllOverrides` clears only the
+  lists, and only with a value of the kind the flag has (`.experimentOverrides(adapter)`, below,
+  forces the experiments it lists into one of their variants); `clearAllOverrides` clears only the
   overrides it set, never the app's own. `.model(_:id:scope:)` serves any
   `DebugDrawerPluginModel` of the app's. A command decodes into the model's own `Command` type or
   is refused as malformed; nothing received is run or evaluated, and a sidecar reads only the
@@ -2299,6 +2300,26 @@ so make it at startup; with `scope: .persistent` they stay until a sidecar clear
 launches when the adapter keeps its overrides. `DebugDrawerFeatureFlagOverrides` keeps the keys it
 overrode (never their values) in the standard defaults, or in those passed to
 `init(adapter:defaults:)`, so a relaunched app still lists and clears them.
+
+**Experiment overrides in production.** Employees can see each arm of an A/B test on a release
+build: `enable(.experimentOverrides(adapter))` serves a sidecar the experiments the app's
+`DebugDrawerExperimentAdapter` lists in `overridableExperiments()`, each with its variants and the
+variant the app is assigned now (`DebugDrawerExperiment`), and within a session forces one of
+those variants (`DebugDrawerExperimentOverrides.Command.setOverride(experiment:variant:)`). The
+risk: a forced variant isn't a real assignment, so the device's events would pollute the
+experiment's data. The exclusion hook guards against it: the adapter must implement
+`overriddenExperimentsDidChange(_:)`, which hears the overridden experiments' keys as the model is
+made (overrides kept from the last launch included) and at every change, empty once none is left;
+while it holds any, leave the session or user out of the experiments' analysis.
+`DebugDrawerExperimentOverrides.isExcludedFromAnalytics` and `overriddenExperiments` say the same at
+any time, from any thread, for an analytics pipeline that tags events on its own queue (make the
+model, then `enable(.experimentOverrides(model))`). It is off until the app enables it: a command
+to it before then is refused as `commandRefused(.unknownCapability)`, even inside a session. An
+experiment the adapter doesn't list is refused as `commandRefused(.notExposed)`, a variant the
+experiment doesn't have as `commandRefused(.malformedCommand)`, and neither reaches the adapter.
+Audit, foreground delivery, scopes and the keys kept across launches work as for feature flag
+overrides: by default the overrides are cleared, and the exclusion lifted, as the session ends;
+with `scope: .persistent` the device stays excluded across launches until a sidecar clears them.
 
 **Turning it off remotely.** To shut every sidecar out without a release (a leaked sidecar app,
 say), give the receiver a gate backed by your own remote configuration, and a capability one of
@@ -2970,6 +2991,7 @@ capability has something in the host that changes:
 | Sidecar plugin | What changes in the host |
 |---|---|
 | Flags | Checkout (`new-checkout`) and Button Color, through the host's `DebugDrawerFeatureFlagAdapter` |
+| Experiments | Checkout Flow and Onboarding's variants, through the host's `DebugDrawerExperimentAdapter`, and Analytics, which reads "Excluded from" the forced experiments until they are cleared |
 | Tweaks | The greeting, a production-safe tweak; the Diagnostics tweak isn't, so the sidecar never lists it |
 | Strings | The Localization Review strings, pseudo-localized or shown as keys |
 | Accessibility | The window's Dynamic Type, contrast and Reduce Motion, read back beside them |
@@ -3146,7 +3168,7 @@ ContentView()
 | Module | Holds |
 |---|---|
 | `DebugDrawer` | The drawer: its window, the plugin protocol and registry, the views plugins are built from, and release-build stand-ins |
-| `DebugDrawerReceiver` | The one product a release build may link: serves a sidecar app, over the app group's store, only the capabilities the app enables (feature flag overrides, or any plugin model) within sessions the sidecar opens, refusing and auditing everything else; UI-less, no interception |
+| `DebugDrawerReceiver` | The one product a release build may link: serves a sidecar app, over the app group's store, only the capabilities the app enables (feature flag and experiment overrides, or any plugin model) within sessions the sidecar opens, refusing and auditing everything else; UI-less, no interception |
 | `DebugDrawerConsolePlugin` | `os_log` entries (stdout and stderr on macOS) and an app logger's lines through `ConsoleLogSink`, with metadata: level filter, text or regular-expression search, subsystem and category mutes, time range, auto-follow, copy, lines kept across launches |
 | `DebugDrawerViewInspectorPlugin` | View borders by depth, alignment grid, click indicators, animation speed, render counts of the views an app tracks with `.trackRenders(_:)`, hierarchy snapshot |
 | `DebugDrawerAccessibility` | The receiver capability (`.accessibilityEnvironmentOverrides()`) that lets a sidecar override Dynamic Type, Increase Contrast and Reduce Motion for its session, and the modifier the app's root view applies them with (`.accessibilityEnvironmentOverrides()`); no drawer, so a release build links it beside the receiver |

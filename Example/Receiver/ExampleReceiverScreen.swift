@@ -8,6 +8,7 @@ import SwiftUI
 struct ExampleReceiverScreen: View {
     @ObservedObject var host: ExampleReceiverHost
     @ObservedObject var flags: ProductionFlags
+    @ObservedObject var experiments: ProductionExperiments
     @ObservedObject var sessions: DebugDrawerSessions
     @ObservedObject var keeper: DebugDrawerBackgroundKeeper
     @ObservedObject var mocking: NetworkMocking
@@ -27,6 +28,17 @@ struct ExampleReceiverScreen: View {
             Section("Feature Flag Overrides") {
                 LabeledContent("Checkout", value: flags.value(forKey: "new-checkout") == .bool(true) ? "New" : "Legacy")
                 LabeledContent("Button Color", value: flags.value(forKey: "checkout-button-color")?.exampleDescription ?? "None")
+            }
+            Section("Experiment Overrides") {
+                LabeledContent("Checkout Flow", value: experiments.variant(forExperiment: "checkout-flow") ?? "Not enrolled")
+                LabeledContent("Onboarding", value: experiments.variant(forExperiment: "onboarding") ?? "Not enrolled")
+                LabeledContent(
+                    "Analytics",
+                    value: experiments.analyticsExclusions.isEmpty
+                        ? "Included"
+                        : "Excluded from \(experiments.analyticsExclusions.joined(separator: ", "))"
+                )
+                .accessibilityIdentifier("ExperimentAnalyticsExclusion")
             }
             Section("Tweaks") {
                 LabeledContent("Greeting", value: greeting)

@@ -25,6 +25,7 @@ final class ExampleReceiverHost: ObservableObject {
     // The literal is a valid URL, so the force unwrap can't fail.
 
     let flags: ProductionFlags
+    let experiments: ProductionExperiments
     let sessions: DebugDrawerSessions
     /// Keeps the app running while a session is open: a background task on iOS, an App Nap
     /// activity on the Mac.
@@ -54,6 +55,7 @@ final class ExampleReceiverHost: ObservableObject {
 
     init() {
         let flags = ProductionFlags()
+        let experiments = ProductionExperiments()
         let sessions = DebugDrawerSessions(
             maximumDuration: 15 * 60,
             grantPolicy: DebugDrawerGrantPolicy(
@@ -64,6 +66,7 @@ final class ExampleReceiverHost: ObservableObject {
         let receiver = DebugDrawerReceiver(directory: ExampleSidecarStore.directory, sessions: sessions)
         let mocking = NetworkMocking(sessions: sessions, allowedHosts: [.exact("api.example.com")])
         receiver.enable(.featureFlagOverrides(flags))
+        receiver.enable(.experimentOverrides(experiments))
         receiver.enable(.tweaks(ProductionTweaks.greeting, ProductionTweaks.diagnostics))
         receiver.enable(.localizationReview())
         receiver.enable(.accessibilityEnvironmentOverrides())
@@ -73,6 +76,7 @@ final class ExampleReceiverHost: ObservableObject {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [NetworkMockingURLProtocol.self] + (configuration.protocolClasses ?? [])
         self.flags = flags
+        self.experiments = experiments
         self.sessions = sessions
         self.receiver = receiver
         self.mocking = mocking
