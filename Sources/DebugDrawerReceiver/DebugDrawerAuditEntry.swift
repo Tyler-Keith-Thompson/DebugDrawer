@@ -77,7 +77,8 @@ public struct DebugDrawerAuditEntry: Codable, Equatable, Sendable {
         /// capability doesn't take.
         case malformedCommand
         /// The command named something the capability doesn't expose to a sidecar, such as a
-        /// tweak the host didn't mark production-safe.
+        /// tweak the host didn't mark production-safe, or a feature flag its adapter doesn't
+        /// list.
         case notExposed
         /// A session was asked to open while one was open.
         case sessionAlreadyActive

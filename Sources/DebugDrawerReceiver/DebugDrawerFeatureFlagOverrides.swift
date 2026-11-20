@@ -5,10 +5,21 @@ import os
 // The feature flag overrides capability's model. It keeps the keys it overrode itself, so clearing
 // (the session's revert) puts back only what a sidecar changed and never an override the host or
 // its drawer set. A command naming a key the adapter doesn't list, or a value of another kind than
-// the flag's, changes nothing: the adapter's list is the whole of what a sidecar may touch.
-// Rejected: refusing such a command in the audit log (the model decoded it, so the session applied
-// it; the model is what knows the keys, and it logs what it ignored), and asking the adapter which
-// keys are overridden (an adapter over a flag SDK may not know which override came from where).
+// the flag's, changes nothing: the adapter's list is the whole of what a sidecar may touch. Through
+// the receiver such a command is refused before the model sees it (`refusal(of:)`), so the audit
+// log says it changed nothing rather than that it was applied: a sidecar reaching for a flag the
+// host didn't mark overridable, a server-enforced one say, is what an auditor looks for. The model
+// still ignores it, and logs it, for a caller that isn't the receiver (the drawer's direct
+// transport). Rejected: asking the adapter which keys are overridden (an adapter over a flag SDK
+// may not know which override came from where).
+//
+// The keys it overrode are kept in the defaults, as an adapter may keep its overrides across
+// launches: so a relaunched app still knows which overrides a sidecar set, lists them, and clears
+// them when asked, and a session-scoped capability made at launch clears those a session left
+// when the app quit during it (`DebugDrawerReceiverCapability.featureFlagOverrides`). Only keys
+// are kept, never values. Rejected: a file in the receiver's store (the model is made, and may be
+// shown in the drawer, before and apart from any receiver), and a storage protocol of its own
+// (`UserDefaults(suiteName:)` already lets a host or a test keep them apart).
 
 /// The model behind the feature flag overrides ``DebugDrawerReceiverCapability``: the flags the
 /// host's adapter lists, and the overrides a sidecar applied to them.
@@ -54,15 +65,41 @@ public final class DebugDrawerFeatureFlagOverrides: DebugDrawerPluginModel {
     /// The flags and overrides now.
     @Published public private(set) var snapshot: Snapshot
 
-    private let adapter: any DebugDrawerFeatureFlagAdapter
-    private var overridden: Set<String> = []
+    /// The defaults key under which the model keeps the keys it overrode.
+    static let overriddenKeysDefaultsKey = "DebugDrawer.FeatureFlagOverrides.overriddenKeys"
 
-    /// Overrides through `adapter`.
+    private let adapter: any DebugDrawerFeatureFlagAdapter
+    private let defaults: UserDefaults
+    private var overridden: Set<String> {
+        didSet {
+            guard overridden != oldValue else { return }
+            if overridden.isEmpty {
+                defaults.removeObject(forKey: Self.overriddenKeysDefaultsKey)
+            } else {
+                defaults.set(overridden.sorted(), forKey: Self.overriddenKeysDefaultsKey)
+            }
+        }
+    }
+
+    /// Overrides through `adapter`, keeping the keys it overrode in the standard defaults.
     ///
     /// - Parameter adapter: The host's adapter to its flag service.
-    public init(adapter: some DebugDrawerFeatureFlagAdapter) {
+    public convenience init(adapter: some DebugDrawerFeatureFlagAdapter) {
+        self.init(adapter: adapter, defaults: .standard)
+    }
+
+    /// Overrides through `adapter`, keeping the keys it overrode in `defaults`, so a relaunched
+    /// app still lists and clears the overrides a sidecar set before it quit.
+    ///
+    /// - Parameters:
+    ///   - adapter: The host's adapter to its flag service.
+    ///   - defaults: Where the keys it overrode are kept (never their values).
+    public init(adapter: some DebugDrawerFeatureFlagAdapter, defaults: UserDefaults) {
         self.adapter = adapter
-        snapshot = Snapshot(flags: adapter.overridableFlags(), overriddenKeys: [])
+        self.defaults = defaults
+        let kept = Set(defaults.stringArray(forKey: Self.overriddenKeysDefaultsKey) ?? [])
+        overridden = kept
+        snapshot = Snapshot(flags: adapter.overridableFlags(), overriddenKeys: kept.sorted())
     }
 
     /// Reads the adapter's flags again, for a host whose flags changed outside the receiver.
@@ -70,6 +107,23 @@ public final class DebugDrawerFeatureFlagOverrides: DebugDrawerPluginModel {
         let current = Snapshot(flags: adapter.overridableFlags(), overriddenKeys: overridden.sorted())
         if current != snapshot {
             snapshot = current
+        }
+    }
+
+    /// Why the receiver refuses `command` before the model performs it, or `nil` to perform it: a
+    /// flag the adapter doesn't list is ``DebugDrawerAuditEntry/Refusal/notExposed``, a value of
+    /// another kind than the flag's ``DebugDrawerAuditEntry/Refusal/malformedCommand``. Clearing a
+    /// key the model overrode is never refused, even once the adapter stops listing it.
+    func refusal(of command: Command) -> DebugDrawerAuditEntry.Refusal? {
+        switch command {
+        case let .setOverride(key, value):
+            guard let flag = adapter.overridableFlags().first(where: { $0.key == key }) else { return .notExposed }
+            return flag.value.isSameKind(as: value) ? nil : .malformedCommand
+        case let .clearOverride(key):
+            guard overridden.contains(key) || adapter.overridableFlags().contains(where: { $0.key == key }) else { return .notExposed }
+            return nil
+        case .clearAllOverrides:
+            return nil
         }
     }
 

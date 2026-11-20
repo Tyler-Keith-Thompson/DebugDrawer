@@ -104,6 +104,28 @@ public struct DebugDrawerReceiverCapability {
     /// Feature flag overrides through the host's adapter to its flag service: a sidecar sees the
     /// flags the adapter lists and, within a session, overrides them.
     ///
+    /// The risk it takes: an employee holding the sidecar can turn on, on their own device, a
+    /// feature that hasn't been released. Only what the app reads through the adapter changes, so a
+    /// flag the server enforces (an entitlement it checks, a feature it serves only when on) stays
+    /// enforced by the server. It is off until the host enables it, and the host marks which flags
+    /// an employee may override by listing them, and only them, in the adapter's
+    /// ``DebugDrawerFeatureFlagAdapter/overridableFlags()``: a command for any other flag, or with
+    /// a value of another kind than the flag's, is refused (``DebugDrawerAuditEntry/Refusal/notExposed``,
+    /// ``DebugDrawerAuditEntry/Refusal/malformedCommand``) and changes nothing. Each override and
+    /// each clear is written to the audit log as ``DebugDrawerAuditEntry/Event/commandApplied``,
+    /// and the session's revert as ``DebugDrawerAuditEntry/Event/changeReverted``.
+    ///
+    /// A command the sidecar leaves while the app is in the background is performed as the app
+    /// comes to the foreground. With the default scope the overrides are cleared as the session
+    /// ends or expires; with ``DebugDrawerChangeScope/persistent`` they stay, across launches when
+    /// the adapter keeps them, until a sidecar clears them. Session-scoped overrides a session
+    /// left when the app quit during it are cleared as the capability is made, so make it as the
+    /// app starts.
+    ///
+    /// ```swift
+    /// receiver.enable(.featureFlagOverrides(flagAdapter))
+    /// ```
+    ///
     /// - Parameters:
     ///   - adapter: The host's adapter, listing only the flags a sidecar may see and override.
     ///   - scope: What becomes of the overrides when the session ends; by default they are
@@ -119,6 +141,10 @@ public struct DebugDrawerReceiverCapability {
     /// Feature flag overrides through a model the host also shows elsewhere, such as in its debug
     /// build's drawer, so the same overrides can be tested in the process.
     ///
+    /// It takes the same risk and limits as the capability made over an adapter. With a session
+    /// scope, the model performs the scope's revert as the capability is made,
+    /// clearing what a session left when the app quit during it, so make it as the app starts.
+    ///
     /// - Parameters:
     ///   - model: The overrides' model.
     ///   - scope: What becomes of the overrides when the session ends; by default they are
@@ -128,6 +154,12 @@ public struct DebugDrawerReceiverCapability {
         _ model: DebugDrawerFeatureFlagOverrides,
         scope: DebugDrawerChangeScope<DebugDrawerFeatureFlagOverrides> = .session(revertWith: .clearAllOverrides)
     ) -> Self {
-        .model(model, id: DebugDrawerFeatureFlagOverrides.pluginID, scope: scope)
+        // Sessions live in memory, so none outlives the process: a session-scoped override the
+        // model still records as it is made is one whose session never ended, the app having quit
+        // or been killed during it, and its revert is owed.
+        if case let .session(revert) = scope.kind, !model.snapshot.overriddenKeys.isEmpty {
+            model.perform(revert)
+        }
+        return .model(model, id: DebugDrawerFeatureFlagOverrides.pluginID, scope: scope, refusal: model.refusal(of:))
     }
 }

@@ -29,9 +29,12 @@ private final class FakeFlagAdapter: DebugDrawerFeatureFlagAdapter {
 @MainActor
 struct FeatureFlagOverridesTests {
     @Test("An override of a listed flag, of the flag's kind, reaches the adapter and the snapshot")
-    func overridesListedFlag() {
+    func overridesListedFlag() throws {
+        let suite = "FeatureFlagOverridesTests-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
         let adapter = FakeFlagAdapter(["new-checkout": .bool(false), "threshold": .number(50)])
-        let sut = DebugDrawerFeatureFlagOverrides(adapter: adapter)
+        let sut = DebugDrawerFeatureFlagOverrides(adapter: adapter, defaults: defaults)
         let expected = DebugDrawerFeatureFlagOverrides.Snapshot(
             flags: [DebugDrawerFeatureFlag(key: "new-checkout", value: .bool(false)), DebugDrawerFeatureFlag(key: "threshold", value: .number(25))],
             overriddenKeys: ["threshold"]
@@ -43,9 +46,12 @@ struct FeatureFlagOverridesTests {
     }
 
     @Test("An override of a flag the adapter doesn't list, or of another kind than the flag's, changes nothing")
-    func ignoresUnlistedAndWrongKind() {
+    func ignoresUnlistedAndWrongKind() throws {
+        let suite = "FeatureFlagOverridesTests-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
         let adapter = FakeFlagAdapter(["new-checkout": .bool(false)])
-        let sut = DebugDrawerFeatureFlagOverrides(adapter: adapter)
+        let sut = DebugDrawerFeatureFlagOverrides(adapter: adapter, defaults: defaults)
         let expected = sut.snapshot
 
         sut.perform(.setOverride(key: "api-token", value: .string("leaked")))
@@ -56,10 +62,13 @@ struct FeatureFlagOverridesTests {
     }
 
     @Test("Clearing removes only the overrides the model set, never the host's own")
-    func clearsOnlyItsOwn() {
+    func clearsOnlyItsOwn() throws {
+        let suite = "FeatureFlagOverridesTests-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
         let adapter = FakeFlagAdapter(["new-checkout": .bool(false), "promo": .bool(true)])
         adapter.overrides["promo"] = .bool(false)
-        let sut = DebugDrawerFeatureFlagOverrides(adapter: adapter)
+        let sut = DebugDrawerFeatureFlagOverrides(adapter: adapter, defaults: defaults)
         let expected: [String: DebugDrawerFeatureFlagValue] = ["promo": .bool(false)]
 
         sut.perform(.setOverride(key: "new-checkout", value: .bool(true)))
@@ -68,6 +77,24 @@ struct FeatureFlagOverridesTests {
 
         #expect(adapter.overrides == expected)
         #expect(sut.snapshot.overriddenKeys.isEmpty)
+    }
+
+    @Test("The keys it overrode outlive the model, in its defaults, so a model made at the next launch lists and clears them")
+    func keepsOverriddenKeys() throws {
+        let suite = "FeatureFlagOverridesTests-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let adapter = FakeFlagAdapter(["new-checkout": .bool(false), "promo": .bool(true)])
+        DebugDrawerFeatureFlagOverrides(adapter: adapter, defaults: defaults).perform(.setOverride(key: "new-checkout", value: .bool(true)))
+        let sut = DebugDrawerFeatureFlagOverrides(adapter: adapter, defaults: defaults)
+        let expectedKeys = ["new-checkout"]
+        let listed = sut.snapshot.overriddenKeys
+
+        sut.perform(.clearAllOverrides)
+
+        #expect(listed == expectedKeys)
+        #expect(adapter.overrides.isEmpty)
+        #expect(DebugDrawerFeatureFlagOverrides(adapter: adapter, defaults: defaults).snapshot.overriddenKeys.isEmpty)
     }
 
     @Test("A value encodes as the bare JSON value and decodes back to its kind", arguments: [

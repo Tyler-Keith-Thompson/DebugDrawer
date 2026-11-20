@@ -3,9 +3,12 @@ import Foundation
 /// The host's adapter between the receiver's feature flag overrides and its flag service
 /// (LaunchDarkly, Firebase Remote Config, Statsig or its own).
 ///
-/// It decides what a sidecar may touch: list only the flags a tester may see and override, never
-/// one whose value is a secret. The receiver calls it on the main actor, only with a key the
-/// adapter listed and a value of the kind that flag already has.
+/// It decides what a sidecar may touch: listing a flag in ``overridableFlags()`` marks it as one an
+/// employee may override on their own device, so list only the flags a tester may see and
+/// override, never one whose value is a secret. An override changes only what the app reads
+/// through the adapter: a flag the server enforces stays enforced. The receiver calls it on the
+/// main actor, only with a key the adapter listed and a value of the kind that flag already has,
+/// and clears only keys it overrode.
 ///
 /// ```swift
 /// @MainActor

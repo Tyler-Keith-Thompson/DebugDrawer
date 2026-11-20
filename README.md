@@ -2283,6 +2283,23 @@ What the receiver does:
   .clearAllOverrides)`), `.persistent` keeps it.
 - **The app draws the indicator.** Observe `sessions.snapshot` as in "Sidecar sessions" above.
 
+**Feature flag overrides in production.** The risk: an employee holding the sidecar can turn on,
+on their own device, a feature that hasn't been released. An override changes only what the app
+reads through the adapter, so a flag the server enforces (an entitlement it checks, content it
+serves only when the flag is on) stays enforced by the server. It is off until the app calls
+`enable(.featureFlagOverrides(adapter))`, and the app marks which flags an employee may override
+by listing them, and only them, in the adapter's `overridableFlags()`: a command for any other
+flag is refused as `commandRefused(.notExposed)`, one with a value of another kind than the flag's
+as `commandRefused(.malformedCommand)`, and neither reaches the adapter. Each override and each
+clear is audited as `commandApplied`, and the session's revert as `changeReverted`. A command the
+sidecar leaves while the app is in the background is applied as the app comes to the foreground.
+With the default scope the overrides are cleared as the session ends or expires, and those a
+session left because the app quit during it are cleared as the next launch makes the capability,
+so make it at startup; with `scope: .persistent` they stay until a sidecar clears them, across
+launches when the adapter keeps its overrides. `DebugDrawerFeatureFlagOverrides` keeps the keys it
+overrode (never their values) in the standard defaults, or in those passed to
+`init(adapter:defaults:)`, so a relaunched app still lists and clears them.
+
 **Turning it off remotely.** To shut every sidecar out without a release (a leaked sidecar app,
 say), give the receiver a gate backed by your own remote configuration, and a capability one of
 its own; the library calls no configuration service itself (`RemoteConfig` here stands for yours):
