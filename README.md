@@ -2471,6 +2471,74 @@ another is) in the zip, under `Bug Reports/` (`screenshot.png`, `note.txt` with 
 the annotation, `console.txt`, `state.json`), and Send Report sends it through
 `DebugDrawer.shared.reportUploader`.
 
+**Scenarios: launching the app into a state.** To reach a screen deep in a release build ("open
+order 123", "show the paywall", "onboarding step 3") without tapping through it, the app registers
+named scenarios, each with the parameters it takes and a handler of its own that puts the app
+there; the sidecar lists them, with a field for each parameter, and Launch brings the app to the
+foreground and runs the handler:
+
+```swift
+@MainActor
+final class ShopRouter {
+    private(set) var screen = "Home"
+
+    func openOrder(_ id: Int) { screen = "Order \(id)" }
+    func showPaywall(plan: String) { screen = "Paywall (\(plan))" }
+}
+
+@MainActor
+final class ProductionScenarios {
+    let sessions = DebugDrawerSessions(maximumDuration: 15 * 60)
+    let receiver: DebugDrawerReceiver
+
+    init(router: ShopRouter, container: URL) throws {
+        receiver = DebugDrawerReceiver(directory: container.appending(path: "DebugDrawer"), sessions: sessions)
+        receiver.enable(.scenarios([
+            DebugDrawerScenario("open-order", title: "Open Order", parameters: [
+                .integer("orderID", title: "Order", default: 123, in: 1 ... 999_999)
+            ]) { arguments in
+                router.openOrder(arguments.integer("orderID") ?? 123)
+            },
+            DebugDrawerScenario("show-paywall", title: "Show Paywall", parameters: [
+                .choice("plan", title: "Plan", options: ["monthly", "annual"])
+            ]) { arguments in
+                router.showPaywall(plan: arguments.string("plan") ?? "monthly")
+            }
+        ], launchURL: URL(string: "shop-internal://")))
+        try receiver.start()
+    }
+}
+```
+
+- **The risk: whatever the handlers allow.** An employee holding the sidecar can put their own
+  device in any state a registered scenario reaches, with any value its parameters take. Register
+  only scenarios fit for production, bound each parameter tightly, keep the server's own checks
+  where a handler reaches it, and add `.requiringGrant()` to the capability when team signing
+  alone isn't enough.
+- **Off by default, and only what the app declares.** Until the app enables `.scenarios(_:)`, a
+  launch is refused as `commandRefused(.unknownCapability)`, even inside a session. The receiver
+  passes a handler only a registered scenario's ID and values for the parameters that scenario
+  declares (`DebugDrawerScenarioParameter`: `.string(_:maximumLength:)`, `.integer(_:in:)`,
+  `.boolean(_:)`, `.choice(_:options:)`), each checked against its kind and bounds, and evaluates
+  nothing it receives. A scenario the app didn't register is refused as
+  `commandRefused(.notExposed)`; a parameter the scenario doesn't declare, a value of another kind,
+  outside the range, longer than the maximum or not among the options as
+  `commandRefused(.malformedCommand)`; neither runs a handler. A declared parameter the launch
+  leaves out takes its default. The handler reads the values typed:
+  `arguments.integer("orderID")`, `string(_:)`, `boolean(_:)`.
+- **Within a session, audited, and not reverted.** A launch is performed only in an open session
+  and audited as `commandApplied`; `DebugDrawerScenarios.Snapshot.lastRun` tells the sidecar it
+  ran. What a handler did lasts past the session: the library can't undo it.
+- **Bringing the app forward.** The sidecar opens `launchURL`, a URL of the app's own scheme
+  (`CFBundleURLTypes`), to bring the app to the foreground; on the Mac it opens the app by its
+  bundle identifier instead. The receiver doesn't depend on it: the launch waits in the store and
+  is performed as the app comes to the foreground, however it got there, or at once when it is
+  already there. The URL's own handling is the app's; it needn't do anything with it.
+
+In the sidecar, the kit's `DebugDrawerSidecarPlugin.scenarios` lists the scenarios with a field
+for each parameter (a text field, a number field, a switch or a picker) and a Launch button, which
+sends the launch and then opens the app (`DebugDrawerSidecarApp.open(url:)`).
+
 **Turning it off remotely.** To shut every sidecar out without a release (a leaked sidecar app,
 say), give the receiver a gate backed by your own remote configuration, and a capability one of
 its own; the library calls no configuration service itself (`RemoteConfig` here stands for yours):
@@ -3178,8 +3246,8 @@ DebugDrawerSidecarView(groupIdentifier: "group.com.example.debug", sessionDurati
 ```
 
 Below it, a picker shows the plugins the app serves, drawn by the plugins' own views over the
-transport: `.console` and `.network` by default, and `.bugReports` for an app that serves bug
-reports (above). A plugin of your own whose model adopts
+transport: `.console` and `.network` by default, `.bugReports` for an app that serves bug
+reports and `.scenarios` for one that registers scenarios (above). A plugin of your own whose model adopts
 `DebugDrawerPluginModel` joins them with `DebugDrawerSidecarPlugin(id:title:icon:snapshot:command:plugin:)`,
 whose closure makes the plugin's view over the transport the kit hands it. Create Report writes the
 hosted plugins' report contributions, redacted by `DebugDrawer.shared.redaction`, under a summary
@@ -3214,6 +3282,7 @@ capability has something in the host that changes:
 | Mocking | Mock Greeting answers the host's Fetch Greeting, and the host shows "Network mocking active" |
 | Bug Reports | Start Capture in Diagnostics and Log Sign-In, then Report a Bug in the host (or Feedback > Report a Bug, Shift-Command-B): the report appears in the sidecar with the window's screenshot, the line and the host's state, its email redacted; type an annotation, then Create Report, and Send Report with an uploader set; the session's end deletes it in the host |
 | Diagnostics | Start Capture, then Log Sign-In and Fetch Greeting: the line and the request appear in the sidecar, the email, session ID and token redacted, and the host shows "Capturing diagnostics for a sidecar"; Create Report adds them to the report, and Stop and Delete or the session's end deletes them in the host |
+| Scenarios | Open Order, Show Paywall and Onboarding Step, each with its parameters: Launch brings the host forward (its `debugdrawer-receiver-example://` scheme on iOS, its bundle identifier on the Mac) and opens the scenario's screen, such as "Order #456" |
 
 While the session is open the host shows its own indicator (who holds the grant, until when, and
 what keeps it running in the background, End Session, and Keep Running on iOS), and its Sidecar
@@ -3384,7 +3453,7 @@ ContentView()
 | Module | Holds |
 |---|---|
 | `DebugDrawer` | The drawer: its window, the plugin protocol and registry, the views plugins are built from, and release-build stand-ins |
-| `DebugDrawerReceiver` | The one product a release build may link: serves a sidecar app, over the app group's store, only the capabilities the app enables (feature flag and experiment overrides, log level elevation, diagnostics capture, bug reports the app triggers, or any plugin model) within sessions the sidecar opens, refusing and auditing everything else; UI-less, no interception |
+| `DebugDrawerReceiver` | The one product a release build may link: serves a sidecar app, over the app group's store, only the capabilities the app enables (feature flag and experiment overrides, log level elevation, diagnostics capture, bug reports the app triggers, scenarios the app registers, or any plugin model) within sessions the sidecar opens, refusing and auditing everything else; UI-less, no interception |
 | `DebugDrawerConsolePlugin` | `os_log` entries (stdout and stderr on macOS) and an app logger's lines through `ConsoleLogSink`, with metadata: level filter, text or regular-expression search, subsystem and category mutes, time range, auto-follow, copy, lines kept across launches |
 | `DebugDrawerViewInspectorPlugin` | View borders by depth, alignment grid, click indicators, animation speed, render counts of the views an app tracks with `.trackRenders(_:)`, hierarchy snapshot |
 | `DebugDrawerAccessibility` | The receiver capability (`.accessibilityEnvironmentOverrides()`) that lets a sidecar override Dynamic Type, Increase Contrast and Reduce Motion for its session, and the modifier the app's root view applies them with (`.accessibilityEnvironmentOverrides()`); no drawer, so a release build links it beside the receiver |
@@ -3427,7 +3496,7 @@ ContentView()
 | `DebugDrawerColorVisionPlugin` | Protanopia, deuteranopia, tritanopia and grayscale simulated live over the views marked `.debugColorVision()`, in linear RGB with Machado et al.'s matrices, picked in the drawer or cycled from the HUD, while the drawer keeps its colors |
 | `DebugDrawerAppStateResetPlugin` | The app's state cleared as a fresh install leaves it, by category: UserDefaults, keychain items, the container's files, caches, cookies, the URL cache and the app's own cleanup, each listed before a confirmation, then relaunched on macOS or quit elsewhere |
 | `DebugDrawerRemote` | Plugin models served to a viewer on another device over the local network: an opt-in Network.framework server advertised over Bonjour, each viewer paired with a six-digit code the device shows, and the viewer's transport and browser |
-| `DebugDrawerSidecarKit` | A sidecar app, as a library: `DebugDrawerSidecarView` lists the apps in the group that serve a sidecar, opens their sessions (with a grant the company's server gives, when they require one), shows their Console, Network, Bug Reports and other model-backed plugins over the socket or the store, and makes and uploads a report of them; iOS, iPadOS and macOS, debug builds |
+| `DebugDrawerSidecarKit` | A sidecar app, as a library: `DebugDrawerSidecarView` lists the apps in the group that serve a sidecar, opens their sessions (with a grant the company's server gives, when they require one), shows their Console, Network, Bug Reports, Scenarios and other model-backed plugins over the socket or the store, and makes and uploads a report of them; iOS, iPadOS and macOS, debug builds |
 
 ## Development
 

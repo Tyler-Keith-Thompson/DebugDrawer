@@ -20,6 +20,19 @@
     <string>NSApplication</string>
     <key>UILaunchScreen</key>
     <dict/>
+    <!-- The scheme the sidecar opens to bring the app forward for a scenario
+         (ProductionScenarios.launchURL); the app does nothing with the URL itself. -->
+    <key>CFBundleURLTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleURLName</key>
+            <string>com.debugdrawer.example.receiver.scenarios</string>
+            <key>CFBundleURLSchemes</key>
+            <array>
+                <string>debugdrawer-receiver-example</string>
+            </array>
+        </dict>
+    </array>
     <!-- iOS: the sidecar session's continued processing task (DebugDrawerBackgroundKeeper), which
          needs no UIBackgroundModes entry. -->
     <key>BGTaskSchedulerPermittedIdentifiers</key>

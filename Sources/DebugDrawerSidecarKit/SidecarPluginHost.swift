@@ -24,6 +24,7 @@
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 case let .shown(hosted):
                     SidecarHostedPlugin(plugin: hosted)
+                        .environment(\.debugDrawerSidecarApp, connection.app)
                 case let .failed(error):
                     DebugDrawerEmptyState("\(plugin.title) Not Reached", systemImage: "exclamationmark.triangle") {
                         Text(error.localizedDescription)

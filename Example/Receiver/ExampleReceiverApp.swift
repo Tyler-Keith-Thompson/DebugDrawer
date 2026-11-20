@@ -8,10 +8,10 @@ import SwiftUI
 // sidecar (Example/Sidecar) every capability the library ships: feature flag overrides,
 // experiment overrides, log levels, production-safe tweaks, localization review, accessibility
 // overrides, analytics events, MetricKit payloads, network mocking, diagnostics capture, bug
-// reports and push registration, within sessions of at most 15 minutes that open only with a grant
-// the example's grant server signed. Each capability has something on the screen that changes as
-// the sidecar acts, and the app draws its own indicator while a session is open. `just run sidecar`
-// (iOS) and `just run sidecar macOS` launch it beside the sidecar.
+// reports, push registration and scenarios, within sessions of at most 15 minutes that open only
+// with a grant the example's grant server signed. Each capability has something on the screen that
+// changes as the sidecar acts, and the app draws its own indicator while a session is open. `just
+// run sidecar` (iOS) and `just run sidecar macOS` launch it beside the sidecar.
 
 @main
 struct ExampleReceiverApp: App {
@@ -29,7 +29,8 @@ struct ExampleReceiverApp: App {
     var body: some Scene {
         WindowGroup {
             ExampleReceiverScreen(
-                host: host, flags: host.flags, experiments: host.experiments, logging: host.logging, sessions: host.sessions,
+                host: host, flags: host.flags, experiments: host.experiments, logging: host.logging, scenarios: host.scenarios,
+                sessions: host.sessions,
                 keeper: host.keeper, mocking: host.mocking, diagnostics: host.diagnostics
             )
             .localizationReview()

@@ -11,6 +11,7 @@ struct ExampleReceiverScreen: View {
     @ObservedObject var flags: ProductionFlags
     @ObservedObject var experiments: ProductionExperiments
     @ObservedObject var logging: ProductionLogging
+    @ObservedObject var scenarios: ProductionScenarios
     @ObservedObject var sessions: DebugDrawerSessions
     @ObservedObject var keeper: DebugDrawerBackgroundKeeper
     @ObservedObject var mocking: NetworkMocking
@@ -27,6 +28,14 @@ struct ExampleReceiverScreen: View {
                 }
                 Toggle("Sidecar Allowed", isOn: $host.isSidecarAllowed)
                     .accessibilityHint("Off, the receiver refuses every command and ends the session, like a remote kill switch")
+            }
+            Section {
+                LabeledContent("Screen", value: scenarios.screen?.title ?? "Home")
+                    .accessibilityIdentifier("ScenarioScreen")
+            } header: {
+                Text("Scenarios")
+            } footer: {
+                Text("A scenario the sidecar launches opens its screen here.")
             }
             Section("Feature Flag Overrides") {
                 LabeledContent("Checkout", value: flags.value(forKey: "new-checkout") == .bool(true) ? "New" : "Legacy")
@@ -125,9 +134,33 @@ struct ExampleReceiverScreen: View {
             }
         }
         .formStyle(.grouped)
+        .sheet(item: $scenarios.screen) { screen in
+            ExampleScenarioScreen(screen: screen) { scenarios.screen = nil }
+        }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             ExampleReceiverSessionIndicator(sessions: sessions, keeper: keeper, keepRunning: host.keepRunningInBackground)
         }
+    }
+}
+
+/// The screen a scenario opened: its title and detail, and Done.
+private struct ExampleScenarioScreen: View {
+    let screen: ProductionScenarios.Screen
+    let done: () -> Void
+
+    var body: some View {
+        VStack(spacing: 16) {
+            Text(screen.title)
+                .font(.largeTitle.bold())
+                .accessibilityIdentifier("ScenarioScreenTitle")
+            Text(screen.detail)
+                .font(.title3)
+                .foregroundStyle(.secondary)
+            Button("Done", action: done)
+                .buttonStyle(.borderedProminent)
+        }
+        .padding(40)
+        .frame(minWidth: 320, minHeight: 240)
     }
 }
 

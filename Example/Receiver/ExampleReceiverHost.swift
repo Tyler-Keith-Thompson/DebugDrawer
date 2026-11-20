@@ -16,8 +16,9 @@ import os
 /// capability the library ships, sessions that need a grant signed by the example's grant server
 /// (Example/Sidecar's stand-in for a company's), the keeper that holds the app running while a
 /// session is open, the session whose requests a sidecar may mock, the diagnostics capture the
-/// app hands its log lines and requests, the bug reports its Report a Bug trigger takes, and the
-/// push registration the app delegate hands the APNs device token.
+/// app hands its log lines and requests, the bug reports its Report a Bug trigger takes, the
+/// push registration the app delegate hands the APNs device token, and the scenarios a sidecar
+/// launches it into.
 ///
 /// Everything here is in the release build too: a production app links the receiver and the
 /// capability modules, never the drawer.
@@ -30,6 +31,8 @@ final class ExampleReceiverHost: ObservableObject {
     let flags: ProductionFlags
     let experiments: ProductionExperiments
     let logging: ProductionLogging
+    /// The screens a sidecar's scenarios open.
+    let scenarios = ProductionScenarios()
     let sessions: DebugDrawerSessions
     /// Keeps the app running while a session is open: a background task on iOS, an App Nap
     /// activity on the Mac.
@@ -97,8 +100,6 @@ final class ExampleReceiverHost: ObservableObject {
         receiver.enable(.diagnosticsCapture(diagnostics))
         receiver.enable(.bugReports(bugReports))
         receiver.enable(.pushRegistration(pushRegistration))
-        let configuration = URLSessionConfiguration.ephemeral
-        configuration.protocolClasses = [NetworkMockingURLProtocol.self] + (configuration.protocolClasses ?? [])
         self.flags = flags
         self.experiments = experiments
         self.logging = logging
@@ -109,7 +110,8 @@ final class ExampleReceiverHost: ObservableObject {
         self.bugReports = bugReports
         self.pushRegistration = pushRegistration
         keeper = DebugDrawerBackgroundKeeper(sessions: sessions)
-        apiSession = URLSession(configuration: configuration)
+        apiSession = Self.apiSession()
+        receiver.enable(.scenarios(scenarios.scenarios, launchURL: ProductionScenarios.launchURL))
         // The audit log goes to the app's own log, as a host would forward it to its own.
         auditLogging = sessions.auditEntries.sink { entry in
             Self.logger.notice("Audit: \(entry.capability, privacy: .public) \(String(describing: entry.event), privacy: .public)")
@@ -121,6 +123,13 @@ final class ExampleReceiverHost: ObservableObject {
             serveError = "No sidecar can reach the app: \(error)"
             Self.logger.error("The receiver didn't start: \(String(describing: error), privacy: .public)")
         }
+    }
+
+    /// The app's session for its own API, with the mocking protocol first in its protocols.
+    private static func apiSession() -> URLSession {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [NetworkMockingURLProtocol.self] + (configuration.protocolClasses ?? [])
+        return URLSession(configuration: configuration)
     }
 
     /// Sends the app's own request, which a sidecar's rule answers during its session; without
