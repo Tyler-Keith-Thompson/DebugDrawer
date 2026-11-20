@@ -94,7 +94,7 @@ public final class DebugDrawerSessions: DebugDrawerPluginModel {
     private let recorded = PassthroughSubject<DebugDrawerAuditEntry, Never>()
     /// What to put back as the open session ends, by capability, in the order each was first
     /// changed in it.
-    private var reverts: [(capability: String, revert: @MainActor () -> Void)] = []
+    private var reverts: [(capability: String, revert: @MainActor () -> [DebugDrawerAuditEntry.Change]?)] = []
     /// The grants sessions opened with, by ID, until each expires: each opens one session.
     private var usedGrants: [String: Date] = [:]
 
@@ -188,6 +188,29 @@ public final class DebugDrawerSessions: DebugDrawerPluginModel {
         requiresGrant: Bool,
         _ perform: () -> DebugDrawerAuditEntry.Refusal?
     ) -> DebugDrawerAuditEntry.Refusal? {
+        apply(to: capability, scope: scope, requiresGrant: requiresGrant) { () -> CommandOutcome in
+            perform().map(CommandOutcome.refused) ?? .applied(changes: nil)
+        }
+    }
+
+    /// Performs a command to `capability`, through `perform`, as the overload whose `perform`
+    /// returns a refusal does, and records the values it changed with it.
+    ///
+    /// - Parameters:
+    ///   - capability: The ID the capability's model was registered under.
+    ///   - scope: What becomes of its changes as the session ends; `nil` when undeclared.
+    ///   - requiresGrant: Whether the capability needs a grant listing it even when the sessions
+    ///     have no ``grantPolicy``.
+    ///   - perform: Performs the command and returns the values it changed, or returns why it was
+    ///     refused, having changed nothing.
+    /// - Returns: Why the command was refused, or `nil` when it was applied.
+    @discardableResult
+    package func apply(
+        to capability: String,
+        scope: CapabilityScope?,
+        requiresGrant: Bool,
+        _ perform: () -> CommandOutcome
+    ) -> DebugDrawerAuditEntry.Refusal? {
         expireIfDue()
         guard let session = snapshot.session else {
             refuse(capability, .noActiveSession)
@@ -207,14 +230,18 @@ public final class DebugDrawerSessions: DebugDrawerPluginModel {
             refuse(capability, .undeclaredScope)
             return .undeclaredScope
         }
-        if let reason = perform() {
+        let changes: [DebugDrawerAuditEntry.Change]?
+        switch perform() {
+        case let .refused(reason):
             refuse(capability, reason)
             return reason
+        case let .applied(changed):
+            changes = changed
         }
-        if case let .session(revert) = scope, !reverts.contains(where: { $0.capability == capability }) {
+        if let revert = scope.revert, !reverts.contains(where: { $0.capability == capability }) {
             reverts.append((capability, revert))
         }
-        record(capability, .commandApplied, in: session.id)
+        record(capability, .commandApplied, in: session.id, changes: changes)
         return nil
     }
 
@@ -231,8 +258,7 @@ public final class DebugDrawerSessions: DebugDrawerPluginModel {
     package func revertChanges(of capability: String) {
         guard let session = snapshot.session, let index = reverts.firstIndex(where: { $0.capability == capability }) else { return }
         let revert = reverts.remove(at: index).revert
-        revert()
-        record(capability, .changeReverted, in: session.id)
+        record(capability, .changeReverted, in: session.id, changes: revert())
     }
 
     /// Records that a command to `capability` was refused for `reason`.
@@ -291,8 +317,7 @@ public final class DebugDrawerSessions: DebugDrawerPluginModel {
         let owed = reverts
         reverts = []
         for (capability, revert) in owed {
-            revert()
-            record(capability, .changeReverted, in: session.id)
+            record(capability, .changeReverted, in: session.id, changes: revert())
         }
         snapshot = .inactive
         record(Self.pluginID, .sessionEnded(ending), in: session.id)
@@ -305,8 +330,15 @@ public final class DebugDrawerSessions: DebugDrawerPluginModel {
         finish(.expired)
     }
 
-    private func record(_ capability: String, _ event: DebugDrawerAuditEntry.Event, in sessionID: UUID?) {
-        let entry = DebugDrawerAuditEntry(date: clock.now, sessionID: sessionID, capability: capability, event: event)
+    private func record(
+        _ capability: String,
+        _ event: DebugDrawerAuditEntry.Event,
+        in sessionID: UUID?,
+        changes: [DebugDrawerAuditEntry.Change]? = nil
+    ) {
+        // An empty list says nothing a missing one doesn't, and would show in the JSON.
+        let changes = changes?.isEmpty == false ? changes : nil
+        let entry = DebugDrawerAuditEntry(date: clock.now, sessionID: sessionID, capability: capability, event: event, changes: changes)
         auditLog = Array((auditLog + [entry]).suffix(max(auditCapacity, 0)))
         recorded.send(entry)
     }
@@ -317,6 +349,9 @@ extension DebugDrawerSessions {
     package enum CapabilityScope {
         /// Its changes last for the session, and `revert` puts them back.
         case session(revert: @MainActor () -> Void)
+        /// Its changes last for the session, and `revert` puts them back and returns the values it
+        /// changed, for the audit log.
+        case sessionRecordingChanges(revert: @MainActor () -> [DebugDrawerAuditEntry.Change])
         /// Its changes outlive the session.
         case persistent
 
@@ -327,5 +362,24 @@ extension DebugDrawerSessions {
             case .persistent: self = .persistent
             }
         }
+
+        /// What puts the changes back as the session ends, or `nil` when they outlive it.
+        var revert: (@MainActor () -> [DebugDrawerAuditEntry.Change]?)? {
+            switch self {
+            case let .session(revert): { revert(); return nil }
+            case let .sessionRecordingChanges(revert): { revert() }
+            case .persistent: nil
+            }
+        }
+    }
+
+    /// What became of a command a capability performed: applied, with the values it changed for a
+    /// capability that records them, or refused, having changed nothing.
+    package enum CommandOutcome {
+        /// Applied; `changes` are the values it changed, or `nil` for a capability that records
+        /// none.
+        case applied(changes: [DebugDrawerAuditEntry.Change]?)
+        /// Refused for `reason`.
+        case refused(DebugDrawerAuditEntry.Refusal)
     }
 }

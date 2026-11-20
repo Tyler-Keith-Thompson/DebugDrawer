@@ -79,6 +79,7 @@ struct ExampleReceiverScreen: View {
                         + "The base URLs stay in the app."
                 )
             }
+            ProductionSettingsSection()
             Section("Feature Flag Overrides") {
                 LabeledContent("Checkout", value: flags.value(forKey: "new-checkout") == .bool(true) ? "New" : "Legacy")
                 LabeledContent("Button Color", value: flags.value(forKey: "checkout-button-color")?.exampleDescription ?? "None")

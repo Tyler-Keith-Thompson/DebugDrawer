@@ -22,8 +22,9 @@ import os
 /// app hands its log lines and requests, the bug reports its Report a Bug trigger takes, the
 /// push registration the app delegate hands the APNs device token, the scenarios a sidecar
 /// launches it into, the actions a sidecar takes on its sign-in, the state a sidecar may reset, the
-/// backends a sidecar may point it at for a session, the hangs and signposts it records, and the
-/// read-only snapshot of its state every sidecar report carries.
+/// backends a sidecar may point it at for a session, the settings keys a sidecar may edit, the
+/// hangs and signposts it records, and the read-only snapshot of its state every sidecar report
+/// carries.
 ///
 /// Everything here is in the release build too: a production app links the receiver and the
 /// capability modules, never the drawer.
@@ -48,6 +49,8 @@ final class ExampleReceiverHost: ObservableObject {
     let appState: ProductionAppState
     /// The backends a sidecar's session points the app at: Production, Staging or Canary.
     let environments: ProductionEnvironments
+    /// The settings keys a sidecar may read and edit for its session, and no other.
+    let settings: DebugDrawerUserDefaults
     /// The freeze and the signposted load a sidecar's performance traces record.
     let performance: ProductionPerformance
     /// The build, the flag and experiment overrides, the backend, the signed-in user's hashed ID
@@ -111,6 +114,7 @@ final class ExampleReceiverHost: ObservableObject {
         let sessions = Self.sessions()
         let signIn = ProductionSignIn()
         let environments = ProductionEnvironments()
+        let settings = ProductionSettings.model()
         let receiver = DebugDrawerReceiver(directory: ExampleSidecarStore.directory, sessions: sessions)
         let mocking = NetworkMocking(sessions: sessions, allowedHosts: [.exact("api.example.com")])
         let diagnostics = DebugDrawerDiagnosticsCapture(sessions: sessions)
@@ -131,6 +135,7 @@ final class ExampleReceiverHost: ObservableObject {
         self.snapshot = snapshot
         self.signIn = signIn
         self.environments = environments
+        self.settings = settings
         self.logging = logging
         self.sessions = sessions
         self.receiver = receiver
@@ -175,6 +180,7 @@ final class ExampleReceiverHost: ObservableObject {
         receiver.enable(.scenarios(scenarios.scenarios, launchURL: ProductionScenarios.launchURL))
         receiver.enable(.authActions(signIn.actions, launchURL: ProductionSignIn.launchURL))
         receiver.enable(.environments(environments.model))
+        receiver.enable(.userDefaults(settings))
         receiver.enable(.performanceTraces(performance.traces))
     }
 

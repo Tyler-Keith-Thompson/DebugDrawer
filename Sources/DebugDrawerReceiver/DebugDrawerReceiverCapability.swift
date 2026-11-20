@@ -32,9 +32,10 @@ public struct DebugDrawerReceiverCapability {
     /// Whether its commands need a session whose grant lists it, even when the sessions have no
     /// ``DebugDrawerGrantPolicy``: see ``requiringGrant()``.
     public private(set) var requiresGrant = false
-    /// Performs the command `payload` encodes, or returns why it was refused: when it isn't one of
-    /// the model's commands, or the capability refuses it.
-    let perform: @MainActor (_ payload: Data) -> DebugDrawerAuditEntry.Refusal?
+    /// Performs the command `payload` encodes, returning the values it changed for a capability
+    /// that records them, or returns why it was refused: when it isn't one of the model's
+    /// commands, or the capability refuses it.
+    let perform: @MainActor (_ payload: Data) -> DebugDrawerSessions.CommandOutcome
     /// The model's snapshots as JSON.
     let snapshots: @MainActor () -> AsyncStream<Data>
     /// Told, as the receiver enables the capability, the file the receiver writes the snapshot to,
@@ -83,12 +84,12 @@ public struct DebugDrawerReceiverCapability {
             id: id,
             scope: DebugDrawerSessions.CapabilityScope(scope, of: model),
             perform: { payload in
-                guard let command = try? JSONDecoder().decode(Model.Command.self, from: payload) else { return .malformedCommand }
+                guard let command = try? JSONDecoder().decode(Model.Command.self, from: payload) else { return .refused(.malformedCommand) }
                 if let reason = refusal(command) {
-                    return reason
+                    return .refused(reason)
                 }
                 model.perform(command)
-                return nil
+                return .applied(changes: nil)
             },
             snapshots: { encodedSnapshots(of: model) }
         )

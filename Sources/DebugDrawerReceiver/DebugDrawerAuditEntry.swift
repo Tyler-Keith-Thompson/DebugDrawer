@@ -2,11 +2,19 @@ import Foundation
 
 // One line of the audit log, as a value the host can keep, encode and forward: when, which
 // session, which capability, and what happened. It never holds a command's payload: a command
-// can carry a value the host wouldn't want written down (a defaults value, a flag's string), so
-// the log names the capability that was driven and the outcome, never what was asked. Rejected:
-// the payload, or a description of it (`String(describing:)` of a command shows its values); a
-// free-text message (a forwarder couldn't tell an applied command from a refused one without
-// parsing it).
+// can carry a value the host wouldn't want written down (a flag's string), so the log names the
+// capability that was driven and the outcome, never what was asked. Rejected: the payload, or a
+// description of it (`String(describing:)` of a command shows its values); a free-text message (a
+// forwarder couldn't tell an applied command from a refused one without parsing it).
+//
+// The one exception is `changes`, which the allowlisted UserDefaults capability fills (DD-127): an
+// edit's key with its value before and after, read as the key's declared kind, for keys the host
+// listed as safe to show a sidecar, which already reads those values. An auditor asking "what did
+// the sidecar change" needs them, and the capability's own snapshot moves on with the next edit.
+// It is a new optional field rather than a payload on `commandApplied`: adding an associated value
+// to a public case, or a new case, breaks hosts' exhaustive switches, while an optional field
+// left out of the JSON when `nil` keeps every log written before it decoding, and every entry
+// without one encoding as it did.
 
 /// One event of the sidecar's sessions: a session opening or ending, a command applied or
 /// refused, or a session-scoped change reverted.
@@ -17,6 +25,13 @@ import Foundation
 ///
 /// ```json
 /// {"capability":"MyApp.LogLevels","date":785000000,"event":{"commandApplied":{}},"sessionID":"…"}
+/// ```
+///
+/// An edit of an allowlisted UserDefaults key also carries the key with its value before and
+/// after, in ``changes``:
+///
+/// ```json
+/// {"capability":"DebugDrawer.UserDefaults","changes":[{"key":"plan","newValue":{"string":"pro"},"oldValue":{"string":"free"}}],…}
 /// ```
 public struct DebugDrawerAuditEntry: Codable, Equatable, Sendable {
     /// What happened.
@@ -124,6 +139,48 @@ public struct DebugDrawerAuditEntry: Codable, Equatable, Sendable {
     public let capability: String
     /// What happened.
     public let event: Event
+    /// The values the event changed, each key with its value before and after, or `nil` when the
+    /// capability records none: only the UserDefaults capability does, for an edit
+    /// (``Event/commandApplied``) and for the session's revert (``Event/changeReverted``).
+    /// Left out of the JSON when `nil`, so a log written without it decodes.
+    public let changes: [Change]?
+
+    /// A value a capability changed: an allowlisted key with what it read before and after.
+    ///
+    /// The values are the host's allowlisted ones, which a sidecar already reads: never
+    /// allowlist a key holding a secret.
+    public struct Change: Codable, Equatable, Sendable {
+        /// The key whose value changed.
+        public let key: String
+        /// What the key read before, or `nil` when it held no value of its declared kind.
+        public let oldValue: DebugDrawerUserDefaultsValue?
+        /// What the key read after, or `nil` when it holds no value of its declared kind (it was
+        /// removed, say).
+        public let newValue: DebugDrawerUserDefaultsValue?
+
+        /// A change.
+        ///
+        /// - Parameters:
+        ///   - key: The key whose value changed.
+        ///   - oldValue: What it read before.
+        ///   - newValue: What it reads after.
+        public init(key: String, oldValue: DebugDrawerUserDefaultsValue?, newValue: DebugDrawerUserDefaultsValue?) {
+            self.key = key
+            self.oldValue = oldValue
+            self.newValue = newValue
+        }
+    }
+
+    /// An entry that records no changed values.
+    ///
+    /// - Parameters:
+    ///   - date: When it happened.
+    ///   - sessionID: The session it happened in.
+    ///   - capability: The capability it concerns.
+    ///   - event: What happened.
+    public init(date: Date, sessionID: UUID?, capability: String, event: Event) {
+        self.init(date: date, sessionID: sessionID, capability: capability, event: event, changes: nil)
+    }
 
     /// An entry.
     ///
@@ -132,10 +189,12 @@ public struct DebugDrawerAuditEntry: Codable, Equatable, Sendable {
     ///   - sessionID: The session it happened in.
     ///   - capability: The capability it concerns.
     ///   - event: What happened.
-    public init(date: Date, sessionID: UUID?, capability: String, event: Event) {
+    ///   - changes: The values it changed, for a capability that records them; `nil` for none.
+    public init(date: Date, sessionID: UUID?, capability: String, event: Event, changes: [Change]?) {
         self.date = date
         self.sessionID = sessionID
         self.capability = capability
         self.event = event
+        self.changes = changes
     }
 }

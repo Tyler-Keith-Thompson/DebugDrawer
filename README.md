@@ -3206,6 +3206,91 @@ struct EnvironmentIndicator: View {
 In the sidecar, the kit's `DebugDrawerSidecarPlugin.environments` lists the environments under a
 high-risk warning, the active one marked, with Switch for each other one and Reset to Default.
 
+**Allowlisted UserDefaults in production.** To try a production build with a setting changed
+(another plan, tips turned on, a longer page), a sidecar can read and edit the UserDefaults keys
+the app allowlists, and no other. It is off unless the app enables it, and enabled with no key it
+lists nothing. The app declares each key with the kind of value it holds:
+
+```swift
+import Combine
+import DebugDrawerReceiver
+import Foundation
+import os
+import SwiftUI
+
+@MainActor
+final class ProductionDefaults {
+    private static let logger = Logger(subsystem: "com.example.MyApp", category: "Sidecar")
+    let sessions = DebugDrawerSessions(maximumDuration: 15 * 60)
+    let receiver: DebugDrawerReceiver
+    private var auditForwarding: AnyCancellable?
+
+    init(container: URL) throws {
+        receiver = DebugDrawerReceiver(directory: container.appending(path: "DebugDrawer"), sessions: sessions)
+        receiver.enable(.userDefaults(
+            .choice("plan", title: "Plan", options: ["free", "pro"]),
+            .bool("showsTips", title: "Shows Tips"),
+            .integer("itemsPerPage", title: "Items per Page", in: 10 ... 100)
+        ))
+        auditForwarding = sessions.auditEntries.sink { entry in
+            for change in entry.changes ?? [] {
+                Self.logger.notice("Sidecar changed \(change.key, privacy: .public)")
+            }
+        }
+        try receiver.start()
+    }
+}
+
+struct TipsBanner: View {
+    @AppStorage("showsTips") private var showsTips = false
+
+    var body: some View {
+        if showsTips {
+            Text("Tip: drag a row to reorder it.")
+        }
+    }
+}
+```
+
+- **The risk: medium.** Whoever holds the sidecar can change any allowlisted value, and with it
+  whatever the app derives from that value. They can't read or write any other key: the domain is
+  never listed, and a key the app didn't allowlist is refused as `commandRefused(.notExposed)` and
+  stays as it was.
+- **Each key with its kind.** `DebugDrawerUserDefaultsKey` declares a key as `.string(_:title:maximumLength:)`,
+  `.integer(_:title:in:)`, `.double(_:title:in:)`, `.bool(_:title:)` or `.choice(_:title:options:)`
+  (stored as a string). A key reads as its kind only (data or a date stored under a string key
+  reads as none), and a value of another kind, out of the key's bounds, longer than its maximum
+  or not one of its options is refused as `commandRefused(.malformedCommand)`. A key listed twice,
+  an empty one, one of DebugDrawer's own (prefixed `DebugDrawer.` or `com.debugdrawer.`), a
+  choice without options and a bound that isn't finite trap. Write the allowlist in the app's
+  source.
+- **Never allowlist a secret.** A key's value is shown to the sidecar and written to the audit log
+  with each edit, so no tokens, passwords or identifiers of a person.
+- **What a sidecar sends.** It connects to `DebugDrawerUserDefaults.pluginID` with
+  `DebugDrawerUserDefaults.Snapshot` (each key's declaration and value, and the keys it edited) and
+  `DebugDrawerUserDefaults.Command`: `set(key:value:)` with a `DebugDrawerUserDefaultsValue`
+  (`.string`, `.integer`, `.double`, `.bool`), `remove(key:)`, which leaves the app reading its
+  registered default, and `revertAll`. Until the app enables `.userDefaults(...)`, or while it
+  is disabled or its gate is off, every one of them is refused, even inside a session.
+- **Every edit in the audit log.** Each edit is audited as `commandApplied` with the key and its
+  value before and after in the entry's `changes` (`DebugDrawerAuditEntry.Change`: `key`,
+  `oldValue`, `newValue`, `nil` for a key holding no value of its kind), and the session's revert
+  as `changeReverted` with what it put back, so a host forwarding the log, as `ProductionDefaults`
+  does, keeps what the sidecar changed. Entries of other capabilities have no `changes`, and the
+  JSON leaves it out.
+- **For the session, unless the app says otherwise.** Before a key's first edit the model records
+  what the key held, in the same defaults (`DebugDrawer.UserDefaults.originalValues`). As the
+  session ends, expires or a gate turns off, each edited key is put back exactly as it was,
+  removed if it held only its registered default; edits a session left when the app was killed
+  are put back as the next launch makes the capability, so make it at startup, before the app
+  reads the keys. `scope: .persistent` keeps the edits until a sidecar sends `revertAll`.
+  `DebugDrawerUserDefaults(_:defaults:)` (pass it to `.userDefaults(_:scope:)`) reads the keys
+  of another suite, and follows the app's own writes through UserDefaults' change notification.
+
+In the sidecar, the kit's `DebugDrawerSidecarPlugin.userDefaults` lists the keys with their
+values, an editor for each kind (a text field, a number field, a switch or a picker), Remove, and
+Revert All while any key is edited.
+
 **Hangs and signposts in production.** A hang a dogfooder hits on an optimized build can reach the
 team with the stack it was stuck on, and the app's own timings beside it: during a sidecar's
 session the app records the main thread's hitches and hangs, using the Hangs plugin's monitor, and
@@ -3634,7 +3719,7 @@ DebugDrawerSidecarView(groupIdentifier: "group.com.example.debug", sessionDurati
 Below it, a picker shows the plugins the app serves, drawn by the plugins' own views over the
 transport: `.console` and `.network` by default, `.bugReports` for an app that serves bug
 reports, `.scenarios` for one that registers scenarios, `.authActions` for one that registers
-auth actions, `.appStateReset` for one that allows a reset, `.environments` for one that lets a sidecar switch its backend and `.appState` for one that shows its state, which the view hosts as the app is reached so every report carries it (above). A plugin of your own whose model adopts
+auth actions, `.appStateReset` for one that allows a reset, `.environments` for one that lets a sidecar switch its backend, `.userDefaults` for one that allowlists defaults keys and `.appState` for one that shows its state, which the view hosts as the app is reached so every report carries it (above). A plugin of your own whose model adopts
 `DebugDrawerPluginModel` joins them with `DebugDrawerSidecarPlugin(id:title:icon:snapshot:command:plugin:)`,
 whose closure makes the plugin's view over the transport the kit hands it. Create Report writes the
 hosted plugins' report contributions, redacted by `DebugDrawer.shared.redaction`, under a summary
@@ -3843,7 +3928,7 @@ ContentView()
 | Module | Holds |
 |---|---|
 | `DebugDrawer` | The drawer: its window, the plugin protocol and registry, the views plugins are built from, and release-build stand-ins |
-| `DebugDrawerReceiver` | The one product a release build may link: serves a sidecar app, over the app group's store, only the capabilities the app enables (feature flag and experiment overrides, log level elevation, diagnostics capture, bug reports the app triggers, scenarios the app registers, auth actions, environment switching among the backends the app allowlists, or any plugin model) within sessions the sidecar opens, refusing and auditing everything else; UI-less, no interception |
+| `DebugDrawerReceiver` | The one product a release build may link: serves a sidecar app, over the app group's store, only the capabilities the app enables (feature flag and experiment overrides, log level elevation, diagnostics capture, bug reports the app triggers, scenarios the app registers, auth actions, environment switching among the backends the app allowlists, reading and editing the UserDefaults keys the app allowlists, or any plugin model) within sessions the sidecar opens, refusing and auditing everything else; UI-less, no interception |
 | `DebugDrawerConsolePlugin` | `os_log` entries (stdout and stderr on macOS) and an app logger's lines through `ConsoleLogSink`, with metadata: level filter, text or regular-expression search, subsystem and category mutes, time range, auto-follow, copy, lines kept across launches |
 | `DebugDrawerViewInspectorPlugin` | View borders by depth, alignment grid, click indicators, animation speed, render counts of the views an app tracks with `.trackRenders(_:)`, hierarchy snapshot |
 | `DebugDrawerAccessibility` | The receiver capability (`.accessibilityEnvironmentOverrides()`) that lets a sidecar override Dynamic Type, Increase Contrast and Reduce Motion for its session, and the modifier the app's root view applies them with (`.accessibilityEnvironmentOverrides()`); no drawer, so a release build links it beside the receiver |
@@ -3889,7 +3974,7 @@ ContentView()
 | `DebugDrawerAppStateReset` | The receiver capability (`.appStateReset(_:)`) that lets a sidecar reset the categories a production app allows (never the keychain unless it opts in), listed and confirmed by revision, applied on the next foreground; no drawer, so a release build links it beside the receiver |
 | `DebugDrawerAppStateResetPlugin` | The app's state cleared as a fresh install leaves it, by category: UserDefaults, keychain items, the container's files, caches, cookies, the URL cache and the app's own cleanup, each listed before a confirmation, then relaunched on macOS or quit elsewhere; re-exports `DebugDrawerAppStateReset` |
 | `DebugDrawerRemote` | Plugin models served to a viewer on another device over the local network: an opt-in Network.framework server advertised over Bonjour, each viewer paired with a six-digit code the device shows, and the viewer's transport and browser |
-| `DebugDrawerSidecarKit` | A sidecar app, as a library: `DebugDrawerSidecarView` lists the apps in the group that serve a sidecar, opens their sessions (with a grant the company's server gives, when they require one), shows their Console, Network, Bug Reports, Scenarios, Auth, Reset App State, Environment, Performance, App State and other model-backed plugins over the socket or the store, and makes and uploads a report of them, the app state attached to each; iOS, iPadOS and macOS, debug builds |
+| `DebugDrawerSidecarKit` | A sidecar app, as a library: `DebugDrawerSidecarView` lists the apps in the group that serve a sidecar, opens their sessions (with a grant the company's server gives, when they require one), shows their Console, Network, Bug Reports, Scenarios, Auth, Reset App State, Environment, UserDefaults, Performance, App State and other model-backed plugins over the socket or the store, and makes and uploads a report of them, the app state attached to each; iOS, iPadOS and macOS, debug builds |
 
 ## Development
 
