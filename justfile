@@ -1,6 +1,11 @@
 PROJECT_ROOT := justfile_directory()
 BAZEL := "bazel"
 
+# Registers a Mac example with Launch Services after `just run` re-extracts and signs it. locationd
+# keeps a Location grant across a rebuild only for an app Launch Services knows; for one it doesn't
+# (a fresh copy in /tmp), every new build asks again, even with the same signing identity.
+LSREGISTER := "/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f"
+
 # Optimized builds use a separate output base: switching --compilation_mode changes the
 # configuration, and sharing a base with debug builds would discard the analysis cache on every
 # switch (which .bazelrc refuses).
@@ -359,6 +364,7 @@ run target="macOS" *args="":
             # Re-signed with the Keychain's Apple Development identity (or DEBUGDRAWER_SIGN_IDENTITY;
             # `-` for ad hoc) and kept at this path, so macOS keeps its privacy grants across rebuilds.
             python3 {{PROJECT_ROOT}}/scripts/sign_example.py "$RUN_DIR/DebugDrawerExample.app"
+            {{LSREGISTER}} "$RUN_DIR/DebugDrawerExample.app"
             open "$RUN_DIR/DebugDrawerExample.app"
             ;;
         iOS|ios)
@@ -407,6 +413,7 @@ run target="macOS" *args="":
                     # share a folder in Caches instead (Example/SidecarStore).
                     for app in "$RUN_DIR"/*.app; do
                         python3 {{PROJECT_ROOT}}/scripts/sign_example.py --app-group com.debugdrawer.example "$app"
+                        {{LSREGISTER}} "$app"
                     done
                     open "$RUN_DIR/DebugDrawerReceiverExample.app"
                     open "$RUN_DIR/DebugDrawerSidecarExample.app"
