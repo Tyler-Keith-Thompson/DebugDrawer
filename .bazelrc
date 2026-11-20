@@ -50,6 +50,12 @@ build --features=swift.suppress_warnings
 # extraction itself; outside it, the cache persists between actions.
 build --strategy=SwiftSymbolGraphExtract=local
 
+# One simulator at a time: every test that boots one (the iOS, visionOS, tvOS and watchOS runners)
+# is tagged `resources:simulator:1` (SIMULATOR_TEST_TAG in scripts/modules.py) and takes this
+# resource's only unit, while the Mac's tests and the compiles run beside it. Several simulators
+# booted at once drove the load average past 200. An execution option: the analysis cache stays.
+build --local_resources=simulator=1
+
 # Show what actually failed rather than just the target.
 test --test_output=errors
 

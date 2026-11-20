@@ -72,36 +72,36 @@ macos_unit_test(
 
 # `bazel test` / `just test` on visionOS: the bundle, run in a new visionOS simulator by
 # //tools:visionos_test_runner (TESTED_PLATFORMS in scripts/modules.py). Booting one takes
-# much of a minute on its own.
+# much of a minute on its own; `resources:simulator:1` runs one simulator test at a time.
 visionos_unit_test(
     name = "DebugDrawerTests_visionOS",
     size = "medium",
     minimum_os_version = "1.0",
     runner = "//tools:visionos_test_runner",
-    tags = ["debug-only"],
+    tags = ["debug-only", "resources:simulator:1"],
     deps = [":DebugDrawerTestsLibrary"],
 )
 
 # `bazel test` / `just test` on tvOS: the bundle, run in a new tvOS simulator by
 # //tools:tvos_test_runner (TESTED_PLATFORMS in scripts/modules.py). Booting one takes
-# much of a minute on its own.
+# much of a minute on its own; `resources:simulator:1` runs one simulator test at a time.
 tvos_unit_test(
     name = "DebugDrawerTests_tvOS",
     size = "medium",
     minimum_os_version = "17.0",
     runner = "//tools:tvos_test_runner",
-    tags = ["debug-only"],
+    tags = ["debug-only", "resources:simulator:1"],
     deps = [":DebugDrawerTestsLibrary"],
 )
 
 # `bazel test` / `just test` on watchOS: the bundle, run in a new watchOS simulator by
 # //tools:watchos_test_runner (TESTED_PLATFORMS in scripts/modules.py). Booting one takes
-# much of a minute on its own.
+# much of a minute on its own; `resources:simulator:1` runs one simulator test at a time.
 watchos_unit_test(
     name = "DebugDrawerTests_watchOS",
     size = "medium",
     minimum_os_version = "10.0",
     runner = "//tools:watchos_test_runner",
-    tags = ["debug-only"],
+    tags = ["debug-only", "resources:simulator:1"],
     deps = [":DebugDrawerTestsLibrary"],
 )

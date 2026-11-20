@@ -343,6 +343,13 @@ PERFORMANCE_TEST_TAG = "exclusive"
 # The tag .bazelrc's release config filters out of builds and tests (see PERFORMANCE_TESTS).
 RELEASE_EXCLUDED_TAG = "debug-only"
 
+# The tag on every test that boots a simulator (the iOS, visionOS, tvOS and watchOS runners): each
+# takes the one unit of the `simulator` resource .bazelrc declares (`--local_resources=simulator=1`),
+# so Bazel runs those tests one at a time, while the Mac's tests and every compile go on beside them.
+# Several simulators booted at once drove the load average past 200. `exclusive` would serialize
+# them too, but runs each alone, after every other action, and so in sequence with everything else.
+SIMULATOR_TEST_TAG = "resources:simulator:1"
+
 # The Benchmarks/ package's targets: (name, what it imports: library modules, or "identity/Product"
 # for a product of one of PACKAGES). Its Package.swift is written from this list. Each target is
 # an ordo-one/benchmark executable in Benchmarks/Benchmarks/<name>, run natively on the Mac by
@@ -993,7 +1000,8 @@ def tested_platforms(name):
 
 def platform_test_bazel(name, platform, minimum, tags):
     """The unit test that runs test target `name`'s library in `platform`'s simulator."""
-    tags_attr = f"    tags = {tags},\n".replace("'", '"') if tags else ""
+    # One simulator at a time (SIMULATOR_TEST_TAG).
+    tags_attr = f"    tags = {list(tags) + [SIMULATOR_TEST_TAG]},\n".replace("'", '"')
     # The test host gives an iOS run an application identifier, and with it a keychain, and a
     # connected window scene.
     host = ("# Hosted by //tools/test_host, whose entitlements give the tests a keychain and whose\n"
@@ -1002,7 +1010,7 @@ def platform_test_bazel(name, platform, minimum, tags):
     return (
         f"\n# `bazel test` / `just test` on {platform}: the bundle, run in a new {platform} simulator by\n"
         f"# //tools:{platform.lower()}_test_runner (TESTED_PLATFORMS in scripts/modules.py). Booting one takes\n"
-        "# much of a minute on its own.\n"
+        f"# much of a minute on its own; `{SIMULATOR_TEST_TAG}` runs one simulator test at a time.\n"
         f"{host[0]}"
         f"{platform.lower()}_unit_test(\n"
         f'    name = "{name}_{platform}",\n'
@@ -1024,7 +1032,8 @@ def simulator_test_build_bazel(name, deps, size):
         'load("@rules_apple//apple:resources.bzl", "apple_resource_bundle")\n'
         'load("//tools:swift_rules.bzl", "swift_library")\n\n'
         "# The tests, run in the iOS simulator: the target depends on an iOS module (IOS_MODULES in\n"
-        f"# scripts/modules.py). Tagged `{RELEASE_EXCLUDED_TAG}`, like every target but the speed-reliant ones.\n"
+        f"# scripts/modules.py). Tagged `{RELEASE_EXCLUDED_TAG}`, like every target but the speed-reliant ones, and\n"
+        f"# its test `{SIMULATOR_TEST_TAG}`, so one simulator test runs at a time.\n"
         "swift_library(\n"
         f'    name = "{name}Library",\n'
         "    testonly = True,\n"
@@ -1050,7 +1059,7 @@ def simulator_test_build_bazel(name, deps, size):
         f'    name = "{name}",\n'
         f'    size = "{size}",\n'
         f'    minimum_os_version = "{IOS_MINIMUM}",\n'
-        f'    tags = ["{RELEASE_EXCLUDED_TAG}"],\n'
+        f'    tags = ["{RELEASE_EXCLUDED_TAG}", "{SIMULATOR_TEST_TAG}"],\n'
         '    runner = "@rules_apple//apple/testing/default_runner:ios_xctestrun_ordered_runner",\n'
         '    test_host = "//tools/test_host",\n'
         '    visibility = ["//visibility:public"],\n'
