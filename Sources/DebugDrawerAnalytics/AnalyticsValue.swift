@@ -22,14 +22,21 @@ import Foundation
 /// each value keyed by its case, so a sidecar decodes exactly the value the app recorded: a date
 /// stays a date and `3.0` a double.
 public enum AnalyticsValue: Hashable, Sendable, Codable {
+    /// Text, and the string literal.
     case string(String)
+    /// A whole number, and the integer literal.
     case int(Int)
+    /// A floating-point number, and the float literal; it stays a double even when whole, like `3.0`.
     case double(Double)
+    /// A Boolean, and the `true` and `false` literals.
     case bool(Bool)
+    /// A moment in time, kept as a date rather than formatted text.
     case date(Date)
     /// No value: JSON's `null`, and the `nil` literal.
     case null
+    /// An ordered list of values, and the array literal.
     case array([AnalyticsValue])
+    /// Values by key, and the dictionary literal.
     case object([String: AnalyticsValue])
 }
 
