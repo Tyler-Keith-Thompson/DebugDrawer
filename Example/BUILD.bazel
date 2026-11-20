@@ -195,8 +195,9 @@ macos_application(
 )
 
 # ── macOS, production receiver ───────────────────────────────────────
-# A production app's use of DebugDrawer: the release-safe receiver and the tweaks' UI-free module,
-# nothing else, serving a sidecar its feature flag overrides and production-safe tweaks. `just release-check` builds it optimized, and its binary holds
+# A production app's use of DebugDrawer: the release-safe receiver and the capability modules,
+# nothing else, serving a sidecar its feature flag overrides, production-safe tweaks, localization
+# review and accessibility overrides. `just release-check` builds it optimized, and its binary holds
 # no drawer, plugin or interception code (README, "Production builds: the receiver").
 
 swift_library(
@@ -207,6 +208,8 @@ swift_library(
     deps = [
         "//Sources/DebugDrawerReceiver",
         "//Sources/DebugDrawerTweaks",
+        "//Sources/DebugDrawerLocalization",
+        "//Sources/DebugDrawerAccessibility",
     ],
 )
 

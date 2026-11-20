@@ -512,7 +512,14 @@ plugin re-exports, with its capability there: `DebugDrawerTweaks` holds the twea
 `.tweaks(...)`, which offers a sidecar only those marked production-safe and refuses a command
 naming any other as `notExposed`, and `DebugDrawerAnalytics` holds the analytics sink and
 `.analyticsEvents(sessions:redaction:capacity:)`, which mirrors only the events recorded during the
-open session, redacted in the app before anything is kept. A model that follows the sessions this
+open session, redacted in the app before anything is kept. A capability that would otherwise
+intercept, as the Localization plugin's live modes replace `Bundle`'s lookup, has the host opt
+in instead: `DebugDrawerLocalization` holds `LocalizationReview`, which the host reads strings
+through, and `.localizationReview()`, which shows their keys or pseudo text for the session. One
+whose effect is in SwiftUI's environment keeps the modifier that applies it in its module, where
+it draws nothing: `DebugDrawerAccessibility` holds `.accessibilityEnvironmentOverrides()` for
+the receiver and the same-named modifier for the host's root view. Both are session-scoped, with
+no scope to choose. A model that follows the sessions this
 way keeps nothing from before a session or after it, and redacts on the way in, since its snapshot
 is written to the store as it is. The receiver's module holds
 `DebugDrawerPluginModel`, the sessions and the store's wire format, real in every build, and

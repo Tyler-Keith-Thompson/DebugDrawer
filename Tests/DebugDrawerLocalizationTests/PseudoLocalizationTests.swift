@@ -1,5 +1,5 @@
 #if DEBUG
-    @testable import DebugDrawerLocalizationPlugin
+    @testable import DebugDrawerLocalization
     import Foundation
     import Testing
 

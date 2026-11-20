@@ -467,7 +467,9 @@ These need only their install call:
   modifiers, below), the color scheme, Dynamic Type size, layout direction, the locale (when the
   app has localizations) and the accessibility settings SwiftUI reads: Reduce Motion, Increase
   Contrast, Bold Text, Reduce Transparency, Differentiate Without Color and Invert Colors, each of
-  those beside the system's value. Reset All clears them; they last until the app quits.
+  those beside the system's value. Reset All clears them; they last until the app quits. A release
+  build gets none of this; a sidecar can override Dynamic Type, Increase Contrast and Reduce
+  Motion there instead ("Accessibility overrides in production", below).
 - **View Inspector** outlines every AppKit or UIKit view in the app's windows, colored by its
   depth, draws the alignment grid over the views `.debugGrid()` is applied to and a ripple where
   each click or touch lands, makes animations up to ten times slower, and lists the key window's
@@ -1728,6 +1730,10 @@ picker and a filter, copies as text or CSV, and the plugin's header shows how ma
 the current language. The bug report carries `localization.txt`: the mode, the languages and what
 each is missing. tvOS and watchOS have no pasteboard, so there it offers no copy.
 
+The live modes replace `Bundle`'s lookup, which a release build never does. There a sidecar
+switches the strings the app reads through `LocalizationReview` to their keys or pseudo text
+instead ("Localization review in production", below).
+
 ### Screen Recording: a video of the bug, without the drawer in it
 
 The Screen Recording plugin records the app as a QuickTime movie, started and stopped
@@ -2196,8 +2202,9 @@ drawer's registry and servers are stand-ins that never reach them, so only a
 
 A release build gets none of the drawer. To let an employee-only sidecar app reach a production
 app, the app links one more product, `DebugDrawerReceiver`: UI-less, with no interception, no
-plugin and no dependency on the drawer (and, to offer tweaks, `DebugDrawerTweaks`, or to mirror
-analytics events, `DebugDrawerAnalytics`, below). It serves a sidecar, over the app group's store, only the
+plugin and no dependency on the drawer (and, to offer tweaks, `DebugDrawerTweaks`, to mirror
+analytics events, `DebugDrawerAnalytics`, or for translators and accessibility reviewers,
+`DebugDrawerLocalization` and `DebugDrawerAccessibility`, below). It serves a sidecar, over the app group's store, only the
 capabilities the app enables, within sessions the sidecar opens, and refuses everything else:
 
 ```swift
@@ -2340,6 +2347,111 @@ AnalyticsEvents.record("checkout_completed", properties: ["plan": "pro", "seats"
   `AnalyticsRedaction(keys:values:)` starts from none. A masked value becomes `"[REDACTED]"`.
   Phone numbers in free text aren't matched by default: add a pattern for the formats your app
   sends.
+
+**Localization review in production.** A translator working on the build that ships can show
+each string's key, to name the one to fix, or pseudo-localized text, to find what clips or was
+never translated, from the sidecar, for the session. Link `DebugDrawerLocalization`
+(`.product(name: "DebugDrawerLocalization", package: "DebugDrawer")`) beside the receiver, the
+UI-free half of the Localization plugin, read the strings a reviewer should see through
+`LocalizationReview`, and enable the capability:
+
+```swift
+import DebugDrawerLocalization
+import DebugDrawerReceiver
+import SwiftUI
+
+@MainActor
+final class ProductionLocalizationReview {
+    let sessions = DebugDrawerSessions(maximumDuration: 15 * 60)
+    let receiver: DebugDrawerReceiver
+
+    init(container: URL) throws {
+        receiver = DebugDrawerReceiver(directory: container.appending(path: "DebugDrawer"), sessions: sessions)
+        receiver.enable(.localizationReview())
+        try receiver.start()
+    }
+}
+
+struct SettingsHeader: View {
+    let itemCount: Int
+
+    var body: some View {
+        VStack {
+            Text(LocalizationReview.shared.localizedString("settings.title"))
+            Text(LocalizationReview.shared.localizedString("\(itemCount) items"))
+        }
+    }
+}
+
+// The app's root view, redrawn as the mode changes:
+// ContentView().localizationReview()
+```
+
+- **The sidecar sets the mode.** It connects to `LocalizationReview.pluginID`; the
+  `LocalizationReview.Snapshot` holds the mode (`standard`, `showingKeys` or `pseudoLocalized`),
+  and `LocalizationReview.Command.setMode(_:)` sets it, within a session only. Outside one, or in
+  an app that hasn't enabled it, the command is refused and audited, and every string shows its
+  translation.
+- **Session-scoped, always.** As the session ends or expires the mode returns to `standard`. A
+  host can't keep it longer: a mode left on would show keys or accented text to whoever holds the
+  device next.
+- **What it covers.** Only strings the app reads through `LocalizationReview`:
+  `localizedString(forKey:value:table:bundle:)`, which asks the bundle as
+  `Bundle.localizedString(forKey:value:table:)` does, and `localizedString(_:)`, which takes a
+  `LocalizedStringResource` and resolves it as `String(localized:)` does, arguments and plural
+  variant included, before the mode applies. Show them in a SwiftUI `Text`, a UIKit label or
+  anywhere else. `.localizationReview()` on the root view gives it a new identity as the mode
+  changes, so every body reads its strings again (and its `@State` starts over); a UIKit screen
+  observes `LocalizationReview.shared.$snapshot` and reloads its text.
+- **What it doesn't.** Nothing is intercepted in a release build, so the strings the app looks up
+  any other way stay translated: `Text("key")` and every `LocalizedStringKey`,
+  `String(localized:)` and `NSLocalizedString` called directly, storyboards and XIBs,
+  `Info.plist` strings, and the system's own text. A plural read through
+  `localizedString(forKey:...)` loses its variants when pseudo-localized; read it through
+  `localizedString(_:)`.
+
+**Accessibility overrides in production.** An accessibility reviewer can try the shipping build at
+another Dynamic Type size, with Increase Contrast or with Reduce Motion, from the sidecar, without
+changing the device's settings, for the session. Link `DebugDrawerAccessibility`
+(`.product(name: "DebugDrawerAccessibility", package: "DebugDrawer")`) beside the receiver, apply
+the overrides to the app's root view, and enable the capability:
+
+```swift
+import DebugDrawerAccessibility
+import DebugDrawerReceiver
+import SwiftUI
+
+@MainActor
+final class ProductionAccessibilityReview {
+    let sessions = DebugDrawerSessions(maximumDuration: 15 * 60)
+    let receiver: DebugDrawerReceiver
+
+    init(container: URL) throws {
+        receiver = DebugDrawerReceiver(directory: container.appending(path: "DebugDrawer"), sessions: sessions)
+        receiver.enable(.accessibilityEnvironmentOverrides())
+        try receiver.start()
+    }
+}
+
+struct ReviewedRoot: View {
+    var body: some View {
+        Text("Order history")
+            .accessibilityEnvironmentOverrides()
+    }
+}
+```
+
+- **The sidecar sets the values.** It connects to `AccessibilityEnvironmentOverrides.pluginID`;
+  the `AccessibilityEnvironmentOverrides.Snapshot` holds each override (`dynamicTypeSize`,
+  `increaseContrast`, `reduceMotion`), `nil` while the system's value applies, and
+  `setDynamicTypeSize(_:)`, `setIncreaseContrast(_:)`, `setReduceMotion(_:)` and `reset` change
+  them, within a session only; outside one, or in an app that hasn't enabled it, they are refused
+  and audited.
+- **Session-scoped, always.** As the session ends or expires every value is the system's again.
+- **SwiftUI views only.** The modifier sets `dynamicTypeSize`, `colorSchemeContrast` and
+  `accessibilityReduceMotion` in the environment of the views under it, through SwiftUI's public
+  modifiers and the settable keys previews use, so a view that reads them, and every text style,
+  follows. UIKit and AppKit views read the system's settings and don't see the overrides.
 
 In a debug build the receiver runs beside the drawer: show the same model in a plugin through
 `DebugDrawerPluginTransport.direct(to:)`, and pass it to `.featureFlagOverrides(_:)` or
@@ -2536,7 +2648,8 @@ ContentView()
 | `DebugDrawerReceiver` | The one product a release build may link: serves a sidecar app, over the app group's store, only the capabilities the app enables (feature flag overrides, or any plugin model) within sessions the sidecar opens, refusing and auditing everything else; UI-less, no interception |
 | `DebugDrawerConsolePlugin` | `os_log` entries (stdout and stderr on macOS) and an app logger's lines through `ConsoleLogSink`, with metadata: level filter, text or regular-expression search, subsystem and category mutes, time range, auto-follow, copy, lines kept across launches |
 | `DebugDrawerViewInspectorPlugin` | View borders by depth, alignment grid, click indicators, animation speed, render counts of the views an app tracks with `.trackRenders(_:)`, hierarchy snapshot |
-| `DebugDrawerAccessibilityPlugin` | Runtime overrides of color scheme, Dynamic Type, layout direction, locale and the system accessibility settings SwiftUI exposes, the accessibility settings each beside the system's value |
+| `DebugDrawerAccessibility` | The receiver capability (`.accessibilityEnvironmentOverrides()`) that lets a sidecar override Dynamic Type, Increase Contrast and Reduce Motion for its session, and the modifier the app's root view applies them with (`.accessibilityEnvironmentOverrides()`); no drawer, so a release build links it beside the receiver |
+| `DebugDrawerAccessibilityPlugin` | Runtime overrides of color scheme, Dynamic Type, layout direction, locale and the system accessibility settings SwiftUI exposes, the accessibility settings each beside the system's value; re-exports `DebugDrawerAccessibility` |
 | `DebugDrawerPerformancePlugin` | Live FPS, dropped frames and memory footprint with its peak, sparkline graphs, CPU per thread, and on iOS a simulated memory warning, sampled only while a drawer shows its view or HUD readout |
 | `DebugDrawerEnergyPlugin` | Battery level and charging, power source, CPU load and thermal state, sampled while a drawer shows its view or between `EnergyMonitor.shared.start()` and `stop()` |
 | `DebugDrawerNetworkPlugin` | URLProtocol HTTP interception: method, URL, status, timing, headers, body, cURL export, mock responses by rule, slow and failing networks per host, replay and edit-and-resend, HAR export and import, WebSocket frames, requests kept across launches, ignored hosts, GraphQL operation names |
@@ -2565,7 +2678,8 @@ ContentView()
 | `DebugDrawerAnalytics` | The analytics sink (`AnalyticsEvents.record`) and `AnalyticsValue`, real in every build, and the receiver capability (`.analyticsEvents(sessions:redaction:capacity:)`) that mirrors the events recorded during a sidecar's session, redacted by `AnalyticsRedaction` in the app; UI-free, so a release build links it beside the receiver |
 | `DebugDrawerAnalyticsPlugin` | The analytics events the app records, live, newest first, with their time and properties: search by name, key or value, each open as inspector rows and JSON to copy, all exported as a JSON file; re-exports `DebugDrawerAnalytics` |
 | `DebugDrawerDatabaseBrowserPlugin` | The app's SQLite, Core Data and SwiftData stores, opened read-only: tables or entities with row counts, rows paged and searched in a grid, and read-only SELECT queries, copied as CSV |
-| `DebugDrawerLocalizationPlugin` | Pseudo-localization and show-keys modes over the strings the app looks up through Bundle, live, Apple's localization launch arguments to copy, and the translations missing for a language, grouped by table, searched and copied as text or CSV |
+| `DebugDrawerLocalization` | `Localization`'s modes and pseudo-localization, real in every build, and the receiver capability (`.localizationReview()`) that lets a sidecar show the keys or pseudo-localized text of the strings the app reads through `LocalizationReview`, for its session; no interception and no drawer, so a release build links it beside the receiver |
+| `DebugDrawerLocalizationPlugin` | Pseudo-localization and show-keys modes over the strings the app looks up through Bundle, live, Apple's localization launch arguments to copy, and the translations missing for a language, grouped by table, searched and copied as text or CSV; re-exports `DebugDrawerLocalization` |
 | `DebugDrawerScreenRecordingPlugin` | The app's windows recorded as a QuickTime movie without the drawer, its HUD or its toasts, started and stopped from the drawer or the HUD, with touch indicators on iOS: the saved recordings to share or delete, and the newest in the bug report |
 | `DebugDrawerDesignOverlayPlugin` | A design mockup over the app's content, picked from Photos or Files on iOS or a file or the pasteboard on macOS: opacity, an offset set by steppers or by dragging in Move mode, the scale, and a difference blend that shows pixel drift; touches pass through to the app |
 | `DebugDrawerColorVisionPlugin` | Protanopia, deuteranopia, tritanopia and grayscale simulated live over the views marked `.debugColorVision()`, in linear RGB with Machado et al.'s matrices, picked in the drawer or cycled from the HUD, while the drawer keeps its colors |

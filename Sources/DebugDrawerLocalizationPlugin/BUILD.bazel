@@ -14,6 +14,7 @@ swift_library(
     module_name = "DebugDrawerLocalizationPlugin",
     deps = [
         "//Sources/DebugDrawer",
+        "//Sources/DebugDrawerLocalization",
     ],
     visibility = ["//visibility:public"],
 )
@@ -25,6 +26,7 @@ docc_archive(
     catalog = glob(["*.docc/**"], allow_empty = True),
     deps = [
         "//Sources/DebugDrawer:DebugDrawerDocumentation",
+        "//Sources/DebugDrawerLocalization:DebugDrawerLocalizationDocumentation",
     ],
     tags = ["manual"],
     visibility = ["//visibility:public"],
