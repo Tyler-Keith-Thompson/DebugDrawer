@@ -239,7 +239,7 @@ build one over hand-written fakes and install it in a drawer of their own.
 
 A plugin whose data should be read, or driven, without its view (by a test, by another tool, or
 from another process) splits into a model and a view. The model adopts
-``DebugDrawerPluginModel``: it holds no SwiftUI types, takes its services through its initializer,
+`DebugDrawerPluginModel`: it holds no SwiftUI types, takes its services through its initializer,
 describes everything the view shows as a `Codable` snapshot, and changes only when it performs a
 `Codable` command. Colors, fonts and formatting stay in the view.
 
@@ -482,18 +482,18 @@ command a transport carries in only within a session a sidecar opened, and only 
 registered with ``DebugDrawerModelRegistry/register(_:id:scope:)``; anything else is refused and
 changes nothing. The gate is the same over the socket and the store. A refused command is still
 acknowledged, and its ID remembered, so a ``DebugDrawerSidecarTransport`` doesn't send it again
-on a switch: a refusal is final, and a sidecar sends the command anew once a session is open. ``DebugDrawerSessions`` is itself a model, served under
-``DebugDrawerSessions/pluginID``: a sidecar connects to it as to any plugin, sends
-``DebugDrawerSessionCommand/open(duration:)`` and ``DebugDrawerSessionCommand/end`` as commands,
-and reads ``DebugDrawerSessionState`` snapshots, so sessions need no message kind or capability
+on a switch: a refusal is final, and a sidecar sends the command anew once a session is open. `DebugDrawerSessions` is itself a model, served under
+`DebugDrawerSessions.pluginID`: a sidecar connects to it as to any plugin, sends
+`DebugDrawerSessionCommand.open(duration:)` and `DebugDrawerSessionCommand.end` as commands,
+and reads `DebugDrawerSessionState` snapshots, so sessions need no message kind or capability
 of their own and work over every transport. A session expires at most
-``DebugDrawerSessions/maximumDuration`` after it opens; as it ends or expires, each capability
-registered as ``DebugDrawerChangeScope/session(revertWith:)`` that a command changed performs its
-reverting command once, and ``DebugDrawerChangeScope/persistent`` ones keep their changes. The
-host reads ``DebugDrawerSessions/snapshot`` to draw its own indicator for as long as a session is
-open, ends one with ``DebugDrawerSessions/end()``, and reads ``DebugDrawerSessions/auditLog``
-(the newest ``DebugDrawerSessions/auditCapacity`` entries) or forwards every
-``DebugDrawerAuditEntry`` from ``DebugDrawerSessions/auditEntries``. An entry holds its date,
+`DebugDrawerSessions.maximumDuration` after it opens; as it ends or expires, each capability
+registered as `DebugDrawerChangeScope.session(revertWith:)` that a command changed performs its
+reverting command once, and `DebugDrawerChangeScope.persistent` ones keep their changes. The
+host reads `DebugDrawerSessions.snapshot` to draw its own indicator for as long as a session is
+open, ends one with `DebugDrawerSessions.end()`, and reads `DebugDrawerSessions.auditLog`
+(the newest `DebugDrawerSessions.auditCapacity` entries) or forwards every
+`DebugDrawerAuditEntry` from `DebugDrawerSessions.auditEntries`. An entry holds its date,
 session, capability and event, never what a command carried. Commands from the in-process
 transport, the app's own drawer, aren't gated. The README's "Sidecar sessions" shows the setup.
 
@@ -503,7 +503,7 @@ store files, read by the same sidecar transports, but only for the capabilities 
 `enable(_:)`, and refuses, logs and audits every other command, every command while none is
 enabled, and every command outside a session. A capability is a model:
 `.featureFlagOverrides(adapter)` over the host's `DebugDrawerFeatureFlagAdapter`, or
-`.model(_:id:scope:)` for any plugin model, each with its ``DebugDrawerChangeScope``. So a plugin
+`.model(_:id:scope:)` for any plugin model, each with its `DebugDrawerChangeScope`. So a plugin
 whose model should be drivable in production needs nothing more than its model: the host enables
 it in the receiver, and in a debug build can show the same model in its drawer through
 ``DebugDrawerPluginTransport/direct(to:)``. A shipped plugin whose data a release build must hold
@@ -515,21 +515,21 @@ naming any other as `notExposed`, and `DebugDrawerAnalytics` holds the analytics
 open session, redacted in the app before anything is kept. A model that follows the sessions this
 way keeps nothing from before a session or after it, and redacts on the way in, since its snapshot
 is written to the store as it is. The receiver's module holds
-``DebugDrawerPluginModel``, the sessions and the store's wire format, real in every build, and
+`DebugDrawerPluginModel`, the sessions and the store's wire format, real in every build, and
 `DebugDrawer` re-exports it; it serves no socket and holds no view. The README's "Production
 builds: the receiver" shows the setup.
 
-**In the background.** A ``DebugDrawerBackgroundKeeper`` made with the sessions keeps the app
+**In the background.** A `DebugDrawerBackgroundKeeper` made with the sessions keeps the app
 running while one is open, so a sidecar in the foreground keeps the socket, and ends every request
-as the session ends or expires; ``DebugDrawerBackgroundKeeper/request`` says what it holds. It
+as the session ends or expires; `DebugDrawerBackgroundKeeper.request` says what it holds. It
 asks only for what the platform sanctions, and claims no background mode:
 
 | Platform | Request | Limits |
 |---|---|---|
-| iOS, iPadOS 26 and later | ``DebugDrawerBackgroundRequest/continuedProcessing`` from ``DebugDrawerBackgroundKeeper/startSession(duration:title:subtitle:)``, else ``DebugDrawerBackgroundRequest/backgroundTask`` | Started from a person's action in the foreground, with `<prefix>.*` in `BGTaskSchedulerPermittedIdentifiers`; runs at once or falls back; the system shows its progress and may end it, which ends the session. The Simulator refuses it. |
-| iOS, iPadOS before 26; tvOS; visionOS | ``DebugDrawerBackgroundRequest/backgroundTask`` | About 30 seconds in the background, no system indicator; asked for again as the app returns to the foreground. |
-| macOS, Mac Catalyst | ``DebugDrawerBackgroundRequest/activity`` | Keeps App Nap away; never expires; idle sleep allowed. |
-| watchOS | ``DebugDrawerBackgroundRequest/none`` | `WKExtendedRuntimeSession` serves only its own session types, none of them a debug session. |
+| iOS, iPadOS 26 and later | `DebugDrawerBackgroundRequest.continuedProcessing` from `DebugDrawerBackgroundKeeper.startSession(duration:title:subtitle:)`, else `DebugDrawerBackgroundRequest.backgroundTask` | Started from a person's action in the foreground, with `<prefix>.*` in `BGTaskSchedulerPermittedIdentifiers`; runs at once or falls back; the system shows its progress and may end it, which ends the session. The Simulator refuses it. |
+| iOS, iPadOS before 26; tvOS; visionOS | `DebugDrawerBackgroundRequest.backgroundTask` | About 30 seconds in the background, no system indicator; asked for again as the app returns to the foreground. |
+| macOS, Mac Catalyst | `DebugDrawerBackgroundRequest.activity` | Keeps App Nap away; never expires; idle sleep allowed. |
+| watchOS | `DebugDrawerBackgroundRequest.none` | `WKExtendedRuntimeSession` serves only its own session types, none of them a debug session. |
 
 Made with the ``DebugDrawerSocketServer``, the keeper also ends the session when the last viewer
 disconnects from the socket on its own (``DebugDrawerSocketServer/viewerDisconnections``), not

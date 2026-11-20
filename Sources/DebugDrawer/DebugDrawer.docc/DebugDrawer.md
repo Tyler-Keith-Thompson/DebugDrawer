@@ -14,6 +14,12 @@ This module is the core: the drawer, the ``DebugDrawerPlugin`` protocol, the vie
 built from, and the bug report every plugin can add to. Outside `DEBUG` the drawer doesn't exist,
 and the API a host calls compiles to stand-ins that do nothing.
 
+The core re-exports the `DebugDrawerReceiver` module, real in every build, and its documentation
+holds the types the core uses from it: `DebugDrawerPluginModel`, the sessions
+(`DebugDrawerSessions`, `DebugDrawerSessionState`, `DebugDrawerSession`,
+`DebugDrawerSessionCommand`, `DebugDrawerChangeScope`, `DebugDrawerAuditEntry`) and
+`DebugDrawerBackgroundKeeper`.
+
 ## Topics
 
 ### Essentials
@@ -37,19 +43,12 @@ and the API a host calls compiles to stand-ins that do nothing.
 - ``DebugDrawerPlugin``
 - ``DebugDrawerAction``
 - ``CaptureBuffer``
-- ``DebugDrawerPluginModel``
 - ``DebugDrawerPluginTransport``
 
 ### Reaching Models from Another Process
 
 - ``DebugDrawerTransport``
 - ``DebugDrawerModelRegistry``
-- ``DebugDrawerSessions``
-- ``DebugDrawerSessionState``
-- ``DebugDrawerSession``
-- ``DebugDrawerSessionCommand``
-- ``DebugDrawerChangeScope``
-- ``DebugDrawerAuditEntry``
 - ``DebugDrawerInProcessTransport``
 - ``DebugDrawerSocketServer``
 - ``DebugDrawerSocketTransport``

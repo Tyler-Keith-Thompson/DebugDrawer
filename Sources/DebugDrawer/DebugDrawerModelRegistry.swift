@@ -65,9 +65,9 @@ import os
         }
 
         /// A registry whose commands from outside the process act only within `sessions`: it
-        /// serves them under ``DebugDrawerSessions/pluginID``, so a sidecar can open one, and
+        /// serves them under `DebugDrawerSessions.pluginID`, so a sidecar can open one, and
         /// refuses a command while none is open, or to a model registered without a
-        /// ``DebugDrawerChangeScope``.
+        /// `DebugDrawerChangeScope`.
         ///
         /// - Parameter sessions: The sessions to act within.
         public init(sessions: DebugDrawerSessions) {
@@ -77,7 +77,7 @@ import os
 
         /// Offers `model` under `id`, in place of any model registered under it before.
         ///
-        /// In a registry made with ``DebugDrawerSessions``, a viewer reads the model's snapshots
+        /// In a registry made with `DebugDrawerSessions`, a viewer reads the model's snapshots
         /// and its commands are refused: register it with ``register(_:id:scope:)`` to let a
         /// session's commands change it.
         ///
