@@ -211,6 +211,47 @@
         }
     }
 
+    /// The host's remote configuration, as the README's "Turning it off remotely" assumes one.
+    @MainActor
+    final class RemoteConfig {
+        private var values: [String: Bool]
+        private var handlers: [@MainActor () -> Void] = []
+
+        init(_ values: [String: Bool]) {
+            self.values = values
+        }
+
+        func bool(_ key: String) -> Bool {
+            values[key] ?? false
+        }
+
+        func onUpdate(_ handler: @escaping @MainActor () -> Void) {
+            handlers.append(handler)
+        }
+
+        func update(_ key: String, to value: Bool) {
+            values[key] = value
+            for handler in handlers {
+                handler()
+            }
+        }
+    }
+
+    @MainActor
+    final class GatedReceiver {
+        let sessions = DebugDrawerSessions(maximumDuration: 15 * 60)
+        let receiver: DebugDrawerReceiver
+
+        init(config: RemoteConfig, flags: FlagServiceAdapter, container: URL) throws {
+            receiver = DebugDrawerReceiver(directory: container.appending(path: "DebugDrawer"), sessions: sessions) {
+                config.bool("sidecar_enabled")
+            }
+            receiver.enable(.featureFlagOverrides(flags)) { config.bool("sidecar_flag_overrides") }
+            config.onUpdate { [receiver] in receiver.reevaluateGates() }
+            try receiver.start()
+        }
+    }
+
     struct SessionIndicator: View {
         @ObservedObject var sessions: DebugDrawerSessions
 
@@ -281,6 +322,44 @@
             #expect(Array(AuditForwarder.sent.dropFirst().map(\.event)) == expectedEvents)
             #expect(SessionIndicator(sessions: sut.sessions).sessions.snapshot == .inactive)
             sut.server.stop()
+        }
+
+        @Test(
+            "Turning it off remotely: the configuration turning the gate off ends the sidecar's session and clears its override",
+            .timeLimit(.minutes(1))
+        )
+        func gatedReceiver() async throws {
+            let flags = FlagServiceAdapter()
+            let config = RemoteConfig(["sidecar_enabled": true, "sidecar_flag_overrides": true])
+            let container = FileManager.default.temporaryDirectory.appending(path: "READMEGatedReceiver-\(UUID().uuidString)")
+            let sut = try GatedReceiver(config: config, flags: flags, container: container)
+            defer { sut.receiver.stop() }
+            let sidecar = try DebugDrawerAppGroupStoreTransport(directory: container.appending(path: "DebugDrawer"))
+            let session = try await sidecar.connect(
+                toPlugin: DebugDrawerSessions.pluginID, snapshot: DebugDrawerSessionState.self, command: DebugDrawerSessionCommand.self
+            )
+            let overrides = try await sidecar.connect(
+                toPlugin: DebugDrawerFeatureFlagOverrides.pluginID,
+                snapshot: DebugDrawerFeatureFlagOverrides.Snapshot.self,
+                command: DebugDrawerFeatureFlagOverrides.Command.self
+            )
+            let expectedEvents: [DebugDrawerAuditEntry.Event] = [.commandApplied, .changeReverted, .sessionEnded(.disabledByHost)]
+
+            session.send(.open(duration: 60))
+            for await state in session.snapshots() where state.isActive {
+                break
+            }
+            overrides.send(.setOverride(key: "new-checkout", value: .bool(true)))
+            for await snapshot in overrides.snapshots() where !snapshot.overriddenKeys.isEmpty {
+                break
+            }
+            let overridden = flags.overrides
+            config.update("sidecar_enabled", to: false)
+
+            #expect(overridden == ["new-checkout": .bool(true)])
+            #expect(flags.overrides.isEmpty)
+            #expect(sut.sessions.snapshot == .inactive)
+            #expect(Array(sut.sessions.auditLog.dropFirst().map(\.event)) == expectedEvents)
         }
 
         @Test(

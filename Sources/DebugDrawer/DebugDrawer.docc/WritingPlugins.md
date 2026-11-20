@@ -501,7 +501,13 @@ transport, the app's own drawer, aren't gated. The README's "Sidecar sessions" s
 `DebugDrawerReceiver` product instead: `DebugDrawerReceiver(directory:sessions:)` serves the same
 store files, read by the same sidecar transports, but only for the capabilities the host passes to
 `enable(_:)`, and refuses, logs and audits every other command, every command while none is
-enabled, and every command outside a session. A capability is a model:
+enabled, and every command outside a session. Before all of that, grants included, it asks the host's gates, so a
+company can turn it off without a release: while `DebugDrawerReceiver.isAllowed` returns `false`
+every command is refused as `receiverDisabled`, the open session ends as `disabledByHost` and no
+capability's snapshot is served, and a capability enabled with `enable(_:isAllowed:)` whose gate
+returns `false` is refused as `capabilityDisabled` and has its session-scoped change reverted at
+once; the host calls `DebugDrawerReceiver.reevaluateGates()` as its configuration changes. A
+plugin's capability needs nothing for this: the gates sit in the receiver. A capability is a model:
 `.featureFlagOverrides(adapter)` over the host's `DebugDrawerFeatureFlagAdapter`, or
 `.model(_:id:scope:)` for any plugin model, each with its `DebugDrawerChangeScope`. So a plugin
 whose model should be drivable in production needs nothing more than its model: the host enables

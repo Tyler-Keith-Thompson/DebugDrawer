@@ -58,6 +58,10 @@ public struct DebugDrawerAuditEntry: Codable, Equatable, Sendable {
         case ended
         /// It reached its expiry.
         case expired
+        /// The host turned the receiver off while it was open: its gate,
+        /// ``DebugDrawerReceiver/isAllowed``, returned `false` at a command, at
+        /// ``DebugDrawerReceiver/reevaluateGates()`` or as the app came to the foreground.
+        case disabledByHost
     }
 
     /// Why a command was refused.
@@ -97,6 +101,12 @@ public struct DebugDrawerAuditEntry: Codable, Equatable, Sendable {
         case grantReplayed
         /// The session's grant doesn't list the capability the command was for.
         case capabilityNotGranted
+        /// The host turned the receiver off: its gate, ``DebugDrawerReceiver/isAllowed``, returned
+        /// `false`. Checked before anything else, a session's opening included.
+        case receiverDisabled
+        /// The host turned this capability off: the gate it was enabled with,
+        /// ``DebugDrawerReceiver/enable(_:isAllowed:)``, returned `false`.
+        case capabilityDisabled
     }
 
     /// When it happened.

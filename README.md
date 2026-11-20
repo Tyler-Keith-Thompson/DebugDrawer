@@ -2198,7 +2198,7 @@ first. The app's own drawer, in the process, is not gated.
 
 Each `DebugDrawerAuditEntry` holds its date, the session's ID, the capability (the ID the model
 was registered under, or `DebugDrawerSessions.pluginID` for a session opening or ending) and the
-event: `sessionOpened(expires:grant:)`, `sessionEnded(.ended or .expired)`, `commandApplied`,
+event: `sessionOpened(expires:grant:)`, `sessionEnded` (`.ended`, `.expired`, or `.disabledByHost` as a receiver's gate turns off), `commandApplied`,
 `commandRefused` with its reason, or `changeReverted`. It never holds what a command carried. It
 is `Codable` for forwarding as JSON. `auditLog` keeps the newest 1,000 entries in memory
 (`auditCapacity` sets another bound), and `auditEntries` publishes every entry as it is recorded.
@@ -2273,6 +2273,44 @@ What the receiver does:
   as the session ends or expires (feature flag overrides default to `.session(revertWith:
   .clearAllOverrides)`), `.persistent` keeps it.
 - **The app draws the indicator.** Observe `sessions.snapshot` as in "Sidecar sessions" above.
+
+**Turning it off remotely.** To shut every sidecar out without a release (a leaked sidecar app,
+say), give the receiver a gate backed by your own remote configuration, and a capability one of
+its own; the library calls no configuration service itself (`RemoteConfig` here stands for yours):
+
+```swift
+@MainActor
+final class GatedReceiver {
+    let sessions = DebugDrawerSessions(maximumDuration: 15 * 60)
+    let receiver: DebugDrawerReceiver
+
+    init(config: RemoteConfig, flags: FlagServiceAdapter, container: URL) throws {
+        receiver = DebugDrawerReceiver(directory: container.appending(path: "DebugDrawer"), sessions: sessions) {
+            config.bool("sidecar_enabled")
+        }
+        receiver.enable(.featureFlagOverrides(flags)) { config.bool("sidecar_flag_overrides") }
+        config.onUpdate { [receiver] in receiver.reevaluateGates() }
+        try receiver.start()
+    }
+}
+```
+
+- **The receiver's gate first.** `isAllowed` (set at `init(directory:sessions:isAllowed:)` or
+  later) is asked before anything else at every command, a session's opening included, so before
+  any grant is verified. While it
+  returns `false` every command is refused as `commandRefused(.receiverDisabled)`, the open
+  session ends as `sessionEnded(.disabledByHost)`, reverting its session-scoped changes, and no
+  capability's snapshot is written: each one's file leaves the store. The sessions' snapshot
+  stays, so the sidecar sees its session end.
+- **A capability's gate.** `enable(_:isAllowed:)` gates one capability. While it returns `false`
+  that capability's commands are refused as `commandRefused(.capabilityDisabled)`, its snapshot
+  leaves the store, and its session-scoped change in the open session is reverted at once
+  (`changeReverted`); the session and the other capabilities carry on.
+- **When it takes effect.** A closure can't announce a change, so the receiver asks the gates at
+  each command, as it starts, as the app comes to the foreground and before writing a snapshot.
+  Call `reevaluateGates()` as your configuration updates, as above, to end an open session at
+  once, with no command needed. A gate turned back on serves the snapshots again, and a new
+  session can open. Nothing polls.
 
 **Tweaks in production.** A tweak marked `.productionSafe()` where it is declared can be changed
 from the sidecar in a release build; every other tweak stays debug-only. Link

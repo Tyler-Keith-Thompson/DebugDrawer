@@ -29,6 +29,10 @@ import os
 //
 // Commands left while the app was not running are performed as it starts, those left while it was
 // suspended as it comes back to the foreground, then each as its file lands (DirectoryWatcher).
+// The host's gates (ReceiverGates.swift) come before all of that: a command is refused while the
+// receiver's or its capability's gate is off, and a gate turned off ends the session or stops the
+// capability.
+//
 // The socket isn't served: a sidecar's transport falls back to the store while no socket answers,
 // and a socket server in a production app is more listening surface for no command the store
 // can't carry.
@@ -49,6 +53,10 @@ import os
 /// Sessions made with a ``DebugDrawerGrantPolicy`` also need a signed grant for each session, and
 /// one that lists each capability a command is for.
 /// Show your own indicator while ``DebugDrawerSessions/snapshot`` is active.
+///
+/// To turn it off for everyone without a release, give it a gate, ``isAllowed``, backed by your
+/// own remote configuration, and call ``reevaluateGates()`` as that configuration changes;
+/// ``enable(_:isAllowed:)`` gates one capability the same way.
 @MainActor
 public final class DebugDrawerReceiver {
     private static let logger = Logger(subsystem: "DebugDrawerReceiver", category: "DebugDrawerReceiver")
@@ -57,14 +65,32 @@ public final class DebugDrawerReceiver {
     public let directory: URL
     /// The sessions every command acts within, and their audit log.
     public let sessions: DebugDrawerSessions
+    /// The host's gate: while it returns `false`, every command is refused as
+    /// ``DebugDrawerAuditEntry/Refusal/receiverDisabled``, a session's opening included, the open
+    /// session ends (``DebugDrawerAuditEntry/Ending/disabledByHost``), reverting its session-scoped
+    /// changes, and no capability's snapshot is served. Back it with your own remote
+    /// configuration, so a leaked sidecar can be shut out without a release.
+    ///
+    /// The receiver asks it at every command, as it starts, as the app comes to the foreground,
+    /// before writing a capability's snapshot, and at ``reevaluateGates()``, which you call as
+    /// your configuration changes so an open session ends without waiting for a command. It
+    /// returns `true` unless you set it, at ``init(directory:sessions:isAllowed:)`` or later;
+    /// setting it asks the new gate at once.
+    public var isAllowed: @MainActor () -> Bool {
+        didSet { reevaluateGates() }
+    }
 
-    private let layout: AppGroupStoreLayout
-    private var capabilities: [String: DebugDrawerReceiverCapability] = [:]
+    let layout: AppGroupStoreLayout
+    var capabilities: [String: DebugDrawerReceiverCapability] = [:]
     /// Writes each served model's snapshots, by ID, while the receiver runs.
-    private var writing: [String: Task<Void, Never>] = [:]
+    var writing: [String: Task<Void, Never>] = [:]
     private var watcher: DirectoryWatcher?
     private var performing: Task<Void, Never>?
     private var foregroundObservation: (any NSObjectProtocol)?
+    /// The gate each capability was enabled with, by ID; one enabled without a gate has none.
+    var capabilityGates: [String: @MainActor () -> Bool] = [:]
+    /// The capabilities whose snapshots aren't served while a gate is off, by ID.
+    var paused: Set<String> = []
 
     /// A receiver of the store in `directory`, gating every command with `sessions`; it serves
     /// once started, and nothing until a capability is enabled.
@@ -76,7 +102,23 @@ public final class DebugDrawerReceiver {
     public init(directory: URL, sessions: DebugDrawerSessions) {
         self.directory = directory
         self.sessions = sessions
+        isAllowed = { true }
         layout = AppGroupStoreLayout(directory: directory)
+    }
+
+    /// A receiver of the store in `directory`, gating every command with `sessions` and, before
+    /// them, with the host's `isAllowed`; it serves once started, and nothing until a capability
+    /// is enabled.
+    ///
+    /// - Parameters:
+    ///   - directory: The store's directory, which the sidecar's transport reads too. It is made if
+    ///     it doesn't exist.
+    ///   - sessions: The sessions every command acts within.
+    ///   - isAllowed: The host's gate, ``isAllowed``: while it returns `false` the receiver serves
+    ///     nothing and refuses everything.
+    public convenience init(directory: URL, sessions: DebugDrawerSessions, isAllowed: @escaping @MainActor () -> Bool) {
+        self.init(directory: directory, sessions: sessions)
+        self.isAllowed = isAllowed
     }
 
     /// The IDs of the capabilities enabled, sorted.
@@ -94,10 +136,7 @@ public final class DebugDrawerReceiver {
     ///
     /// - Parameter capability: What to allow.
     public func enable(_ capability: DebugDrawerReceiverCapability) {
-        capabilities[capability.id] = capability
-        if isRunning {
-            serve(capability.id, capability.snapshots())
-        }
+        enable(capability, gate: nil)
     }
 
     /// Stops serving the capability enabled under `id`: its snapshot leaves the store, and its
@@ -107,6 +146,8 @@ public final class DebugDrawerReceiver {
     /// - Parameter id: The capability's ID.
     public func disable(_ id: String) {
         guard capabilities.removeValue(forKey: id) != nil else { return }
+        capabilityGates[id] = nil
+        paused.remove(id)
         writing.removeValue(forKey: id)?.cancel()
         try? FileManager.default.removeItem(at: layout.snapshotFile(for: id))
     }
@@ -124,9 +165,12 @@ public final class DebugDrawerReceiver {
         removeSnapshotsNotServed()
         self.watcher = watcher
         serve(DebugDrawerSessions.pluginID, encodedSnapshots(of: sessions))
+        paused = []
         for (id, capability) in capabilities {
             serve(id, capability.snapshots())
         }
+        // Before any of those writes runs: they wait for the main actor.
+        reevaluateGates()
         performWaitingCommands()
         performing = Task { [weak self] in
             for await _ in watcher.changes {
@@ -137,6 +181,7 @@ public final class DebugDrawerReceiver {
         // the main thread.
         foregroundObservation = NotificationCenter.default.addObserver(forName: Self.foreground, object: nil, queue: nil) { [weak self] _ in
             MainActor.assumeIsolated {
+                self?.reevaluateGates()
                 self?.performWaitingCommands()
             }
         }
@@ -191,6 +236,7 @@ public final class DebugDrawerReceiver {
     /// Performs the command `payload` encodes on the capability `id` names, if one is enabled
     /// there, within the sessions.
     private func perform(_ payload: Data, for id: String) {
+        guard passesGates(id) else { return }
         guard id != DebugDrawerSessions.pluginID else {
             // A session with nothing to drive would show the host's indicator for nothing.
             guard !capabilities.isEmpty else {
@@ -215,12 +261,17 @@ public final class DebugDrawerReceiver {
 
     /// Writes the snapshots `snapshots` delivers to `id`'s file, in place of any written for it
     /// before.
-    private func serve(_ id: String, _ snapshots: AsyncStream<Data>) {
+    func serve(_ id: String, _ snapshots: AsyncStream<Data>) {
         writing[id]?.cancel()
         let layout = layout
         let file = layout.snapshotFile(for: id)
-        writing[id] = Task {
+        writing[id] = Task { [weak self] in
             for await payload in snapshots {
+                // A gate turned off since the receiver last asked: stop now rather than write.
+                guard let self, servesSnapshot(of: id) else {
+                    self?.reevaluateGates()
+                    return
+                }
                 let document = StoreDocument(TransportMessage(kind: .snapshot, pluginID: id, payload: payload))
                 do {
                     try layout.write(document.encoded(), to: file)
@@ -241,7 +292,7 @@ public final class DebugDrawerReceiver {
 
     /// What the system posts as the app comes to the foreground: on the Mac, where apps aren't
     /// suspended, as it becomes active.
-    private static var foreground: Notification.Name {
+    static var foreground: Notification.Name {
         #if os(macOS)
             NSApplication.willBecomeActiveNotification
         #elseif os(watchOS)

@@ -1,6 +1,7 @@
 import Combine
 @testable import DebugDrawerReceiver
 import Foundation
+import os
 import Testing
 
 /// A flag service the test reads back: what the app would read for each flag, overrides winning.
@@ -45,6 +46,26 @@ private final class LogLevelModel: DebugDrawerPluginModel {
         case let .set(level): snapshot.level = level
         case .reset: snapshot.level = "info"
         }
+    }
+}
+
+/// The host's gate, as its remote configuration would flip it.
+@MainActor
+private final class HostGate {
+    var isOn = true
+}
+
+/// A grant verifier that counts how often it is asked, and rejects every grant.
+private final class CountingVerifier: DebugDrawerGrantVerifier {
+    private let count = OSAllocatedUnfairLock(initialState: 0)
+
+    var calls: Int {
+        count.withLock { $0 }
+    }
+
+    func verify(_ token: String) throws(DebugDrawerGrantVerificationError) -> DebugDrawerGrant {
+        count.withLock { $0 += 1 }
+        throw .invalidSignature
     }
 }
 
@@ -294,6 +315,64 @@ struct ReceiverTests {
         let actualFlags = try JSONDecoder().decode(DebugDrawerFeatureFlagOverrides.Snapshot.self, from: document.message.payload)
         #expect(document.message.kind == .snapshot)
         #expect(actualFlags == expectedFlags)
+    }
+
+    @Test("The host's gate, off as the app comes to the foreground, ends the open session as disabledByHost and reverts its changes")
+    func gateOffAtForegroundEndsSession() throws {
+        let directory = FileManager.default.temporaryDirectory.appending(path: "ReceiverTests-\(UUID().uuidString)")
+        let logLevels = LogLevelModel()
+        let sessions = DebugDrawerSessions(maximumDuration: 300, auditCapacity: 100, clock: FixedClock(now: Self.now), timer: IdleTimer())
+        let gate = HostGate()
+        let sut = DebugDrawerReceiver(directory: directory, sessions: sessions) { gate.isOn }
+        sut.enable(.model(logLevels, id: "MyApp.LogLevels", scope: .session(revertWith: .reset)))
+        try sut.start()
+        defer { sut.stop() }
+        sessions.perform(.open(duration: 60))
+        let session = try #require(sessions.snapshot.session)
+        sessions.apply(to: "MyApp.LogLevels", scope: .session { logLevels.perform(.reset) }) {
+            logLevels.perform(.set("debug"))
+            return true
+        }
+        let expectedTail = [
+            DebugDrawerAuditEntry(date: Self.now, sessionID: session.id, capability: "MyApp.LogLevels", event: .changeReverted),
+            DebugDrawerAuditEntry(date: Self.now, sessionID: session.id, capability: sessionsID, event: .sessionEnded(.disabledByHost))
+        ]
+
+        gate.isOn = false
+        NotificationCenter.default.post(name: DebugDrawerReceiver.foreground, object: nil)
+
+        #expect(Array(sessions.auditLog.suffix(2)) == expectedTail)
+        #expect(sessions.snapshot == .inactive)
+        #expect(logLevels.snapshot == LogLevelModel.Snapshot())
+    }
+
+    @Test("The host gate comes before grants: off, a session asked for with a grant is refused as receiverDisabled, the verifier unasked")
+    func gateBeforeGrant() throws {
+        let directory = FileManager.default.temporaryDirectory.appending(path: "ReceiverTests-\(UUID().uuidString)")
+        let layout = AppGroupStoreLayout(directory: directory)
+        #expect(layout.create())
+        let verifier = CountingVerifier()
+        let policy = DebugDrawerGrantPolicy(verifier: verifier, audience: "com.example.MyApp")
+        let sessions = DebugDrawerSessions(
+            maximumDuration: 300, auditCapacity: 100, grantPolicy: policy, clock: FixedClock(now: Self.now), timer: IdleTimer()
+        )
+        let gate = HostGate()
+        gate.isOn = false
+        let sut = DebugDrawerReceiver(directory: directory, sessions: sessions) { gate.isOn }
+        sut.enable(.model(LogLevelModel(), id: "MyApp.LogLevels", scope: .session(revertWith: .reset)))
+        let payload = try TransportMessage.payload(DebugDrawerSessionCommand.open(duration: 60, grant: "a-grant"))
+        let document = StoreDocument(TransportMessage(kind: .command, pluginID: sessionsID, payload: payload))
+        try layout.write(document.encoded(), to: layout.commands.appending(path: "0.json"))
+        let expectedLog = [
+            DebugDrawerAuditEntry(date: Self.now, sessionID: nil, capability: sessionsID, event: .commandRefused(.receiverDisabled))
+        ]
+
+        try sut.start()
+        defer { sut.stop() }
+
+        #expect(sessions.auditLog == expectedLog)
+        #expect(verifier.calls == 0)
+        #expect(sessions.snapshot == .inactive)
     }
 
     @Test("Starting throws cannotServe, and serves nothing, where the store's directory can't be made")

@@ -215,6 +215,23 @@ public final class DebugDrawerSessions: DebugDrawerPluginModel {
         record(capability, .commandApplied, in: session.id)
     }
 
+    /// Ends the open session as `ending` says, reverting its session-scoped changes; does nothing
+    /// when none is open. For a receiver whose host turned it off (``DebugDrawerAuditEntry/Ending/disabledByHost``).
+    package func end(because ending: DebugDrawerAuditEntry.Ending) {
+        finish(ending)
+    }
+
+    /// Reverts `capability`'s session-scoped change in the open session now, rather than as the
+    /// session ends, and records it; does nothing when none is open or the capability changed
+    /// nothing in it. A later command applied to it in the same session is reverted as the
+    /// session ends, as usual.
+    package func revertChanges(of capability: String) {
+        guard let session = snapshot.session, let index = reverts.firstIndex(where: { $0.capability == capability }) else { return }
+        let revert = reverts.remove(at: index).revert
+        revert()
+        record(capability, .changeReverted, in: session.id)
+    }
+
     /// Records that a command to `capability` was refused for `reason`.
     package func refuse(_ capability: String, _ reason: DebugDrawerAuditEntry.Refusal) {
         Self.logger.notice("Refused a command for \(capability, privacy: .public): \(reason.rawValue, privacy: .public)")
