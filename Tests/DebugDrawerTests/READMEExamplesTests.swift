@@ -364,9 +364,10 @@
             }
 
             DebugDrawer.shared.registerGlobal(CartPlugin())
-            let zip = try DebugDrawer.shared.createReport() // the same zip the button makes
+            let reports = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+            let zip = try DebugDrawer.shared.createReport(in: reports) // the same zip the button makes
 
-            defer { try? FileManager.default.removeItem(at: zip) }
+            defer { try? FileManager.default.removeItem(at: reports) }
             var contribution = DebugDrawerReport()
             CartPlugin().contribute(to: &contribution, redaction: DebugDrawer.shared.redaction)
             let checkout = try #require(contribution.files.last)

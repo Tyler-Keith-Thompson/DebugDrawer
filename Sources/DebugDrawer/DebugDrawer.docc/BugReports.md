@@ -34,7 +34,8 @@ struct CartPlugin: DebugDrawerPlugin, DebugDrawerReportContributor {
 }
 
 DebugDrawer.shared.registerGlobal(CartPlugin())
-let zip = try DebugDrawer.shared.createReport() // the same zip the button makes
+let reports = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+let zip = try DebugDrawer.shared.createReport(in: reports) // the same zip the button makes
 ```
 
 A file's name is made safe for a file system, given its kind's extension when it lacks one, and

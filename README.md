@@ -355,7 +355,8 @@ struct CartPlugin: DebugDrawerPlugin, DebugDrawerReportContributor {
 }
 
 DebugDrawer.shared.registerGlobal(CartPlugin())
-let zip = try DebugDrawer.shared.createReport() // the same zip the button makes
+let reports = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+let zip = try DebugDrawer.shared.createReport(in: reports) // the same zip the button makes
 ```
 
 The protocol, `DebugDrawerReport` and `DebugDrawerRedaction` exist in every configuration, so a
