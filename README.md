@@ -2088,7 +2088,8 @@ Writing Global and Local Plugins).
 
 **A sidecar on the Mac.** There both apps run at once, so the socket is the norm and the store the
 fallback. Both apps find the group's container with `DebugDrawerAppGroupContainer`, sandboxed or
-not, and hand its `socketPath` and `storeDirectory` to the servers and the sidecar transport. List
+not: the app hands its `socketPath` and `storeDirectory` to its servers, and the sidecar hands
+`socketPath(of:)` and `appDirectory(of:)`, naming the app by its bundle ID, to its transport. List
 the group in each app's debug entitlements and sign both with the same team; on the Mac, prefix
 the group with the team ID (or list a `group.` one in a provisioning profile), so macOS doesn't
 ask whether one app may access another's data:
@@ -2256,8 +2257,12 @@ final class ProductionReceiver {
 Add it to the production target alone (`.product(name: "DebugDrawerReceiver", package:
 "DebugDrawer")`); the drawer and its plugins stay in the debug configuration. `container` is the
 app group's container, `FileManager.default.containerURL(forSecurityApplicationGroupIdentifier:)`,
-which the sidecar app shares: it reaches the receiver with a `DebugDrawerSidecarTransport` (or a
-`DebugDrawerAppGroupStoreTransport`) on the same directory, opens a session through
+which the sidecar app shares. The receiver keeps to the app's own directory of that store,
+`DebugDrawer/apps/<bundle ID>/` (`receiver.appDirectory`), named by the main bundle's identifier,
+so several apps of a company can share one group and one sidecar ("Several apps, one sidecar"
+below). The sidecar reaches the receiver with a `DebugDrawerSidecarTransport` (or a
+`DebugDrawerAppGroupStoreTransport`) on that app's directory
+(`DebugDrawerAppGroupContainer.appDirectory(of:)`), opens a session through
 `DebugDrawerSessions.pluginID`, then connects to `DebugDrawerFeatureFlagOverrides.pluginID`. The
 receiver serves the store only, not the socket.
 
@@ -2877,12 +2882,38 @@ The sidecar app and the apps it reaches list the same group in their
 `com.apple.security.application-groups` entitlement and keep their store in its `DebugDrawer`
 folder (`DebugDrawerAppGroupContainer.storeDirectory`). The view's sidebar lists every app there
 that serves a sidecar: a release build running `DebugDrawerReceiver`, or a debug build running
-`DebugDrawerAppGroupStoreServer`, each with its name, version, build and bundle ID. Each writes a
-presence file (`<store>/presence/<bundle ID>.json`) as it starts, rewrites it as the capabilities it
-serves change and as it comes to the foreground, and removes it as it stops; the list watches the
-folder and changes as the files do, with no polling. An app that was killed stays listed, with when
-it was last seen. An app whose host has turned its receiver off (`DebugDrawerReceiver.isAllowed`)
-stays listed as turned off, serving nothing.
+`DebugDrawerAppGroupStoreServer`, each with its name, version, build and bundle ID. Each registers
+itself with a presence file in its own directory of the store (`<store>/apps/<bundle
+ID>/presence.json`: its bundle ID, name, version, build, the capabilities it serves and the
+protocol version it speaks, `DebugDrawerSidecarApp.protocolVersion`) as it starts, rewrites it as
+the capabilities it serves change and as it comes to the foreground, and removes it as it stops;
+the list watches the store's `apps` folder and each app's folder and changes as the files do, with
+no polling. An app that was killed stays listed, with when it was last seen. An app whose host has
+turned its receiver off (`DebugDrawerReceiver.isAllowed`) stays listed as turned off, serving
+nothing.
+
+**Several apps, one sidecar.** A company with several apps gives them one employee tool: each app
+of the group serves its own directory of the store, `apps/<bundle ID>/`, holding its presence
+file, its socket, its snapshots (the sessions' among them) and the commands for it, and the
+sidecar lists them all and scopes every connection, session and file to the app picked. The
+directory comes from the app's main bundle, never from a parameter, so one app's receiver or store
+server never performs another's commands, never serves where another's sidecar reads, and refuses
+a command naming a capability only another app serves (`commandRefused(.unknownCapability)`).
+That is as far as the library can keep apps apart: **the system doesn't isolate apps within one
+app group**, and any app of the group can read the whole container, another app's captured logs
+and requests included. For real isolation, give each app an app group of its own and have the
+sidecar join every one:
+
+```swift
+DebugDrawerSidecarView(groupIdentifiers: ["group.com.example.shop.debug", "group.com.example.wallet.debug"])
+```
+
+`DebugDrawerSidecarAppList(groupIdentifiers:)` and `init(storeDirectories:)` list several groups'
+apps the same way; an app found in two groups is listed once, as it last registered, and a group
+the system gives no container is reported in `error` while the others are still listed.
+Encrypting each app's files wouldn't help: a key both the app and the sidecar can reach sits in
+the same container. A store from before per-app directories (files at the top of `DebugDrawer/`)
+is neither read nor removed; each app writes its own directory as it next starts serving.
 
 Picking an app connects to it with `DebugDrawerSidecarTransport`: live over its socket while it
 answers, through the store while it is suspended. For an app whose commands need a session (it
@@ -2913,8 +2944,9 @@ app, so archive a TestFlight sidecar in the Debug configuration.
 **The example pair.** `Example/Sidecar` is a sidecar built on the kit, and `Example/Receiver` the
 production app it drives: it links only the receiver and the capability modules, and serves every
 capability the library ships, within sessions that need a grant. `just run sidecar` installs and
-launches both in the iOS simulator, in `group.com.debugdrawer.example`; `just run sidecar macOS`
-launches both on the Mac. Pick the app in the sidecar, Open Session (the sidecar's stand-in for a
+launches both in the iOS simulator, in `group.com.debugdrawer.example`, with the iOS example's
+debug build beside them in the same group, so the sidecar lists two apps, each in its own
+directory of the store; `just run sidecar macOS` launches the pair on the Mac. Pick the app in the sidecar, Open Session (the sidecar's stand-in for a
 grant server signs a grant with RFC 8037's published test key, which the host trusts), and each
 capability has something in the host that changes:
 

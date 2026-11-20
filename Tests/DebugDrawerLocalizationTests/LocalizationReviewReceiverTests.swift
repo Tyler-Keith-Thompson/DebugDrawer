@@ -60,7 +60,7 @@
             receiver.enable(.localizationReview(review))
             try receiver.start()
             defer { receiver.stop() }
-            let sidecar = try DebugDrawerAppGroupStoreTransport(directory: directory)
+            let sidecar = try DebugDrawerAppGroupStoreTransport(directory: AppGroupStoreLayout.appDirectory(inStore: directory))
             let sessionControl = try await sidecar.connect(
                 toPlugin: DebugDrawerSessions.pluginID, snapshot: DebugDrawerSessionState.self, command: DebugDrawerSessionCommand.self
             )
@@ -130,7 +130,7 @@
             receiver.enable(.localizationReview(review))
             try receiver.start()
             defer { receiver.stop() }
-            let sidecar = try DebugDrawerAppGroupStoreTransport(directory: directory)
+            let sidecar = try DebugDrawerAppGroupStoreTransport(directory: AppGroupStoreLayout.appDirectory(inStore: directory))
             let modes = try await sidecar.connect(
                 toPlugin: LocalizationReview.pluginID, snapshot: LocalizationReview.Snapshot.self, command: LocalizationReview.Command.self
             )
@@ -163,7 +163,7 @@
             // The commands a sidecar's transport would leave, as files in the store: the transport
             // can't connect to a capability the app doesn't serve, since no snapshot of it is
             // written. The receiver performs them in name order as it starts.
-            let layout = AppGroupStoreLayout(directory: directory)
+            let layout = AppGroupStoreLayout(directory: AppGroupStoreLayout.appDirectory(inStore: directory))
             #expect(layout.create())
             let commands: [(String, Data)] = try [
                 (DebugDrawerSessions.pluginID, TransportMessage.payload(DebugDrawerSessionCommand.open(duration: 60))),

@@ -158,7 +158,7 @@
             case .malformed:
                 "\(valid).extra"
             }
-            let sidecar = try DebugDrawerAppGroupStoreTransport(directory: directory)
+            let sidecar = try DebugDrawerAppGroupStoreTransport(directory: AppGroupStoreLayout.appDirectory(inStore: directory))
             let sessionControl = try await sidecar.connect(
                 toPlugin: sessionsID, snapshot: DebugDrawerSessionState.self, command: DebugDrawerSessionCommand.self
             )
@@ -210,7 +210,7 @@
                 capabilities: [flagsID],
                 notBefore: Self.start, expires: Self.start.addingTimeInterval(300)
             ))
-            let sidecar = try DebugDrawerAppGroupStoreTransport(directory: directory)
+            let sidecar = try DebugDrawerAppGroupStoreTransport(directory: AppGroupStoreLayout.appDirectory(inStore: directory))
             let sessionControl = try await sidecar.connect(
                 toPlugin: sessionsID, snapshot: DebugDrawerSessionState.self, command: DebugDrawerSessionCommand.self
             )
@@ -281,7 +281,7 @@
                 capabilities: [flagsID],
                 notBefore: Self.start.addingTimeInterval(60), expires: Self.start.addingTimeInterval(300)
             ))
-            let sidecar = try DebugDrawerAppGroupStoreTransport(directory: directory)
+            let sidecar = try DebugDrawerAppGroupStoreTransport(directory: AppGroupStoreLayout.appDirectory(inStore: directory))
             let sessionControl = try await sidecar.connect(
                 toPlugin: sessionsID, snapshot: DebugDrawerSessionState.self, command: DebugDrawerSessionCommand.self
             )
@@ -319,7 +319,7 @@
                 capabilities: [flagsID],
                 notBefore: Self.start, expires: Self.start.addingTimeInterval(300)
             ))
-            let sidecar = try DebugDrawerAppGroupStoreTransport(directory: directory)
+            let sidecar = try DebugDrawerAppGroupStoreTransport(directory: AppGroupStoreLayout.appDirectory(inStore: directory))
             let sessionControl = try await sidecar.connect(
                 toPlugin: sessionsID, snapshot: DebugDrawerSessionState.self, command: DebugDrawerSessionCommand.self
             )
@@ -370,7 +370,7 @@
                 capabilities: [flagsID],
                 notBefore: Self.start, expires: Self.start.addingTimeInterval(120)
             ))
-            let sidecar = try DebugDrawerAppGroupStoreTransport(directory: directory)
+            let sidecar = try DebugDrawerAppGroupStoreTransport(directory: AppGroupStoreLayout.appDirectory(inStore: directory))
             let sessionControl = try await sidecar.connect(
                 toPlugin: sessionsID, snapshot: DebugDrawerSessionState.self, command: DebugDrawerSessionCommand.self
             )
@@ -421,7 +421,7 @@
                 capabilities: [flagsID],
                 notBefore: Self.start, expires: Self.start.addingTimeInterval(300)
             ))
-            let sidecar = try DebugDrawerAppGroupStoreTransport(directory: directory)
+            let sidecar = try DebugDrawerAppGroupStoreTransport(directory: AppGroupStoreLayout.appDirectory(inStore: directory))
             let sessionControl = try await sidecar.connect(
                 toPlugin: sessionsID, snapshot: DebugDrawerSessionState.self, command: DebugDrawerSessionCommand.self
             )
@@ -457,7 +457,7 @@
             receiver.enable(.featureFlagOverrides(flags))
             try receiver.start()
             defer { receiver.stop() }
-            let sidecar = try DebugDrawerAppGroupStoreTransport(directory: directory)
+            let sidecar = try DebugDrawerAppGroupStoreTransport(directory: AppGroupStoreLayout.appDirectory(inStore: directory))
             let sessionControl = try await sidecar.connect(
                 toPlugin: sessionsID, snapshot: DebugDrawerSessionState.self, command: DebugDrawerSessionCommand.self
             )
@@ -522,14 +522,14 @@
             let grantedSubscription = grantedSessions.auditEntries.sink { arrival.yield($0) }
             defer { grantedSubscription.cancel() }
             var recorded = arrivals.makeAsyncIterator()
-            let plainSidecar = try DebugDrawerAppGroupStoreTransport(directory: withoutDirectory)
+            let plainSidecar = try DebugDrawerAppGroupStoreTransport(directory: AppGroupStoreLayout.appDirectory(inStore: withoutDirectory))
             let plainControl = try await plainSidecar.connect(
                 toPlugin: sessionsID, snapshot: DebugDrawerSessionState.self, command: DebugDrawerSessionCommand.self
             )
             let plainLog = try await plainSidecar.connect(
                 toPlugin: "MyApp.LogLevels", snapshot: LogLevelModel.Snapshot.self, command: LogLevelModel.Command.self
             )
-            let grantedSidecar = try DebugDrawerAppGroupStoreTransport(directory: withDirectory)
+            let grantedSidecar = try DebugDrawerAppGroupStoreTransport(directory: AppGroupStoreLayout.appDirectory(inStore: withDirectory))
             let grantedControl = try await grantedSidecar.connect(
                 toPlugin: sessionsID, snapshot: DebugDrawerSessionState.self, command: DebugDrawerSessionCommand.self
             )

@@ -197,8 +197,9 @@ macos_application(
 # ── Sidecar and its production host (iOS, iPadOS and macOS) ──────────
 # A company's sidecar app built from DebugDrawerSidecarKit, and a production app serving it through
 # DebugDrawerReceiver, for every platform the kit builds on; `just run sidecar` launches the pair in
-# the iOS simulator, `just run sidecar macOS` on the Mac. On iOS both join
-# group.com.debugdrawer.example (the iOS example's debug build serves it too); the Mac apps are
+# the iOS simulator, with the iOS example's debug build beside them, `just run sidecar macOS` on
+# the Mac. On iOS all three join group.com.debugdrawer.example, the host and the iOS example each
+# serving its own directory of the group's store, so the sidecar lists both; the Mac apps are
 # built without a group and signed into a team-prefixed one by the run recipe (Example/SidecarStore
 # says why).
 

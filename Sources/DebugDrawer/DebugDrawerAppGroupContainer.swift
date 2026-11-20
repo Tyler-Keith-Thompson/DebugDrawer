@@ -1,3 +1,4 @@
+import DebugDrawerReceiver
 import Foundation
 
 // Where an app and its sidecar meet: the app group's shared container, resolved the one way both
@@ -11,9 +12,11 @@ import Foundation
 // and transports check it as they first touch their directories, which is where macOS asks the
 // person, and throw `accessDenied` there.
 //
-// The socket sits beside the store, in `DebugDrawer/`, rather than at the container's root, so the
-// sidecar's watch on the socket's directory hears the socket and the store's own directories, not
-// whatever else the app keeps in the container. The resolver is a closure with the system's as its
+// The socket sits in the app's own directory of the store, `DebugDrawer/apps/<bundle ID>/`, beside
+// its snapshots and commands, rather than at the container's root, so the sidecar's watch on the
+// socket's directory hears the socket and that app's store directories, not whatever else the app
+// or another app of the group keeps in the container. The app's own paths come from its main
+// bundle; a sidecar names the app whose paths it wants (`appDirectory(of:)`, `socketPath(of:)`). The resolver is a closure with the system's as its
 // default, the seam the charter asks for, so a test can give a container that is missing.
 //
 // Rejected: a `DebugDrawerSidecarTransport(appGroup:)` and server initializers taking the group
@@ -55,16 +58,37 @@ import Foundation
             self.url = url
         }
 
-        /// Where the app's ``DebugDrawerSocketServer`` makes its socket: `DebugDrawer/drawer.sock`
-        /// in the container.
+        /// Where the app's ``DebugDrawerSocketServer`` makes its socket: `drawer.sock` in the app's
+        /// own directory of the store, `DebugDrawer/apps/<main bundle ID>/drawer.sock` in the
+        /// container.
         public var socketPath: String {
-            storeDirectory.appending(path: "drawer.sock", directoryHint: .notDirectory).path
+            socketPath(of: AppPresence.Identity.of(.main).bundleIdentifier)
         }
 
-        /// The directory of the app's ``DebugDrawerAppGroupStoreServer``: `DebugDrawer` in the
-        /// container.
+        /// The group's store, which the app's ``DebugDrawerAppGroupStoreServer`` and
+        /// `DebugDrawerReceiver` take: `DebugDrawer` in the container. Each app of the group keeps
+        /// to its own directory in it, ``appDirectory(of:)``.
         public var storeDirectory: URL {
             url.appending(path: "DebugDrawer", directoryHint: .isDirectory)
+        }
+
+        /// The directory the app `bundleIdentifier` keeps its store in, which a sidecar's
+        /// ``DebugDrawerSidecarTransport`` or ``DebugDrawerAppGroupStoreTransport`` reads:
+        /// `DebugDrawer/apps/<bundle ID>` in the container.
+        ///
+        /// - Parameter bundleIdentifier: The app's bundle identifier.
+        /// - Returns: The app's directory of the store.
+        public func appDirectory(of bundleIdentifier: String) -> URL {
+            AppGroupStoreLayout.appDirectory(of: bundleIdentifier, inStore: storeDirectory)
+        }
+
+        /// Where the app `bundleIdentifier`'s ``DebugDrawerSocketServer`` makes its socket, when
+        /// it serves one: `drawer.sock` in its ``appDirectory(of:)``.
+        ///
+        /// - Parameter bundleIdentifier: The app's bundle identifier.
+        /// - Returns: The socket's path.
+        public func socketPath(of bundleIdentifier: String) -> String {
+            appDirectory(of: bundleIdentifier).appending(path: "drawer.sock", directoryHint: .notDirectory).path
         }
     }
 #else
@@ -93,12 +117,28 @@ import Foundation
 
         /// Where the socket would be.
         public var socketPath: String {
-            storeDirectory.appending(path: "drawer.sock", directoryHint: .notDirectory).path
+            socketPath(of: AppPresence.Identity.of(.main).bundleIdentifier)
         }
 
         /// Where the store would be.
         public var storeDirectory: URL {
             url.appending(path: "DebugDrawer", directoryHint: .isDirectory)
+        }
+
+        /// Where the app's directory of the store would be.
+        ///
+        /// - Parameter bundleIdentifier: The app's bundle identifier.
+        /// - Returns: The app's directory of the store.
+        public func appDirectory(of bundleIdentifier: String) -> URL {
+            AppGroupStoreLayout.appDirectory(of: bundleIdentifier, inStore: storeDirectory)
+        }
+
+        /// Where the app's socket would be.
+        ///
+        /// - Parameter bundleIdentifier: The app's bundle identifier.
+        /// - Returns: The socket's path.
+        public func socketPath(of bundleIdentifier: String) -> String {
+            appDirectory(of: bundleIdentifier).appending(path: "drawer.sock", directoryHint: .notDirectory).path
         }
     }
 #endif

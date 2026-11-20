@@ -43,7 +43,7 @@
             await #expect(processExitsWith: .success) { [path = directory.path as String] in
                 @MainActor
                 func writeAndQuit() async -> Bool {
-                    let layout = AppGroupStoreLayout(directory: URL(filePath: path))
+                    let layout = AppGroupStoreLayout(directory: AppGroupStoreLayout.appDirectory(inStore: URL(filePath: path)))
                     let model = TallyModel()
                     let registry = DebugDrawerModelRegistry()
                     registry.register(model, id: "Tally")
@@ -65,7 +65,7 @@
                 }
                 exit(await writeAndQuit() ? EXIT_SUCCESS : EXIT_FAILURE)
             }
-            let sut = try DebugDrawerAppGroupStoreTransport(directory: directory)
+            let sut = try DebugDrawerAppGroupStoreTransport(directory: AppGroupStoreLayout.appDirectory(inStore: directory))
             let actual = try await sut.connect(toPlugin: "Tally", snapshot: TallyModel.Snapshot.self, command: TallyModel.Command.self)
 
             #expect(actual.snapshot == expected)
@@ -74,13 +74,13 @@
         @Test("An app killed while writing a snapshot leaves the last complete one for the viewer, and the cut-off file is never read")
         func appKilledMidWrite() async throws {
             let directory = FileManager.default.temporaryDirectory.appending(path: "AppGroupStoreKillExitTests-\(UUID().uuidString)")
-            let snapshots = directory.appending(path: "snapshots")
+            let snapshots = AppGroupStoreLayout.appDirectory(inStore: directory).appending(path: "snapshots")
             let expected = TallyModel.Snapshot(note: "last complete")
 
             await #expect(processExitsWith: .signal(SIGXFSZ)) { [path = directory.path as String] in
                 @MainActor
                 func writeUntilKilled() async {
-                    let layout = AppGroupStoreLayout(directory: URL(filePath: path))
+                    let layout = AppGroupStoreLayout(directory: AppGroupStoreLayout.appDirectory(inStore: URL(filePath: path)))
                     let model = TallyModel()
                     let registry = DebugDrawerModelRegistry()
                     registry.register(model, id: "Tally")
@@ -125,7 +125,7 @@
             let names = try FileManager.default.contentsOfDirectory(atPath: snapshots.path).sorted()
             let cutOffName = try #require(names.first { $0 != "Tally.json" })
             let cutOff = try Data(contentsOf: snapshots.appending(path: cutOffName))
-            let sut = try DebugDrawerAppGroupStoreTransport(directory: directory)
+            let sut = try DebugDrawerAppGroupStoreTransport(directory: AppGroupStoreLayout.appDirectory(inStore: directory))
             let actual = try await sut.connect(toPlugin: "Tally", snapshot: TallyModel.Snapshot.self, command: TallyModel.Command.self)
 
             #expect(names.count == 2)
@@ -140,10 +140,10 @@
             let registry = DebugDrawerModelRegistry()
             registry.register(model, id: "Tally")
             let directory = FileManager.default.temporaryDirectory.appending(path: "AppGroupStoreKillExitTests-\(UUID().uuidString)")
-            let commands = directory.appending(path: "commands")
+            let commands = AppGroupStoreLayout.appDirectory(inStore: directory).appending(path: "commands")
             let server = DebugDrawerAppGroupStoreServer(registry: registry, directory: directory)
             try server.start()
-            let reading = try DebugDrawerAppGroupStoreTransport(directory: directory)
+            let reading = try DebugDrawerAppGroupStoreTransport(directory: AppGroupStoreLayout.appDirectory(inStore: directory))
             _ = try await reading.connect(toPlugin: "Tally", snapshot: TallyModel.Snapshot.self, command: TallyModel.Command.self)
             // The app is suspended while the viewer runs.
             server.stop()
@@ -152,7 +152,7 @@
             await #expect(processExitsWith: .signal(SIGXFSZ)) { [path = directory.path as String] in
                 @MainActor
                 func sendUntilKilled() async throws {
-                    let connection = try DebugDrawerAppGroupStoreTransport(directory: URL(filePath: path))
+                    let connection = try DebugDrawerAppGroupStoreTransport(directory: AppGroupStoreLayout.appDirectory(inStore: URL(filePath: path)))
                     let viewer = try await connection.connect(toPlugin: "Tally", snapshot: TallyModel.Snapshot.self, command: TallyModel.Command.self)
                     viewer.send(.note("last complete"))
                     // Output to /dev/null, no core file, then a size limit far below the next

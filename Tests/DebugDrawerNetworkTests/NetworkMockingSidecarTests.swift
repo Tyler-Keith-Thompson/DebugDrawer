@@ -69,7 +69,7 @@
                 matcher: .init(methods: ["GET"], host: .exact("127.0.0.1"), path: .exact("/v1/greeting")),
                 response: .init(status: 201, body: .text("mocked"), contentType: "text/plain")
             )
-            let sidecar = try DebugDrawerAppGroupStoreTransport(directory: store)
+            let sidecar = try DebugDrawerAppGroupStoreTransport(directory: AppGroupStoreLayout.appDirectory(inStore: store))
             let sessionControl = try await sidecar.connect(
                 toPlugin: DebugDrawerSessions.pluginID, snapshot: DebugDrawerSessionState.self, command: DebugDrawerSessionCommand.self
             )
@@ -153,7 +153,7 @@
             let rule = NetworkMockRule(
                 name: "Greeting", matcher: .init(host: .exact("127.0.0.1"), path: .exact("/v1/greeting")), response: .init(body: .text("mocked"))
             )
-            let sidecar = try DebugDrawerAppGroupStoreTransport(directory: store)
+            let sidecar = try DebugDrawerAppGroupStoreTransport(directory: AppGroupStoreLayout.appDirectory(inStore: store))
             let sessionControl = try await sidecar.connect(
                 toPlugin: DebugDrawerSessions.pluginID, snapshot: DebugDrawerSessionState.self, command: DebugDrawerSessionCommand.self
             )
@@ -223,7 +223,7 @@
                 NetworkMockRule(name: "Named", matcher: .init(host: .exact("localhost")), response: .init(body: .text("mocked by name"))),
                 NetworkMockRule(name: "Any host", matcher: .init(host: .any, path: .exact("/v1/greeting")), response: .init(body: .text("mocked")))
             ]
-            let sidecar = try DebugDrawerAppGroupStoreTransport(directory: store)
+            let sidecar = try DebugDrawerAppGroupStoreTransport(directory: AppGroupStoreLayout.appDirectory(inStore: store))
             let sessionControl = try await sidecar.connect(
                 toPlugin: DebugDrawerSessions.pluginID, snapshot: DebugDrawerSessionState.self, command: DebugDrawerSessionCommand.self
             )
@@ -280,7 +280,7 @@
                 notBefore: Self.start, expires: Self.start.addingTimeInterval(300)
             ))
             let rule = NetworkMockRule(name: "Everything", matcher: .init(), response: .init(body: .text("mocked")))
-            let sidecar = try DebugDrawerAppGroupStoreTransport(directory: store)
+            let sidecar = try DebugDrawerAppGroupStoreTransport(directory: AppGroupStoreLayout.appDirectory(inStore: store))
             let sessionControl = try await sidecar.connect(
                 toPlugin: DebugDrawerSessions.pluginID, snapshot: DebugDrawerSessionState.self, command: DebugDrawerSessionCommand.self
             )
@@ -337,7 +337,7 @@
                 notBefore: Self.start, expires: Self.start.addingTimeInterval(300)
             ))
             let rule = NetworkMockRule(name: "Greeting", matcher: .init(host: .exact("127.0.0.1")), response: .init(body: .text("mocked")))
-            let sidecar = try DebugDrawerAppGroupStoreTransport(directory: store)
+            let sidecar = try DebugDrawerAppGroupStoreTransport(directory: AppGroupStoreLayout.appDirectory(inStore: store))
             let sessionControl = try await sidecar.connect(
                 toPlugin: DebugDrawerSessions.pluginID, snapshot: DebugDrawerSessionState.self, command: DebugDrawerSessionCommand.self
             )
@@ -397,7 +397,7 @@
             defer { urlSession.invalidateAndCancel() }
             let url = try #require(URL(string: "http://127.0.0.1:\(port)/v1/greeting"))
             let rule = NetworkMockRule(name: "Greeting", matcher: .init(host: .exact("127.0.0.1")), response: .init(body: .text("mocked")))
-            let sidecar = try DebugDrawerAppGroupStoreTransport(directory: store)
+            let sidecar = try DebugDrawerAppGroupStoreTransport(directory: AppGroupStoreLayout.appDirectory(inStore: store))
             let sessionControl = try await sidecar.connect(
                 toPlugin: DebugDrawerSessions.pluginID, snapshot: DebugDrawerSessionState.self, command: DebugDrawerSessionCommand.self
             )
@@ -454,7 +454,7 @@
                 .setRules([NetworkMockRule(name: "File", matcher: .init(host: .exact("127.0.0.1")), response: .init(body: .file("greeting.json")))]),
                 .setConditions([NetworkConditionProfile(name: "Regex", host: .regex(".*"), latency: .seconds(1))])
             ]
-            let sidecar = try DebugDrawerAppGroupStoreTransport(directory: store)
+            let sidecar = try DebugDrawerAppGroupStoreTransport(directory: AppGroupStoreLayout.appDirectory(inStore: store))
             let sessionControl = try await sidecar.connect(
                 toPlugin: DebugDrawerSessions.pluginID, snapshot: DebugDrawerSessionState.self, command: DebugDrawerSessionCommand.self
             )
@@ -515,7 +515,7 @@
                 notBefore: Self.start, expires: Self.start.addingTimeInterval(300)
             ))
             let rule = NetworkMockRule(name: "Greeting", matcher: .init(host: .exact("127.0.0.1")), response: .init(body: .text("mocked")))
-            let sidecar = try DebugDrawerAppGroupStoreTransport(directory: store)
+            let sidecar = try DebugDrawerAppGroupStoreTransport(directory: AppGroupStoreLayout.appDirectory(inStore: store))
             let sessionControl = try await sidecar.connect(
                 toPlugin: DebugDrawerSessions.pluginID, snapshot: DebugDrawerSessionState.self, command: DebugDrawerSessionCommand.self
             )

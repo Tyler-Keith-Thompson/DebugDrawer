@@ -57,6 +57,29 @@ import SwiftUI
             )
         }
 
+        /// The sidecar for the apps serving any of the app groups `groupIdentifiers`: for a
+        /// company that gives each app a group of its own, so the apps can't read each other's
+        /// files, and has the sidecar join every one.
+        ///
+        /// - Parameters:
+        ///   - groupIdentifiers: The app groups, each listed in the sidecar's
+        ///     `com.apple.security.application-groups` entitlement and in its apps'.
+        ///   - plugins: The plugins to show, for each app that serves them, in this order.
+        ///   - sessionDuration: How long a session Open Session asks for, in seconds; the app caps
+        ///     it at its maximum.
+        ///   - grant: Fetches the signed grant for a session with the app given, for apps whose
+        ///     sessions require one; `nil` opens sessions without a grant.
+        public init(
+            groupIdentifiers: [String],
+            plugins: [DebugDrawerSidecarPlugin] = [.console, .network],
+            sessionDuration: TimeInterval = 15 * 60,
+            grant: (@MainActor (DebugDrawerSidecarApp) async throws -> String)? = nil
+        ) {
+            self.init(
+                apps: DebugDrawerSidecarAppList(groupIdentifiers: groupIdentifiers), plugins: plugins, sessionDuration: sessionDuration, grant: grant
+            )
+        }
+
         /// The sidecar for the apps `apps` lists.
         ///
         /// - Parameters:
@@ -118,6 +141,20 @@ import SwiftUI
         ///   - grant: Never called.
         public init(
             groupIdentifier: String,
+            plugins: [DebugDrawerSidecarPlugin] = [.console, .network],
+            sessionDuration: TimeInterval = 15 * 60,
+            grant: (@MainActor (DebugDrawerSidecarApp) async throws -> String)? = nil
+        ) {}
+
+        /// A stand-in.
+        ///
+        /// - Parameters:
+        ///   - groupIdentifiers: Ignored.
+        ///   - plugins: Ignored.
+        ///   - sessionDuration: Ignored.
+        ///   - grant: Never called.
+        public init(
+            groupIdentifiers: [String],
             plugins: [DebugDrawerSidecarPlugin] = [.console, .network],
             sessionDuration: TimeInterval = 15 * 60,
             grant: (@MainActor (DebugDrawerSidecarApp) async throws -> String)? = nil

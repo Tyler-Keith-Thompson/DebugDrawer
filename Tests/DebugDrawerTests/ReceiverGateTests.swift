@@ -67,7 +67,7 @@
 
         init(receiverGate: RemoteSwitch, themeGate: RemoteSwitch) async throws {
             let directory = FileManager.default.temporaryDirectory.appending(path: "ReceiverGateTests-\(UUID().uuidString)")
-            layout = AppGroupStoreLayout(directory: directory)
+            layout = AppGroupStoreLayout(directory: AppGroupStoreLayout.appDirectory(inStore: directory))
             receiver = DebugDrawerReceiver(directory: directory, sessions: sessions) { receiverGate.isOn }
             receiver.enable(.model(logLevels, id: Self.logLevelsID, scope: .session(revertWith: .reset)))
             receiver.enable(.model(theme, id: Self.themeID, scope: .session(revertWith: .reset))) { themeGate.isOn }
@@ -75,7 +75,7 @@
             self.entries = entries
             subscription = sessions.auditEntries.sink { entry.yield($0) }
             try receiver.start()
-            sidecar = try DebugDrawerAppGroupStoreTransport(directory: directory)
+            sidecar = try DebugDrawerAppGroupStoreTransport(directory: AppGroupStoreLayout.appDirectory(inStore: directory))
             sessionControl = try await sidecar.connect(
                 toPlugin: DebugDrawerSessions.pluginID, snapshot: DebugDrawerSessionState.self, command: DebugDrawerSessionCommand.self
             )

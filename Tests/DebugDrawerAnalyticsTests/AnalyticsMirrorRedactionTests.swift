@@ -23,7 +23,7 @@
             receiver.enable(.analyticsEvents(sessions: sessions, redaction: redaction))
             try receiver.start()
             defer { receiver.stop() }
-            let sidecar = try DebugDrawerAppGroupStoreTransport(directory: directory)
+            let sidecar = try DebugDrawerAppGroupStoreTransport(directory: AppGroupStoreLayout.appDirectory(inStore: directory))
             let sessionControl = try await sidecar.connect(
                 toPlugin: DebugDrawerSessions.pluginID, snapshot: DebugDrawerSessionState.self, command: DebugDrawerSessionCommand.self
             )

@@ -1,13 +1,35 @@
 import Foundation
 
-// The app-group store's files, which both its server and its transport read and write. Each file
-// holds one `StoreDocument` as JSON, a message with its schema version and writer (no frame: the
-// file is the frame), written atomically, so a
-// reader in another process sees the old file or the new one, never part of one.
+// The app-group store's files, which both its server and its transport read and write. The group's
+// store (`<container>/DebugDrawer`) holds a directory per app that serves it, named by the app's
+// bundle ID, and each app reads and writes only its own:
 //
-//     <directory>/snapshots/<plugin ID>.json   each plugin's newest snapshot, replaced as it changes
-//     <directory>/commands/<sequence>.json     commands waiting for the app, performed in name
-//                                              order and removed
+//     <store>/apps/<percent-encoded bundle ID>/presence.json        who the app is (AppPresence)
+//     <store>/apps/<percent-encoded bundle ID>/drawer.sock          a debug build's socket
+//     <store>/apps/<percent-encoded bundle ID>/snapshots/<plugin ID>.json
+//     <store>/apps/<percent-encoded bundle ID>/commands/<sequence>.json
+//
+// The app's server and receiver take the group's store and find their own directory from the
+// main bundle's identifier, never from a parameter, so two apps of one group never perform each
+// other's commands or write where the other's sidecar reads. A sidecar names the app it reaches
+// (`appDirectory(of:inStore:)`). This keeps apps apart only as far as the library goes: the OS
+// lets every app of a group read the whole container, so an app that must not see another's
+// data needs a group of its own, which the sidecar joins too. Rejected: encrypting each app's
+// directory (a key both an app and its sidecar reach sits in the same container), and a store per
+// app in a container per app (the group's container is the only one both sides reach).
+//
+// A store from before the per-app layout, with `snapshots/`, `commands/` and `presence/` at the
+// store's top level, is neither read nor removed: it never shipped in a release, its commands
+// can't be told apart by app (performing one could run another app's command), and its snapshots
+// and presence files are rewritten by each app as it starts serving.
+//
+// Each file holds one `StoreDocument` as JSON, a message with its schema version and writer (no
+// frame: the file is the frame), written atomically, so a reader in another process sees the old
+// file or the new one, never part of one.
+//
+//     snapshots/<plugin ID>.json   each plugin's newest snapshot, replaced as it changes
+//     commands/<sequence>.json     commands waiting for the app, performed in name order and
+//                                  removed
 //
 // Snapshots stay when the app is suspended or quits, so a viewer started later reads the last
 // state; commands wait for the app to come back. A plugin ID is percent-encoded into its file name.
@@ -36,7 +58,7 @@ import Foundation
 // processes agree on), and removing cut-off files by age (a clock rule where the name already
 // says what a file is).
 
-/// Where the app-group store keeps its files under a directory.
+/// Where the app-group store keeps an app's files under the app's directory.
 package struct AppGroupStoreLayout: Sendable {
     /// The most files `commands` holds once a viewer has left a command.
     package static let maximumCommandFiles = 256
@@ -47,9 +69,33 @@ package struct AppGroupStoreLayout: Sendable {
     package let snapshots: URL
     package let commands: URL
 
+    /// The layout of the app directory `directory`: one app's, in the group's store.
     package init(directory: URL) {
         snapshots = directory.appending(path: "snapshots", directoryHint: .isDirectory)
         commands = directory.appending(path: "commands", directoryHint: .isDirectory)
+    }
+
+    /// The directory holding every app's directory in the group's store in `store`.
+    package static func appsDirectory(inStore store: URL) -> URL {
+        store.appending(path: "apps", directoryHint: .isDirectory)
+    }
+
+    /// The directory of the app `bundleIdentifier` in the group's store in `store`:
+    /// `apps/<percent-encoded bundle ID>`.
+    package static func appDirectory(of bundleIdentifier: String, inStore store: URL) -> URL {
+        appsDirectory(inStore: store).appending(path: fileName(bundleIdentifier), directoryHint: .isDirectory)
+    }
+
+    /// This process's own directory in the group's store in `store`, named by the main bundle's
+    /// identifier, as its receiver or store server keeps it.
+    package static func appDirectory(inStore store: URL) -> URL {
+        appDirectory(of: AppPresence.Identity.of(.main).bundleIdentifier, inStore: store)
+    }
+
+    /// `text` as a file name: percent-encoded but for letters, digits, `.`, `_` and `-`, so a
+    /// bundle ID or plugin ID with a `/` in it can't name a path outside its directory.
+    package static func fileName(_ text: String) -> String {
+        text.addingPercentEncoding(withAllowedCharacters: fileNameCharacters) ?? text
     }
 
     /// Makes both directories, as either side may start first, and checks this process may read,
@@ -67,8 +113,7 @@ package struct AppGroupStoreLayout: Sendable {
 
     /// The file holding `pluginID`'s snapshot.
     package func snapshotFile(for pluginID: String) -> URL {
-        let name = pluginID.addingPercentEncoding(withAllowedCharacters: Self.fileNameCharacters) ?? pluginID
-        return snapshots.appending(path: "\(name).json", directoryHint: .notDirectory)
+        snapshots.appending(path: "\(Self.fileName(pluginID)).json", directoryHint: .notDirectory)
     }
 
     /// The message files in `directory`, sorted by name; the temporary files an atomic write

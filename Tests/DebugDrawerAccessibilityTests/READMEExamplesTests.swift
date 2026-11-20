@@ -37,7 +37,9 @@
             defer { review.receiver.stop() }
             _ = ReviewedRoot().body
 
-            let sidecar = try DebugDrawerAppGroupStoreTransport(directory: container.appending(path: "DebugDrawer"))
+            let appDirectory = AppGroupStoreLayout.appDirectory(inStore: container.appending(path: "DebugDrawer"))
+
+            let sidecar = try DebugDrawerAppGroupStoreTransport(directory: appDirectory)
             let environment = try await sidecar.connect(
                 toPlugin: AccessibilityEnvironmentOverrides.pluginID,
                 snapshot: AccessibilityEnvironmentOverrides.Snapshot.self,

@@ -35,7 +35,7 @@
             let root = FileManager.default.temporaryDirectory.appending(path: "ReleaseMetricKitTests-\(UUID().uuidString)")
             let store = root.appending(path: "Group/DebugDrawer")
             let archive = root.appending(path: "Payloads")
-            let layout = AppGroupStoreLayout(directory: store)
+            let layout = AppGroupStoreLayout(directory: AppGroupStoreLayout.appDirectory(inStore: store))
             let file = layout.snapshotFile(for: MetricKitPayloadsMirror.pluginID)
             func read() -> MetricKitPayloadsMirror.Snapshot? {
                 guard let data = try? Data(contentsOf: file), let document = StoreDocument.decoded(from: data) else { return nil }

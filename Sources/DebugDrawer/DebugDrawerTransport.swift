@@ -22,7 +22,7 @@
 /// ```swift
 /// let connection: any DebugDrawerTransport = isAppRunning
 ///     ? try DebugDrawerSocketTransport(socketPath: socketPath)
-///     : try DebugDrawerAppGroupStoreTransport(directory: storeDirectory)
+///     : try DebugDrawerAppGroupStoreTransport(directory: appDirectory)
 /// let transport = try await connection.connect(
 ///     toPlugin: "DebugDrawerLaunchTimePlugin.LaunchTimePlugin",
 ///     snapshot: LaunchTimeSnapshot.self,

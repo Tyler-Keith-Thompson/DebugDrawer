@@ -358,13 +358,16 @@ The viewer picks a transport per connection, at run time, and can hold several a
 model or to many. A sidecar holds a ``DebugDrawerSidecarTransport``: it reads the app over the
 socket while the app answers on it and through the store while it doesn't, and switches each way
 on its own, so the transport it hands out keeps drawing as the app goes to the background, quits
-or comes back.
+or comes back. Several apps can serve one group's store, each in its own directory, so the
+sidecar names the app it reaches by its bundle ID:
 
 ```swift
 @MainActor
-func counterTransport(group: DebugDrawerAppGroupContainer) async throws
+func counterTransport(group: DebugDrawerAppGroupContainer, app bundleIdentifier: String) async throws
     -> DebugDrawerPluginTransport<CounterModel.Snapshot, CounterModel.Command> {
-    let sidecar = try DebugDrawerSidecarTransport(socketPath: group.socketPath, storeDirectory: group.storeDirectory)
+    let sidecar = try DebugDrawerSidecarTransport(
+        socketPath: group.socketPath(of: bundleIdentifier), storeDirectory: group.appDirectory(of: bundleIdentifier)
+    )
     return try await sidecar.connect(toPlugin: "MyApp.CounterPlugin", snapshot: CounterModel.Snapshot.self, command: CounterModel.Command.self)
 }
 ```
@@ -396,12 +399,25 @@ release builds get stand-ins whose connections throw ``DebugDrawerTransportError
 and whose servers serve nothing.
 
 **The group's container.** Both sides resolve it with ``DebugDrawerAppGroupContainer``, which
-calls `FileManager.containerURL(forSecurityApplicationGroupIdentifier:)` and keeps the socket at
-`DebugDrawer/drawer.sock` and the store in `DebugDrawer/` there:
+calls `FileManager.containerURL(forSecurityApplicationGroupIdentifier:)`. The group's store is
+`DebugDrawer/` there (``DebugDrawerAppGroupContainer/storeDirectory``, which the app's
+``DebugDrawerAppGroupStoreServer`` takes), and each app that serves it keeps to a directory of its
+own in it, named by its main bundle's identifier: `DebugDrawer/apps/<bundle ID>/`, with its
+presence file, its socket (``DebugDrawerAppGroupContainer/socketPath``), its snapshots and the
+commands for it. A sidecar reads one app's with ``DebugDrawerAppGroupContainer/appDirectory(of:)``
+and ``DebugDrawerAppGroupContainer/socketPath(of:)``:
 
 ```swift
 let group = try DebugDrawerAppGroupContainer(groupIdentifier: "TEAMID.com.example.debug")
 ```
+
+**Several apps in one group.** Because each app serves only its own directory, a company's apps
+can share one group and one sidecar: neither performs the other's commands, and neither serves
+where the other's sidecar reads. That is as far as the library can keep them apart. The system
+lets every app of a group read the whole container, so an app that must not see another's data
+(another app's captured logs or requests) needs a group of its own: give each app its own group,
+and have the sidecar join every one (`DebugDrawerSidecarView(groupIdentifiers:)` in
+`DebugDrawerSidecarKit`).
 
 It throws ``DebugDrawerTransportError/noAppGroupContainer`` where the system gives the group no
 container (on iOS, visionOS, tvOS and watchOS, when the app's entitlements lack it), rather than

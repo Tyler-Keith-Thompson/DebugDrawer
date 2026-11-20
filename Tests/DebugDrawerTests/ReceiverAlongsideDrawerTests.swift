@@ -43,7 +43,7 @@
             let (arrivals, arrival) = AsyncStream<DebugDrawerAuditEntry>.makeStream()
             let subscription = sessions.auditEntries.sink { arrival.yield($0) }
             defer { subscription.cancel() }
-            let layout = AppGroupStoreLayout(directory: directory)
+            let layout = AppGroupStoreLayout(directory: AppGroupStoreLayout.appDirectory(inStore: directory))
             let payload = try TransportMessage.payload(DebugDrawerFeatureFlagOverrides.Command.setOverride(key: "new-checkout", value: .bool(true)))
             let document = StoreDocument(TransportMessage(kind: .command, pluginID: DebugDrawerFeatureFlagOverrides.pluginID, payload: payload))
             let expected = [DebugDrawerFeatureFlag(key: "new-checkout", value: .bool(true))]

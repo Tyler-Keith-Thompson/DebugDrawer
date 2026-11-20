@@ -20,7 +20,7 @@
         @Test("In release, a granted rule answers only the session the host configured, nothing is registered or replaced, and the end stops it")
         func answersOnlyTheConfiguredSession() async throws {
             let directory = FileManager.default.temporaryDirectory.appending(path: "ReleaseNetworkMockingTests-\(UUID().uuidString)")
-            let layout = AppGroupStoreLayout(directory: directory)
+            let layout = AppGroupStoreLayout(directory: AppGroupStoreLayout.appDirectory(inStore: directory))
             #expect(layout.create())
             let serverKey = Curve25519.Signing.PrivateKey()
             let now = Date()
@@ -86,7 +86,7 @@
         @Test("In release, without a grant policy the capability's rules are refused, and nothing is answered")
         func refusedWithoutGrants() async throws {
             let directory = FileManager.default.temporaryDirectory.appending(path: "ReleaseNetworkMockingTests-\(UUID().uuidString)")
-            let layout = AppGroupStoreLayout(directory: directory)
+            let layout = AppGroupStoreLayout(directory: AppGroupStoreLayout.appDirectory(inStore: directory))
             #expect(layout.create())
             let rule = NetworkMockRule(name: "Everything", matcher: .init(), response: .init(body: .text("mocked")))
             let commands: [(String, Data)] = try [

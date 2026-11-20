@@ -41,7 +41,9 @@
             defer { review.receiver.stop() }
             _ = SettingsHeader(itemCount: 3).localizationReview()
 
-            let sidecar = try DebugDrawerAppGroupStoreTransport(directory: container.appending(path: "DebugDrawer"))
+            let appDirectory = AppGroupStoreLayout.appDirectory(inStore: container.appending(path: "DebugDrawer"))
+
+            let sidecar = try DebugDrawerAppGroupStoreTransport(directory: appDirectory)
             let modes = try await sidecar.connect(
                 toPlugin: LocalizationReview.pluginID, snapshot: LocalizationReview.Snapshot.self, command: LocalizationReview.Command.self
             )

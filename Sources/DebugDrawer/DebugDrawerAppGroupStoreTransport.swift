@@ -43,8 +43,9 @@ import os
         /// Reads the store in `directory`, making it if it doesn't exist, so the app's first
         /// snapshots are seen as they land.
         ///
-        /// - Parameter directory: The store's directory, the app's
-        ///   ``DebugDrawerAppGroupStoreServer/directory``.
+        /// - Parameter directory: The app's own directory of the group's store,
+        ///   ``DebugDrawerAppGroupStoreServer/appDirectory``
+        ///   (``DebugDrawerAppGroupContainer/appDirectory(of:)``), never the group's store itself.
         /// - Throws: ``DebugDrawerTransportError/accessDenied`` when the system refuses access to
         ///   the directory (the app group missing from the app's entitlements, or the person
         ///   declining macOS's prompt), and ``DebugDrawerTransportError/unreachable`` when it can't

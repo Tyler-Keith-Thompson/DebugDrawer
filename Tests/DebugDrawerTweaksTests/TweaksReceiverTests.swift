@@ -29,7 +29,7 @@
             receiver.enable(.tweaks([AnyTweak(backend), AnyTweak(verbose), AnyTweak(timeout), AnyTweak(apiToken)], store: store, scope: .persistent))
             try receiver.start()
             defer { receiver.stop() }
-            let sidecar = try DebugDrawerAppGroupStoreTransport(directory: directory)
+            let sidecar = try DebugDrawerAppGroupStoreTransport(directory: AppGroupStoreLayout.appDirectory(inStore: directory))
             let expected = TweaksModel.Snapshot(tweaks: [
                 TweaksModel.Entry(
                     title: "Backend",
@@ -70,7 +70,7 @@
             let (arrivals, arrival) = AsyncStream<DebugDrawerAuditEntry>.makeStream()
             let subscription = sessions.auditEntries.sink { arrival.yield($0) }
             defer { subscription.cancel() }
-            let sidecar = try DebugDrawerAppGroupStoreTransport(directory: directory)
+            let sidecar = try DebugDrawerAppGroupStoreTransport(directory: AppGroupStoreLayout.appDirectory(inStore: directory))
             let session = try await sidecar.connect(
                 toPlugin: DebugDrawerSessions.pluginID, snapshot: DebugDrawerSessionState.self, command: DebugDrawerSessionCommand.self
             )
@@ -123,7 +123,7 @@
             let (arrivals, arrival) = AsyncStream<DebugDrawerAuditEntry>.makeStream()
             let subscription = sessions.auditEntries.sink { arrival.yield($0) }
             defer { subscription.cancel() }
-            let sidecar = try DebugDrawerAppGroupStoreTransport(directory: directory)
+            let sidecar = try DebugDrawerAppGroupStoreTransport(directory: AppGroupStoreLayout.appDirectory(inStore: directory))
             let sut = try await sidecar.connect(
                 toPlugin: TweaksModel.pluginID, snapshot: TweaksModel.Snapshot.self, command: TweaksModel.Command.self
             )
@@ -155,7 +155,7 @@
             let firstLaunch = DebugDrawerReceiver(directory: directory, sessions: firstSessions)
             firstLaunch.enable(.tweaks([AnyTweak(backend), AnyTweak(timeout)], store: firstStore, scope: .persistent))
             try firstLaunch.start()
-            let sidecar = try DebugDrawerAppGroupStoreTransport(directory: directory)
+            let sidecar = try DebugDrawerAppGroupStoreTransport(directory: AppGroupStoreLayout.appDirectory(inStore: directory))
             let session = try await sidecar.connect(
                 toPlugin: DebugDrawerSessions.pluginID, snapshot: DebugDrawerSessionState.self, command: DebugDrawerSessionCommand.self
             )
@@ -200,7 +200,7 @@
             sessions.perform(.open(duration: 60))
             try receiver.start()
             defer { receiver.stop() }
-            let sidecar = try DebugDrawerAppGroupStoreTransport(directory: directory)
+            let sidecar = try DebugDrawerAppGroupStoreTransport(directory: AppGroupStoreLayout.appDirectory(inStore: directory))
             let sut = try await sidecar.connect(
                 toPlugin: TweaksModel.pluginID, snapshot: TweaksModel.Snapshot.self, command: TweaksModel.Command.self
             )

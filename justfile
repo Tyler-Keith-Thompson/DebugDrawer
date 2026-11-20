@@ -384,11 +384,13 @@ run target="macOS" *args="":
             # on the Mac.
             case "{{args}}" in
                 ""|iOS|ios)
-                    # Both serve the group's store, so the iOS example's debug build is stopped
-                    # first: two servers of one store would each take the other's commands.
-                    xcrun simctl terminate "{{IOS_DEVICE}}" com.debugdrawer.example.ios 2>/dev/null || true
+                    # Two of the group's apps, each serving its own directory of the group's store
+                    # (apps/<bundle ID>/), so the sidecar lists both: the production host and the
+                    # iOS example's debug build.
                     run_in_simulator ExampleApp_Receiver_iOS "{{IOS_DEVICE}}" com.debugdrawer.example.receiver \
                         /tmp/debugdrawer-example-receiver-ios
+                    run_in_simulator ExampleApp_iOS "{{IOS_DEVICE}}" com.debugdrawer.example.ios \
+                        /tmp/debugdrawer-example-ios
                     run_in_simulator ExampleApp_Sidecar_iOS "{{IOS_DEVICE}}" com.debugdrawer.example.sidecar \
                         /tmp/debugdrawer-example-sidecar-ios
                     ;;

@@ -6,6 +6,12 @@ Notable changes in each release, newest first, in the style of
 new empty Unreleased above it, and commit. Deploy refuses to tag a version with no entry here, and
 the entry becomes the GitHub release's notes.
 
+## [Unreleased]
+
+### Added
+
+- DD-102: one sidecar serves all of a company's apps in an app group. The group's store (`DebugDrawer/` in the container) now holds a directory per app, `apps/<bundle ID>/`, with its presence file (`presence.json`, which registers the app: bundle ID, name, version, build, capabilities and, new, the protocol version it speaks), its socket, its snapshots (the sessions' among them) and the commands for it. `DebugDrawerReceiver` and `DebugDrawerAppGroupStoreServer` are still handed the group's store and keep to their own directory, named by the main bundle's identifier (new `appDirectory` on both), so two apps of one group never perform each other's commands or serve where the other's sidecar reads, and a command naming another app's capability is refused as `unknownCapability`. `DebugDrawerAppGroupContainer.socketPath` is now `DebugDrawer/apps/<main bundle ID>/drawer.sock`, and a sidecar names the app it reaches with the new `appDirectory(of:)` and `socketPath(of:)`; hand those, not `storeDirectory`, to `DebugDrawerSidecarTransport` and `DebugDrawerAppGroupStoreTransport`. In `DebugDrawerSidecarKit`, `DebugDrawerSidecarApp.storeDirectory` is the app's own directory and `protocolVersion` is new (a parameter of its initializer); `DebugDrawerSidecarAppList` takes several groups (`init(groupIdentifiers:)`, `init(storeDirectories:)`, merged, `storeDirectories` in place of `storeDirectory`) and `DebugDrawerSidecarView(groupIdentifiers:)` shows them, for companies that give each app its own group: the system doesn't isolate apps within one group, so that is the way to keep one app from reading another's captured data, and the README says so. A store in 0.1.4's flat layout is neither read nor removed: its commands can't be tied to an app, and each app writes its registration and snapshots again at launch, so a 0.1.4 host and a sidecar from this release don't see each other until both are updated. `just run sidecar` now launches the iOS example's debug build beside the production host, and the sidecar lists both.
+
 ## [0.1.4] - 2026-11-20
 
 ### Added

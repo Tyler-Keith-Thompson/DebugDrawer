@@ -28,7 +28,8 @@
 
             try receiver.start()
             defer { receiver.stop() }
-            let sidecar = try DebugDrawerAppGroupStoreTransport(directory: container.appending(path: "DebugDrawer"))
+            let appDirectory = AppGroupStoreLayout.appDirectory(inStore: container.appending(path: "DebugDrawer"))
+            let sidecar = try DebugDrawerAppGroupStoreTransport(directory: appDirectory)
             let tweaks = try await sidecar.connect(
                 toPlugin: TweaksModel.pluginID, snapshot: TweaksModel.Snapshot.self, command: TweaksModel.Command.self
             )

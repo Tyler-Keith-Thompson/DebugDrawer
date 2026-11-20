@@ -536,7 +536,7 @@
             let directory = FileManager.default.temporaryDirectory.appending(path: "SessionTests-\(UUID().uuidString)")
             let server = DebugDrawerAppGroupStoreServer(registry: registry, directory: directory)
             try server.start()
-            let sidecar = try DebugDrawerAppGroupStoreTransport(directory: directory)
+            let sidecar = try DebugDrawerAppGroupStoreTransport(directory: AppGroupStoreLayout.appDirectory(inStore: directory))
             let session = try await sidecar.connect(
                 toPlugin: sessionsID, snapshot: DebugDrawerSessionState.self, command: DebugDrawerSessionCommand.self
             )

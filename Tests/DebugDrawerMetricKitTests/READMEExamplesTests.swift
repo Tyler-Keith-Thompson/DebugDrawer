@@ -32,7 +32,9 @@
             let diagnostics = try ProductionDiagnostics(container: container)
             defer { diagnostics.receiver.stop() }
 
-            let sidecar = try DebugDrawerAppGroupStoreTransport(directory: container.appending(path: "DebugDrawer"))
+            let appDirectory = AppGroupStoreLayout.appDirectory(inStore: container.appending(path: "DebugDrawer"))
+
+            let sidecar = try DebugDrawerAppGroupStoreTransport(directory: appDirectory)
             let payloads = try await sidecar.connect(
                 toPlugin: MetricKitPayloadsMirror.pluginID,
                 snapshot: MetricKitPayloadsMirror.Snapshot.self,

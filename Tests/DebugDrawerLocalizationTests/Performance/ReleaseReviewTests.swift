@@ -21,7 +21,7 @@
             try Data(#""greeting" = "Hello";"#.utf8).write(to: lproj.appending(path: "Localizable.strings"))
             let bundle = try #require(Bundle(url: root.appending(path: "Fixture.bundle")))
             let directory = root.appending(path: "Store")
-            let layout = AppGroupStoreLayout(directory: directory)
+            let layout = AppGroupStoreLayout(directory: AppGroupStoreLayout.appDirectory(inStore: directory))
             #expect(layout.create())
             let commands: [(String, Data)] = try [
                 (DebugDrawerSessions.pluginID, TransportMessage.payload(DebugDrawerSessionCommand.open(duration: 60))),

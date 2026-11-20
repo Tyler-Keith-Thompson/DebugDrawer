@@ -82,7 +82,7 @@
             let storeServer = DebugDrawerAppGroupStoreServer(registry: registry, directory: storeDirectory)
             try storeServer.start()
             try socketServer.start()
-            let sut = try DebugDrawerSidecarTransport(socketPath: socketPath, storeDirectory: storeDirectory)
+            let sut = try DebugDrawerSidecarTransport(socketPath: socketPath, storeDirectory: storeServer.appDirectory)
             for await channel in sut.$channel.values where channel == .socket {
                 break
             }
@@ -139,7 +139,7 @@
             let socketServer = DebugDrawerSocketServer(registry: registry, socketPath: socketPath)
             let storeServer = DebugDrawerAppGroupStoreServer(registry: registry, directory: storeDirectory)
             try storeServer.start()
-            let sut = try DebugDrawerSidecarTransport(socketPath: socketPath, storeDirectory: storeDirectory)
+            let sut = try DebugDrawerSidecarTransport(socketPath: socketPath, storeDirectory: storeServer.appDirectory)
             let plugin = try await sut.connect(toPlugin: "History", snapshot: HistoryModel.Snapshot.self, command: HistoryModel.Command.self)
             storeServer.stop()
             let firstChannel = sut.channel
@@ -160,7 +160,7 @@
             for await snapshot in plugin.snapshots() where snapshot.history.contains(4) {
                 break
             }
-            let leftInStore = try FileManager.default.contentsOfDirectory(atPath: storeDirectory.appending(path: "commands").path)
+            let leftInStore = try FileManager.default.contentsOfDirectory(atPath: storeServer.appDirectory.appending(path: "commands").path)
 
             #expect(firstChannel == .store)
             #expect(waiting.isEmpty)
@@ -259,7 +259,9 @@
             registry.register(model, id: "History")
             let storeServer = DebugDrawerAppGroupStoreServer(registry: registry, directory: storeDirectory)
             try storeServer.start()
-            let sut = try DebugDrawerSidecarTransport(socketPath: container.appending(path: "drawer.sock").path, storeDirectory: storeDirectory)
+            let sut = try DebugDrawerSidecarTransport(
+                socketPath: container.appending(path: "drawer.sock").path, storeDirectory: storeServer.appDirectory
+            )
             let plugin = try await sut.connect(toPlugin: "History", snapshot: HistoryModel.Snapshot.self, command: HistoryModel.Command.self)
             storeServer.stop()
 

@@ -54,9 +54,10 @@ public enum ExampleSidecar {
     public static let logLevel = ExampleLogLevel()
     private static let registry = DebugDrawerModelRegistry(sessions: sessions)
     private static let server = DebugDrawerAppGroupStoreServer(registry: registry, directory: storeDirectory)
-    /// The socket a sidecar app connects to while both run, beside the store.
+    /// The socket a sidecar app connects to while both run, in the app's own directory of the
+    /// store, where a sidecar looks for it.
     private static let socketServer = DebugDrawerSocketServer(
-        registry: registry, socketPath: storeDirectory.appending(path: "drawer.sock").path
+        registry: registry, socketPath: server.appDirectory.appending(path: "drawer.sock").path
     )
     /// Keeps the app running in the background while a session is open, and ends the session as
     /// the sidecar disconnects from the socket.
@@ -69,8 +70,10 @@ public enum ExampleSidecar {
     private static var auditForwarding: AnyCancellable?
     private static var keeperLogging: AnyCancellable?
 
-    /// The store's directory: in the app group's container when the app has the group, else in
-    /// Caches, which serves the test bench's stand-in sidecar as well.
+    /// The group's store: in the app group's container when the app has the group, else in
+    /// Caches, which serves the test bench's stand-in sidecar as well. The server keeps to the
+    /// app's own directory in it, so the production host (Example/Receiver) serves the same
+    /// group's store beside it, and the example sidecar lists both.
     private static var storeDirectory: URL {
         let container = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: "group.com.debugdrawer.example")
             ?? URL.cachesDirectory
@@ -159,7 +162,7 @@ public enum ExampleSidecar {
     private static func connection() throws -> any DebugDrawerTransport {
         install()
         if let sidecar { return sidecar }
-        let transport = try DebugDrawerAppGroupStoreTransport(directory: storeDirectory)
+        let transport = try DebugDrawerAppGroupStoreTransport(directory: server.appDirectory)
         sidecar = transport
         return transport
     }

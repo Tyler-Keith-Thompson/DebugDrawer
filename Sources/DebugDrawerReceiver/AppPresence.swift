@@ -1,14 +1,16 @@
 import Foundation
 
-// How a sidecar app learns which apps in its group serve it: each app that serves the store (a
-// production app's `DebugDrawerReceiver`, a debug build's `DebugDrawerAppGroupStoreServer`) keeps a
-// small file in the store's `presence/` directory while it serves, named by its bundle ID, and the
-// sidecar kit watches that directory (`DirectoryWatcher`) and lists one app per file. The file says
-// who the app is and what it serves, nothing secret: its bundle ID, name, version and build, the
-// IDs it serves, and when it last said so. It is written atomically (`AppGroupStoreLayout`), as
-// the store's other files are, so a reader sees the old file or the new one.
+// How a sidecar app learns which apps in its group serve it, the group's registry: each app that
+// serves the store (a production app's `DebugDrawerReceiver`, a debug build's
+// `DebugDrawerAppGroupStoreServer`) keeps a small file in its own directory of the store while it
+// serves, and the sidecar kit watches the `apps/` directory and each app's directory in it
+// (`DirectoryWatcher`) and lists one app per file. The file says who the app is and what it serves,
+// nothing secret: its bundle ID, name, version and build, the IDs it serves, the protocol it speaks
+// (its hello: major version, oldest version, capabilities) and when it last said so. It is written
+// atomically (`AppGroupStoreLayout`), as the store's other files are, so a reader sees the old file
+// or the new one.
 //
-//     <directory>/presence/<percent-encoded bundle ID>.json
+//     <store>/apps/<percent-encoded bundle ID>/presence.json
 //
 // The app writes it as it starts serving, again as what it serves changes and as it comes back
 // to the foreground (`lastSeen`), and removes it as it stops, so the list follows each app without
@@ -23,11 +25,11 @@ import Foundation
 // sessions' snapshot (a debug build's ungated registry serves no sessions, and the sidecar would
 // have to read every snapshot to list apps).
 
-/// What an app serving the store says about itself in the store's `presence/` directory, as JSON.
+/// What an app serving the store says about itself in its directory of the store, as JSON.
 package struct AppPresence: Codable, Equatable, Sendable {
     /// The schema this build writes. A reader reads the keys it knows of a newer one, as a later
-    /// schema only adds keys.
-    package static let currentSchemaVersion = 1
+    /// schema only adds keys. Schema 2 added `hello` and moved the file into the app's directory.
+    package static let currentSchemaVersion = 2
 
     /// The schema the file is in.
     package var schemaVersion = AppPresence.currentSchemaVersion
@@ -39,11 +41,15 @@ package struct AppPresence: Codable, Equatable, Sendable {
     /// When the app last wrote the file: as it started serving, as what it serves changed, or as
     /// it came to the foreground.
     package var lastSeen: Date
+    /// The protocol the app's store speaks: its major version, the oldest it still speaks, and
+    /// its capabilities, as each of its store files' writer says.
+    package var hello: TransportHello
 
-    package init(identity: Identity, capabilities: [String], lastSeen: Date) {
+    package init(identity: Identity, capabilities: [String], lastSeen: Date, hello: TransportHello = .current) {
         self.identity = identity
         self.capabilities = capabilities.sorted()
         self.lastSeen = lastSeen
+        self.hello = hello
     }
 
     /// Who an app is, as its bundle says.
@@ -76,15 +82,9 @@ package struct AppPresence: Codable, Equatable, Sendable {
         }
     }
 
-    /// The directory of every presence file of the store in `directory`.
-    package static func directory(inStore directory: URL) -> URL {
-        directory.appending(path: "presence", directoryHint: .isDirectory)
-    }
-
-    /// The file `bundleIdentifier`'s presence is kept in, in the store in `directory`.
-    package static func file(of bundleIdentifier: String, inStore directory: URL) -> URL {
-        let name = bundleIdentifier.addingPercentEncoding(withAllowedCharacters: fileNameCharacters) ?? bundleIdentifier
-        return Self.directory(inStore: directory).appending(path: "\(name).json", directoryHint: .notDirectory)
+    /// The file an app's presence is kept in, in its directory of the store, `appDirectory`.
+    package static func file(inAppDirectory appDirectory: URL) -> URL {
+        appDirectory.appending(path: "presence.json", directoryHint: .notDirectory)
     }
 
     /// The presence `data` holds, or `nil` when it isn't one.
@@ -99,11 +99,9 @@ package struct AppPresence: Codable, Equatable, Sendable {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys]
         encoder.dateEncodingStrategy = .iso8601
-        // Strings, a date and an array of strings: encoding can't fail.
+        // Strings, integers, a date and arrays of strings: encoding can't fail.
         return (try? encoder.encode(self)) ?? Data()
     }
-
-    private static let fileNameCharacters = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "._-"))
 }
 
 /// Keeps an app's presence file in a store while the app serves it.
@@ -115,11 +113,11 @@ package final class PresenceAnnouncement {
     private var presence: AppPresence
     private var foregroundObservation: (any NSObjectProtocol)?
 
-    /// Writes `identity`'s presence, serving `capabilities`, into the store in `directory`, and
-    /// again each time the app comes to the foreground, until ``withdraw()``.
+    /// Writes `identity`'s presence, serving `capabilities`, into its directory of the store,
+    /// `directory`, and again each time the app comes to the foreground, until ``withdraw()``.
     ///
     /// - Parameters:
-    ///   - directory: The store's directory.
+    ///   - directory: The app's directory of the store.
     ///   - identity: Who the app is.
     ///   - capabilities: The IDs the app serves.
     ///   - foreground: What the system posts as the app comes to the foreground.
@@ -131,7 +129,7 @@ package final class PresenceAnnouncement {
         foreground: Notification.Name,
         now: @escaping () -> Date = Date.init
     ) {
-        file = AppPresence.file(of: identity.bundleIdentifier, inStore: directory)
+        file = AppPresence.file(inAppDirectory: directory)
         layout = AppGroupStoreLayout(directory: directory)
         self.now = now
         presence = AppPresence(identity: identity, capabilities: capabilities, lastSeen: now())

@@ -71,7 +71,7 @@
         func noSessionsForAnUngatedApp() throws {
             let app = DebugDrawerSidecarApp(
                 bundleIdentifier: "com.example.shop.debug", displayName: "Shop Debug", version: "2.5", build: "900",
-                capabilities: ["ConsolePlugin"], lastSeen: Date(),
+                capabilities: ["ConsolePlugin"], protocolVersion: 2, lastSeen: Date(),
                 storeDirectory: FileManager.default.temporaryDirectory.appending(path: "SidecarSessionTests-\(UUID().uuidString)")
             )
 

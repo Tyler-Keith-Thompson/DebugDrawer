@@ -59,18 +59,33 @@
             #expect(asked == ["TEAMID.com.example.debug"])
         }
 
-        @Test("A group's container holds the socket at DebugDrawer/drawer.sock and the store in DebugDrawer")
+        @Test("A group's container holds the store in DebugDrawer and each app's socket and files in DebugDrawer/apps/<bundle ID>")
         func containerPaths() throws {
             let container = URL(filePath: "/Users/someone/Library/Group Containers/TEAMID.com.example.debug", directoryHint: .isDirectory)
-            let expectedSocketPath = "/Users/someone/Library/Group Containers/TEAMID.com.example.debug/DebugDrawer/drawer.sock"
             let expectedStoreDirectory = "/Users/someone/Library/Group Containers/TEAMID.com.example.debug/DebugDrawer"
+            let expectedShopDirectory = "/Users/someone/Library/Group Containers/TEAMID.com.example.debug/DebugDrawer/apps/com.example.shop"
+            let expectedShopSocketPath = "\(expectedShopDirectory)/drawer.sock"
+            let expectedOwnSocketPath = AppGroupStoreLayout.appDirectory(inStore: URL(filePath: expectedStoreDirectory, directoryHint: .isDirectory))
+                .appending(path: "drawer.sock").path
 
             let sut = try DebugDrawerAppGroupContainer(groupIdentifier: "TEAMID.com.example.debug") { _ in container }
 
             #expect(sut.groupIdentifier == "TEAMID.com.example.debug")
             #expect(sut.url == container)
-            #expect(sut.socketPath == expectedSocketPath)
             #expect(sut.storeDirectory.path == expectedStoreDirectory)
+            #expect(sut.appDirectory(of: "com.example.shop").path == expectedShopDirectory)
+            #expect(sut.socketPath(of: "com.example.shop") == expectedShopSocketPath)
+            #expect(sut.socketPath == expectedOwnSocketPath)
+        }
+
+        @Test("A bundle ID with a slash stays one directory under apps/, percent-encoded")
+        func appDirectoryEncodesSlash() throws {
+            let container = URL(filePath: "/tmp/group", directoryHint: .isDirectory)
+            let expected = "/tmp/group/DebugDrawer/apps/..%2Fescape"
+
+            let sut = try DebugDrawerAppGroupContainer(groupIdentifier: "TEAMID.com.example.debug") { _ in container }
+
+            #expect(sut.appDirectory(of: "../escape").path == expected)
         }
 
         @Test("The store server throws accessDenied when its directory is refused, and writes nothing anywhere", arguments: StoreDenial.allCases)
@@ -78,6 +93,7 @@
             let root = FileManager.default.temporaryDirectory.appending(path: "ContainerAccessTests-\(UUID().uuidString)")
             let container = root.appending(path: "container")
             let store = container.appending(path: "DebugDrawer")
+            let app = AppGroupStoreLayout.appDirectory(inStore: store)
             let locked: URL
             let expectedFiles: [String]
             switch denial {
@@ -90,10 +106,13 @@
                 locked = store
                 expectedFiles = ["container", "container/DebugDrawer"]
             case .commandsReadOnly:
-                try FileManager.default.createDirectory(at: store.appending(path: "snapshots"), withIntermediateDirectories: true)
-                try FileManager.default.createDirectory(at: store.appending(path: "commands"), withIntermediateDirectories: true)
-                locked = store.appending(path: "commands")
-                expectedFiles = ["container", "container/DebugDrawer", "container/DebugDrawer/commands", "container/DebugDrawer/snapshots"]
+                try FileManager.default.createDirectory(at: app.appending(path: "snapshots"), withIntermediateDirectories: true)
+                try FileManager.default.createDirectory(at: app.appending(path: "commands"), withIntermediateDirectories: true)
+                locked = app.appending(path: "commands")
+                let appPath = "container/DebugDrawer/apps/\(app.lastPathComponent)"
+                expectedFiles = [
+                    "container", "container/DebugDrawer", "container/DebugDrawer/apps", appPath, "\(appPath)/commands", "\(appPath)/snapshots"
+                ]
             }
             chmod(locked.path, denial == .storeReadOnly || denial == .commandsReadOnly ? 0o555 : 0)
             defer { chmod(locked.path, 0o755) }
@@ -114,6 +133,7 @@
             let root = FileManager.default.temporaryDirectory.appending(path: "ContainerAccessTests-\(UUID().uuidString)")
             let container = root.appending(path: "container")
             let store = container.appending(path: "DebugDrawer")
+            let app = AppGroupStoreLayout.appDirectory(inStore: store)
             let locked: URL
             let expectedFiles: [String]
             switch denial {
@@ -126,15 +146,18 @@
                 locked = store
                 expectedFiles = ["container", "container/DebugDrawer"]
             case .commandsReadOnly:
-                try FileManager.default.createDirectory(at: store.appending(path: "snapshots"), withIntermediateDirectories: true)
-                try FileManager.default.createDirectory(at: store.appending(path: "commands"), withIntermediateDirectories: true)
-                locked = store.appending(path: "commands")
-                expectedFiles = ["container", "container/DebugDrawer", "container/DebugDrawer/commands", "container/DebugDrawer/snapshots"]
+                try FileManager.default.createDirectory(at: app.appending(path: "snapshots"), withIntermediateDirectories: true)
+                try FileManager.default.createDirectory(at: app.appending(path: "commands"), withIntermediateDirectories: true)
+                locked = app.appending(path: "commands")
+                let appPath = "container/DebugDrawer/apps/\(app.lastPathComponent)"
+                expectedFiles = [
+                    "container", "container/DebugDrawer", "container/DebugDrawer/apps", appPath, "\(appPath)/commands", "\(appPath)/snapshots"
+                ]
             }
             chmod(locked.path, denial == .storeReadOnly || denial == .commandsReadOnly ? 0o555 : 0)
             defer { chmod(locked.path, 0o755) }
 
-            #expect(throws: DebugDrawerTransportError.accessDenied) { try DebugDrawerAppGroupStoreTransport(directory: store) }
+            #expect(throws: DebugDrawerTransportError.accessDenied) { try DebugDrawerAppGroupStoreTransport(directory: app) }
             chmod(locked.path, 0o755)
             let actual = try FileManager.default.subpathsOfDirectory(atPath: root.path).sorted()
 
@@ -193,7 +216,9 @@
             let expectedFiles = ["container"]
 
             #expect(throws: DebugDrawerTransportError.accessDenied) {
-                try DebugDrawerSidecarTransport(socketPath: group.socketPath, storeDirectory: group.storeDirectory)
+                try DebugDrawerSidecarTransport(
+                    socketPath: group.socketPath(of: "com.example.shop"), storeDirectory: group.appDirectory(of: "com.example.shop")
+                )
             }
             chmod(container.path, 0o755)
             let actual = try FileManager.default.subpathsOfDirectory(atPath: root.path).sorted()
@@ -218,7 +243,7 @@
             }
             chmod(group.socketPath, 0)
 
-            let sut = try DebugDrawerSidecarTransport(socketPath: group.socketPath, storeDirectory: group.storeDirectory)
+            let sut = try DebugDrawerSidecarTransport(socketPath: group.socketPath, storeDirectory: storeServer.appDirectory)
             let deniedError = sut.socketError
             let deniedChannel = sut.channel
             let plugin = try await sut.connect(toPlugin: "Count", snapshot: CountModel.Snapshot.self, command: CountModel.Command.self)

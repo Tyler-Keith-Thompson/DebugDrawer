@@ -133,7 +133,8 @@
             await #expect(processExitsWith: .success) { [path = directory.path as String] in
                 @MainActor
                 func viewerSeesEveryStep() async throws -> Bool {
-                    let connection = try DebugDrawerAppGroupStoreTransport(directory: URL(filePath: path, directoryHint: .isDirectory))
+                    let store = URL(filePath: path, directoryHint: .isDirectory)
+                    let connection = try DebugDrawerAppGroupStoreTransport(directory: AppGroupStoreLayout.appDirectory(inStore: store))
                     let launch = try await connection.connect(
                         toPlugin: "DebugDrawerLaunchTimePlugin.LaunchTimePlugin",
                         snapshot: LaunchTimeSnapshot.self,

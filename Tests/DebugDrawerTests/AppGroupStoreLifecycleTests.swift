@@ -50,7 +50,7 @@
             let directory = FileManager.default.temporaryDirectory.appending(path: "AppGroupStoreLifecycleTests-\(UUID().uuidString)")
             let server = DebugDrawerAppGroupStoreServer(registry: registry, directory: directory)
             try server.start()
-            let connection = try DebugDrawerAppGroupStoreTransport(directory: directory)
+            let connection = try DebugDrawerAppGroupStoreTransport(directory: AppGroupStoreLayout.appDirectory(inStore: directory))
             let viewer = try await connection.connect(toPlugin: "Tally", snapshot: TallyModel.Snapshot.self, command: TallyModel.Command.self)
             #if os(macOS)
                 let foreground = NSApplication.willBecomeActiveNotification
@@ -82,7 +82,7 @@
             let directory = FileManager.default.temporaryDirectory.appending(path: "AppGroupStoreLifecycleTests-\(UUID().uuidString)")
             let server = DebugDrawerAppGroupStoreServer(registry: registry, directory: directory)
             try server.start()
-            let connection = try DebugDrawerAppGroupStoreTransport(directory: directory)
+            let connection = try DebugDrawerAppGroupStoreTransport(directory: AppGroupStoreLayout.appDirectory(inStore: directory))
             let viewer = try await connection.connect(toPlugin: "Tally", snapshot: TallyModel.Snapshot.self, command: TallyModel.Command.self)
             server.stop()
             #if os(macOS)
@@ -92,7 +92,7 @@
             #else
                 let foreground = UIApplication.willEnterForegroundNotification
             #endif
-            let commands = directory.appending(path: "commands")
+            let commands = AppGroupStoreLayout.appDirectory(inStore: directory).appending(path: "commands")
 
             viewer.send(.note("override"))
             NotificationCenter.default.post(name: foreground, object: nil)
@@ -109,10 +109,10 @@
             let registry = DebugDrawerModelRegistry()
             registry.register(model, id: "Tally")
             let directory = FileManager.default.temporaryDirectory.appending(path: "AppGroupStoreLifecycleTests-\(UUID().uuidString)")
-            let commands = directory.appending(path: "commands")
+            let commands = AppGroupStoreLayout.appDirectory(inStore: directory).appending(path: "commands")
             let server = DebugDrawerAppGroupStoreServer(registry: registry, directory: directory)
             try server.start()
-            let connection = try DebugDrawerAppGroupStoreTransport(directory: directory)
+            let connection = try DebugDrawerAppGroupStoreTransport(directory: AppGroupStoreLayout.appDirectory(inStore: directory))
             let viewer = try await connection.connect(toPlugin: "Tally", snapshot: TallyModel.Snapshot.self, command: TallyModel.Command.self)
             server.stop()
             // What a viewer killed mid-write leaves: its name sorts before every command's.
@@ -144,10 +144,10 @@
             let registry = DebugDrawerModelRegistry()
             registry.register(model, id: "Tally")
             let directory = FileManager.default.temporaryDirectory.appending(path: "AppGroupStoreLifecycleTests-\(UUID().uuidString)")
-            let commands = directory.appending(path: "commands")
+            let commands = AppGroupStoreLayout.appDirectory(inStore: directory).appending(path: "commands")
             let server = DebugDrawerAppGroupStoreServer(registry: registry, directory: directory)
             try server.start()
-            let connection = try DebugDrawerAppGroupStoreTransport(directory: directory)
+            let connection = try DebugDrawerAppGroupStoreTransport(directory: AppGroupStoreLayout.appDirectory(inStore: directory))
             let viewer = try await connection.connect(toPlugin: "Tally", snapshot: TallyModel.Snapshot.self, command: TallyModel.Command.self)
             server.stop()
             // Base64 makes each document about a third larger than its note: three fit, four don't.
@@ -177,10 +177,10 @@
             let registry = DebugDrawerModelRegistry()
             registry.register(model, id: "Tally")
             let directory = FileManager.default.temporaryDirectory.appending(path: "AppGroupStoreLifecycleTests-\(UUID().uuidString)")
-            let commands = directory.appending(path: "commands")
+            let commands = AppGroupStoreLayout.appDirectory(inStore: directory).appending(path: "commands")
             let server = DebugDrawerAppGroupStoreServer(registry: registry, directory: directory)
             try server.start()
-            let connection = try DebugDrawerAppGroupStoreTransport(directory: directory)
+            let connection = try DebugDrawerAppGroupStoreTransport(directory: AppGroupStoreLayout.appDirectory(inStore: directory))
             let viewer = try await connection.connect(toPlugin: "Tally", snapshot: TallyModel.Snapshot.self, command: TallyModel.Command.self)
             server.stop()
 
@@ -194,7 +194,7 @@
         func startRemovesCutOffSnapshots() throws {
             let registry = DebugDrawerModelRegistry()
             let directory = FileManager.default.temporaryDirectory.appending(path: "AppGroupStoreLifecycleTests-\(UUID().uuidString)")
-            let snapshots = directory.appending(path: "snapshots")
+            let snapshots = AppGroupStoreLayout.appDirectory(inStore: directory).appending(path: "snapshots")
             try FileManager.default.createDirectory(at: snapshots, withIntermediateDirectories: true)
             try Data(#"{"kind":"snap"#.utf8).write(to: snapshots.appending(path: "Tally.json.4C3F0E0A-6D47-4A9B-8C1F-2E5D7B9A1C30.partial"))
             try Data("left".utf8).write(to: snapshots.appending(path: ".Tally.json"))

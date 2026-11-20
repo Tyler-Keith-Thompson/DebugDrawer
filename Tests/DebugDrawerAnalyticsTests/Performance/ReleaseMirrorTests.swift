@@ -16,7 +16,7 @@
         func mirrorsInRelease() async throws {
             let prefix = "release-\(UUID().uuidString)-"
             let directory = FileManager.default.temporaryDirectory.appending(path: "ReleaseMirrorTests-\(UUID().uuidString)")
-            let layout = AppGroupStoreLayout(directory: directory)
+            let layout = AppGroupStoreLayout(directory: AppGroupStoreLayout.appDirectory(inStore: directory))
             let sessions = DebugDrawerSessions(maximumDuration: 300)
             let receiver = DebugDrawerReceiver(directory: directory, sessions: sessions)
             receiver.enable(.analyticsEvents(sessions: sessions))

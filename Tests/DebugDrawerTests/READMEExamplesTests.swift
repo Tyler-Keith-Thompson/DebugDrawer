@@ -292,7 +292,8 @@
             let container = FileManager.default.temporaryDirectory.appending(path: "READMESidecar-\(UUID().uuidString)")
             AuditForwarder.sent = []
             let sut = try SidecarReceiver(logLevels: logLevels, flags: flags, container: container)
-            let sidecar = try DebugDrawerAppGroupStoreTransport(directory: container.appending(path: "DebugDrawer"))
+            let appDirectory = AppGroupStoreLayout.appDirectory(inStore: container.appending(path: "DebugDrawer"))
+            let sidecar = try DebugDrawerAppGroupStoreTransport(directory: appDirectory)
             let session = try await sidecar.connect(
                 toPlugin: DebugDrawerSessions.pluginID, snapshot: DebugDrawerSessionState.self, command: DebugDrawerSessionCommand.self
             )
@@ -334,7 +335,8 @@
             let container = FileManager.default.temporaryDirectory.appending(path: "READMEGatedReceiver-\(UUID().uuidString)")
             let sut = try GatedReceiver(config: config, flags: flags, container: container)
             defer { sut.receiver.stop() }
-            let sidecar = try DebugDrawerAppGroupStoreTransport(directory: container.appending(path: "DebugDrawer"))
+            let appDirectory = AppGroupStoreLayout.appDirectory(inStore: container.appending(path: "DebugDrawer"))
+            let sidecar = try DebugDrawerAppGroupStoreTransport(directory: appDirectory)
             let session = try await sidecar.connect(
                 toPlugin: DebugDrawerSessions.pluginID, snapshot: DebugDrawerSessionState.self, command: DebugDrawerSessionCommand.self
             )
@@ -371,7 +373,8 @@
             let container = FileManager.default.temporaryDirectory.appending(path: "READMEReceiver-\(UUID().uuidString)")
             let sut = try ProductionReceiver(flags: flags, container: container)
             defer { sut.receiver.stop() }
-            let sidecar = try DebugDrawerAppGroupStoreTransport(directory: container.appending(path: "DebugDrawer"))
+            let appDirectory = AppGroupStoreLayout.appDirectory(inStore: container.appending(path: "DebugDrawer"))
+            let sidecar = try DebugDrawerAppGroupStoreTransport(directory: appDirectory)
             let session = try await sidecar.connect(
                 toPlugin: DebugDrawerSessions.pluginID, snapshot: DebugDrawerSessionState.self, command: DebugDrawerSessionCommand.self
             )

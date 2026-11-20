@@ -115,13 +115,13 @@
         @Test("A viewer reads a snapshot file a schema 1 build left, and leaves its command in the current schema")
         func viewerReadsSchemaOneSnapshot() async throws {
             let directory = FileManager.default.temporaryDirectory.appending(path: "StoreDocumentTests-\(UUID().uuidString)")
-            let snapshots = directory.appending(path: "snapshots")
-            let commands = directory.appending(path: "commands")
+            let snapshots = AppGroupStoreLayout.appDirectory(inStore: directory).appending(path: "snapshots")
+            let commands = AppGroupStoreLayout.appDirectory(inStore: directory).appending(path: "commands")
             try FileManager.default.createDirectory(at: snapshots, withIntermediateDirectories: true)
             let payload = try TransportMessage.payload(CountModel.Snapshot(count: 9))
             let schemaOne = Data(#"{"kind":"snapshot","payload":"\#(payload.base64EncodedString())","pluginID":"Count","version":1}"#.utf8)
             try schemaOne.write(to: snapshots.appending(path: "Count.json"))
-            let connection = try DebugDrawerAppGroupStoreTransport(directory: directory)
+            let connection = try DebugDrawerAppGroupStoreTransport(directory: AppGroupStoreLayout.appDirectory(inStore: directory))
 
             let sut = try await connection.connect(toPlugin: "Count", snapshot: CountModel.Snapshot.self, command: CountModel.Command.self)
             sut.send(.add(1))
@@ -141,7 +141,7 @@
             let registry = DebugDrawerModelRegistry()
             registry.register(model, id: "Count")
             let directory = FileManager.default.temporaryDirectory.appending(path: "StoreDocumentTests-\(UUID().uuidString)")
-            let commands = directory.appending(path: "commands")
+            let commands = AppGroupStoreLayout.appDirectory(inStore: directory).appending(path: "commands")
             try FileManager.default.createDirectory(at: commands, withIntermediateDirectories: true)
             let addHundred = try TransportMessage.payload(CountModel.Command.add(100)).base64EncodedString()
             let addTwo = try TransportMessage.payload(CountModel.Command.add(2)).base64EncodedString()
@@ -153,7 +153,7 @@
             let server = DebugDrawerAppGroupStoreServer(registry: registry, directory: directory)
 
             try server.start()
-            let viewer = try await DebugDrawerAppGroupStoreTransport(directory: directory)
+            let viewer = try await DebugDrawerAppGroupStoreTransport(directory: AppGroupStoreLayout.appDirectory(inStore: directory))
                 .connect(toPlugin: "Count", snapshot: CountModel.Snapshot.self, command: CountModel.Command.self)
             for await snapshot in viewer.snapshots() where snapshot.count >= 2 {
                 break
@@ -161,7 +161,7 @@
             server.stop()
 
             let remaining = try FileManager.default.contentsOfDirectory(atPath: commands.path)
-            let written = try StoreDocument.decoded(from: Data(contentsOf: directory.appending(path: "snapshots/Count.json")))
+            let written = try StoreDocument.decoded(from: Data(contentsOf: server.appDirectory.appending(path: "snapshots/Count.json")))
             #expect(model.snapshot.count == 2)
             #expect(viewer.snapshot.count == 2)
             #expect(remaining.isEmpty)

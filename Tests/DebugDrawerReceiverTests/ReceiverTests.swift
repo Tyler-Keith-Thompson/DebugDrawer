@@ -95,7 +95,7 @@ struct ReceiverTests {
     @Test("With no capability enabled, every command is refused, a session included, changes nothing, and is audited")
     func refusesEverythingWithNothingEnabled() throws {
         let directory = FileManager.default.temporaryDirectory.appending(path: "ReceiverTests-\(UUID().uuidString)")
-        let layout = AppGroupStoreLayout(directory: directory)
+        let layout = AppGroupStoreLayout(directory: AppGroupStoreLayout.appDirectory(inStore: directory))
         #expect(layout.create())
         let adapter = FakeFlagAdapter(["new-checkout": .bool(false)])
         let commands: [(String, Data)] = try [
@@ -128,7 +128,7 @@ struct ReceiverTests {
     @Test("A capability the host didn't enable stays refused inside an open session, while an enabled one is applied")
     func unenabledRefusedInsideSession() throws {
         let directory = FileManager.default.temporaryDirectory.appending(path: "ReceiverTests-\(UUID().uuidString)")
-        let layout = AppGroupStoreLayout(directory: directory)
+        let layout = AppGroupStoreLayout(directory: AppGroupStoreLayout.appDirectory(inStore: directory))
         #expect(layout.create())
         let adapter = FakeFlagAdapter(["new-checkout": .bool(false)])
         let commands: [(String, Data)] = try [
@@ -164,7 +164,7 @@ struct ReceiverTests {
     @Test("An enabled capability's command outside a session is refused and changes nothing")
     func refusedOutsideSession() throws {
         let directory = FileManager.default.temporaryDirectory.appending(path: "ReceiverTests-\(UUID().uuidString)")
-        let layout = AppGroupStoreLayout(directory: directory)
+        let layout = AppGroupStoreLayout(directory: AppGroupStoreLayout.appDirectory(inStore: directory))
         #expect(layout.create())
         let logLevels = LogLevelModel()
         let payload = try TransportMessage.payload(LogLevelModel.Command.set("debug"))
@@ -187,7 +187,7 @@ struct ReceiverTests {
     @Test("A disabled capability's commands are refused, and its snapshot leaves the store")
     func disabledIsRefused() async throws {
         let directory = FileManager.default.temporaryDirectory.appending(path: "ReceiverTests-\(UUID().uuidString)")
-        let layout = AppGroupStoreLayout(directory: directory)
+        let layout = AppGroupStoreLayout(directory: AppGroupStoreLayout.appDirectory(inStore: directory))
         #expect(layout.create())
         let logLevels = LogLevelModel()
         let sessions = DebugDrawerSessions(maximumDuration: 300, auditCapacity: 100, clock: FixedClock(now: Self.now), timer: IdleTimer())
@@ -233,7 +233,7 @@ struct ReceiverTests {
     @Test("Ending the session clears the overrides a sidecar set, by default, and audits the revert")
     func sessionEndRevertsOverrides() throws {
         let directory = FileManager.default.temporaryDirectory.appending(path: "ReceiverTests-\(UUID().uuidString)")
-        let layout = AppGroupStoreLayout(directory: directory)
+        let layout = AppGroupStoreLayout(directory: AppGroupStoreLayout.appDirectory(inStore: directory))
         #expect(layout.create())
         let adapter = FakeFlagAdapter(["new-checkout": .bool(false), "button-color": .string("blue")])
         let commands: [(String, Data)] = try [
@@ -264,7 +264,7 @@ struct ReceiverTests {
     @Test("A command that isn't one of the capability's commands is refused as malformed")
     func malformedCommandRefused() throws {
         let directory = FileManager.default.temporaryDirectory.appending(path: "ReceiverTests-\(UUID().uuidString)")
-        let layout = AppGroupStoreLayout(directory: directory)
+        let layout = AppGroupStoreLayout(directory: AppGroupStoreLayout.appDirectory(inStore: directory))
         #expect(layout.create())
         let adapter = FakeFlagAdapter(["new-checkout": .bool(false)])
         let document = StoreDocument(TransportMessage(kind: .command, pluginID: flagsID, payload: Data(#"{"runScript":{"source":"exit(0)"}}"#.utf8)))
@@ -286,7 +286,7 @@ struct ReceiverTests {
     @Test("Starting writes the sessions' and each enabled capability's snapshot, and removes any other snapshot file")
     func writesOnlyServedSnapshots() async throws {
         let directory = FileManager.default.temporaryDirectory.appending(path: "ReceiverTests-\(UUID().uuidString)")
-        let layout = AppGroupStoreLayout(directory: directory)
+        let layout = AppGroupStoreLayout(directory: AppGroupStoreLayout.appDirectory(inStore: directory))
         #expect(layout.create())
         let stale = layout.snapshotFile(for: "MyApp.Keychain")
         try Data("{}".utf8).write(to: stale)
@@ -349,7 +349,7 @@ struct ReceiverTests {
     @Test("The host gate comes before grants: off, a session asked for with a grant is refused as receiverDisabled, the verifier unasked")
     func gateBeforeGrant() throws {
         let directory = FileManager.default.temporaryDirectory.appending(path: "ReceiverTests-\(UUID().uuidString)")
-        let layout = AppGroupStoreLayout(directory: directory)
+        let layout = AppGroupStoreLayout(directory: AppGroupStoreLayout.appDirectory(inStore: directory))
         #expect(layout.create())
         let verifier = CountingVerifier()
         let policy = DebugDrawerGrantPolicy(verifier: verifier, audience: "com.example.MyApp")

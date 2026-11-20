@@ -76,7 +76,7 @@
                 receiver.enable(.metricKitPayloads(sessions: sessions, directory: URL(filePath: archive, directoryHint: .isDirectory)))
                 try receiver.start()
                 defer { receiver.stop() }
-                let sidecar = try DebugDrawerAppGroupStoreTransport(directory: URL(filePath: store, directoryHint: .isDirectory))
+                let sidecar = try DebugDrawerAppGroupStoreTransport(directory: receiver.appDirectory)
                 let sessionControl = try await sidecar.connect(
                     toPlugin: DebugDrawerSessions.pluginID, snapshot: DebugDrawerSessionState.self, command: DebugDrawerSessionCommand.self
                 )

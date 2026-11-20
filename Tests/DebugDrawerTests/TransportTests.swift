@@ -65,7 +65,7 @@
             try storeServer.start()
             let connections: [any DebugDrawerTransport] = try [
                 DebugDrawerSocketTransport(socketPath: socketPath),
-                DebugDrawerAppGroupStoreTransport(directory: directory)
+                DebugDrawerAppGroupStoreTransport(directory: AppGroupStoreLayout.appDirectory(inStore: directory))
             ]
             let overSocket = try await connections[0].connect(toPlugin: "Tally", snapshot: TallyModel.Snapshot.self, command: TallyModel.Command.self)
             let overStore = try await connections[1].connect(toPlugin: "Tally", snapshot: TallyModel.Snapshot.self, command: TallyModel.Command.self)
@@ -133,7 +133,7 @@
             let connections: [any DebugDrawerTransport] = try [
                 DebugDrawerInProcessTransport(registry: registry),
                 DebugDrawerSocketTransport(socketPath: socketPath),
-                DebugDrawerAppGroupStoreTransport(directory: directory)
+                DebugDrawerAppGroupStoreTransport(directory: AppGroupStoreLayout.appDirectory(inStore: directory))
             ]
 
             for connection in connections {
@@ -317,7 +317,7 @@
             let directory = FileManager.default.temporaryDirectory.appending(path: "TransportTests-\(UUID().uuidString)")
             let server = DebugDrawerAppGroupStoreServer(registry: registry, directory: directory)
             try server.start()
-            let connection = try DebugDrawerAppGroupStoreTransport(directory: directory)
+            let connection = try DebugDrawerAppGroupStoreTransport(directory: AppGroupStoreLayout.appDirectory(inStore: directory))
             let sut = try await connection.connect(toPlugin: "Tally", snapshot: TallyModel.Snapshot.self, command: TallyModel.Command.self)
             let expected = TallyModel.Snapshot(count: 3, note: "second")
 
@@ -346,11 +346,11 @@
             let directory = FileManager.default.temporaryDirectory.appending(path: "TransportTests-\(UUID().uuidString)")
             let server = DebugDrawerAppGroupStoreServer(registry: registry, directory: directory)
             try server.start()
-            let first = try DebugDrawerAppGroupStoreTransport(directory: directory)
+            let first = try DebugDrawerAppGroupStoreTransport(directory: AppGroupStoreLayout.appDirectory(inStore: directory))
             _ = try await first.connect(toPlugin: "Tally", snapshot: TallyModel.Snapshot.self, command: TallyModel.Command.self)
             server.stop()
 
-            let later = try DebugDrawerAppGroupStoreTransport(directory: directory)
+            let later = try DebugDrawerAppGroupStoreTransport(directory: AppGroupStoreLayout.appDirectory(inStore: directory))
             let actual = try await later.connect(toPlugin: "Tally", snapshot: TallyModel.Snapshot.self, command: TallyModel.Command.self)
 
             #expect(actual.snapshot == TallyModel.Snapshot(count: 7))
@@ -362,8 +362,8 @@
             let registry = DebugDrawerModelRegistry()
             registry.register(model, id: "Tally")
             let directory = FileManager.default.temporaryDirectory.appending(path: "TransportTests-\(UUID().uuidString)")
-            let commands = directory.appending(path: "commands")
-            let snapshots = directory.appending(path: "snapshots")
+            let commands = AppGroupStoreLayout.appDirectory(inStore: directory).appending(path: "commands")
+            let snapshots = AppGroupStoreLayout.appDirectory(inStore: directory).appending(path: "snapshots")
             try FileManager.default.createDirectory(at: commands, withIntermediateDirectories: true)
             try FileManager.default.createDirectory(at: snapshots, withIntermediateDirectories: true)
             try Data("garbage".utf8).write(to: commands.appending(path: "0-garbage.json"))
@@ -371,7 +371,7 @@
             let server = DebugDrawerAppGroupStoreServer(registry: registry, directory: directory)
 
             try server.start()
-            let connection = try DebugDrawerAppGroupStoreTransport(directory: directory)
+            let connection = try DebugDrawerAppGroupStoreTransport(directory: AppGroupStoreLayout.appDirectory(inStore: directory))
             let sut = try await connection.connect(toPlugin: "Tally", snapshot: TallyModel.Snapshot.self, command: TallyModel.Command.self)
             sut.send(.add(1))
             for await snapshot in sut.snapshots() where snapshot.count == 1 {

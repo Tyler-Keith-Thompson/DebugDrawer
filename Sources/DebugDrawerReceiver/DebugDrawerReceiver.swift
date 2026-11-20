@@ -33,6 +33,12 @@ import os
 // receiver's or its capability's gate is off, and a gate turned off ends the session or stops the
 // capability.
 //
+// The receiver is handed the group's store and keeps to its own directory in it,
+// `apps/<bundle ID>/`, the main bundle's identifier (AppGroupStoreLayout): it reads commands from
+// and writes snapshots and its presence to that directory alone, so a command another app's
+// sidecar left, or another app's capture data, never reaches it. The bundle ID isn't a parameter,
+// so a host can't point its receiver at another app's directory by mistake.
+//
 // The socket isn't served: a sidecar's transport falls back to the store while no socket answers,
 // and a socket server in a production app is more listening surface for no command the store
 // can't carry.
@@ -61,7 +67,8 @@ import os
 public final class DebugDrawerReceiver {
     private static let logger = Logger(subsystem: "DebugDrawerReceiver", category: "DebugDrawerReceiver")
 
-    /// The store's directory, usually in the app group's container.
+    /// The group's store, usually `DebugDrawer` in the app group's container; the receiver keeps
+    /// to its own directory in it, ``appDirectory``.
     public let directory: URL
     /// The sessions every command acts within, and their audit log.
     public let sessions: DebugDrawerSessions
@@ -80,7 +87,6 @@ public final class DebugDrawerReceiver {
         didSet { reevaluateGates() }
     }
 
-    let layout: AppGroupStoreLayout
     var capabilities: [String: DebugDrawerReceiverCapability] = [:]
     /// Writes each served model's snapshots, by ID, while the receiver runs.
     var writing: [String: Task<Void, Never>] = [:]
@@ -95,21 +101,34 @@ public final class DebugDrawerReceiver {
     var paused: Set<String> = []
     /// The app's presence file, which lists it in a sidecar's app list, while the receiver runs.
     var presence: PresenceAnnouncement?
-    /// Who the presence file says the app is: the main bundle, unless a test names another app.
+    /// Who the presence file says the app is, and whose directory of the store the receiver
+    /// serves: the main bundle, unless a test names another app.
     package var identity = AppPresence.Identity.of(.main)
+
+    /// The app's own directory in the group's store, `apps/<bundle ID>` in ``directory``, named by
+    /// the main bundle's identifier: its presence file, its snapshots and the commands for it.
+    /// The receiver reads and writes nothing outside it. A sidecar's transport reads this
+    /// directory (`DebugDrawerAppGroupContainer.appDirectory(of:)`).
+    public var appDirectory: URL {
+        AppGroupStoreLayout.appDirectory(of: identity.bundleIdentifier, inStore: directory)
+    }
+
+    /// The app's files in its directory of the store.
+    var layout: AppGroupStoreLayout {
+        AppGroupStoreLayout(directory: appDirectory)
+    }
 
     /// A receiver of the store in `directory`, gating every command with `sessions`; it serves
     /// once started, and nothing until a capability is enabled.
     ///
     /// - Parameters:
-    ///   - directory: The store's directory, which the sidecar's transport reads too. It is made if
-    ///     it doesn't exist.
+    ///   - directory: The group's store, `DebugDrawer` in the app group's container; the receiver
+    ///     serves its own directory in it, ``appDirectory``, made if it doesn't exist.
     ///   - sessions: The sessions every command acts within.
     public init(directory: URL, sessions: DebugDrawerSessions) {
         self.directory = directory
         self.sessions = sessions
         isAllowed = { true }
-        layout = AppGroupStoreLayout(directory: directory)
     }
 
     /// A receiver of the store in `directory`, gating every command with `sessions` and, before
@@ -117,8 +136,8 @@ public final class DebugDrawerReceiver {
     /// is enabled.
     ///
     /// - Parameters:
-    ///   - directory: The store's directory, which the sidecar's transport reads too. It is made if
-    ///     it doesn't exist.
+    ///   - directory: The group's store, `DebugDrawer` in the app group's container; the receiver
+    ///     serves its own directory in it, ``appDirectory``, made if it doesn't exist.
     ///   - sessions: The sessions every command acts within.
     ///   - isAllowed: The host's gate, ``isAllowed``: while it returns `false` the receiver serves
     ///     nothing and refuses everything.
@@ -161,14 +180,16 @@ public final class DebugDrawerReceiver {
 
     /// Writes the sessions' and each enabled capability's snapshot, performs the commands waiting in
     /// the store, and goes on doing both as they change, and as the app comes back to the
-    /// foreground. It also keeps a presence file in the store's `presence/` directory, the app's
-    /// bundle ID, name, version and build and the IDs it serves, so a sidecar built on
-    /// `DebugDrawerSidecarKit` lists the app. Does nothing while the receiver runs.
+    /// foreground, all in the app's own directory of the store, ``appDirectory``. It also keeps a
+    /// presence file there, the app's bundle ID, name, version and build, the IDs it serves and
+    /// the protocol version it speaks, so a sidecar built on `DebugDrawerSidecarKit` lists the
+    /// app. Does nothing while the receiver runs.
     ///
     /// - Throws: ``DebugDrawerReceiverError/cannotServe`` when the store's directories can't be
     ///   made or watched.
     public func start() throws(DebugDrawerReceiverError) {
         guard watcher == nil else { return }
+        let layout = layout
         guard layout.create(), let watcher = DirectoryWatcher(directory: layout.commands) else { throw .cannotServe }
         layout.removeCutOffSnapshots()
         removeSnapshotsNotServed()
@@ -194,7 +215,7 @@ public final class DebugDrawerReceiver {
                 self?.reevaluateGates()
             }
         }
-        presence = PresenceAnnouncement(directory: directory, identity: identity, capabilities: servedIDs, foreground: Self.foreground)
+        presence = PresenceAnnouncement(directory: appDirectory, identity: identity, capabilities: servedIDs, foreground: Self.foreground)
     }
 
     /// Stops writing snapshots and performing commands. The snapshots written stay in the store, and

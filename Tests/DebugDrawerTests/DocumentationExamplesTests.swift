@@ -188,9 +188,11 @@
 
     // WritingPlugins.md
     @MainActor
-    func counterTransport(group: DebugDrawerAppGroupContainer) async throws
+    func counterTransport(group: DebugDrawerAppGroupContainer, app bundleIdentifier: String) async throws
         -> DebugDrawerPluginTransport<CounterModel.Snapshot, CounterModel.Command> {
-        let sidecar = try DebugDrawerSidecarTransport(socketPath: group.socketPath, storeDirectory: group.storeDirectory)
+        let sidecar = try DebugDrawerSidecarTransport(
+            socketPath: group.socketPath(of: bundleIdentifier), storeDirectory: group.appDirectory(of: bundleIdentifier)
+        )
         return try await sidecar.connect(toPlugin: "MyApp.CounterPlugin", snapshot: CounterModel.Snapshot.self, command: CounterModel.Command.self)
     }
 
@@ -211,7 +213,7 @@
             let model = CounterModel()
             let sharing = try CounterSharing(model: model, group: group)
 
-            let sut = try await counterTransport(group: group)
+            let sut = try await counterTransport(group: group, app: AppPresence.Identity.of(.main).bundleIdentifier)
             sut.send(.increment)
             for await snapshot in sut.snapshots() where snapshot.count == 1 {
                 break

@@ -89,7 +89,7 @@
                 let directory = FileManager.default.temporaryDirectory.appending(path: "LaunchTimeTransportTests-\(UUID().uuidString)")
                 let server = DebugDrawerAppGroupStoreServer(registry: registry, directory: directory)
                 try server.start()
-                return try Connection(transport: DebugDrawerAppGroupStoreTransport(directory: directory)) { server.stop() }
+                return try Connection(transport: DebugDrawerAppGroupStoreTransport(directory: server.appDirectory)) { server.stop() }
             }
         }
     }

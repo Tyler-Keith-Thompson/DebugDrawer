@@ -118,7 +118,8 @@
             let app = App()
             let storeServer = DebugDrawerAppGroupStoreServer(registry: app.registry, directory: store)
             storeServer.identity = AppPresence.Identity(bundleIdentifier: "com.example.shop", displayName: "Shop", version: "2.4", build: "881")
-            let socketServer = DebugDrawerSocketServer(registry: app.registry, socketPath: store.appending(path: "drawer.sock").path)
+            let socketPath = storeServer.appDirectory.appending(path: "drawer.sock").path
+            let socketServer = DebugDrawerSocketServer(registry: app.registry, socketPath: socketPath)
             try storeServer.start()
             try socketServer.start()
             let listed = try #require(DebugDrawerSidecarAppList(storeDirectory: store).apps.first)

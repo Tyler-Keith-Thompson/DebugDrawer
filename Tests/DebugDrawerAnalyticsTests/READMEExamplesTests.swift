@@ -33,7 +33,9 @@
             // Wherever the app sends an event, in every build:
             AnalyticsEvents.record("checkout_completed", properties: ["plan": "pro", "seats": 3], source: "Segment")
 
-            let sidecar = try DebugDrawerAppGroupStoreTransport(directory: container.appending(path: "DebugDrawer"))
+            let appDirectory = AppGroupStoreLayout.appDirectory(inStore: container.appending(path: "DebugDrawer"))
+
+            let sidecar = try DebugDrawerAppGroupStoreTransport(directory: appDirectory)
             let events = try await sidecar.connect(
                 toPlugin: AnalyticsEventsMirror.pluginID, snapshot: AnalyticsEventsMirror.Snapshot.self, command: AnalyticsEventsMirror.Command.self
             )

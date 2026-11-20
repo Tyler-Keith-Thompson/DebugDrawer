@@ -30,13 +30,14 @@
     }
 
     // Two "apps" in one process: two receivers on one temporary group store, each naming another
-    // app, as two production apps in a group would. The kit's list hears each presence file as it
-    // lands and goes through its directory's dispatch source; every wait is for the list to change,
-    // never for time.
+    // app, as two production apps in a group would, and each keeping to its own directory of the
+    // store. The kit's list hears each app's directory and presence file as they land and go,
+    // through the directories' dispatch sources; every wait is for the list to change, never for
+    // time.
     @MainActor
     @Suite(.timeLimit(.minutes(1)))
     struct SidecarAppListTests {
-        @Test("Two apps running a receiver in the group are both listed; one that stops drops off")
+        @Test("Two apps running a receiver in the group are both listed, each with its own directory of the store; one that stops drops off")
         func listsReceiversAsTheyStartAndStop() async throws {
             let store = FileManager.default.temporaryDirectory
                 .appending(path: "SidecarAppListTests-\(UUID().uuidString)")
@@ -71,7 +72,9 @@
             #expect(listed.map(\.build) == ["881", "12"])
             #expect(listed.first?.capabilities == ["DebugDrawer.Sessions", "Shop.LogLevel"])
             #expect(listed.last?.capabilities == ["DebugDrawer.Sessions", "Wallet.LogLevel"])
-            #expect(listed.allSatisfy { $0.requiresSession && $0.isServing && $0.storeDirectory == store })
+            #expect(listed.allSatisfy { $0.requiresSession && $0.isServing && $0.protocolVersion == 2 })
+            #expect(listed.map(\.storeDirectory) == [shop.appDirectory, wallet.appDirectory])
+            #expect(listed.map(\.storeDirectory.lastPathComponent) == ["com.example.shop", "com.example.wallet"])
             #expect(afterStop.map(\.bundleIdentifier) == ["com.example.shop"])
         }
 
@@ -162,23 +165,81 @@
 
             #expect(sut.apps.isEmpty)
             #expect(sut.error == .noAppGroupContainer)
-            #expect(sut.storeDirectory == nil)
+            #expect(sut.storeDirectories.isEmpty)
         }
 
-        @Test("A file in the presence directory that isn't a presence, and a write in progress, are left out")
+        @Test("Apps in several groups are listed together; an app in two groups once, as it last said; a group with no container is reported")
+        func listsSeveralGroups() throws {
+            let root = FileManager.default.temporaryDirectory.appending(path: "SidecarAppListTests-\(UUID().uuidString)")
+            let containers = [
+                "TEAMID.com.example.shop": root.appending(path: "shop"),
+                "TEAMID.com.example.wallet": root.appending(path: "wallet")
+            ]
+            let shopStore = root.appending(path: "shop/DebugDrawer")
+            let walletStore = root.appending(path: "wallet/DebugDrawer")
+            func write(_ presence: AppPresence, inStore store: URL) throws {
+                let directory = AppGroupStoreLayout.appDirectory(of: presence.identity.bundleIdentifier, inStore: store)
+                try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+                try presence.encoded().write(to: AppPresence.file(inAppDirectory: directory))
+            }
+            let shop = AppPresence.Identity(bundleIdentifier: "com.example.shop", displayName: "Shop", version: "2.4", build: "881")
+            let wallet = AppPresence.Identity(bundleIdentifier: "com.example.wallet", displayName: "Wallet", version: "1.0", build: "12")
+            let latest = Date(timeIntervalSince1970: 1_800_000_000)
+            let earlier = Date(timeIntervalSince1970: 1_700_000_000)
+            try write(AppPresence(identity: shop, capabilities: ["Shop.LogLevel"], lastSeen: latest), inStore: shopStore)
+            try write(AppPresence(identity: wallet, capabilities: ["Wallet.LogLevel"], lastSeen: latest), inStore: walletStore)
+            try write(AppPresence(identity: shop, capabilities: ["Shop.Old"], lastSeen: earlier), inStore: walletStore)
+            let groups = ["TEAMID.com.example.shop", "group.com.example.missing", "TEAMID.com.example.wallet"]
+
+            let sut = DebugDrawerSidecarAppList(groupIdentifiers: groups) { containers[$0] }
+
+            #expect(sut.apps.map(\.bundleIdentifier) == ["com.example.shop", "com.example.wallet"])
+            #expect(sut.apps.map(\.capabilities) == [["Shop.LogLevel"], ["Wallet.LogLevel"]])
+            #expect(sut.apps.map(\.storeDirectory) == [
+                AppGroupStoreLayout.appDirectory(of: "com.example.shop", inStore: shopStore),
+                AppGroupStoreLayout.appDirectory(of: "com.example.wallet", inStore: walletStore)
+            ])
+            #expect(sut.storeDirectories.map(\.path) == [shopStore.path, walletStore.path])
+            #expect(sut.error == .noAppGroupContainer)
+        }
+
+        @Test("A store in the flat layout from before per-app directories lists no app")
+        func flatLayoutListsNothing() throws {
+            let store = FileManager.default.temporaryDirectory
+                .appending(path: "SidecarAppListTests-\(UUID().uuidString)")
+                .appending(path: "DebugDrawer")
+            let presence = store.appending(path: "presence")
+            try FileManager.default.createDirectory(at: presence, withIntermediateDirectories: true)
+            let flat = AppPresence(
+                identity: AppPresence.Identity(bundleIdentifier: "com.example.shop", displayName: "Shop", version: "", build: ""),
+                capabilities: ["Shop.LogLevel"], lastSeen: Date(timeIntervalSince1970: 1_800_000_000)
+            )
+            try flat.encoded().write(to: presence.appending(path: "com.example.shop.json"))
+
+            let sut = DebugDrawerSidecarAppList(storeDirectory: store)
+
+            #expect(sut.apps.isEmpty)
+            #expect(sut.error == nil)
+        }
+
+        @Test("A presence file that isn't one, one naming another app than its directory, and a write in progress are left out")
         func unreadableFilesAreSkipped() throws {
             let store = FileManager.default.temporaryDirectory
                 .appending(path: "SidecarAppListTests-\(UUID().uuidString)")
                 .appending(path: "DebugDrawer")
-            let presence = AppPresence.directory(inStore: store)
-            try FileManager.default.createDirectory(at: presence, withIntermediateDirectories: true)
-            try Data("not json".utf8).write(to: presence.appending(path: "broken.json"))
+            func directory(of bundleIdentifier: String) throws -> URL {
+                let directory = AppGroupStoreLayout.appDirectory(of: bundleIdentifier, inStore: store)
+                try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+                return directory
+            }
             let valid = AppPresence(
                 identity: AppPresence.Identity(bundleIdentifier: "com.example.shop", displayName: "Shop", version: "", build: ""),
                 capabilities: ["Shop.LogLevel"], lastSeen: Date(timeIntervalSince1970: 1_800_000_000)
             )
-            try valid.encoded().write(to: presence.appending(path: "com.example.shop.json"))
-            try valid.encoded().write(to: presence.appending(path: "com.example.other.json.1234.partial"))
+            try Data("not json".utf8).write(to: directory(of: "com.example.broken").appending(path: "presence.json"))
+            try valid.encoded().write(to: directory(of: "com.example.shop").appending(path: "presence.json"))
+            try valid.encoded().write(to: directory(of: "com.example.impostor").appending(path: "presence.json"))
+            try valid.encoded().write(to: directory(of: "com.example.other").appending(path: "presence.json.1234.partial"))
 
             let sut = DebugDrawerSidecarAppList(storeDirectory: store)
 

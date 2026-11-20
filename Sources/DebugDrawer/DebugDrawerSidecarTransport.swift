@@ -38,7 +38,9 @@ import os
     ///
     /// ```swift
     /// let group = try DebugDrawerAppGroupContainer(groupIdentifier: "TEAMID.com.example.debug")
-    /// let sidecar = try DebugDrawerSidecarTransport(socketPath: group.socketPath, storeDirectory: group.storeDirectory)
+    /// let sidecar = try DebugDrawerSidecarTransport(
+    ///     socketPath: group.socketPath(of: "com.example.shop"), storeDirectory: group.appDirectory(of: "com.example.shop")
+    /// )
     /// ```
     ///
     /// The plugin transports it hands out show each snapshot the app publishes while the socket is
@@ -88,7 +90,9 @@ import os
         /// - Parameters:
         ///   - socketPath: The app's ``DebugDrawerSocketServer/socketPath``, of any length; its
         ///     directory is made if it doesn't exist.
-        ///   - storeDirectory: The app's ``DebugDrawerAppGroupStoreServer/directory``.
+        ///   - storeDirectory: The app's own directory of the group's store,
+        ///     ``DebugDrawerAppGroupStoreServer/appDirectory``
+        ///     (``DebugDrawerAppGroupContainer/appDirectory(of:)``).
         /// - Throws: ``DebugDrawerTransportError/socketPathTooLong`` when the socket's file name
         ///   doesn't fit a socket's address, ``DebugDrawerTransportError/accessDenied`` when the
         ///   system refuses access to either directory (the app group missing from this app's

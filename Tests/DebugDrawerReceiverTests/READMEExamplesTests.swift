@@ -94,7 +94,8 @@ struct DebugDrawerTestGrantSigner {
                 capabilities: [DebugDrawerFeatureFlagOverrides.pluginID],
                 notBefore: Date(), expires: Date().addingTimeInterval(10 * 60)
             ))
-            let sidecar = try DebugDrawerAppGroupStoreTransport(directory: container.appending(path: "DebugDrawer"))
+            let appDirectory = AppGroupStoreLayout.appDirectory(inStore: container.appending(path: "DebugDrawer"))
+            let sidecar = try DebugDrawerAppGroupStoreTransport(directory: appDirectory)
             let sessionControl = try await sidecar.connect(
                 toPlugin: DebugDrawerSessions.pluginID, snapshot: DebugDrawerSessionState.self, command: DebugDrawerSessionCommand.self
             )

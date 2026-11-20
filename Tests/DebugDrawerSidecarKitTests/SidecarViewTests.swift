@@ -13,11 +13,12 @@
     struct SidecarViewTests {
         static let shop = DebugDrawerSidecarApp(
             bundleIdentifier: "com.example.shop", displayName: "Shop", version: "2.4", build: "881",
-            capabilities: ["ConsolePlugin", "DebugDrawer.Sessions"], lastSeen: Date(), storeDirectory: URL(filePath: "/tmp/store")
+            capabilities: ["ConsolePlugin", "DebugDrawer.Sessions"], protocolVersion: 2, lastSeen: Date(),
+            storeDirectory: URL(filePath: "/tmp/store/apps/com.example.shop")
         )
         static let wallet = DebugDrawerSidecarApp(
             bundleIdentifier: "com.example.wallet", displayName: "Wallet", version: "1.0", build: "",
-            capabilities: [], lastSeen: Date(), storeDirectory: URL(filePath: "/tmp/store")
+            capabilities: [], protocolVersion: 2, lastSeen: Date(), storeDirectory: URL(filePath: "/tmp/store/apps/com.example.wallet")
         )
 
         @Test("The sidebar lists each app with its version and bundle ID, and one turned off by its host says so")
