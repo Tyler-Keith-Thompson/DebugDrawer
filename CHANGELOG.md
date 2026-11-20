@@ -6,7 +6,7 @@ Notable changes in each release, newest first, in the style of
 new empty Unreleased above it, and commit. Deploy refuses to tag a version with no entry here, and
 the entry becomes the GitHub release's notes.
 
-## [Unreleased]
+## [0.1.4] - 2026-11-20
 
 ### Added
 
