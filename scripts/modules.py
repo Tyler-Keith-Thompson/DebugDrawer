@@ -84,6 +84,9 @@ MODULES = [
     # The Tweaks plugin's declarations, storage and typed accessors, and the receiver capability
     # that offers the production-safe tweaks to a sidecar.
     ("DebugDrawerTweaks", "Capabilities", "Tweak declarations, their storage and typed accessors, real in every build, and the receiver capability that lets a sidecar change the tweaks the host marked production-safe; UI-free.", ["DebugDrawerReceiver"]),
+    # The Analytics plugin's sink and values, and the receiver capability that mirrors the events
+    # recorded during a sidecar's session, redacted in the app.
+    ("DebugDrawerAnalytics", "Capabilities", "The analytics sink (AnalyticsEvents.record) and its values, real in every build, and the receiver capability that mirrors the events recorded during a sidecar's session to it, redacted before they leave the process; UI-free.", ["DebugDrawerReceiver"]),
     # Plugins
     ("DebugDrawerConsolePlugin", "Plugins", "Captures os_log entries (stdout and stderr on macOS) and an app logger's lines through ConsoleLogSink, with metadata: level filter, text or regular-expression search, subsystem and category mutes, time range, auto-follow, copy, lines kept across launches.", ["DebugDrawer", "oslogclient/OSLogClient"]),
     ("DebugDrawerViewInspectorPlugin", "Plugins", "View borders by depth, alignment grid, click indicators, animation speed, render tracking, hierarchy snapshot.", ["DebugDrawer"]),
@@ -111,7 +114,7 @@ MODULES = [
     ("DebugDrawerPermissionsPlugin", "Plugins", "Every privacy permission the app declares in its Info.plist, with its live status, a button that asks when it is undecided and one that opens Settings.", ["DebugDrawer"]),
     ("DebugDrawerNotificationsPlugin", "Plugins", "The APNs device token to copy, notification authorization and settings, pending and delivered notifications to inspect and remove, and a pasted APNs payload sent as a local notification.", ["DebugDrawer"]),
     ("DebugDrawerBackgroundTasksPlugin", "Plugins", "The BGTaskScheduler identifiers the Info.plist permits and the pending task requests, with their kind and earliest begin date, each cancellable; a request scheduled on demand, and the LLDB commands that simulate a launch or an expiration.", ["DebugDrawer"]),
-    ("DebugDrawerAnalyticsPlugin", "Plugins", "The analytics events the app records, live, newest first, with their time and properties: search by name, key or value, each open as inspector rows and JSON to copy, all exported as a JSON file.", ["DebugDrawer"]),
+    ("DebugDrawerAnalyticsPlugin", "Plugins", "The analytics events the app records, live, newest first, with their time and properties: search by name, key or value, each open as inspector rows and JSON to copy, all exported as a JSON file.", ["DebugDrawer", "DebugDrawerAnalytics"]),
     ("DebugDrawerDatabaseBrowserPlugin", "Plugins", "The app's SQLite, Core Data and SwiftData stores, opened read-only: tables or entities with row counts, rows paged and searched in a grid, and read-only SELECT queries, copied as CSV.", ["DebugDrawer"]),
     ("DebugDrawerLocalizationPlugin", "Plugins", "Pseudo-localization and show-keys modes over the strings the app looks up through Bundle's public API, live, and the translations missing for a language, grouped by table, searched and copied as text or CSV.", ["DebugDrawer"]),
     ("DebugDrawerScreenRecordingPlugin", "Plugins", "Records the app's windows as a QuickTime movie without the drawer, its HUD or its toasts, started and stopped from the drawer or the HUD, with optional touch indicators on iOS: the saved recordings to share or delete, and the newest in the bug report.", ["DebugDrawer"]),
@@ -139,11 +142,11 @@ IOS_MINIMUM = "17.0"
 # only on modules listed for it.
 EXTRA_PLATFORMS = {
     # visionOS 1 shipped with iOS 17's SwiftUI.
-    "visionOS": ("1.0", ["DebugDrawerReceiver", "DebugDrawerTweaks", "DebugDrawer", "DebugDrawerAnalyticsPlugin", "DebugDrawerDatabaseBrowserPlugin", "DebugDrawerLocalizationPlugin", "DebugDrawerColorVisionPlugin", "DebugDrawerAppStateResetPlugin"]),
+    "visionOS": ("1.0", ["DebugDrawerReceiver", "DebugDrawerTweaks", "DebugDrawerAnalytics", "DebugDrawer", "DebugDrawerAnalyticsPlugin", "DebugDrawerDatabaseBrowserPlugin", "DebugDrawerLocalizationPlugin", "DebugDrawerColorVisionPlugin", "DebugDrawerAppStateResetPlugin"]),
     # tvOS 17 shipped with iOS 17's SwiftUI.
-    "tvOS": ("17.0", ["DebugDrawerReceiver", "DebugDrawerTweaks", "DebugDrawer", "DebugDrawerAnalyticsPlugin", "DebugDrawerDatabaseBrowserPlugin", "DebugDrawerLocalizationPlugin", "DebugDrawerColorVisionPlugin", "DebugDrawerAppStateResetPlugin"]),
+    "tvOS": ("17.0", ["DebugDrawerReceiver", "DebugDrawerTweaks", "DebugDrawerAnalytics", "DebugDrawer", "DebugDrawerAnalyticsPlugin", "DebugDrawerDatabaseBrowserPlugin", "DebugDrawerLocalizationPlugin", "DebugDrawerColorVisionPlugin", "DebugDrawerAppStateResetPlugin"]),
     # watchOS 10 shipped with iOS 17's SwiftUI.
-    "watchOS": ("10.0", ["DebugDrawerReceiver", "DebugDrawerTweaks", "DebugDrawer", "DebugDrawerAnalyticsPlugin", "DebugDrawerDatabaseBrowserPlugin", "DebugDrawerLocalizationPlugin"]),
+    "watchOS": ("10.0", ["DebugDrawerReceiver", "DebugDrawerTweaks", "DebugDrawerAnalytics", "DebugDrawer", "DebugDrawerAnalyticsPlugin", "DebugDrawerDatabaseBrowserPlugin", "DebugDrawerLocalizationPlugin"]),
 }
 
 # Test targets that also run in the simulator of iOS or of a platform in EXTRA_PLATFORMS, by
@@ -179,13 +182,13 @@ BAZEL_TESTED_PLATFORM_EXCLUDED_PACKAGES = {
 # beside each library compiles it for the IOS_MINIMUM Catalyst target triple instead. A module
 # listed here depends only on modules listed here, and on no C or Objective-C package, which that
 # rule would still build for macOS.
-CATALYST_MODULES = ["DebugDrawerReceiver", "DebugDrawerTweaks", "DebugDrawer", "DebugDrawerAnalyticsPlugin", "DebugDrawerDatabaseBrowserPlugin", "DebugDrawerLocalizationPlugin", "DebugDrawerScreenRecordingPlugin", "DebugDrawerDesignOverlayPlugin", "DebugDrawerColorVisionPlugin", "DebugDrawerAppStateResetPlugin"]
+CATALYST_MODULES = ["DebugDrawerReceiver", "DebugDrawerTweaks", "DebugDrawerAnalytics", "DebugDrawer", "DebugDrawerAnalyticsPlugin", "DebugDrawerDatabaseBrowserPlugin", "DebugDrawerLocalizationPlugin", "DebugDrawerScreenRecordingPlugin", "DebugDrawerDesignOverlayPlugin", "DebugDrawerColorVisionPlugin", "DebugDrawerAppStateResetPlugin"]
 
 # Modules whose every public symbol must have a doc comment. Their DocC archive, and so `just docs`,
 # fails on one that has none (tools/documentation_coverage.py, run by docc_archive's
 # `require_documentation`). Checked against the debug build's symbol graph, which holds the drawer
 # as well as the API that exists in every build.
-DOCUMENTED_MODULES = ["DebugDrawerReceiver", "DebugDrawerTweaks", "DebugDrawer"]
+DOCUMENTED_MODULES = ["DebugDrawerReceiver", "DebugDrawerTweaks", "DebugDrawerAnalytics", "DebugDrawer"]
 
 # Dynamic libraries: (name, description). Each is C sources under Sources/<name> (headers in
 # include/) with no dependencies, shipped as a `.dynamic` library product in Package.swift and as
@@ -208,6 +211,7 @@ EXECUTABLES = [
 # holds tests. (name, dependencies)
 TEST_TARGETS = [
     ("DebugDrawerReceiverTests", ["DebugDrawerReceiver"]),
+    ("DebugDrawerAnalyticsTests", ["DebugDrawerAnalytics", "DebugDrawerReceiver", "DebugDrawer"]),
     ("DebugDrawerTests", ["DebugDrawer", "DebugDrawerReceiver", "viewinspector/ViewInspector", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
     ("DebugDrawerConsolePluginTests", ["DebugDrawerConsolePlugin", "DebugDrawer", "DebugDrawerTestSupport", "viewinspector/ViewInspector", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
     ("DebugDrawerViewInspectorPluginTests", ["DebugDrawerViewInspectorPlugin", "DebugDrawer", "DebugDrawerInterceptionContract", "viewinspector/ViewInspector", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
@@ -236,7 +240,7 @@ TEST_TARGETS = [
     ("DebugDrawerPermissionsPluginTests", ["DebugDrawerPermissionsPlugin", "DebugDrawer", "viewinspector/ViewInspector", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
     ("DebugDrawerNotificationsPluginTests", ["DebugDrawerNotificationsPlugin", "DebugDrawer", "viewinspector/ViewInspector", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
     ("DebugDrawerBackgroundTasksPluginTests", ["DebugDrawerBackgroundTasksPlugin", "DebugDrawer", "viewinspector/ViewInspector", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
-    ("DebugDrawerAnalyticsPluginTests", ["DebugDrawerAnalyticsPlugin", "DebugDrawer", "viewinspector/ViewInspector", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
+    ("DebugDrawerAnalyticsPluginTests", ["DebugDrawerAnalyticsPlugin", "DebugDrawerAnalytics", "DebugDrawer", "viewinspector/ViewInspector", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
     ("DebugDrawerDatabaseBrowserPluginTests", ["DebugDrawerDatabaseBrowserPlugin", "DebugDrawer", "viewinspector/ViewInspector", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
     ("DebugDrawerLocalizationPluginTests", ["DebugDrawerLocalizationPlugin", "DebugDrawer", "viewinspector/ViewInspector", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
     ("DebugDrawerScreenRecordingPluginTests", ["DebugDrawerScreenRecordingPlugin", "DebugDrawer", "viewinspector/ViewInspector", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
@@ -286,6 +290,7 @@ PERFORMANCE_TESTS = [
     "DebugDrawerNotificationsPluginTests",
     "DebugDrawerBackgroundTasksPluginTests",
     "DebugDrawerAnalyticsPluginTests",
+    "DebugDrawerAnalyticsTests",
     "DebugDrawerDatabaseBrowserPluginTests",
     "DebugDrawerLocalizationPluginTests",
     "DebugDrawerScreenRecordingPluginTests",

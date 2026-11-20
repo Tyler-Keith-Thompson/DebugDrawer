@@ -510,7 +510,11 @@ it in the receiver, and in a debug build can show the same model in its drawer t
 splits its UI-free half into a module of its own that depends on the receiver alone and that the
 plugin re-exports, with its capability there: `DebugDrawerTweaks` holds the tweaks and
 `.tweaks(...)`, which offers a sidecar only those marked production-safe and refuses a command
-naming any other as `notExposed`. The receiver's module holds
+naming any other as `notExposed`, and `DebugDrawerAnalytics` holds the analytics sink and
+`.analyticsEvents(sessions:redaction:capacity:)`, which mirrors only the events recorded during the
+open session, redacted in the app before anything is kept. A model that follows the sessions this
+way keeps nothing from before a session or after it, and redacts on the way in, since its snapshot
+is written to the store as it is. The receiver's module holds
 ``DebugDrawerPluginModel``, the sessions and the store's wire format, real in every build, and
 `DebugDrawer` re-exports it; it serves no socket and holds no view. The README's "Production
 builds: the receiver" shows the setup.

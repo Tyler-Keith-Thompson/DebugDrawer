@@ -1,5 +1,8 @@
 import Foundation
 
+// Codable is synthesized rather than written as bare JSON values: bare JSON can't tell a date from
+// a string, or 3.0 from 3, and the mirror's snapshot must decode to what was recorded.
+
 /// The value of an analytics event's property: what an analytics service accepts, as a value
 /// that crosses threads and actors.
 ///
@@ -15,8 +18,10 @@ import Foundation
 /// A value that isn't a literal takes its case (`.string(user.plan)`), and one from a
 /// `[String: Any]` an analytics SDK was handed converts with ``init(converting:)``.
 ///
-/// The type exists in every build, so call sites compile unchanged in release.
-public enum AnalyticsValue: Hashable, Sendable {
+/// The type exists in every build, so call sites compile unchanged in release. It is `Codable`,
+/// each value keyed by its case, so a sidecar decodes exactly the value the app recorded: a date
+/// stays a date and `3.0` a double.
+public enum AnalyticsValue: Hashable, Sendable, Codable {
     case string(String)
     case int(Int)
     case double(Double)

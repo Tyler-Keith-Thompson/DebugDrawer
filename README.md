@@ -1484,7 +1484,8 @@ AnalyticsEvents.record("screen_viewed", properties: properties.mapValues(Analyti
 ```
 
 `AnalyticsEvents` and `AnalyticsValue` exist in every configuration, so the calls need no
-`#if DEBUG`: in release they do nothing, and `record` doesn't even evaluate its arguments. In
+`#if DEBUG`: in release they do nothing, and `record` doesn't even evaluate its arguments, unless a
+sidecar's session is mirroring analytics events (below). In
 debug builds `record` can be called from any thread or actor and returns at once. Property values
 are `AnalyticsValue`s (strings, integers, doubles, Booleans, dates, `nil`, arrays and objects of
 them), which literals convert to; `AnalyticsValue(converting:)` reads a value from a
@@ -1503,6 +1504,11 @@ sensitive (an `auth_token`, say) are masked on screen until revealed, and in the
 and the bug report, which carries every event as `analytics.json`. The plugin runs on every
 platform the drawer does; tvOS and watchOS have no pasteboard or share sheet, so there it offers
 no Copy JSON or Export All.
+
+`AnalyticsEvents`, `AnalyticsValue` and the sink live in `DebugDrawerAnalytics`, a UI-free module
+that `DebugDrawerAnalyticsPlugin` re-exports and a release build links on its own. Through it, a
+release build's receiver can mirror the events recorded during a sidecar's session, redacted in the
+app ("Production builds: the receiver" below); in debug builds the drawer keeps them as well.
 
 ### Databases: what the app actually saved
 
@@ -2190,7 +2196,8 @@ drawer's registry and servers are stand-ins that never reach them, so only a
 
 A release build gets none of the drawer. To let an employee-only sidecar app reach a production
 app, the app links one more product, `DebugDrawerReceiver`: UI-less, with no interception, no
-plugin and no dependency on the drawer (and, to offer tweaks, `DebugDrawerTweaks`, below). It serves a sidecar, over the app group's store, only the
+plugin and no dependency on the drawer (and, to offer tweaks, `DebugDrawerTweaks`, or to mirror
+analytics events, `DebugDrawerAnalytics`, below). It serves a sidecar, over the app group's store, only the
 capabilities the app enables, within sessions the sidecar opens, and refuses everything else:
 
 ```swift
@@ -2283,6 +2290,56 @@ receiver.enable(.tweaks(AppTweaks.backend, AppTweaks.newCheckout))
   before.
 - **Persistent by default.** Pass `scope: .session(revertWith: .resetAll)` to reset the
   production-safe tweaks to their defaults when the session ends instead.
+
+**Analytics events in production.** While a sidecar's session is open, the events the app records
+through `AnalyticsEvents.record` can be mirrored to the sidecar, so QA can check tracking on the
+build that ships. It is off unless the app enables it. Link `DebugDrawerAnalytics`
+(`.product(name: "DebugDrawerAnalytics", package: "DebugDrawer")`) beside the receiver, the
+UI-free half of the Analytics plugin, which holds `AnalyticsEvents` and `AnalyticsValue`, and
+enable the capability with the redaction rules for the app's events:
+
+```swift
+import DebugDrawerAnalytics
+import DebugDrawerReceiver
+
+@MainActor
+final class ProductionAnalyticsMirror {
+    let sessions = DebugDrawerSessions(maximumDuration: 15 * 60)
+    let receiver: DebugDrawerReceiver
+
+    init(container: URL) throws {
+        receiver = DebugDrawerReceiver(directory: container.appending(path: "DebugDrawer"), sessions: sessions)
+        receiver.enable(.analyticsEvents(
+            sessions: sessions,
+            redaction: .standard.adding(keys: ["customer_name"], values: [#"\bACCT-\d{6}\b"#])
+        ))
+        try receiver.start()
+    }
+}
+
+// Wherever the app sends an event, in every build:
+AnalyticsEvents.record("checkout_completed", properties: ["plan": "pro", "seats": 3], source: "Segment")
+```
+
+- **Only during a session.** The sidecar connects to `AnalyticsEventsMirror.pluginID`; its
+  `AnalyticsEventsMirror.Snapshot` holds the open session's ID and the events recorded since it
+  opened, oldest first, each with its place in the session's order, time, name, properties and
+  source. Nothing recorded before the session opens is kept for it, and as the session ends or
+  expires the list empties and nothing more is mirrored, even an event recorded after the expiry
+  date before the system's timer fires. The snapshot keeps the session's newest 1,000 events
+  (`capacity:`); `AnalyticsEventsMirror.Command.clear` drops those already read. While no session
+  is open, `record` in a release build evaluates none of its arguments.
+- **Redacted in the app.** Each event is redacted on the thread that records it, before it is kept
+  anywhere, so no unredacted value reaches the snapshot, the store's files or the audit log
+  (which never holds an event). `AnalyticsRedaction.standard` masks the value of any property
+  whose key contains `email`, `phone`, `token`, `secret`, `password`, `session`, `auth` or
+  `apikey`/`api_key`/`api-key` (ignoring case, at any depth, an object or array under it whole),
+  and any string value holding an email address or a JSON Web Token; an event name or source a
+  value pattern matches is masked too. `adding(keys:values:)` adds key substrings and regular
+  expressions (`NSRegularExpression` syntax, ignoring case; an invalid one traps), and
+  `AnalyticsRedaction(keys:values:)` starts from none. A masked value becomes `"[REDACTED]"`.
+  Phone numbers in free text aren't matched by default: add a pattern for the formats your app
+  sends.
 
 In a debug build the receiver runs beside the drawer: show the same model in a plugin through
 `DebugDrawerPluginTransport.direct(to:)`, and pass it to `.featureFlagOverrides(_:)` or
@@ -2505,7 +2562,8 @@ ContentView()
 | `DebugDrawerPermissionsPlugin` | Every privacy permission the app declares in its Info.plist, with its live status, a button that asks when it is undecided and one that opens Settings |
 | `DebugDrawerNotificationsPlugin` | The APNs device token to copy, notification authorization and settings, pending and delivered notifications to inspect and remove, and a pasted APNs payload sent as a local notification |
 | `DebugDrawerBackgroundTasksPlugin` | The BGTaskScheduler identifiers the Info.plist permits and the pending task requests, with their kind and earliest begin date, each cancellable; a request scheduled on demand, and the LLDB commands that simulate a launch or an expiration |
-| `DebugDrawerAnalyticsPlugin` | The analytics events the app records, live, newest first, with their time and properties: search by name, key or value, each open as inspector rows and JSON to copy, all exported as a JSON file |
+| `DebugDrawerAnalytics` | The analytics sink (`AnalyticsEvents.record`) and `AnalyticsValue`, real in every build, and the receiver capability (`.analyticsEvents(sessions:redaction:capacity:)`) that mirrors the events recorded during a sidecar's session, redacted by `AnalyticsRedaction` in the app; UI-free, so a release build links it beside the receiver |
+| `DebugDrawerAnalyticsPlugin` | The analytics events the app records, live, newest first, with their time and properties: search by name, key or value, each open as inspector rows and JSON to copy, all exported as a JSON file; re-exports `DebugDrawerAnalytics` |
 | `DebugDrawerDatabaseBrowserPlugin` | The app's SQLite, Core Data and SwiftData stores, opened read-only: tables or entities with row counts, rows paged and searched in a grid, and read-only SELECT queries, copied as CSV |
 | `DebugDrawerLocalizationPlugin` | Pseudo-localization and show-keys modes over the strings the app looks up through Bundle, live, Apple's localization launch arguments to copy, and the translations missing for a language, grouped by table, searched and copied as text or CSV |
 | `DebugDrawerScreenRecordingPlugin` | The app's windows recorded as a QuickTime movie without the drawer, its HUD or its toasts, started and stopped from the drawer or the HUD, with touch indicators on iOS: the saved recordings to share or delete, and the newest in the bug report |

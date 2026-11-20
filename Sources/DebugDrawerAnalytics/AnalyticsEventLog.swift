@@ -9,10 +9,10 @@
     /// behind a lock rather than in an actor, which would make each record an asynchronous hop and
     /// could reorder events sent back to back. `OSAllocatedUnfairLock` rather than `Mutex`, which
     /// needs iOS 18; switch to `Mutex` once iOS 18 is the minimum.
-    final class AnalyticsEventLog: Sendable {
+    package final class AnalyticsEventLog: Sendable {
         /// The log `AnalyticsEvents.record` writes to, for the life of the app. It keeps events
         /// from the first record, before install too.
-        static let shared = AnalyticsEventLog(capacity: AnalyticsEvents.defaultCapacity)
+        package static let shared = AnalyticsEventLog(capacity: AnalyticsEvents.defaultCapacity)
 
         fileprivate struct State: Sendable {
             /// The events, in a ring: `ring[start]` is the oldest once the ring is full.
@@ -37,14 +37,14 @@
         /// - Parameters:
         ///   - capacity: How many events are kept; at least 1.
         ///   - now: The time an event is recorded at.
-        init(capacity: Int, now: @escaping @Sendable () -> Date = { Date() }) {
+        package init(capacity: Int, now: @escaping @Sendable () -> Date = { Date() }) {
             precondition(capacity > 0, "The log keeps at least one event")
             state = OSAllocatedUnfairLock(initialState: State(capacity: capacity))
             self.now = now
         }
 
         /// How many events are kept at most.
-        var capacity: Int {
+        package var capacity: Int {
             state.withLock(\.capacity)
         }
 
@@ -53,7 +53,7 @@
         ///
         /// - Parameter source: An empty one is none.
         /// - Complexity: O(1), amortized.
-        func record(name: String, properties: [String: AnalyticsValue], source: String?) {
+        package func record(name: String, properties: [String: AnalyticsValue], source: String?) {
             let timestamp = now()
             let onChange = state.withLock { state -> (@Sendable () -> Void)? in
                 let event = AnalyticsEvent(
@@ -76,7 +76,7 @@
         /// Every event kept, the newest first. Reading it lets the next change be reported.
         ///
         /// - Complexity: O(*n*), where *n* is the number of events kept.
-        var events: [AnalyticsEvent] {
+        package var events: [AnalyticsEvent] {
             state.withLock { state in
                 state.isChangeReported = false
                 return Array((state.ring[state.start...] + state.ring[..<state.start]).reversed())
@@ -86,7 +86,7 @@
         /// Keeps at most `capacity` events from now on, dropping the oldest beyond it.
         ///
         /// - Parameter capacity: At least 1.
-        func resize(to capacity: Int) {
+        package func resize(to capacity: Int) {
             precondition(capacity > 0, "The log keeps at least one event")
             let onChange = state.withLock { state -> (@Sendable () -> Void)? in
                 let oldestFirst = Array(state.ring[state.start...] + state.ring[..<state.start])
@@ -99,7 +99,7 @@
         }
 
         /// Drops every event.
-        func removeAll() {
+        package func removeAll() {
             let onChange = state.withLock { state -> (@Sendable () -> Void)? in
                 state.ring = []
                 state.start = 0
@@ -113,7 +113,7 @@
         ///
         /// - Returns: The observer's identity, which ``stopObserving(_:)`` takes.
         @discardableResult
-        func observe(_ onChange: @escaping @Sendable () -> Void) -> Int {
+        package func observe(_ onChange: @escaping @Sendable () -> Void) -> Int {
             state.withLock { state in
                 state.onChange = onChange
                 state.isChangeReported = false
@@ -126,7 +126,7 @@
         /// that one keeps being called.
         ///
         /// - Parameter observerID: What ``observe(_:)`` returned.
-        func stopObserving(_ observerID: Int) {
+        package func stopObserving(_ observerID: Int) {
             state.withLock { state in
                 guard state.observerID == observerID else { return }
                 state.onChange = nil
@@ -134,7 +134,7 @@
         }
 
         /// Whether an observer is called on each change.
-        var isObserved: Bool {
+        package var isObserved: Bool {
             state.withLock { $0.onChange != nil }
         }
     }

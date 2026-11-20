@@ -14,6 +14,7 @@ swift_library(
     module_name = "DebugDrawerAnalyticsPlugin",
     deps = [
         "//Sources/DebugDrawer",
+        "//Sources/DebugDrawerAnalytics",
     ],
     visibility = ["//visibility:public"],
 )
@@ -25,6 +26,7 @@ docc_archive(
     catalog = glob(["*.docc/**"], allow_empty = True),
     deps = [
         "//Sources/DebugDrawer:DebugDrawerDocumentation",
+        "//Sources/DebugDrawerAnalytics:DebugDrawerAnalyticsDocumentation",
     ],
     tags = ["manual"],
     visibility = ["//visibility:public"],

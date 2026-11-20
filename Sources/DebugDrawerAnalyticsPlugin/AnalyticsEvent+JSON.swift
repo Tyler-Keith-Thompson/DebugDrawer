@@ -60,8 +60,9 @@
 
     /// A property's value as it is written in JSON: dates as ISO 8601 strings.
     ///
-    /// A wrapper rather than a conformance of `AnalyticsValue`, which exists in release builds,
-    /// where it would have to encode too.
+    /// A wrapper rather than `AnalyticsValue`'s own `Codable` conformance, which keys each value by
+    /// its case so a sidecar decodes exactly what was recorded; the drawer's JSON is the bare
+    /// values a person reads.
     struct AnalyticsValueJSON: Encodable {
         let value: AnalyticsValue
 
