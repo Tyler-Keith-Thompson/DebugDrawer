@@ -28,6 +28,12 @@ final class ProductionSignIn: ObservableObject {
     static let launchURL = URL(string: "debugdrawer-receiver-example://auth")
 
     @Published private(set) var state = State.signedIn
+    /// The signed-in account's ID while signed in, which the app state capability hashes before it
+    /// leaves the app; the sidecar never sees it raw.
+    var userID: String? {
+        accessToken == nil ? nil : "example-user-1042"
+    }
+
     /// Stands in for the token a server issued. The screen shows only `state`, and no handler
     /// returns it.
     private var accessToken: String? = ProductionSignIn.issueToken()

@@ -1,5 +1,6 @@
 import Combine
 import DebugDrawer
+import DebugDrawerAppInfo
 import Foundation
 
 #if DEBUG

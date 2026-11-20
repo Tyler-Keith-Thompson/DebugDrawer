@@ -1,5 +1,6 @@
 #if DEBUG
     @testable import DebugDrawer
+    import DebugDrawerAppInfo
     @testable import DebugDrawerAppInfoPlugin
     import Foundation
     import Testing

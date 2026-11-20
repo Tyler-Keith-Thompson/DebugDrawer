@@ -1,4 +1,5 @@
 #if DEBUG
+    import DebugDrawerAppInfo
     import Foundation
 
     /// A bundle's Info.plist: the main bundle's, unless told otherwise.

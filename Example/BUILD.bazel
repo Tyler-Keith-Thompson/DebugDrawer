@@ -265,6 +265,7 @@ swift_library(
         ":ExampleSidecarStore",
         "//Sources/DebugDrawerAccessibility",
         "//Sources/DebugDrawerAnalytics",
+        "//Sources/DebugDrawerAppInfo",
         "//Sources/DebugDrawerAppStateReset",
         "//Sources/DebugDrawerHangDetector",
         "//Sources/DebugDrawerLocalization",

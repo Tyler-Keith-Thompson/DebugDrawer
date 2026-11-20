@@ -2227,8 +2227,9 @@ plugin and no dependency on the drawer (and, to offer tweaks, `DebugDrawerTweaks
 analytics events, `DebugDrawerAnalytics`, for translators and accessibility reviewers,
 `DebugDrawerLocalization` and `DebugDrawerAccessibility`, to forward crash reports and
 MetricKit payloads, `DebugDrawerMetricKit`, to mock responses for a session, `DebugDrawerNetwork`,
-to show the push token for test pushes, `DebugDrawerNotifications`, or to record hangs and
-signposts, `DebugDrawerHangDetector`, below). It serves a sidecar, over the app group's store, only the
+to show the push token for test pushes, `DebugDrawerNotifications`, to record hangs and
+signposts, `DebugDrawerHangDetector`, or to show a snapshot of the app's state, `DebugDrawerAppInfo`,
+below). It serves a sidecar, over the app group's store, only the
 capabilities the app enables, within sessions the sidecar opens, and refuses everything else:
 
 ```swift
@@ -3277,6 +3278,86 @@ In the sidecar, the kit's `DebugDrawerSidecarPlugin.performanceTraces` offers St
 lists the stalls, newest first, each open to its main-thread stack, and the intervals, with Stop
 and Delete; Create Report adds `performance.txt`.
 
+**The app's state in every report.** To know which build and configuration a report came from,
+a sidecar can read a snapshot of the app's state during its session and attach it to every report:
+the version, build, commit, branch and CI build always, and only what the app registers beside
+them, its flag and experiment overrides, experiment buckets, environment, a hashed user ID and
+values of its own. It is off unless the app enables it. Link `DebugDrawerAppInfo` (`.product(name:
+"DebugDrawerAppInfo", package: "DebugDrawer")`) beside the receiver, the UI-free half of the App
+Info plugin, make the snapshot's model with the receiver's sessions and the sources to show, and
+enable the capability:
+
+```swift
+import DebugDrawerAppInfo
+import DebugDrawerReceiver
+import Foundation
+
+@MainActor
+final class Account {
+    var userID: String?
+    var plan = "free"
+}
+
+@MainActor
+final class ProductionAppStateSnapshot {
+    let sessions = DebugDrawerSessions(maximumDuration: 15 * 60)
+    let appState: DebugDrawerAppState
+    let receiver: DebugDrawerReceiver
+
+    init(flags: DebugDrawerFeatureFlagOverrides, account: Account, container: URL) throws {
+        appState = DebugDrawerAppState(
+            sessions: sessions,
+            featureFlags: flags,
+            userID: { account.userID },
+            values: [DebugDrawerAppStateField("plan") { .string(account.plan) }]
+        )
+        receiver = DebugDrawerReceiver(directory: container.appending(path: "DebugDrawer"), sessions: sessions)
+        receiver.enable(.featureFlagOverrides(flags))
+        receiver.enable(.appState(appState))
+        try receiver.start()
+    }
+}
+```
+
+- **The risk: low.** Whoever holds the sidecar learns which build the app is and how it is
+  configured, and, when the app registers one, a hashed identifier of the signed-in user. Raw user
+  IDs, tokens and keychain values are never read by the capability, and nothing the sidecar sends
+  is executed: its one command, `DebugDrawerAppState.Command.refresh`, reads the state again.
+- **Every field beyond the build is the app's choice.** With nothing registered, the
+  `DebugDrawerAppState.State` holds only `bundleIdentifier`, `version`, `build`, `buildMetadata`
+  (`AppInfoBuildMetadata`: the commit, branch and CI build the app passes, or its Info.plist's
+  `DebugDrawerGitCommit`, `DebugDrawerGitBranch` and `DebugDrawerCIBuildNumber`, as App Info reads
+  them) and `date`. Pass `featureFlags:` (a `DebugDrawerFeatureFlagOverrides`) for the flags a
+  sidecar overrides now, `experiments:` (a `DebugDrawerExperimentOverrides`) for every listed
+  experiment's bucket and whether it is forced, `environments:` (a `DebugDrawerEnvironments`) for
+  the active backend, `userID:` for the hashed user ID, and `values:` for the app's own: each a
+  `DebugDrawerAppStateField`, a key and a closure returning a string, a number or a Boolean
+  (`DebugDrawerAppStateValue`). The models are the capabilities' own, read as the state is read and
+  followed during a session, so an override a sidecar sets shows at once; hand the same model to the
+  receiver, as `.featureFlagOverrides(flags)` does above.
+- **Never register a secret.** What a field's closure returns leaves the app. Keys aren't checked
+  for what they look like (a key named `plan` can still be handed a token), so the app decides:
+  no tokens, passwords, keychain values or raw identifiers of a person. The sidecar's report masks
+  values under the keys its `DebugDrawerRedaction` masks, as a second line, not the first.
+- **The user ID is hashed in the app.** The closure's raw ID is hashed as it is read, before
+  anything holds it, with HMAC-SHA256 under 32 random bytes the install makes on its first hash and
+  keeps in the app's own defaults (`DebugDrawer.AppState.userIDKey`, which Reset App State keeps),
+  never the app group's. The same user reads the same on every launch of the install, so one
+  install's reports correlate, while a sidecar or a report can't test a guessed ID against the hash
+  without the key, which never leaves the app; another install hashes the same user differently.
+  Return `nil` while no one is signed in.
+- **Served during a session only.** Outside one the snapshot holds nothing and no closure is asked;
+  under a grant policy a session whose grant doesn't list `DebugDrawerAppState.pluginID` is served
+  nothing. The state lives in memory and in the capability's snapshot file in the app's own
+  directory of the store, rewritten without it as the session ends. Until the app enables
+  `.appState(_:)`, a refresh is refused as `commandRefused(.unknownCapability)`.
+- **In bug reports too.** `appState.read()` reads the state at any time, so the app's bug reports
+  carry it: `DebugDrawerBugReports(sessions: sessions) { appState.read() }`.
+
+In the sidecar, the kit's `DebugDrawerSidecarPlugin.appState` shows the build and each registered
+field with Refresh. `DebugDrawerSidecarView` hosts it as soon as the app is reached, so Create
+Report adds `App State/app-state.json` to every report, opened or not.
+
 In a debug build the receiver runs beside the drawer: show the same model in a plugin through
 `DebugDrawerPluginTransport.direct(to:)`, and pass it to `.featureFlagOverrides(_:)` or
 `.model(_:id:scope:)`, so what a sidecar does is seen in the app's own drawer. `DebugDrawer`
@@ -3553,7 +3634,7 @@ DebugDrawerSidecarView(groupIdentifier: "group.com.example.debug", sessionDurati
 Below it, a picker shows the plugins the app serves, drawn by the plugins' own views over the
 transport: `.console` and `.network` by default, `.bugReports` for an app that serves bug
 reports, `.scenarios` for one that registers scenarios, `.authActions` for one that registers
-auth actions, `.appStateReset` for one that allows a reset and `.environments` for one that lets a sidecar switch its backend (above). A plugin of your own whose model adopts
+auth actions, `.appStateReset` for one that allows a reset, `.environments` for one that lets a sidecar switch its backend and `.appState` for one that shows its state, which the view hosts as the app is reached so every report carries it (above). A plugin of your own whose model adopts
 `DebugDrawerPluginModel` joins them with `DebugDrawerSidecarPlugin(id:title:icon:snapshot:command:plugin:)`,
 whose closure makes the plugin's view over the transport the kit hands it. Create Report writes the
 hosted plugins' report contributions, redacted by `DebugDrawer.shared.redaction`, under a summary
@@ -3562,7 +3643,8 @@ uploads it, as in the drawer.
 
 For a layout of your own, the pieces are public: `DebugDrawerSidecarAppList` (the apps, as they
 come and go), `DebugDrawerSidecarConnection` (one app: its channel, sessions, hosted plugins and
-`createReport(redaction:in:)`) and `DebugDrawerSidecarApp`. The kit builds for iOS, iPadOS and macOS,
+`createReport(redaction:in:)`; host `.appState` as the app is reached, to put the app's state in
+every report) and `DebugDrawerSidecarApp`. The kit builds for iOS, iPadOS and macOS,
 in debug builds: like the transports it is built on, a release build gets stand-ins that list no
 app, so archive a TestFlight sidecar in the Debug configuration.
 
@@ -3772,7 +3854,8 @@ ContentView()
 | `DebugDrawerNetworkPlugin` | URLProtocol HTTP interception: method, URL, status, timing, headers, body, cURL export, mock responses by rule, slow and failing networks per host, replay and edit-and-resend, HAR export and import, WebSocket frames, requests kept across launches, ignored hosts, GraphQL operation names; re-exports `DebugDrawerNetwork` |
 | `DebugDrawerDiskIOPlugin` | FileManager, NSData and FileHandle file calls, flagging main-thread I/O and failures |
 | `DebugDrawerDiskIOInterposer` | A dynamic library, linked only to opt in: dyld interposing tuples for `read`, `write`, `pread` and `pwrite`, which `unsafeInstallDiskIOWithInterposing()` turns on so Disk I/O records Swift's `Data` and `FileHandle` calls |
-| `DebugDrawerAppInfoPlugin` | Build (version, commit, branch, CI build), provisioning profile, entitlements, OS, memory, uptime, process, debugger, screen and reachability facts |
+| `DebugDrawerAppInfo` | `AppInfoBuildMetadata`, real in every build, and the receiver capability (`.appState(_:)`) that shows a sidecar, during its session, a read-only snapshot of the app's state (`DebugDrawerAppState`): the version, build, commit, branch and CI build, and only what the app registers beside them (its flag and experiment overrides, experiment buckets, environment, a user ID hashed in the app, values of its own); UI-free, so a release build can link it |
+| `DebugDrawerAppInfoPlugin` | Build (version, commit, branch, CI build), provisioning profile, entitlements, OS, memory, uptime, process, debugger, screen and reachability facts; re-exports `DebugDrawerAppInfo` |
 | `DebugDrawerUserDefaultsPlugin` | Browse, search, add, edit, copy and delete UserDefaults keys of the standard defaults and app group suites, values of every property-list type edited at any depth, the list following the app's writes |
 | `DebugDrawerKeychainPlugin` | Generic and internet passwords, certificates and keys, each with every attribute the keychain returns (a key's or certificate's data is never read), filtered by access group and text; generic passwords added and edited, any item deleted; on the Mac, the data protection keychain |
 | `DebugDrawerScreenshotPlugin` | The app's key window captured without the drawer or the HUD: to a PNG on the Desktop or the clipboard on macOS, to the clipboard on iOS |
@@ -3806,7 +3889,7 @@ ContentView()
 | `DebugDrawerAppStateReset` | The receiver capability (`.appStateReset(_:)`) that lets a sidecar reset the categories a production app allows (never the keychain unless it opts in), listed and confirmed by revision, applied on the next foreground; no drawer, so a release build links it beside the receiver |
 | `DebugDrawerAppStateResetPlugin` | The app's state cleared as a fresh install leaves it, by category: UserDefaults, keychain items, the container's files, caches, cookies, the URL cache and the app's own cleanup, each listed before a confirmation, then relaunched on macOS or quit elsewhere; re-exports `DebugDrawerAppStateReset` |
 | `DebugDrawerRemote` | Plugin models served to a viewer on another device over the local network: an opt-in Network.framework server advertised over Bonjour, each viewer paired with a six-digit code the device shows, and the viewer's transport and browser |
-| `DebugDrawerSidecarKit` | A sidecar app, as a library: `DebugDrawerSidecarView` lists the apps in the group that serve a sidecar, opens their sessions (with a grant the company's server gives, when they require one), shows their Console, Network, Bug Reports, Scenarios, Auth, Reset App State, Environment, Performance and other model-backed plugins over the socket or the store, and makes and uploads a report of them; iOS, iPadOS and macOS, debug builds |
+| `DebugDrawerSidecarKit` | A sidecar app, as a library: `DebugDrawerSidecarView` lists the apps in the group that serve a sidecar, opens their sessions (with a grant the company's server gives, when they require one), shows their Console, Network, Bug Reports, Scenarios, Auth, Reset App State, Environment, Performance, App State and other model-backed plugins over the socket or the store, and makes and uploads a report of them, the app state attached to each; iOS, iPadOS and macOS, debug builds |
 
 ## Development
 

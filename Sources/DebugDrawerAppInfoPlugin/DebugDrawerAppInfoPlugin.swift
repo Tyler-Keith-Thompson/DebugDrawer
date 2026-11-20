@@ -1,4 +1,5 @@
 import DebugDrawer
+import DebugDrawerAppInfo
 import SwiftUI
 
 // MARK: - Plugin
@@ -26,7 +27,7 @@ public struct AppInfoPlugin: DebugDrawerPlugin {
         let model: AppInfoModel?
 
         /// - Parameter buildMetadata: The commit, branch and CI build to show; each one `nil` is
-        ///   read from the main bundle's Info.plist (``AppInfoBuildMetadata``).
+        ///   read from the main bundle's Info.plist (`AppInfoBuildMetadata`).
         @MainActor public init(buildMetadata: AppInfoBuildMetadata = AppInfoBuildMetadata()) {
             self.buildMetadata = buildMetadata
             model = nil
@@ -41,7 +42,7 @@ public struct AppInfoPlugin: DebugDrawerPlugin {
         }
     #else
         /// - Parameter buildMetadata: The commit, branch and CI build to show; each one `nil` is
-        ///   read from the main bundle's Info.plist (``AppInfoBuildMetadata``).
+        ///   read from the main bundle's Info.plist (`AppInfoBuildMetadata`).
         @MainActor public init(buildMetadata: AppInfoBuildMetadata = AppInfoBuildMetadata()) {
             self.buildMetadata = buildMetadata
         }
@@ -97,7 +98,7 @@ public extension DebugDrawer {
     /// is shown or a report is made.
     ///
     /// - Parameter buildMetadata: The commit, branch and CI build to show; each one `nil` is
-    ///   read from the main bundle's Info.plist (``AppInfoBuildMetadata``).
+    ///   read from the main bundle's Info.plist (`AppInfoBuildMetadata`).
     func installAppInfo(buildMetadata: AppInfoBuildMetadata = AppInfoBuildMetadata()) {
         #if DEBUG
             let plugin = AppInfoPlugin(buildMetadata: buildMetadata)

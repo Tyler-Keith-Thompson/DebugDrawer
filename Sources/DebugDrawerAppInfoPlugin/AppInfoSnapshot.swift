@@ -1,3 +1,4 @@
+import DebugDrawerAppInfo
 import Foundation
 
 // Public because it is `AppInfoModel`'s `Snapshot`, and opaque: its fields stay internal, so a

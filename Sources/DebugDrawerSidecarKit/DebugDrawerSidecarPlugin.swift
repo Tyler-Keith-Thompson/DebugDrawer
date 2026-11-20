@@ -34,6 +34,9 @@ public struct DebugDrawerSidecarPlugin: Identifiable {
     public let icon: String
     /// Connects to the model over a transport and makes the plugin over it.
     let connect: @MainActor (any DebugDrawerTransport) async throws(DebugDrawerTransportError) -> AnyDebugDrawerPlugin
+    /// Whether the sidecar view hosts it as soon as the app is reached rather than when it is
+    /// picked, so its report contribution is in every report: the app state's.
+    var hostsOnConnect = false
 
     /// A plugin whose model the app serves under `id`, made over the transport to it.
     ///

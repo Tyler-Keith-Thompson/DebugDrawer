@@ -2,6 +2,7 @@ import Combine
 import CryptoKit
 import DebugDrawerAccessibility
 import DebugDrawerAnalytics
+import DebugDrawerAppInfo
 import DebugDrawerAppStateReset
 import DebugDrawerHangDetector
 import DebugDrawerLocalization
@@ -21,7 +22,8 @@ import os
 /// app hands its log lines and requests, the bug reports its Report a Bug trigger takes, the
 /// push registration the app delegate hands the APNs device token, the scenarios a sidecar
 /// launches it into, the actions a sidecar takes on its sign-in, the state a sidecar may reset, the
-/// backends a sidecar may point it at for a session, and the hangs and signposts it records.
+/// backends a sidecar may point it at for a session, the hangs and signposts it records, and the
+/// read-only snapshot of its state every sidecar report carries.
 ///
 /// Everything here is in the release build too: a production app links the receiver and the
 /// capability modules, never the drawer.
@@ -32,18 +34,26 @@ final class ExampleReceiverHost: ObservableObject {
     // The literal is a valid URL, so the force unwrap can't fail.
 
     let flags: ProductionFlags
+    /// The flag overrides a sidecar sets, which the app state lists.
+    let flagOverrides: DebugDrawerFeatureFlagOverrides
     let experiments: ProductionExperiments
+    /// The experiments a sidecar forces, whose buckets the app state lists.
+    let experimentOverrides: DebugDrawerExperimentOverrides
     let logging: ProductionLogging
     /// The screens a sidecar's scenarios open.
     let scenarios = ProductionScenarios()
     /// The sign-in a sidecar's auth actions expire, refresh and end.
-    let signIn = ProductionSignIn()
+    let signIn: ProductionSignIn
     /// The defaults and caches a sidecar may reset.
     let appState: ProductionAppState
     /// The backends a sidecar's session points the app at: Production, Staging or Canary.
-    let environments = ProductionEnvironments()
+    let environments: ProductionEnvironments
     /// The freeze and the signposted load a sidecar's performance traces record.
     let performance: ProductionPerformance
+    /// The build, the flag and experiment overrides, the backend, the signed-in user's hashed ID
+    /// and two values of the app's own, served to a sidecar during its session and attached to
+    /// every report it creates; also each bug report's state.
+    let snapshot: DebugDrawerAppState
     let sessions: DebugDrawerSessions
     /// Keeps the app running while a session is open: a background task on iOS, an App Nap
     /// activity on the Mac.
@@ -99,27 +109,28 @@ final class ExampleReceiverHost: ObservableObject {
         let experiments = ProductionExperiments()
         let logging = ProductionLogging()
         let sessions = Self.sessions()
+        let signIn = ProductionSignIn()
+        let environments = ProductionEnvironments()
         let receiver = DebugDrawerReceiver(directory: ExampleSidecarStore.directory, sessions: sessions)
         let mocking = NetworkMocking(sessions: sessions, allowedHosts: [.exact("api.example.com")])
         let diagnostics = DebugDrawerDiagnosticsCapture(sessions: sessions)
-        let bugReports = Self.bugReports(sessions: sessions, diagnostics: diagnostics, flags: flags, experiments: experiments)
+        // The models, not the adapters, so the app state reads the overrides they keep.
+        let flagOverrides = DebugDrawerFeatureFlagOverrides(adapter: flags)
+        let experimentOverrides = DebugDrawerExperimentOverrides(adapter: experiments)
+        let snapshot = Self.snapshot(
+            sessions: sessions, flagOverrides: flagOverrides, experimentOverrides: experimentOverrides,
+            environments: environments.model, signIn: signIn
+        )
+        let bugReports = Self.bugReports(sessions: sessions, diagnostics: diagnostics, flags: flags, experiments: experiments, snapshot: snapshot)
         let pushRegistration = Self.pushRegistration(sessions: sessions)
         let appState = ProductionAppState(sessions: sessions)
-        receiver.enable(.featureFlagOverrides(flags))
-        receiver.enable(.experimentOverrides(experiments))
-        receiver.enable(.logLevels(logging))
-        receiver.enable(.tweaks(ProductionTweaks.greeting, ProductionTweaks.diagnostics))
-        receiver.enable(.localizationReview())
-        receiver.enable(.accessibilityEnvironmentOverrides())
-        receiver.enable(.analyticsEvents(sessions: sessions))
-        receiver.enable(.metricKitPayloads(sessions: sessions))
-        receiver.enable(.networkMocking(mocking))
-        receiver.enable(.diagnosticsCapture(diagnostics))
-        receiver.enable(.bugReports(bugReports))
-        receiver.enable(.pushRegistration(pushRegistration))
-        receiver.enable(.appStateReset(appState.requests))
         self.flags = flags
+        self.flagOverrides = flagOverrides
         self.experiments = experiments
+        self.experimentOverrides = experimentOverrides
+        self.snapshot = snapshot
+        self.signIn = signIn
+        self.environments = environments
         self.logging = logging
         self.sessions = sessions
         self.receiver = receiver
@@ -131,10 +142,7 @@ final class ExampleReceiverHost: ObservableObject {
         performance = ProductionPerformance(sessions: sessions)
         keeper = DebugDrawerBackgroundKeeper(sessions: sessions)
         apiSession = Self.apiSession()
-        receiver.enable(.scenarios(scenarios.scenarios, launchURL: ProductionScenarios.launchURL))
-        receiver.enable(.authActions(signIn.actions, launchURL: ProductionSignIn.launchURL))
-        receiver.enable(.environments(environments.model))
-        receiver.enable(.performanceTraces(performance.traces))
+        enableCapabilities()
         // The audit log goes to the app's own log, as a host would forward it to its own.
         auditLogging = sessions.auditEntries.sink { entry in
             Self.logger.notice("Audit: \(entry.capability, privacy: .public) \(String(describing: entry.event), privacy: .public)")
@@ -146,6 +154,28 @@ final class ExampleReceiverHost: ObservableObject {
             serveError = "No sidecar can reach the app: \(error)"
             Self.logger.error("The receiver didn't start: \(String(describing: error), privacy: .public)")
         }
+    }
+
+    /// Enables every capability the library ships on the receiver, before it starts.
+    private func enableCapabilities() {
+        receiver.enable(.featureFlagOverrides(flagOverrides))
+        receiver.enable(.experimentOverrides(experimentOverrides))
+        receiver.enable(.appState(snapshot))
+        receiver.enable(.logLevels(logging))
+        receiver.enable(.tweaks(ProductionTweaks.greeting, ProductionTweaks.diagnostics))
+        receiver.enable(.localizationReview())
+        receiver.enable(.accessibilityEnvironmentOverrides())
+        receiver.enable(.analyticsEvents(sessions: sessions))
+        receiver.enable(.metricKitPayloads(sessions: sessions))
+        receiver.enable(.networkMocking(mocking))
+        receiver.enable(.diagnosticsCapture(diagnostics))
+        receiver.enable(.bugReports(bugReports))
+        receiver.enable(.pushRegistration(pushRegistration))
+        receiver.enable(.appStateReset(appState.requests))
+        receiver.enable(.scenarios(scenarios.scenarios, launchURL: ProductionScenarios.launchURL))
+        receiver.enable(.authActions(signIn.actions, launchURL: ProductionSignIn.launchURL))
+        receiver.enable(.environments(environments.model))
+        receiver.enable(.performanceTraces(performance.traces))
     }
 
     /// The app's session for its own API, with the mocking protocol first in its protocols.
@@ -189,19 +219,49 @@ final class ExampleReceiverHost: ObservableObject {
     }
 
     /// The bug reports Report a Bug takes. The state a report carries is the host's choice: here
-    /// the checkout's flag and experiment, the greeting, and the signed-in customer, whose email the
-    /// redaction masks.
+    /// the checkout's flag and experiment, the greeting, the signed-in customer, whose email the
+    /// redaction masks, and the app state as a sidecar sees it.
     private static func bugReports(
-        sessions: DebugDrawerSessions, diagnostics: DebugDrawerDiagnosticsCapture, flags: ProductionFlags, experiments: ProductionExperiments
+        sessions: DebugDrawerSessions,
+        diagnostics: DebugDrawerDiagnosticsCapture,
+        flags: ProductionFlags,
+        experiments: ProductionExperiments,
+        snapshot: DebugDrawerAppState
     ) -> DebugDrawerBugReports {
         DebugDrawerBugReports(sessions: sessions, diagnostics: diagnostics) {
             ExampleBugReportState(
                 checkout: flags.value(forKey: "new-checkout") == .bool(true) ? "new" : "legacy",
                 checkoutFlow: experiments.variant(forExperiment: "checkout-flow"),
                 greeting: ProductionTweaks.greeting.value,
-                customer: .init(email: "jane@example.com", plan: "pro")
+                customer: .init(email: "jane@example.com", plan: "pro"),
+                appState: snapshot.read()
             )
         }
+    }
+
+    /// The app state a sidecar reads: the build's commit and branch (a CI script would write them
+    /// into Info.plist), the flag and experiment overrides, the backend, the signed-in user's ID,
+    /// hashed in the app, and two values of the app's own: the plan and the greeting. Nothing else
+    /// is registered, and nothing secret: the access token stays in the sign-in.
+    private static func snapshot(
+        sessions: DebugDrawerSessions,
+        flagOverrides: DebugDrawerFeatureFlagOverrides,
+        experimentOverrides: DebugDrawerExperimentOverrides,
+        environments: DebugDrawerEnvironments,
+        signIn: ProductionSignIn
+    ) -> DebugDrawerAppState {
+        DebugDrawerAppState(
+            sessions: sessions,
+            buildMetadata: AppInfoBuildMetadata(gitCommit: "4f9c2e1", gitBranch: "main"),
+            featureFlags: flagOverrides,
+            experiments: experimentOverrides,
+            environments: environments,
+            userID: { [weak signIn] in signIn?.userID },
+            values: [
+                DebugDrawerAppStateField("plan") { "pro" },
+                DebugDrawerAppStateField("greeting") { .string(ProductionTweaks.greeting.value) }
+            ]
+        )
     }
 
     /// The push registration the app delegate hands the device token, serving the environment the
@@ -266,6 +326,7 @@ struct ExampleBugReportState: Encodable {
     let checkoutFlow: String?
     let greeting: String
     let customer: Customer
+    let appState: DebugDrawerAppState.State
 }
 
 /// The public key of the example's grant server, which signs every grant the example sidecar

@@ -1,4 +1,5 @@
 #if DEBUG
+    import DebugDrawerAppInfo
     import Foundation
 
     /// What the app's bundle says about the build: its identifier, version and build number, and

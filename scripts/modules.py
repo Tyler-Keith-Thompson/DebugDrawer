@@ -115,11 +115,15 @@ MODULES = [
     # the main thread's stack), and the receiver capability that records the stalls and the host's
     # signpost intervals for a sidecar's session.
     ("DebugDrawerHangDetector", "Capabilities", "The main-thread stall monitor (a run loop observer and a watcher thread that samples the main thread's stack), real in every build, and the receiver capability that records hitches, hangs with their main-thread stacks (addresses, image UUIDs and offsets, for a dSYM) and the signpost intervals the host marks, while a sidecar records in its session; UI-free.", ["DebugDrawerReceiver"]),
+    # The App Info plugin's build metadata (the commit, branch and CI build an Info.plist or the
+    # host names), and the receiver capability that shows a sidecar a read-only snapshot of the
+    # app's state during its session: the build, and what else the host registers.
+    ("DebugDrawerAppInfo", "Capabilities", "The build's metadata (commit, branch, CI build), real in every build, and the receiver capability that shows a sidecar, during its session, a read-only snapshot of the app's state: the version and build, and only what the host registers beside them (its flag and experiment overrides, experiment buckets, environment, a user ID hashed in the process, values of its own); UI-free.", ["DebugDrawerReceiver"]),
     # Plugins
     ("DebugDrawerConsolePlugin", "Plugins", "Captures os_log entries (stdout and stderr on macOS) and an app logger's lines through ConsoleLogSink, with metadata: level filter, text or regular-expression search, subsystem and category mutes, time range, auto-follow, copy, lines kept across launches.", ["DebugDrawer", "oslogclient/OSLogClient"]),
     ("DebugDrawerViewInspectorPlugin", "Plugins", "View borders by depth, alignment grid, click indicators, animation speed, render tracking, hierarchy snapshot.", ["DebugDrawer"]),
     ("DebugDrawerAccessibilityPlugin", "Plugins", "Overrides color scheme, Dynamic Type, layout direction, locale and the system accessibility settings at runtime.", ["DebugDrawer", "DebugDrawerAccessibility"]),
-    ("DebugDrawerAppInfoPlugin", "Plugins", "Build (version, commit, branch, CI build), provisioning profile, entitlements, OS, memory, uptime, process, debugger, screen and reachability facts.", ["DebugDrawer"]),
+    ("DebugDrawerAppInfoPlugin", "Plugins", "Build (version, commit, branch, CI build), provisioning profile, entitlements, OS, memory, uptime, process, debugger, screen and reachability facts.", ["DebugDrawer", "DebugDrawerAppInfo"]),
     ("DebugDrawerUserDefaultsPlugin", "Plugins", "Browse, search, add, edit, copy and delete UserDefaults keys of the standard defaults and app group suites, values of every property-list type edited at any depth, the list following the app's writes.", ["DebugDrawer"]),
     ("DebugDrawerPerformancePlugin", "Plugins", "Live FPS, dropped frames and memory with sparkline graphs, CPU per thread, and a simulated memory warning, sampled only while shown.", ["DebugDrawer"]),
     ("DebugDrawerNetworkPlugin", "Plugins", "URLProtocol HTTP interception: requests, responses, timing, cURL export, mock responses, slow and failing networks per host, replay and edit-and-resend, HAR export and import, WebSocket frames, requests kept across launches, ignored hosts, GraphQL operation names.", ["DebugDrawer", "DebugDrawerNetwork"]),
@@ -154,7 +158,7 @@ MODULES = [
     # Sidecar: what a company builds its employee-only sidecar app on (the charter's D6). It hosts
     # the views of the plugins it depends on, so it may depend on plugins, and only an app links
     # it: no module depends on it, and a production app never does.
-    ("DebugDrawerSidecarKit", "Sidecar", "The kit a sidecar app is built on: the apps in the group that serve it, listed as they start and stop, a session opened and ended for one, with an optional signed grant, the Console, Network, Bug Reports, Scenarios, Auth, Reset App State, Environment and Performance views (and any plugin's) over the socket or the store, and a bug report of them, created and sent; debug builds only.", ["DebugDrawer", "DebugDrawerConsolePlugin", "DebugDrawerNetworkPlugin", "DebugDrawerAppStateResetPlugin", "DebugDrawerHangDetectorPlugin"]),
+    ("DebugDrawerSidecarKit", "Sidecar", "The kit a sidecar app is built on: the apps in the group that serve it, listed as they start and stop, a session opened and ended for one, with an optional signed grant, the Console, Network, Bug Reports, Scenarios, Auth, Reset App State, Environment, Performance and App State views (and any plugin's) over the socket or the store, and a bug report of them, created and sent; debug builds only.", ["DebugDrawer", "DebugDrawerConsolePlugin", "DebugDrawerNetworkPlugin", "DebugDrawerAppStateResetPlugin", "DebugDrawerHangDetectorPlugin", "DebugDrawerAppInfo"]),
 ]
 
 # Modules only iOS builds: SwiftUI views and what they draw with. Bazel builds them for the
@@ -222,7 +226,7 @@ CATALYST_MODULES = ["DebugDrawerReceiver", "DebugDrawerTweaks", "DebugDrawerAnal
 # fails on one that has none (tools/documentation_coverage.py, run by docc_archive's
 # `require_documentation`). Checked against the debug build's symbol graph, which holds the drawer
 # as well as the API that exists in every build.
-DOCUMENTED_MODULES = ["DebugDrawerReceiver", "DebugDrawerTweaks", "DebugDrawerAnalytics", "DebugDrawerLocalization", "DebugDrawerAccessibility", "DebugDrawerMetricKit", "DebugDrawerNetwork", "DebugDrawerNotifications", "DebugDrawerAppStateReset", "DebugDrawerHangDetector", "DebugDrawer", "DebugDrawerSidecarKit"]
+DOCUMENTED_MODULES = ["DebugDrawerReceiver", "DebugDrawerTweaks", "DebugDrawerAnalytics", "DebugDrawerLocalization", "DebugDrawerAccessibility", "DebugDrawerMetricKit", "DebugDrawerNetwork", "DebugDrawerNotifications", "DebugDrawerAppStateReset", "DebugDrawerHangDetector", "DebugDrawerAppInfo", "DebugDrawer", "DebugDrawerSidecarKit"]
 
 # Dynamic libraries: (name, description). Each is C sources under Sources/<name> (headers in
 # include/) with no dependencies, shipped as a `.dynamic` library product in Package.swift and as
@@ -252,7 +256,8 @@ TEST_TARGETS = [
     ("DebugDrawerConsolePluginTests", ["DebugDrawerConsolePlugin", "DebugDrawer", "DebugDrawerTestSupport", "viewinspector/ViewInspector", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
     ("DebugDrawerViewInspectorPluginTests", ["DebugDrawerViewInspectorPlugin", "DebugDrawer", "DebugDrawerInterceptionContract", "viewinspector/ViewInspector", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
     ("DebugDrawerAccessibilityPluginTests", ["DebugDrawerAccessibilityPlugin", "DebugDrawerAccessibility", "DebugDrawer", "viewinspector/ViewInspector", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
-    ("DebugDrawerAppInfoPluginTests", ["DebugDrawerAppInfoPlugin", "DebugDrawer", "viewinspector/ViewInspector", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
+    ("DebugDrawerAppInfoTests", ["DebugDrawerAppInfo", "DebugDrawerReceiver", "DebugDrawer"]),
+    ("DebugDrawerAppInfoPluginTests", ["DebugDrawerAppInfoPlugin", "DebugDrawerAppInfo", "DebugDrawer", "viewinspector/ViewInspector", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
     ("DebugDrawerUserDefaultsPluginTests", ["DebugDrawerUserDefaultsPlugin", "DebugDrawer", "viewinspector/ViewInspector", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
     ("DebugDrawerPerformancePluginTests", ["DebugDrawerPerformancePlugin", "DebugDrawer", "viewinspector/ViewInspector", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
     ("DebugDrawerNetworkTests", ["DebugDrawerNetwork", "DebugDrawerReceiver", "DebugDrawer"]),
@@ -289,7 +294,7 @@ TEST_TARGETS = [
     ("DebugDrawerAppStateResetTests", ["DebugDrawerAppStateReset", "DebugDrawerReceiver", "DebugDrawer"]),
     ("DebugDrawerAppStateResetPluginTests", ["DebugDrawerAppStateResetPlugin", "DebugDrawerAppStateReset", "DebugDrawer", "viewinspector/ViewInspector", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
     ("DebugDrawerRemoteTests", ["DebugDrawerRemote", "DebugDrawer", "DebugDrawerReceiver", "DebugDrawerNetworkPlugin", "DebugDrawerNetwork", "DebugDrawerConsolePlugin"]),
-    ("DebugDrawerSidecarKitTests", ["DebugDrawerSidecarKit", "DebugDrawer", "DebugDrawerReceiver", "DebugDrawerAppStateReset", "DebugDrawerHangDetectorPlugin", "DebugDrawerNetworkPlugin", "DebugDrawerConsolePlugin", "viewinspector/ViewInspector"]),
+    ("DebugDrawerSidecarKitTests", ["DebugDrawerSidecarKit", "DebugDrawer", "DebugDrawerReceiver", "DebugDrawerAppInfo", "DebugDrawerAppStateReset", "DebugDrawerHangDetectorPlugin", "DebugDrawerNetworkPlugin", "DebugDrawerConsolePlugin", "viewinspector/ViewInspector"]),
 ]
 
 # The modules the test-support target depends on (fixtures are usually written against the
@@ -325,6 +330,7 @@ TEST_SIZES = {name: "medium" for name in [
 # xcodebuild stages (`just test-ios`, `just spm-catalyst-test`) with `-skip-testing:` for each of
 # performance_targets(), since a debug build beside every other test can't meet their budgets.
 PERFORMANCE_TESTS = [
+    "DebugDrawerAppInfoTests",
     "DebugDrawerHangDetectorPluginTests",
     "DebugDrawerHangDetectorTests",
     "DebugDrawerLeakDetectorPluginTests",

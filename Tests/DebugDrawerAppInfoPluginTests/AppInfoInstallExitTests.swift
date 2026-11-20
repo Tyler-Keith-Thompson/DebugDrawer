@@ -3,6 +3,7 @@
 // here, verbatim, rather than in DebugDrawerTests, which links core alone.
 #if os(macOS) && DEBUG
     import DebugDrawer
+    import DebugDrawerAppInfo
     @testable import DebugDrawerAppInfoPlugin
     import Foundation
     import Testing

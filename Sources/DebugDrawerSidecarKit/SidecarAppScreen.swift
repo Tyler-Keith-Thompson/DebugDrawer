@@ -94,6 +94,11 @@
                 Divider()
                 SidecarReportBar(connection: connection)
             }
+            // The app state goes in every report, so it is hosted as the app is reached, before
+            // anyone picks it; cancelled with the screen.
+            .task {
+                await connection.hostOnConnect(plugins)
+            }
         }
 
         /// Opens a session, with a grant first when the sidecar fetches them: the error that

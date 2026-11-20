@@ -119,6 +119,15 @@ import Foundation
             return made
         }
 
+        /// Hosts each of `plugins` that is hosted as the app is reached (the app state) and that
+        /// the app serves, so its report contribution is in every report, opened or not.
+        func hostOnConnect(_ plugins: [DebugDrawerSidecarPlugin]) async {
+            for plugin in plugins where plugin.hostsOnConnect && app.serves(plugin.id) {
+                // A plugin that can't be reached is left out of the report; picking it shows why.
+                _ = try? await host(plugin)
+            }
+        }
+
         /// Writes a bug report of the plugins shown so far that adopt
         /// `DebugDrawerReportContributor`, as the drawer's Create Report does, and zips it.
         ///
