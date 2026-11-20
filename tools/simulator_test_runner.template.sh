@@ -1,6 +1,6 @@
 #!/bin/bash
-# Runs a visionOS unit test bundle (visionos_test_runner.bzl): a new simulator on the newest
-# visionOS runtime, booted, the bundle run by the platform's xctest agent, the simulator deleted.
+# Runs a %(platform_name)s unit test bundle (simulator_test_runner.bzl): a new simulator on the newest
+# %(platform_name)s runtime, booted, the bundle run by the platform's xctest agent, the simulator deleted.
 # `--test_filter` is not passed on: the bundle runs whole.
 
 set -euo pipefail
@@ -13,7 +13,7 @@ test_bundle_path="%(test_bundle_path)s"
 test_bundle_name=$(basename "$test_bundle_path")
 test_bundle_name="${test_bundle_name%.*}"
 
-work_dir="$(mktemp -d "${TEST_TMPDIR:-${TMPDIR:-/tmp}}/visionos_test.XXXXXX")"
+work_dir="$(mktemp -d "${TEST_TMPDIR:-${TMPDIR:-/tmp}}/simulator_test.XXXXXX")"
 simulator_id=""
 clean_up() {
   if [[ -n "$simulator_id" ]]; then
@@ -34,19 +34,19 @@ fi
 # Bazel's outputs are read-only, and the agent writes beside the bundle.
 chmod -R u+w "$work_dir"
 
-# The newest visionOS runtime installed and the device type to create on it.
+# The newest %(platform_name)s runtime installed and the device type to create on it.
 read -r runtime device_type < <(xcrun simctl list runtimes --json | /usr/bin/python3 -c '
 import json, sys
-wanted = sys.argv[1]
-runtimes = [r for r in json.load(sys.stdin)["runtimes"] if r.get("platform") == "xrOS" and r["isAvailable"]]
+wanted, platform, name = sys.argv[1:4]
+runtimes = [r for r in json.load(sys.stdin)["runtimes"] if r.get("platform") == platform and r["isAvailable"]]
 if not runtimes:
-    sys.exit("error: no visionOS simulator runtime is installed (Xcode > Settings > Components)")
+    sys.exit("error: no " + name + " simulator runtime is installed (Xcode > Settings > Components)")
 runtime = max(runtimes, key=lambda r: [int(part) for part in r["version"].split(".")])
 types = [t["identifier"] for t in runtime["supportedDeviceTypes"]]
 if wanted and wanted not in types:
-    sys.exit("error: the visionOS " + runtime["version"] + " runtime supports no device type " + wanted)
+    sys.exit("error: the " + name + " " + runtime["version"] + " runtime supports no device type " + wanted)
 print(runtime["identifier"], wanted or types[0])
-' "%(device_type)s")
+' "%(device_type)s" "%(runtime_platform)s" "%(platform_name)s")
 
 simulator_id=$(xcrun simctl create "Bazel $test_bundle_name $$" "$device_type" "$runtime")
 xcrun simctl bootstatus "$simulator_id" -b >/dev/null
@@ -65,7 +65,7 @@ if [[ -n "$test_env" ]]; then
   done
 fi
 
-developer_dir="$(xcode-select -p)/Platforms/XRSimulator.platform/Developer"
+developer_dir="$(xcode-select -p)/Platforms/%(simulator_platform)s.platform/Developer"
 test_log="$work_dir/test.log"
 test_exit_code=0
 env "${child_env[@]}" \

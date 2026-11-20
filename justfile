@@ -188,8 +188,20 @@ spm-visionos-test: (spm-platform-test "visionOS" VISIONOS_DESTINATION)
 [doc('Build the tvOS modules through SwiftPM for the tvOS simulator')]
 spm-tvos: (spm-platform "tvOS")
 
+# The simulator `just spm-tvos-test` runs the tvOS tests in.
+TVOS_DESTINATION := env("TVOS_DESTINATION", "platform=tvOS Simulator,name=" + TVOS_DEVICE)
+
+[doc("Run the tvOS test targets (core's) through SwiftPM in the tvOS simulator")]
+spm-tvos-test: (spm-platform-test "tvOS" TVOS_DESTINATION)
+
 [doc('Build the watchOS modules through SwiftPM for the watchOS simulator')]
 spm-watchos: (spm-platform "watchOS")
+
+# The simulator `just spm-watchos-test` runs the watchOS tests in.
+WATCHOS_DESTINATION := env("WATCHOS_DESTINATION", "platform=watchOS Simulator,name=" + WATCHOS_DEVICE)
+
+[doc("Run the watchOS test targets (core's) through SwiftPM in the watchOS simulator")]
+spm-watchos-test: (spm-platform-test "watchOS" WATCHOS_DESTINATION)
 
 # Package.swift's `.iOS` covers Mac Catalyst, so it is a destination rather than a platform.
 [doc('Build the Mac Catalyst modules (CATALYST_MODULES in scripts/modules.py) through SwiftPM')]
@@ -252,11 +264,13 @@ spm-test-mac *args:
     skip=$(python3 {{PROJECT_ROOT}}/scripts/modules.py swift-test-performance-skip)
     CFFIXED_USER_HOME="$home" {{SWIFT}} test --skip-build --skip "$skip" $skipped "$@"
 
-[doc('Run the tests via SwiftPM but the performance ones: on the Mac (arguments go to swift test), then the visionOS ones in its simulator and the rest for Mac Catalyst. To skip a test in every stage, name it in SKIP_TESTS, e.g. SKIP_TESTS="DebugDrawerTests/CaptureBufferTests/countBound(),DebugDrawerNetworkPluginTests/NetworkWebSocketExitTests" just spm-test; a --skip reaches swift test only')]
+[doc('Run the tests via SwiftPM but the performance ones: on the Mac (arguments go to swift test), then the visionOS, tvOS and watchOS ones in their simulators and the rest for Mac Catalyst. To skip a test in every stage, name it in SKIP_TESTS, e.g. SKIP_TESTS="DebugDrawerTests/CaptureBufferTests/countBound(),DebugDrawerNetworkPluginTests/NetworkWebSocketExitTests" just spm-test; a --skip reaches swift test only')]
 [positional-arguments]
 spm-test *args:
     just spm-test-mac "$@"
     just spm-visionos-test
+    just spm-tvos-test
+    just spm-watchos-test
     just spm-catalyst-test
 
 [doc('Verify both build systems agree — run before pushing')]

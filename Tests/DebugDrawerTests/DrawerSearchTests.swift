@@ -132,7 +132,10 @@
         }
     }
 
-    #if !os(visionOS)
+    // tvOS binds no keyboard shortcut (DrawerKeyboardShortcuts): the focus engine and the remote's
+    // Menu button stand in for them. watchOS has no keyboard, and no panel (DebugDrawerOverlay):
+    // its drawer is a list (DrawerWatchList).
+    #if !os(visionOS) && !os(tvOS) && !os(watchOS)
         @MainActor
         @Suite("Drawer search shortcut")
         struct DrawerSearchShortcutTests {

@@ -80,7 +80,7 @@ Every shell command gets a timeout. macOS has no `timeout`; use
 | `just filter <pattern>` | Tests whose name matches |
 | `just test-release` | `--config=release`: builds and runs only the `XPerformanceTests` targets |
 | `just release-check` | Example apps built optimized, and every public symbol present in release (`scripts/release_api.py`); a `just deploy` gate |
-| `just spm-visionos-test` | Core's tests (`TESTED_PLATFORMS`) through SwiftPM in the visionOS simulator, through a scheme holding only that test target; `just spm-test` runs it. Bazel runs them as `//Tests/DebugDrawerTests:DebugDrawerTests_visionOS` in a new simulator (`tools/visionos_test_runner.bzl`) |
+| `just spm-visionos-test`, `just spm-tvos-test`, `just spm-watchos-test` | Core's tests (`TESTED_PLATFORMS`) through SwiftPM in that platform's simulator (`VISIONOS_DESTINATION`, `TVOS_DESTINATION`, `WATCHOS_DESTINATION` override it), through a scheme holding only that test target; `just spm-test` runs each. Bazel runs them as `//Tests/DebugDrawerTests:DebugDrawerTests_<platform>` in a new simulator (`tools/simulator_test_runner.bzl`). Bazel has no Catalyst platform: there it only compiles the `CATALYST_MODULES` libraries (`catalyst_build_test`), and `just spm-catalyst-test` runs the tests |
 | `just spm-catalyst-test` | Every test target through SwiftPM for Mac Catalyst (`xcodebuild test -scheme DebugDrawer-Package`), so `targetEnvironment(macCatalyst)` branches run; `just spm-test` runs it. Snapshot tests sit under `#if os(iOS) && !targetEnvironment(macCatalyst)`, as SnapshotTesting doesn't compile there, and so does a test that makes a UIKit window: xctest has no NSApplication |
 | `just spm-catalyst-example` | Build the iOS example as a Mac Catalyst app without launching it: every `Example/iOS` file, the example libraries and products their imports name; `just spm` runs it |
 | `just spm-test`, `just verify` | SwiftPM tests; both build systems. The Mac's run (`just spm-test-mac`) and Catalyst's get a temporary home folder (`CFFIXED_USER_HOME`), as every Bazel `swift_test` does (`tools/swift_rules.bzl`), so no test writes into `~/Library`. SwiftPM builds the `XPerformanceTests` targets in debug but runs none of them, in any stage or in `just test-ios`: `swift test --skip` and `-skip-testing:` from `scripts/modules.py` (`PERFORMANCE_TESTS`); Bazel runs them. To leave a test out of every stage, and out of `just test-ios`, name it in `SKIP_TESTS` (`SKIP_TESTS="Target/Suite/test(),Target/Suite" just spm-test`): entries take xcodebuild's `-skip-testing:` form, a Swift Testing test with its parentheses and argument labels, and `scripts/test_skips.py` writes the `--skip` regexes swift test takes; a `--skip` argument reaches swift test only |
@@ -150,9 +150,10 @@ the *default* sections below where they differ:
   are the platforms built today (`PLATFORMS` in `scripts/modules.py`). Core also builds for
   visionOS, tvOS and watchOS (`EXTRA_PLATFORMS`): a plugin ported to one joins its list, and
   `just build` and `just build-spm` then build it for that platform's simulator. Core's tests also
-  run on visionOS (`TESTED_PLATFORMS`): a test that can't run there (ViewInspector and
-  SnapshotTesting don't build for it, `APPLE_ONLY_PACKAGE_EXCLUDED_PLATFORMS`) sits under an `#if`
-  that says why. The Keychain and App State Reset tests also run in the iOS simulator under
+  run on visionOS, tvOS and watchOS (`TESTED_PLATFORMS`): a test that can't run there
+  (ViewInspector and SnapshotTesting don't build for visionOS,
+  `APPLE_ONLY_PACKAGE_EXCLUDED_PLATFORMS`; tvOS binds no keyboard shortcut; watchOS has no panel)
+  sits under an `#if` that says why. The Keychain and App State Reset tests also run in the iOS simulator under
   `just test`, hosted by `//tools/test_host`, whose entitlements give them the keychain no Mac
   test runner has; a test of the real keychain sits under `#if os(iOS) &&
   targetEnvironment(simulator)` and never touches the Mac's. On tvOS a view is

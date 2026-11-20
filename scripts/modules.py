@@ -172,9 +172,9 @@ EXTRA_PLATFORMS = {
 # Test targets that also run in the simulator of iOS or of a platform in EXTRA_PLATFORMS, by
 # platform, each testing only modules listed for it. Bazel runs each as a `<Name>_<platform>` unit
 # test (`just test`), with //tools:<platform>_test_runner, in a simulator made for the run; an iOS
-# one runs inside //tools/test_host. SwiftPM runs each visionOS one through a scheme of its own
-# that holds just that test target, so no unported module builds (`just spm-platform-test`, which
-# `just spm-test` runs), and every target on iOS (`just test-ios`). Tests that can't run there sit
+# one runs inside //tools/test_host. SwiftPM runs each visionOS, tvOS and watchOS one through a
+# scheme of its own that holds just that test target, so no unported module builds (`just
+# spm-platform-test`, which `just spm-test` runs), and every target on iOS (`just test-ios`). Tests that can't run there sit
 # under an `#if` that says why.
 TESTED_PLATFORMS = {
     # The data protection keychain answers only a process with an application identifier, which
@@ -185,6 +185,8 @@ TESTED_PLATFORMS = {
     # tests of outlines under sheets run inside the test host too.
     "iOS": ["DebugDrawerAppStateResetPluginTests", "DebugDrawerKeychainPluginTests", "DebugDrawerViewInspectorPluginTests"],
     "visionOS": ["DebugDrawerTests"],
+    "tvOS": ["DebugDrawerTests"],
+    "watchOS": ["DebugDrawerTests"],
 }
 
 # Apple-only packages Bazel leaves out of a TESTED_PLATFORMS run, by platform. On iOS the views are

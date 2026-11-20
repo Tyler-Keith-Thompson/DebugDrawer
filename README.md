@@ -2909,6 +2909,37 @@ in debug builds: like the transports it is built on, a release build gets stand-
 app, so archive a TestFlight sidecar in the Debug configuration. `Example/Sidecar` is the example's
 sidecar app (`just run sidecar`, beside `just run iOS`).
 
+### The sidecar on Apple TV, Vision Pro, Apple Watch and Mac Catalyst
+
+The transports, the receiver and `DebugDrawerAppGroupContainer` build and run on every platform
+the drawer does: the store is files in the app group's container and a dispatch source on its
+directory, which each platform has. Their tests run in the tvOS, visionOS and watchOS simulators
+and for Mac Catalyst. The kit itself (`DebugDrawerSidecarKit`) builds for iOS, iPadOS and macOS
+only, since the Console and Network views it hosts do; on the other platforms a sidecar is built
+on `DebugDrawerSidecarTransport` or `DebugDrawerAppGroupStoreTransport` directly, with views of
+its own.
+
+- **Mac Catalyst** follows iOS: a Catalyst sidecar and a Catalyst app share their group as iOS
+  apps do. Catalyst apps aren't suspended, as on the Mac.
+- **visionOS** follows iOS too, in its own windows: the sidecar opens beside the app, and both
+  keep running while visible.
+- **tvOS** has app groups, but one app runs at a time: switching to the sidecar suspends the app,
+  and the background keeper's task lasts about 30 seconds (above). So on Apple TV the sidecar
+  works through the store: what it leaves there is performed as the app comes back to the
+  foreground, and the app's last snapshot is read meanwhile.
+- **watchOS**: app groups don't span a watch and its iPhone, so **a watchOS app's sidecar is a
+  watch app on the same watch**, signed by the same team and listing the same group, not the
+  iPhone sidecar talking to the iPhone app and relayed over WatchConnectivity. The watch sidecar
+  needs nothing the iPhone one doesn't: the same store, in the watch's own group container. A
+  relay was rejected because it would put new code that carries commands into the production
+  iPhone app, outside the trust boundary the app group draws; because an independent watch app
+  may have no iPhone app to relay through; and because WatchConnectivity delivers a live message
+  only while the other side is reachable, while its queued transfers come when the system picks.
+  A backgrounded watch app is suspended (the keeper holds nothing on watchOS), so it, too, picks up
+  what the sidecar left as it comes to the foreground. The socket's tests pass in the watchOS
+  simulator, but the simulator runs on the Mac's kernel, so on a watch rely on the store:
+  `DebugDrawerSidecarTransport` uses it whenever the socket doesn't answer.
+
 ### What the plugins need from the app
 
 No plugin needs an Info.plist key or an entitlement to install. Some of what they show depends on

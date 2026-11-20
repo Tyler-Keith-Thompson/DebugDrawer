@@ -6,6 +6,8 @@
     import Testing
     #if os(macOS)
         import AppKit
+    #elseif os(watchOS)
+        import WatchKit
     #elseif canImport(UIKit)
         import UIKit
     #endif
@@ -541,6 +543,8 @@
             let levels = try await sidecar.connect(toPlugin: "LogLevels", snapshot: LogLevelModel.Snapshot.self, command: LogLevelModel.Command.self)
             #if os(macOS)
                 let foreground = NSApplication.willBecomeActiveNotification
+            #elseif os(watchOS)
+                let foreground = WKApplication.willEnterForegroundNotification
             #else
                 let foreground = UIApplication.willEnterForegroundNotification
             #endif

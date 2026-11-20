@@ -9,7 +9,8 @@
         @Test("A window narrower than two regular panels gets a compact panel: every iPhone in portrait, Slide Over, a narrow Mac window",
               arguments: [CGFloat(320), 375, 393, 430, 631])
         func compactWidths(width: CGFloat) {
-            let actual = DrawerPanelLayout(windowWidth: width)
+            // tvOS lays the panel out at twice iOS's points, as its text is (debugDrawerTextScale).
+            let actual = DrawerPanelLayout(windowWidth: width * .debugDrawerTextScale)
 
             #expect(actual == .compact)
         }
@@ -17,14 +18,14 @@
         @Test("A window at least two regular panels wide keeps the 316 point panel: an iPhone in landscape, an iPad, a Mac window",
               arguments: [CGFloat(632), 667, 744, 1024, 1440])
         func regularWidths(width: CGFloat) {
-            let actual = DrawerPanelLayout(windowWidth: width)
+            let actual = DrawerPanelLayout(windowWidth: width * .debugDrawerTextScale)
 
             #expect(actual == .regular)
         }
 
-        @Test("A regular panel is 316 points wide")
+        @Test("A regular panel is 316 points wide, in iOS points (632 on tvOS)")
         func regularWidth() {
-            let expected: CGFloat = 316
+            let expected: CGFloat = 316 * .debugDrawerTextScale
 
             let actual = DrawerPanelLayout.regularWidth
 

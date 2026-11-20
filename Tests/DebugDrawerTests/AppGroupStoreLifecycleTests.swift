@@ -6,6 +6,8 @@
     import Testing
     #if os(macOS)
         import AppKit
+    #elseif os(watchOS)
+        import WatchKit
     #elseif canImport(UIKit)
         import UIKit
     #endif
@@ -52,6 +54,8 @@
             let viewer = try await connection.connect(toPlugin: "Tally", snapshot: TallyModel.Snapshot.self, command: TallyModel.Command.self)
             #if os(macOS)
                 let foreground = NSApplication.willBecomeActiveNotification
+            #elseif os(watchOS)
+                let foreground = WKApplication.willEnterForegroundNotification
             #else
                 let foreground = UIApplication.willEnterForegroundNotification
             #endif
@@ -83,6 +87,8 @@
             server.stop()
             #if os(macOS)
                 let foreground = NSApplication.willBecomeActiveNotification
+            #elseif os(watchOS)
+                let foreground = WKApplication.willEnterForegroundNotification
             #else
                 let foreground = UIApplication.willEnterForegroundNotification
             #endif
