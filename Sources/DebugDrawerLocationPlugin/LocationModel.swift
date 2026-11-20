@@ -25,7 +25,10 @@ import Foundation
     /// Release builds get a stand-in whose snapshot holds nothing and which ignores every command.
     @MainActor
     public final class LocationModel: DebugDrawerPluginModel {
-        /// The model over the simulator the app's location managers ask, which the plugin shows.
+        /// The model `DebugDrawer.shared` shows: the one `installLocation()` installs there and
+        /// ``LocationPlugin/init()`` shows, keeping the switch and coordinate in the shared
+        /// drawer's defaults. A drawer of its own that `installLocation()` is called on gets a
+        /// model of its own instead.
         public static let shared = LocationModel()
 
         @Published private var latitudeText: String
@@ -39,6 +42,17 @@ import Foundation
         /// The drawers the plugin is installed in; the methods stay swapped while any holds it.
         private var installations: Set<ObjectIdentifier> = []
 
+        /// A model over a simulator of its own, which keeps the switch and coordinate in
+        /// `defaults` and which the app's managers ask while a drawer that installed this model is
+        /// the latest to hold the plugin.
+        ///
+        /// - Parameter defaults: Where the switch and coordinate are kept: the drawer's own suite,
+        ///   apart from the app's defaults.
+        convenience init(defaults: UserDefaults = .debugDrawer) {
+            let simulator = LocationSimulator(defaults: defaults)
+            self.init(simulator: simulator, interception: _LocationInterception(simulator: simulator))
+        }
+
         /// - Parameters:
         ///   - simulator: What the app's location managers are given.
         ///   - interception: Swaps `CLLocationManager`'s location methods for the simulator's.
@@ -46,8 +60,8 @@ import Foundation
         ///   - scheduler: The clock route playback runs on.
         ///   - routes: The routes to choose from, the first chosen; at least one.
         init(
-            simulator: any LocationOverride = LocationSimulator.shared,
-            interception: any LocationInterception = _LocationInterception(),
+            simulator: any LocationOverride,
+            interception: any LocationInterception,
             files: any GPXFileReading = _GPXFileReading(),
             scheduler: any PlaybackScheduler = TimerPlaybackScheduler(),
             routes: [Route] = Route.samples
@@ -124,22 +138,26 @@ import Foundation
         }
 
         /// Counts `drawer` as one the plugin is installed in, and swaps `CLLocationManager`'s
-        /// location methods for the simulator's, so spoofing kept from the last launch is in effect
-        /// at once.
+        /// location methods for the simulator's, which the app's managers ask while `drawer` is
+        /// the latest to hold the plugin, so spoofing kept from the last launch is in effect at
+        /// once.
         func install(in drawer: ObjectIdentifier) {
             installations.insert(drawer)
-            interception.install()
+            interception.install(for: drawer)
         }
 
-        /// Uncounts `drawer`; once no drawer holds the plugin, stops a route playing, hands every
-        /// manager the simulator tracked back to Core Location and gives each swapped method its
-        /// original implementation back. The switch, the coordinate and the fields stay.
+        /// Uncounts `drawer`, whose managers go to the drawer that installed the plugin before it,
+        /// or, with none left, back to Core Location, the swapped methods put back. Once no drawer
+        /// holds this model's plugin, stops a route playing. The switch, the coordinate and the
+        /// fields stay.
         func uninstall(from drawer: ObjectIdentifier) {
-            guard installations.remove(drawer) != nil, installations.isEmpty else { return }
+            guard installations.remove(drawer) != nil else { return }
+            // Before the route stops: the managers move once, to the next drawer's location,
+            // rather than to this model's fixed coordinate first.
+            interception.uninstall(for: drawer)
+            guard installations.isEmpty else { return }
             objectWillChange.send()
             player.stop()
-            simulator.release()
-            interception.uninstall()
         }
 
         /// Spoofs the typed coordinate once both fields hold numbers in range. Until then the one

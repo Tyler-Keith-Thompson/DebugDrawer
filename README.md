@@ -212,7 +212,11 @@ in place and calls straight through, recording nothing, until the plugin is inst
 When two drawers hold Network, Console or View Inspector, the one that installed it last gets
 what it captures (requests, log lines, render counts), and Network's mock rules and conditions
 come from that drawer's plugin; once that drawer removes the plugin, the one before it captures
-again. An app that uses only the shared drawer sees no difference.
+again. Location works the same way: `installLocation()` on a drawer of your own gives it a
+simulator of its own, its switch and coordinate kept in that drawer's defaults, and the app's
+location managers get the locations of the drawer that installed it last.
+`ScreenRecording.install(in:)` gives a drawer its own recorder, list and Show Touches setting. An
+app that uses only the shared drawer sees no difference.
 
 ### Grouping, pinning and ordering
 

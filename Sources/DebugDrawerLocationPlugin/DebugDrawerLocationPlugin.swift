@@ -62,18 +62,20 @@ public struct LocationPlugin: DebugDrawerPlugin {
     }
 
     /// Swaps `CLLocationManager`'s location methods for the simulator's as `drawer` adds the
-    /// plugin, so spoofing kept from the last launch is in effect at once. Release builds swap
-    /// nothing.
+    /// plugin, so spoofing kept from the last launch is in effect at once. The app's managers get
+    /// this plugin's locations until another drawer installs the Location plugin, and again once
+    /// that one removes it. Release builds swap nothing.
     @MainActor public func install(in drawer: DebugDrawer) {
         #if DEBUG
             (model ?? .shared).install(in: ObjectIdentifier(drawer))
         #endif
     }
 
-    /// Once no drawer holds the plugin, stops a route playing, hands every manager the simulator
-    /// tracked back to Core Location (one given a simulated location gets its real updates
-    /// started again) and gives each swapped method its original implementation back. The switch
-    /// and the coordinate stay saved for the next install.
+    /// Hands the app's managers back to the drawer that installed the Location plugin before
+    /// `drawer`. Once no drawer holds a Location plugin, hands every manager back to Core
+    /// Location (one given a simulated location gets its real updates started again) and gives
+    /// each swapped method its original implementation back. Once no drawer holds this plugin,
+    /// stops a route playing. The switch and the coordinate stay saved for the next install.
     @MainActor public func uninstall(from drawer: DebugDrawer) {
         #if DEBUG
             (model ?? .shared).uninstall(from: ObjectIdentifier(drawer))
@@ -87,12 +89,19 @@ public extension DebugDrawer {
     /// Registers ``LocationPlugin`` and swaps `CLLocationManager`'s location methods for the
     /// simulator's, so spoofing kept from the last launch is in effect at once.
     ///
+    /// The spoofing switch, the coordinate and the route playing are this drawer's: on
+    /// ``DebugDrawer/DebugDrawer/shared`` they are ``LocationModel/shared``'s, kept in the shared
+    /// drawer's defaults, and a drawer made with ``DebugDrawer/DebugDrawer/init(defaults:)`` gets
+    /// a model of its own, kept in its defaults. The app's managers get the locations of the
+    /// drawer that installed the plugin last, and the one before's once it removes the plugin.
+    ///
     /// Call it at startup, before the app starts location updates: a manager that started
     /// before it isn't tracked. Release builds do nothing.
     func installLocation() {
         #if DEBUG
+            let model = installerState { self === DebugDrawer.shared ? LocationModel.shared : LocationModel(defaults: defaults) }
             // Adding the plugin installs it, which swaps the methods.
-            registerGlobal(LocationPlugin())
+            registerGlobal(LocationPlugin(model: model))
         #endif
     }
 }

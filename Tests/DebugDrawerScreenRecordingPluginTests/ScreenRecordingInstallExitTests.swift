@@ -28,8 +28,8 @@
         func installAgain() async {
             await #expect(processExitsWith: .success) {
                 let isExpected = await MainActor.run {
-                    let first = ScreenRecordingInstallation.install(capacity: 5)
-                    let second = ScreenRecordingInstallation.install(capacity: 2)
+                    let first = ScreenRecordingInstallation.install(capacity: 5, in: .shared)
+                    let second = ScreenRecordingInstallation.install(capacity: 2, in: .shared)
                     let plugins = DebugDrawer.shared.globalPlugins.count { $0.title == "Screen Recording" }
                     return plugins == 1 && first === second && second.capacity == 2
                 }
@@ -41,13 +41,13 @@
         func installAgainKeepsItInstalled() async {
             await #expect(processExitsWith: .success) {
                 let isExpected = await MainActor.run {
-                    let model = ScreenRecordingInstallation.install(capacity: 5)
-                    ScreenRecordingInstallation.install(capacity: 5)
+                    let model = ScreenRecordingInstallation.install(capacity: 5, in: .shared)
+                    ScreenRecordingInstallation.install(capacity: 5, in: .shared)
                     let isKeptInstalled = !model.isUninstalled
                     DebugDrawer.shared.unregisterGlobal(id: ScreenRecordingPlugin.pluginID)
                     let isUninstalled = model.isUninstalled
                         && !DebugDrawer.shared.globalPlugins.contains { $0.id == ScreenRecordingPlugin.pluginID }
-                    let reinstalled = ScreenRecordingInstallation.install(capacity: 5)
+                    let reinstalled = ScreenRecordingInstallation.install(capacity: 5, in: .shared)
                     return isKeptInstalled && isUninstalled && reinstalled === model && !model.isUninstalled
                         && DebugDrawer.shared.globalPlugins.count { $0.id == ScreenRecordingPlugin.pluginID } == 1
                 }
@@ -60,6 +60,15 @@
             await #expect(processExitsWith: .failure) {
                 await MainActor.run {
                     ScreenRecording.install(capacity: 0)
+                }
+            }
+        }
+
+        @Test("Installing on a drawer of its own with a capacity below one traps too")
+        func zeroCapacityTrapsOnAnyDrawer() async {
+            await #expect(processExitsWith: .failure) {
+                await MainActor.run {
+                    ScreenRecording.install(capacity: 0, in: DebugDrawer())
                 }
             }
         }

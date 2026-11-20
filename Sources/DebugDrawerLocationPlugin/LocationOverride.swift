@@ -23,9 +23,5 @@
 
         /// Ends a route: the fixed coordinate, if one is set, is in effect again.
         func endRoute()
-
-        /// Lets go of every manager, handing each back to Core Location, and forgets the route's
-        /// point. The switch and the coordinate stay.
-        func release()
     }
 #endif

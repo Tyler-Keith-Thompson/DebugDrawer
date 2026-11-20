@@ -107,6 +107,28 @@
         /// apart from ``shared``'s.
         package let defaults: UserDefaults
 
+        /// What the shipped plugins' installers keep for this drawer, by the type that holds it.
+        private var installerStates: [ObjectIdentifier: AnyObject] = [:]
+
+        /// The object of type `State` a plugin's installer keeps for this drawer (the model its
+        /// `install*()` call shows), made with `make` the first time it is asked for and handed
+        /// back after.
+        ///
+        /// The drawer holds it for as long as the drawer lives, so a drawer made for a test keeps
+        /// a model of its own, apart from ``shared``'s, and lets go of it with the drawer. One
+        /// object per type: a plugin keeps everything it needs in one.
+        ///
+        /// - Parameter make: Makes the object, on the first call for `State` only.
+        /// - Returns: The drawer's object of type `State`.
+        package func installerState<State: AnyObject>(_ make: () -> State) -> State {
+            let key = ObjectIdentifier(State.self)
+            // The cast can't fail: only this method writes the dictionary, under `State`'s key.
+            if let state = installerStates[key] as? State { return state }
+            let state = make()
+            installerStates[key] = state
+            return state
+        }
+
         /// How many of each plugin's views are on screen (its section's body, its view shown
         /// alone, its HUD readout), by plugin ID; a plugin with none has no entry.
         var visibleContentCounts: [String: Int] = [:]

@@ -315,7 +315,7 @@ struct LocationModelTests {
         #expect(simulator.calls == expectedCalls)
     }
 
-    @Test("Each install swaps the methods; only the last drawer's uninstall stops the route, lets go of the managers and puts the methods back")
+    @Test("Each drawer's install and uninstall reach the interception once, and one that never installed none; the last uninstall stops the route")
     func installCounting() {
         let start = Date(timeIntervalSince1970: 1_000_000)
         let fixes = GPXTrack(points: [
@@ -333,22 +333,23 @@ struct LocationModelTests {
         let second = NSObject()
         let never = NSObject()
         let expectedCalls: [FakeLocationOverride.Call] = [
-            .deliverRoute(LocationCoordinate(latitude: 1, longitude: 1)), .endRoute, .release
+            .deliverRoute(LocationCoordinate(latitude: 1, longitude: 1)), .endRoute
         ]
+        let expectedDrawers = [ObjectIdentifier(first), ObjectIdentifier(second)]
 
         sut.install(in: ObjectIdentifier(first))
         sut.install(in: ObjectIdentifier(second))
         sut.perform(LocationCommand(.play))
         sut.uninstall(from: ObjectIdentifier(never))
         sut.uninstall(from: ObjectIdentifier(first))
-        let afterFirst = (sut.snapshot.playback, interception.uninstalls)
+        let afterFirst = (sut.snapshot.playback, interception.uninstalled)
         sut.uninstall(from: ObjectIdentifier(second))
         sut.uninstall(from: ObjectIdentifier(second))
 
-        #expect(interception.installs == 2)
+        #expect(interception.installed == expectedDrawers)
         #expect(afterFirst.0 == .playing(delivered: 1))
-        #expect(afterFirst.1 == 0)
-        #expect(interception.uninstalls == 1)
+        #expect(afterFirst.1 == [ObjectIdentifier(first)])
+        #expect(interception.uninstalled == expectedDrawers)
         #expect(simulator.calls == expectedCalls)
         #expect(sut.snapshot.playback == .stopped)
         #expect(sut.snapshot.isEnabled)
@@ -375,11 +376,11 @@ struct LocationModelTests {
         first.registerGlobal(sut)
         second.registerGlobal(sut)
         first.unregisterGlobal(id: sut.id)
-        let afterFirst = interception.uninstalls
+        let afterFirst = interception.uninstalled
         second.unregisterGlobal(id: sut.id)
 
-        #expect(interception.installs == 2)
-        #expect(afterFirst == 0)
-        #expect(interception.uninstalls == 1)
+        #expect(interception.installed == [ObjectIdentifier(first), ObjectIdentifier(second)])
+        #expect(afterFirst == [ObjectIdentifier(first)])
+        #expect(interception.uninstalled == [ObjectIdentifier(first), ObjectIdentifier(second)])
     }
 }

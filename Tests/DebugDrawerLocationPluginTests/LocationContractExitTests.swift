@@ -97,12 +97,14 @@
         }
 
         func capturedMarkers(through marker: String) async throws -> [String] {
-            // Tracked as startUpdatingLocation returns, so there is nothing to wait for.
-            LocationSimulator.shared.updatingManagers().compactMap { ($0 as? MarkedLocationManager)?.marker }
+            // Tracked as startUpdatingLocation returns, so there is nothing to wait for. The
+            // simulator the swizzled methods ask: the latest drawer's, which the earlier drawers'
+            // managers were handed to.
+            (LocationSwizzles.simulator?.updatingManagers() ?? []).compactMap { ($0 as? MarkedLocationManager)?.marker }
         }
 
         func capturedCount() -> Int {
-            LocationSimulator.shared.updatingManagers().count
+            LocationSwizzles.simulator?.updatingManagers().count ?? 0
         }
     }
 

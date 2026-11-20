@@ -30,13 +30,14 @@
                     "com.debugdrawer.location.longitude": 2.2945
                 ], forName: UserDefaults.argumentDomain)
                 DebugDrawer.shared.installLocation()
+                let simulator = try #require(LocationSwizzles.simulator)
                 let manager = CLLocationManager()
                 let delegate = RecordingLocationDelegate()
                 manager.delegate = delegate
                 var updates = delegate.updates.makeAsyncIterator()
                 let expected: [Double] = [48.8584, 2.2945]
                 // Fails at once rather than waiting on a fix Core Location would have to give.
-                try #require(LocationSimulator.shared.simulatedLocation != nil)
+                try #require(simulator.simulatedLocation != nil)
 
                 manager.startUpdatingLocation()
                 let actual = await updates.next()

@@ -27,26 +27,27 @@
                     forName: UserDefaults.argumentDomain
                 )
                 DebugDrawer.shared.installLocation()
+                let simulator = try #require(LocationSwizzles.simulator)
                 let manager = CLLocationManager()
                 let delegate = RecordingLocationDelegate()
                 manager.delegate = delegate
                 var updates = delegate.updates.makeAsyncIterator()
                 let expectedLatitudes: [Double] = [37.3349, 37.3349, 40.7128]
 
-                LocationSimulator.shared.deliverRoute(CLLocation(latitude: 37.3349, longitude: -122.009))
+                simulator.deliverRoute(CLLocation(latitude: 37.3349, longitude: -122.009))
                 // Fails at once rather than waiting on a fix Core Location would have to give.
-                try #require(LocationSimulator.shared.simulatedLocation != nil)
+                try #require(simulator.simulatedLocation != nil)
                 // Through the swizzled method, as the app calls it.
                 manager.startUpdatingLocation()
                 _ = await updates.next()
                 let afterStart = manager.location?.coordinate.latitude
                 manager.requestLocation()
                 _ = await updates.next()
-                LocationSimulator.shared.deliverRoute(CLLocation(latitude: 40.7128, longitude: -74.006))
+                simulator.deliverRoute(CLLocation(latitude: 40.7128, longitude: -74.006))
                 // Core Location's own stopUpdatingLocation runs too, which is harmless on a manager
                 // it never started.
                 manager.stopUpdatingLocation()
-                LocationSimulator.shared.deliverRoute(CLLocation(latitude: 51.5, longitude: -0.12))
+                simulator.deliverRoute(CLLocation(latitude: 51.5, longitude: -0.12))
 
                 #expect(afterStart == 37.3349)
                 #expect(delegate.locations.map(\.coordinate.latitude) == expectedLatitudes)

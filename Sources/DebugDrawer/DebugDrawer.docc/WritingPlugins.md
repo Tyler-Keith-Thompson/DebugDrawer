@@ -688,7 +688,9 @@ it in the order they installed it, and its interception reads the latest one's s
 drawer removes the plugin, the one before it captures again, and a store no drawer holds any more
 forgets what it kept. A test that installs the plugin in a drawer of its own, over a store of its
 own, sees the app's calls there while the app's drawer still holds the plugin, and nothing reaches
-the shared store until it removes it. Network, Console and View Inspector bind this way.
+the shared store until it removes it. Network, Console, View Inspector and Location bind this way:
+Location's swizzled `CLLocationManager` methods ask the simulator of the latest drawer, which takes
+over the managers the one before was updating, and hands them back as it removes the plugin.
 
 The shipped plugins' test targets check the contract with shared checks: installing twice and in a
 second drawer, uninstalling and installing again, the app's results with the plugin and without,

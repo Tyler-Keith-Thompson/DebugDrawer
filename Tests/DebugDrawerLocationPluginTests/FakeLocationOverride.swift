@@ -11,7 +11,6 @@ final class FakeLocationOverride: LocationOverride {
         case setCoordinate(LocationCoordinate?)
         case deliverRoute(LocationCoordinate)
         case endRoute
-        case release
     }
 
     /// Every change so far, in order.
@@ -47,10 +46,5 @@ final class FakeLocationOverride: LocationOverride {
     func endRoute() {
         route = nil
         calls.append(.endRoute)
-    }
-
-    func release() {
-        route = nil
-        calls.append(.release)
     }
 }

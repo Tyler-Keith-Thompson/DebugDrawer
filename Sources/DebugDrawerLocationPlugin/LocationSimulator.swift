@@ -7,14 +7,16 @@
     /// What the app's location managers are given: the switch and fixed coordinate, kept across
     /// launches, a route's latest point while one plays, and the managers that asked for updates.
     ///
+    /// Each drawer's Location model has one, keeping the switch and coordinate in that drawer's
+    /// defaults; the swizzled `CLLocationManager` methods ask the one of the drawer that installed
+    /// the plugin last (``LocationSwizzles/simulator``).
+    ///
     /// While a location is simulated (``simulatedLocation`` isn't nil), a manager that starts
     /// updating gets it instead of starting Core Location, every updating manager gets each new
     /// one, and `requestLocation` and `location` answer with it. When simulation begins, the
     /// real updates of managers already updating stop; when it ends, they start again.
     final class LocationSimulator: @unchecked Sendable {
         // @unchecked: the store is `Sendable` and the rest of the mutable state is behind `state`.
-
-        static let shared = LocationSimulator()
 
         private let store: any LocationSpoofingStore
         private let service: any LocationService
@@ -191,16 +193,43 @@
             }
         }
 
+        // MARK: - Handing over
+
+        /// Hands every manager it tracks to `next`, which the swizzled methods ask from now on:
+        /// each moves from what this simulator gave it to what `next` gives, as a change of
+        /// simulated location does. This simulator keeps its switch, coordinate and route, and
+        /// gives them to no manager.
+        func handOff(to next: LocationSimulator) {
+            let given = simulatedLocation
+            let managers = updatingManagers()
+            state.withLockUnchecked { $0.updating = [] }
+            next.adopt(managers, given: given)
+        }
+
+        /// Tracks `managers`, which were given `given` (nil: real updates), and moves them to
+        /// what this simulator gives.
+        private func adopt(_ managers: [CLLocationManager], given: CLLocation?) {
+            state.withLockUnchecked { state in
+                for manager in managers where !state.updating.contains(where: { $0.manager === manager }) {
+                    state.updating.append(UpdatingManager(manager: manager))
+                }
+            }
+            move(managers, from: given, to: simulatedLocation)
+        }
+
         // MARK: - Delivery
 
-        /// Makes a change to what is simulated, then moves the updating managers to the result:
-        /// real updates stop when simulation begins and start again when it ends, and every new
-        /// simulated location is delivered.
+        /// Makes a change to what is simulated, then moves the updating managers to the result.
         private func change(_ body: () -> Void) {
             let before = simulatedLocation
             body()
-            let after = simulatedLocation
-            let managers = updatingManagers()
+            move(updatingManagers(), from: before, to: simulatedLocation)
+        }
+
+        /// Moves `managers` from one simulated location to another: real updates stop when
+        /// simulation begins and start again when it ends, and every new simulated location is
+        /// delivered.
+        private func move(_ managers: [CLLocationManager], from before: CLLocation?, to after: CLLocation?) {
             switch (before, after) {
             case (nil, nil):
                 return
