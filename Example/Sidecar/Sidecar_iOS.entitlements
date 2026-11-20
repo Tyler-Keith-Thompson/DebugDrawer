@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- The group the example apps serve a sidecar in; the simulator gives it without a profile.
+         The Mac app is built without a group: `just run sidecar macOS` signs it with the
+         team-prefixed one (Example/SidecarStore). -->
+    <key>com.apple.security.application-groups</key>
+    <array>
+        <string>group.com.debugdrawer.example</string>
+    </array>
+</dict>
+</plist>

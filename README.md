@@ -2906,8 +2906,35 @@ For a layout of your own, the pieces are public: `DebugDrawerSidecarAppList` (th
 come and go), `DebugDrawerSidecarConnection` (one app: its channel, sessions, hosted plugins and
 `createReport(redaction:in:)`) and `DebugDrawerSidecarApp`. The kit builds for iOS, iPadOS and macOS,
 in debug builds: like the transports it is built on, a release build gets stand-ins that list no
-app, so archive a TestFlight sidecar in the Debug configuration. `Example/Sidecar` is the example's
-sidecar app (`just run sidecar`, beside `just run iOS`).
+app, so archive a TestFlight sidecar in the Debug configuration.
+
+**The example pair.** `Example/Sidecar` is a sidecar built on the kit, and `Example/Receiver` the
+production app it drives: it links only the receiver and the capability modules, and serves every
+capability the library ships, within sessions that need a grant. `just run sidecar` installs and
+launches both in the iOS simulator, in `group.com.debugdrawer.example`; `just run sidecar macOS`
+launches both on the Mac. Pick the app in the sidecar, Open Session (the sidecar's stand-in for a
+grant server signs a grant with RFC 8037's published test key, which the host trusts), and each
+capability has something in the host that changes:
+
+| Sidecar plugin | What changes in the host |
+|---|---|
+| Flags | Checkout (`new-checkout`) and Button Color, through the host's `DebugDrawerFeatureFlagAdapter` |
+| Tweaks | The greeting, a production-safe tweak; the Diagnostics tweak isn't, so the sidecar never lists it |
+| Strings | The Localization Review strings, pseudo-localized or shown as keys |
+| Accessibility | The window's Dynamic Type, contrast and Reduce Motion, read back beside them |
+| Analytics | Record Checkout Event's event appears in the sidecar, its `email` redacted |
+| MetricKit | The payloads MetricKit hands the host on a device; Crash leaves a crash diagnostic for the next launch |
+| Mocking | Mock Greeting answers the host's Fetch Greeting, and the host shows "Network mocking active" |
+
+While the session is open the host shows its own indicator (who holds the grant, until when, and
+what keeps it running in the background, End Session, and Keep Running on iOS), and its Sidecar
+Allowed switch is the remote kill switch: off, the session ends and its changes revert. On iOS the
+host is suspended once the sidecar is in front and the keeper's background task runs out, so what
+the sidecar sends waits in the store until the host returns to the foreground. On the Mac a group
+named `group.` needs a provisioning profile, so `just run sidecar macOS` signs both apps with your
+Apple Development identity into `<team ID>.com.debugdrawer.example`, a group macOS gives them
+without asking. Signed ad hoc (no identity, or `DEBUGDRAWER_SIGN_IDENTITY=-`) the apps get no group
+and share a folder in Caches instead, without a group container's protection.
 
 ### The sidecar on Apple TV, Vision Pro, Apple Watch and Mac Catalyst
 
@@ -3126,7 +3153,7 @@ Bazel is the development build; SwiftPM is the published package. Both are gener
 | `just lint` | SwiftLint and a11y-check over every first-party target |
 | `just record-snapshots` | Every snapshot reference, re-recorded into the workspace |
 | `just generate` | An Xcode project from the Bazel graph, `xcode/DebugDrawer.xcodeproj`, opened in Xcode (`--no-open` only writes it) |
-| `just run [macOS\|iOS\|appkit\|uikit\|catalyst\|visionOS\|tvOS\|watchOS]` | Build and launch an example app; each has a Test Bench of actions that give every plugin something to show (`-RunTestBench all` runs them at launch). The Mac example is signed with your Apple Development certificate when the Keychain has one, so macOS keeps its Location and other privacy grants across rebuilds; set `DEBUGDRAWER_SIGN_IDENTITY` to choose another identity, or `-` to sign ad hoc |
+| `just run [macOS\|iOS\|appkit\|uikit\|sidecar\|catalyst\|visionOS\|tvOS\|watchOS]` | Build and launch an example app (`just run sidecar [iOS\|macOS]`: the example sidecar beside the production host it drives, "The example pair" above); each has a Test Bench of actions that give every plugin something to show (`-RunTestBench all` runs them at launch). The Mac example is signed with your Apple Development certificate when the Keychain has one, so macOS keeps its Location and other privacy grants across rebuilds; set `DEBUGDRAWER_SIGN_IDENTITY` to choose another identity, or `-` to sign ad hoc |
 
 `AGENTS.md` describes the layout, the workflow and the house rules in full.
 

@@ -1,17 +1,28 @@
 import DebugDrawerSidecarKit
+import ExampleSidecarStore
 import SwiftUI
 
 // A company's sidecar app, built from the kit: it lists the apps in the example's app group that
-// serve a sidecar (the iOS example's debug build, through its store and socket; a production app
-// through its receiver), opens their sessions, shows their Console and Network, and makes a report
-// of what it shows. Everything else the company would add (sign-in, a grant from its server, its
-// branding) goes around DebugDrawerSidecarView or into its grant closure.
+// serve a sidecar (the production host, Example/Receiver; the iOS example's debug build), opens
+// their sessions with a grant from the example's grant server, shows their Console and Network and
+// a plugin for each capability the production host serves, and makes a report of what it shows.
+// The capability plugins are the kit's generic plugin over each capability's model, one file each
+// beside this one. On the Mac the store is the one `just run sidecar macOS` signed both apps for
+// (ExampleSidecarStore).
 
 @main
 struct ExampleSidecarApp: App {
     var body: some Scene {
         WindowGroup {
-            DebugDrawerSidecarView(groupIdentifier: "group.com.debugdrawer.example")
+            DebugDrawerSidecarView(
+                apps: DebugDrawerSidecarAppList(storeDirectory: ExampleSidecarStore.directory),
+                plugins: [
+                    .featureFlagOverrides, .tweaks, .localizationReview, .accessibilityEnvironment,
+                    .analyticsEvents, .metricKitPayloads, .networkMocking, .console, .network
+                ]
+            ) { app in
+                try ExampleGrantServer.grant(for: app)
+            }
         }
     }
 }

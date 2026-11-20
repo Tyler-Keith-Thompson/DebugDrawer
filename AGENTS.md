@@ -22,7 +22,8 @@ Tests/DebugDrawerTests/          The core's tests and the README examples, verba
 Tests/DebugDrawerTestSupport/    Shared test fixtures (data only)
 Tests/DebugDrawerInterceptionContract/  The interception contract's checks (TEST_HELPERS), test-only
 Example/                         The macOS, iOS, visionOS, tvOS and watchOS example apps, a UIKit-only and an
-                                 AppKit-only one, and the libraries they share: TestBench (actions that give each
+                                 AppKit-only one, a sidecar (Sidecar) and the production host it drives (Receiver)
+                                 for iOS and macOS, and the libraries they share: TestBench (actions that give each
                                  plugin data) and Plugins (every plugin with its defaults) (hand-written BUILD.bazel)
 Benchmarks/                      The interception benchmarks: a SwiftPM package of its own (ordo-one/benchmark),
                                  generated from BENCHMARKS, with the committed main baseline (Benchmarks/README.md)
@@ -89,7 +90,7 @@ Every shell command gets a timeout. macOS has no `timeout`; use
 | `just resolve` | Re-resolve Bazel's SwiftPM dependencies after editing `PACKAGES` |
 | `just docs` | Combined DocC site into `.build/docs` |
 | `just generate` | Xcode project from the Bazel graph, written to `xcode/DebugDrawer.xcodeproj` (gitignored) and opened; `--no-open` skips opening it. Never at the root: xcodebuild run beside a `.xcodeproj` builds it instead of `Package.swift`, so every SwiftPM recipe that calls xcodebuild would fail |
-| `just run [macOS\|iOS\|appkit\|uikit\|catalyst\|visionOS\|tvOS\|watchOS]` | Build and launch an example app (`catalyst`: the iOS one as a Mac Catalyst app, through SwiftPM); `-RunTestBench all` runs the test bench at launch. `macOS` installs at `/tmp/debugdrawer-example` and signs with the Keychain's Apple Development identity (`scripts/sign_example.py`; `DEBUGDRAWER_SIGN_IDENTITY` overrides it, `-` for ad hoc, with a warning), so privacy grants survive a rebuild |
+| `just run [macOS\|iOS\|appkit\|uikit\|sidecar\|catalyst\|visionOS\|tvOS\|watchOS]` | Build and launch an example app (`catalyst`: the iOS one as a Mac Catalyst app, through SwiftPM; `sidecar [iOS\|macOS]`: Example/Sidecar beside the production host Example/Receiver, in the simulator `IOS_DEVICE` or on the Mac, where `scripts/sign_example.py --app-group` signs both into the signing team's group, or ad hoc into none, and they share a folder in Caches); `-RunTestBench all` runs the test bench at launch. `macOS` installs at `/tmp/debugdrawer-example` and signs with the Keychain's Apple Development identity (`scripts/sign_example.py`; `DEBUGDRAWER_SIGN_IDENTITY` overrides it, `-` for ad hoc, with a warning), so privacy grants survive a rebuild |
 | `just deploy [patch\|minor\|major] [allow-breaking] [dry-run]` | Check the release gates, verify, then tag, push the tag and create the GitHub release (the owner's call); `dry-run` runs only the gates |
 | `just buildbuddy-key` | Store the BuildBuddy key in the Keychain (once per Mac; builds then use the remote cache) |
 | `just template-update` | Merge the project template's changes since `.template.json`'s commit; resolve conflicts, then `just modules`, `just test` |

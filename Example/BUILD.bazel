@@ -194,16 +194,39 @@ macos_application(
     visibility = ["//visibility:public"],
 )
 
-# ── Sidecar (iOS, iPadOS and macOS) ──────────────────────────────────
-# A company's sidecar app built from DebugDrawerSidecarKit: one source file, for every platform the
-# kit builds on. It lists the apps in group.com.debugdrawer.example that serve a sidecar (the iOS
-# example; a receiver's app), and shows their sessions, Console, Network and a report.
+# ── Sidecar and its production host (iOS, iPadOS and macOS) ──────────
+# A company's sidecar app built from DebugDrawerSidecarKit, and a production app serving it through
+# DebugDrawerReceiver, for every platform the kit builds on; `just run sidecar` launches the pair in
+# the iOS simulator, `just run sidecar macOS` on the Mac. On iOS both join
+# group.com.debugdrawer.example (the iOS example's debug build serves it too); the Mac apps are
+# built without a group and signed into a team-prefixed one by the run recipe (Example/SidecarStore
+# says why).
 
+# Where the two apps meet: the group's store, or the Mac's fallback folder.
+swift_library(
+    name = "ExampleSidecarStore",
+    srcs = glob(["SidecarStore/*.swift"]),
+    module_name = "ExampleSidecarStore",
+)
+
+# The sidecar: the kit's view, the example's grant server and a plugin for each capability the
+# production host serves.
 swift_library(
     name = "ExampleAppLib_Sidecar",
     srcs = glob(["Sidecar/*.swift"]),
     module_name = "ExampleApp_Sidecar",
-    deps = ["//Sources/DebugDrawerSidecarKit"],
+    deps = [
+        ":ExampleSidecarStore",
+        "//Sources/DebugDrawer",
+        "//Sources/DebugDrawerAccessibility",
+        "//Sources/DebugDrawerAnalytics",
+        "//Sources/DebugDrawerLocalization",
+        "//Sources/DebugDrawerMetricKit",
+        "//Sources/DebugDrawerNetwork",
+        "//Sources/DebugDrawerReceiver",
+        "//Sources/DebugDrawerSidecarKit",
+        "//Sources/DebugDrawerTweaks",
+    ],
 )
 
 ios_application(
@@ -213,7 +236,7 @@ ios_application(
     families = ["iphone", "ipad"],
     infoplists = ["Sidecar/Info.plist"],
     minimum_os_version = "17.0",
-    entitlements = "Sidecar/Sidecar.entitlements",
+    entitlements = "Sidecar/Sidecar_iOS.entitlements",
     deps = [":ExampleAppLib_Sidecar"],
     visibility = ["//visibility:public"],
 )
@@ -224,37 +247,49 @@ macos_application(
     bundle_name = "DebugDrawerSidecarExample",
     infoplists = ["Sidecar/Info.plist"],
     minimum_os_version = "15.0",
-    entitlements = "Sidecar/Sidecar.entitlements",
     deps = [":ExampleAppLib_Sidecar"],
     visibility = ["//visibility:public"],
 )
 
-# ── macOS, production receiver ───────────────────────────────────────
 # A production app's use of DebugDrawer: the release-safe receiver and the capability modules,
-# nothing else, serving a sidecar its feature flag overrides, production-safe tweaks, localization
-# review and accessibility overrides. `just release-check` builds it optimized, and its binary holds
-# no drawer, plugin or interception code (README, "Production builds: the receiver").
-
+# nothing else, serving a sidecar every capability the library ships, within sessions that need a
+# grant. `just release-check` builds it optimized, and its binary holds no drawer, plugin or
+# interception code (README, "Production builds: the receiver").
 swift_library(
-    name = "ExampleAppLib_macOSReceiver",
-    srcs = glob(["macOSReceiver/*.swift"]),
-    module_name = "ExampleApp_macOSReceiver",
-    target_compatible_with = ["@platforms//os:macos"],
+    name = "ExampleAppLib_Receiver",
+    srcs = glob(["Receiver/*.swift"]),
+    module_name = "ExampleApp_Receiver",
     deps = [
+        ":ExampleSidecarStore",
+        "//Sources/DebugDrawerAccessibility",
+        "//Sources/DebugDrawerAnalytics",
+        "//Sources/DebugDrawerLocalization",
+        "//Sources/DebugDrawerMetricKit",
+        "//Sources/DebugDrawerNetwork",
         "//Sources/DebugDrawerReceiver",
         "//Sources/DebugDrawerTweaks",
-        "//Sources/DebugDrawerLocalization",
-        "//Sources/DebugDrawerAccessibility",
     ],
 )
 
-macos_application(
-    name = "ExampleApp_macOSReceiver",
+ios_application(
+    name = "ExampleApp_Receiver_iOS",
     bundle_id = "com.debugdrawer.example.receiver",
     bundle_name = "DebugDrawerReceiverExample",
-    infoplists = ["macOSReceiver/Info.plist"],
+    families = ["iphone", "ipad"],
+    infoplists = ["Receiver/Info.plist"],
+    minimum_os_version = "17.0",
+    entitlements = "Receiver/Receiver_iOS.entitlements",
+    deps = [":ExampleAppLib_Receiver"],
+    visibility = ["//visibility:public"],
+)
+
+macos_application(
+    name = "ExampleApp_Receiver_macOS",
+    bundle_id = "com.debugdrawer.example.receiver",
+    bundle_name = "DebugDrawerReceiverExample",
+    infoplists = ["Receiver/Info.plist"],
     minimum_os_version = "15.0",
-    deps = [":ExampleAppLib_macOSReceiver"],
+    deps = [":ExampleAppLib_Receiver"],
     visibility = ["//visibility:public"],
 )
 

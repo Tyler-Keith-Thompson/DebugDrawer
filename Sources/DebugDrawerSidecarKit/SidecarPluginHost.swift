@@ -62,8 +62,14 @@
                 .padding(.horizontal, 14)
                 .padding(.vertical, 8)
                 ScrollView {
-                    plugin.body
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                    // Inset as the drawer's panel insets a plugin, at the header's margin: the
+                    // shipped rows pad themselves only vertically.
+                    VStack(alignment: .leading, spacing: 0) {
+                        plugin.body
+                    }
+                    .debugDrawerFont(.body)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 14)
                 }
             }
         }

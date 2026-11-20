@@ -18,5 +18,13 @@
     <string>15.0</string>
     <key>NSPrincipalClass</key>
     <string>NSApplication</string>
+    <key>UILaunchScreen</key>
+    <dict/>
+    <!-- iOS: the sidecar session's continued processing task (DebugDrawerBackgroundKeeper), which
+         needs no UIBackgroundModes entry. -->
+    <key>BGTaskSchedulerPermittedIdentifiers</key>
+    <array>
+        <string>com.debugdrawer.example.receiver.DebugDrawerSession.*</string>
+    </array>
 </dict>
 </plist>

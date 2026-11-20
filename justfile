@@ -313,20 +313,23 @@ release-check:
     {{BAZEL_RELEASE}} build --config=release //Example/...
     python3 {{PROJECT_ROOT}}/scripts/release_api.py check --swift "{{SWIFT}}"
 
-# The simulators `just run visionOS`, `just run tvOS` and `just run watchOS` boot, by name.
+# The simulators `just run sidecar`, `just run visionOS`, `just run tvOS` and `just run watchOS`
+# boot, by name.
+IOS_DEVICE := env("IOS_DEVICE", "iPhone 18 Pro")
 VISIONOS_DEVICE := env("VISIONOS_DEVICE", "Apple Vision Pro")
 TVOS_DEVICE := env("TVOS_DEVICE", "Apple TV 4K (4th generation)")
 WATCHOS_DEVICE := env("WATCHOS_DEVICE", "Apple Watch Series 12 (46mm)")
 
-[doc('Build and launch an example app: just run, just run iOS, just run appkit, just run uikit, just run sidecar, just run catalyst, just run visionOS, just run tvOS or just run watchOS')]
+[doc('Build and launch an example app: just run, just run iOS, just run appkit, just run uikit, just run sidecar [iOS|macOS], just run catalyst, just run visionOS, just run tvOS or just run watchOS')]
 run target="macOS" *args="":
     #!/usr/bin/env bash
     set -euo pipefail
     # Builds an example app for a simulator, installs it from a writable copy (the simulator can't
-    # copy Bazel's read-only bundle) and launches it. Extra arguments go to the app;
-    # -OpenDebugDrawer opens the drawer at launch.
+    # copy Bazel's read-only bundle) and launches it, with the arguments after the first four.
+    # Extra arguments go to the app; -OpenDebugDrawer opens the drawer at launch.
     run_in_simulator() {
         local target="$1" device="$2" bundle_id="$3" run_dir="$4"
+        shift 4
         rm -rf "$run_dir"
         mkdir -p "$run_dir"
         {{BAZEL}} build "//Example:$target"
@@ -342,8 +345,8 @@ run target="macOS" *args="":
         chmod -R u+w "$run_dir"
         xcrun simctl boot "$device" 2>/dev/null || true
         xcrun simctl bootstatus "$device" -b
-        xcrun simctl install "$device" "$run_dir/DebugDrawerExample.app"
-        xcrun simctl launch "$device" "$bundle_id" {{args}}
+        xcrun simctl install "$device" "$run_dir/"*.app
+        xcrun simctl launch "$device" "$bundle_id" "$@"
     }
     case "{{target}}" in
         macOS|macos)
@@ -376,9 +379,41 @@ run target="macOS" *args="":
             {{BAZEL}} run //Example:ExampleApp_iOSUIKit
             ;;
         sidecar|Sidecar)
-            # The example sidecar app, built from DebugDrawerSidecarKit, beside the iOS example in
-            # the same simulator, so it lists that app (run `just run iOS` too).
-            {{BAZEL}} run //Example:ExampleApp_Sidecar_iOS
+            # The example sidecar (Example/Sidecar, built from DebugDrawerSidecarKit) beside the
+            # production host it drives (Example/Receiver): in the iOS simulator, or with `macOS`
+            # on the Mac.
+            case "{{args}}" in
+                ""|iOS|ios)
+                    # Both serve the group's store, so the iOS example's debug build is stopped
+                    # first: two servers of one store would each take the other's commands.
+                    xcrun simctl terminate "{{IOS_DEVICE}}" com.debugdrawer.example.ios 2>/dev/null || true
+                    run_in_simulator ExampleApp_Receiver_iOS "{{IOS_DEVICE}}" com.debugdrawer.example.receiver \
+                        /tmp/debugdrawer-example-receiver-ios
+                    run_in_simulator ExampleApp_Sidecar_iOS "{{IOS_DEVICE}}" com.debugdrawer.example.sidecar \
+                        /tmp/debugdrawer-example-sidecar-ios
+                    ;;
+                macOS|macos)
+                    RUN_DIR="/tmp/debugdrawer-example-sidecar"
+                    rm -rf "$RUN_DIR"
+                    mkdir -p "$RUN_DIR"
+                    {{BAZEL}} build //Example:ExampleApp_Receiver_macOS //Example:ExampleApp_Sidecar_macOS
+                    for target in ExampleApp_Receiver_macOS ExampleApp_Sidecar_macOS; do
+                        unzip -qo "$({{BAZEL}} cquery "//Example:$target" --output=files 2>/dev/null | grep '\.zip$')" -d "$RUN_DIR"
+                    done
+                    # Signed as `just run macOS` signs, into the app group named after the signing
+                    # team, which needs no provisioning profile on the Mac; signed ad hoc, the two
+                    # share a folder in Caches instead (Example/SidecarStore).
+                    for app in "$RUN_DIR"/*.app; do
+                        python3 {{PROJECT_ROOT}}/scripts/sign_example.py --app-group com.debugdrawer.example "$app"
+                    done
+                    open "$RUN_DIR/DebugDrawerReceiverExample.app"
+                    open "$RUN_DIR/DebugDrawerSidecarExample.app"
+                    ;;
+                *)
+                    echo "Unknown platform: {{args}}. Use 'just run sidecar' (iOS) or 'just run sidecar macOS'"
+                    exit 1
+                    ;;
+            esac
             ;;
         catalyst|Catalyst)
             # The iOS example as a Mac Catalyst app, built through SwiftPM (Bazel has no Catalyst).
@@ -387,15 +422,15 @@ run target="macOS" *args="":
             ;;
         visionOS|visionos)
             run_in_simulator ExampleApp_visionOS "{{VISIONOS_DEVICE}}" com.debugdrawer.example.visionos \
-                /tmp/debugdrawer-example-visionos
+                /tmp/debugdrawer-example-visionos {{args}}
             ;;
         tvOS|tvos)
             run_in_simulator ExampleApp_tvOS "{{TVOS_DEVICE}}" com.debugdrawer.example.tvos \
-                /tmp/debugdrawer-example-tvos
+                /tmp/debugdrawer-example-tvos {{args}}
             ;;
         watchOS|watchos)
             run_in_simulator ExampleApp_watchOS "{{WATCHOS_DEVICE}}" com.debugdrawer.example.watchos \
-                /tmp/debugdrawer-example-watchos
+                /tmp/debugdrawer-example-watchos {{args}}
             ;;
         *)
             echo "Unknown target: {{target}}. Use 'macOS', 'iOS', 'appkit', 'uikit', 'sidecar', 'catalyst', 'visionOS', 'tvOS' or 'watchOS'"
