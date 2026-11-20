@@ -256,7 +256,7 @@ extension DebugDrawerDiagnosticsCapture {
 
 extension DebugDrawerDiagnosticsCapture.LogLine {
     /// The line as `console.log` writes it.
-    fileprivate var reportLine: String {
+    var reportLine: String {
         let source = [subsystem, category].filter { !$0.isEmpty }.joined(separator: "/")
         let fields = metadata.keys.sorted().map { "\($0)=\(metadata[$0] ?? "")" }
         return ([timestamp.ISO8601Format(), "[\(level.rawValue)]", source.isEmpty ? nil : "\(source):", message] + fields)

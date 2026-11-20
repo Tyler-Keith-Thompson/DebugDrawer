@@ -14,8 +14,8 @@ import os
 /// The production host's side of the sidecar, made once at launch: the receiver serving every
 /// capability the library ships, sessions that need a grant signed by the example's grant server
 /// (Example/Sidecar's stand-in for a company's), the keeper that holds the app running while a
-/// session is open, the session whose requests a sidecar may mock, and the diagnostics capture the
-/// app hands its log lines and requests.
+/// session is open, the session whose requests a sidecar may mock, the diagnostics capture the
+/// app hands its log lines and requests, and the bug reports its Report a Bug trigger takes.
 ///
 /// Everything here is in the release build too: a production app links the receiver and the
 /// capability modules, never the drawer.
@@ -35,6 +35,11 @@ final class ExampleReceiverHost: ObservableObject {
     let mocking: NetworkMocking
     /// What the app logs and sends, captured for a sidecar that starts it in its session.
     let diagnostics: DebugDrawerDiagnosticsCapture
+    /// The bug reports Report a Bug takes during a sidecar's session, with the diagnostics
+    /// capture's recent lines and the app's state.
+    let bugReports: DebugDrawerBugReports
+    /// What the last Report a Bug came to.
+    @Published private(set) var lastBugReport = "None taken"
     /// Where the store is, as the screen says it.
     let storeSummary = ExampleSidecarStore.summary
     /// Why the receiver isn't serving, when it isn't.
@@ -71,6 +76,7 @@ final class ExampleReceiverHost: ObservableObject {
         let receiver = DebugDrawerReceiver(directory: ExampleSidecarStore.directory, sessions: sessions)
         let mocking = NetworkMocking(sessions: sessions, allowedHosts: [.exact("api.example.com")])
         let diagnostics = DebugDrawerDiagnosticsCapture(sessions: sessions)
+        let bugReports = Self.bugReports(sessions: sessions, diagnostics: diagnostics, flags: flags, experiments: experiments)
         receiver.enable(.featureFlagOverrides(flags))
         receiver.enable(.experimentOverrides(experiments))
         receiver.enable(.logLevels(logging))
@@ -81,6 +87,7 @@ final class ExampleReceiverHost: ObservableObject {
         receiver.enable(.metricKitPayloads(sessions: sessions))
         receiver.enable(.networkMocking(mocking))
         receiver.enable(.diagnosticsCapture(diagnostics))
+        receiver.enable(.bugReports(bugReports))
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [NetworkMockingURLProtocol.self] + (configuration.protocolClasses ?? [])
         self.flags = flags
@@ -90,6 +97,7 @@ final class ExampleReceiverHost: ObservableObject {
         self.receiver = receiver
         self.mocking = mocking
         self.diagnostics = diagnostics
+        self.bugReports = bugReports
         keeper = DebugDrawerBackgroundKeeper(sessions: sessions)
         apiSession = URLSession(configuration: configuration)
         // The audit log goes to the app's own log, as a host would forward it to its own.
@@ -138,6 +146,35 @@ final class ExampleReceiverHost: ObservableObject {
         )
     }
 
+    /// The bug reports Report a Bug takes. The state a report carries is the host's choice: here
+    /// the checkout's flag and experiment, the greeting, and the signed-in customer, whose email the
+    /// redaction masks.
+    private static func bugReports(
+        sessions: DebugDrawerSessions, diagnostics: DebugDrawerDiagnosticsCapture, flags: ProductionFlags, experiments: ProductionExperiments
+    ) -> DebugDrawerBugReports {
+        DebugDrawerBugReports(sessions: sessions, diagnostics: diagnostics) {
+            ExampleBugReportState(
+                checkout: flags.value(forKey: "new-checkout") == .bool(true) ? "new" : "legacy",
+                checkoutFlow: experiments.variant(forExperiment: "checkout-flow"),
+                greeting: ProductionTweaks.greeting.value,
+                customer: .init(email: "jane@example.com", plan: "pro")
+            )
+        }
+    }
+
+    /// Takes a bug report for the sidecar whose session is open: the app's own trigger, a button
+    /// and a menu item here, as DebugDrawer adds none. Outside a session it takes nothing.
+    func reportBug() {
+        switch bugReports.trigger(note: "Reported from the example's Report a Bug") {
+        case .captured:
+            lastBugReport = "Taken: the sidecar shows it under Bug Reports"
+        case .refused(.noActiveSession):
+            lastBugReport = "Nothing taken: no sidecar session is open"
+        case let .refused(reason):
+            lastBugReport = "Refused: \(reason.rawValue)"
+        }
+    }
+
     /// Records an analytics event as the app hands it to its analytics service: mirrored, with
     /// the email redacted, to a sidecar whose session is open.
     func recordCheckoutEvent() {
@@ -154,6 +191,19 @@ final class ExampleReceiverHost: ObservableObject {
     func keepRunningInBackground() {
         keeper.startSession(duration: sessions.maximumDuration, title: "Debug session", subtitle: "The example sidecar is connected")
     }
+}
+
+/// The app's state as a bug report carries it, chosen by the host.
+struct ExampleBugReportState: Encodable {
+    struct Customer: Encodable {
+        let email: String
+        let plan: String
+    }
+
+    let checkout: String
+    let checkoutFlow: String?
+    let greeting: String
+    let customer: Customer
 }
 
 /// The public key of the example's grant server, which signs every grant the example sidecar

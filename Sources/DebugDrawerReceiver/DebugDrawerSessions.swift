@@ -180,39 +180,42 @@ public final class DebugDrawerSessions: DebugDrawerPluginModel {
     ///   - requiresGrant: Whether the capability needs a grant listing it even when the sessions
     ///     have no ``grantPolicy``.
     ///   - perform: Performs the command, or returns why it was refused, having changed nothing.
+    /// - Returns: Why the command was refused, or `nil` when it was applied.
+    @discardableResult
     package func apply(
         to capability: String,
         scope: CapabilityScope?,
         requiresGrant: Bool,
         _ perform: () -> DebugDrawerAuditEntry.Refusal?
-    ) {
+    ) -> DebugDrawerAuditEntry.Refusal? {
         expireIfDue()
         guard let session = snapshot.session else {
             refuse(capability, .noActiveSession)
-            return
+            return .noActiveSession
         }
         if grantPolicy != nil || requiresGrant {
             guard let grant = session.grant else {
                 refuse(capability, .grantMissing)
-                return
+                return .grantMissing
             }
             guard grant.capabilities.contains(capability) else {
                 refuse(capability, .capabilityNotGranted)
-                return
+                return .capabilityNotGranted
             }
         }
         guard let scope else {
             refuse(capability, .undeclaredScope)
-            return
+            return .undeclaredScope
         }
         if let reason = perform() {
             refuse(capability, reason)
-            return
+            return reason
         }
         if case let .session(revert) = scope, !reverts.contains(where: { $0.capability == capability }) {
             reverts.append((capability, revert))
         }
         record(capability, .commandApplied, in: session.id)
+        return nil
     }
 
     /// Ends the open session as `ending` says, reverting its session-scoped changes; does nothing

@@ -3,7 +3,7 @@
 load("//tools:docc.bzl", "docc_archive")
 load("//tools:swift_rules.bzl", "swift_library")
 
-# The kit a sidecar app is built on: the apps in the group that serve it, listed as they start and stop, a session opened and ended for one, with an optional signed grant, the Console and Network views (and any plugin's) over the socket or the store, and a bug report of them, created and sent; debug builds only.
+# The kit a sidecar app is built on: the apps in the group that serve it, listed as they start and stop, a session opened and ended for one, with an optional signed grant, the Console, Network and Bug Reports views (and any plugin's) over the socket or the store, and a bug report of them, created and sent; debug builds only.
 swift_library(
     name = "DebugDrawerSidecarKit",
     srcs = glob(["**/*.swift"]),

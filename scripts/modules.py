@@ -76,7 +76,7 @@ MODULES = [
     # The one module a release build may link (the charter's D6 and D9): UI-less, and real in every
     # build. Core depends on it for the wire format, the plugin model and the sidecar's sessions,
     # and re-exports it, so `import DebugDrawer` still sees them.
-    ("DebugDrawerReceiver", "Core", "The release-build sidecar receiver: serves a sidecar app, over the app group's store, only the capabilities the host enables (feature flag and experiment overrides, log level elevation, diagnostics capture, or any plugin model), within sessions the sidecar opens, refusing and auditing everything else; UI-less, with no interception.", []),
+    ("DebugDrawerReceiver", "Core", "The release-build sidecar receiver: serves a sidecar app, over the app group's store, only the capabilities the host enables (feature flag and experiment overrides, log level elevation, diagnostics capture, bug reports the host triggers, or any plugin model), within sessions the sidecar opens, refusing and auditing everything else; UI-less, with no interception.", []),
     ("DebugDrawer", "Core", "The drawer: its window, the plugin protocol and registry, the views plugins are built from, and release-build stand-ins.", ["DebugDrawerReceiver"]),
     # Capabilities: a plugin's UI-free half that a release build links beside the receiver (the
     # charter's D9), real in every build, with no drawer. Each depends on the receiver alone, and its
@@ -142,7 +142,7 @@ MODULES = [
     # Sidecar: what a company builds its employee-only sidecar app on (the charter's D6). It hosts
     # the views of the plugins it depends on, so it may depend on plugins, and only an app links
     # it: no module depends on it, and a production app never does.
-    ("DebugDrawerSidecarKit", "Sidecar", "The kit a sidecar app is built on: the apps in the group that serve it, listed as they start and stop, a session opened and ended for one, with an optional signed grant, the Console and Network views (and any plugin's) over the socket or the store, and a bug report of them, created and sent; debug builds only.", ["DebugDrawer", "DebugDrawerConsolePlugin", "DebugDrawerNetworkPlugin"]),
+    ("DebugDrawerSidecarKit", "Sidecar", "The kit a sidecar app is built on: the apps in the group that serve it, listed as they start and stop, a session opened and ended for one, with an optional signed grant, the Console, Network and Bug Reports views (and any plugin's) over the socket or the store, and a bug report of them, created and sent; debug builds only.", ["DebugDrawer", "DebugDrawerConsolePlugin", "DebugDrawerNetworkPlugin"]),
 ]
 
 # Modules only iOS builds: SwiftUI views and what they draw with. Bazel builds them for the
@@ -486,6 +486,10 @@ def check():
         if group == "Capabilities":
             assert deps == ["DebugDrawerReceiver"], f"{name} is a capability, so it depends on DebugDrawerReceiver alone, not {deps}"
             assert name + "Plugin" in names, f"{name} is a capability, so a plugin {name}Plugin holds its drawer half"
+    # What a release build links (the charter's N1 and D6): the receiver and the capabilities. The
+    # receiver depends on nothing, so a production app can't link the drawer's report uploader
+    # (DebugDrawerReportUploader, in DebugDrawer) or anything else that sends; a sidecar uploads.
+    assert dict((m[0], m[3]) for m in MODULES)["DebugDrawerReceiver"] == [], "DebugDrawerReceiver links into release builds, so it depends on nothing"
     for name, _, _, deps in MODULES:
         if name not in IOS_MODULES:
             for d in deps:

@@ -207,6 +207,15 @@ public final class DebugDrawerDiagnosticsCapture: DebugDrawerPluginModel {
         inbox.receive(request: request(), response: response(), body: body(), error: error(), started: started())
     }
 
+    /// The newest `count` lines captured for the session `sessionID` names, taken from the capture
+    /// now rather than from the last snapshot, or `nil` when it isn't capturing for that session:
+    /// the lines a bug report the host triggers (``DebugDrawerBugReports``) copies.
+    package func recentLines(_ count: Int, inSession sessionID: UUID) -> [LogLine]? {
+        collect()
+        guard snapshot.sessionID == sessionID else { return nil }
+        return Array(snapshot.lines.suffix(max(count, 0)))
+    }
+
     /// Takes the file the receiver writes the snapshot to, and removes what is there: a capture
     /// made fresh holds nothing, so anything there was left by a launch killed during a session.
     package func attach(snapshotFile file: URL) {

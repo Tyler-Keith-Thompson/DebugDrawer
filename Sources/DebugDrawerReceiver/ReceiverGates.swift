@@ -69,7 +69,9 @@ extension DebugDrawerReceiver {
     }
 
     func enable(_ capability: DebugDrawerReceiverCapability, gate: (@MainActor () -> Bool)?) {
-        capability.enabled?(layout.snapshotFile(for: capability.id))
+        capability.enabled?(layout.snapshotFile(for: capability.id)) { [weak self, id = capability.id] change in
+            self?.applyHostChange(to: id, change) ?? .unknownCapability
+        }
         capabilities[capability.id] = capability
         capabilityGates[capability.id] = gate
         paused.remove(capability.id)
@@ -87,9 +89,9 @@ extension DebugDrawerReceiver {
         id == DebugDrawerSessions.pluginID || (isAllowed() && capabilityGates[id]?() != false)
     }
 
-    /// Refuses and audits a command to `id` while a gate is off, then applies the gates; whether
-    /// the command may go on to the other checks.
-    func passesGates(_ id: String) -> Bool {
+    /// Refuses and audits a command to `id` while a gate is off, then applies the gates; why the
+    /// command was refused, or `nil` when it may go on to the other checks.
+    func gateRefusal(_ id: String) -> DebugDrawerAuditEntry.Refusal? {
         let receiverAllowed = isAllowed()
         let refusal: DebugDrawerAuditEntry.Refusal? =
             if !receiverAllowed {
@@ -104,7 +106,7 @@ extension DebugDrawerReceiver {
             sessions.refuse(id, refusal)
         }
         apply(receiverAllowed: receiverAllowed)
-        return refusal == nil
+        return refusal
     }
 
     private func apply(receiverAllowed: Bool) {

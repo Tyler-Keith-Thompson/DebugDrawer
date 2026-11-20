@@ -93,6 +93,12 @@ struct ExampleReceiverScreen: View {
                         .accessibilityIdentifier("DiagnosticsCaptureActive")
                 }
             }
+            Section("Bug Reports") {
+                Button("Report a Bug", systemImage: "ladybug", action: host.reportBug)
+                    .accessibilityHint("Takes a screenshot, the captured log lines and the app's state for the sidecar whose session is open")
+                LabeledContent("Last Report", value: host.lastBugReport)
+                    .accessibilityIdentifier("BugReportResult")
+            }
             Section {
                 Button("Crash", role: .destructive) {
                     // A deliberate crash, for the person checking MetricKit forwarding.

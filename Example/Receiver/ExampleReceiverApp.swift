@@ -7,7 +7,7 @@ import SwiftUI
 // plugin and no interception (`just release-check` builds it optimized). It serves the example
 // sidecar (Example/Sidecar) every capability the library ships: feature flag overrides,
 // experiment overrides, log levels, production-safe tweaks, localization review, accessibility
-// overrides, analytics events, MetricKit payloads, network mocking and diagnostics capture, within sessions of at most
+// overrides, analytics events, MetricKit payloads, network mocking, diagnostics capture and bug reports, within sessions of at most
 // 15 minutes that open only with a grant the example's grant server signed. Each capability has
 // something on the screen that changes as the sidecar acts, and the app draws its own indicator
 // while a session is open. `just run sidecar` (iOS) and `just run sidecar macOS` launch it beside
@@ -25,6 +25,14 @@ struct ExampleReceiverApp: App {
             )
             .localizationReview()
             .accessibilityEnvironmentOverrides()
+        }
+        .commands {
+            // The host's own trigger for a bug report, beside the screen's button: DebugDrawer binds
+            // no key or gesture.
+            CommandMenu("Feedback") {
+                Button("Report a Bug", action: host.reportBug)
+                    .keyboardShortcut("b", modifiers: [.command, .shift])
+            }
         }
     }
 }

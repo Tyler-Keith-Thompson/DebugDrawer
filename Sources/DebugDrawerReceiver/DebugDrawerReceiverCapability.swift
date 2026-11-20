@@ -37,9 +37,17 @@ public struct DebugDrawerReceiverCapability {
     let perform: @MainActor (_ payload: Data) -> DebugDrawerAuditEntry.Refusal?
     /// The model's snapshots as JSON.
     let snapshots: @MainActor () -> AsyncStream<Data>
-    /// Told the file the receiver writes the snapshot to as the receiver enables the capability,
-    /// for a model that must delete it itself (``diagnosticsCapture(_:)``); `nil` for most.
-    var enabled: (@MainActor (_ snapshotFile: URL) -> Void)?
+    /// Told, as the receiver enables the capability, the file the receiver writes the snapshot to,
+    /// for a model that must delete it itself, and how to apply a change the host asks for itself,
+    /// through the receiver's gates and the sessions as a sidecar's command goes (it returns why the
+    /// change was refused, or `nil`), for a model whose changes can start in the app
+    /// (``diagnosticsCapture(_:)``, ``bugReports(_:)``); `nil` for most.
+    var enabled: (
+        @MainActor (
+            _ snapshotFile: URL,
+            _ applyHostChange: @escaping @MainActor (_ change: () -> DebugDrawerAuditEntry.Refusal?) -> DebugDrawerAuditEntry.Refusal?
+        ) -> Void
+    )?
 
     /// A capability that drives `model`: a sidecar reads its snapshots and, within a session,
     /// sends it the model's own commands.

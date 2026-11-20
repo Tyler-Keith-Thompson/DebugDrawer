@@ -2407,6 +2407,63 @@ capture.record(request, response: response, body: data, started: started)
 Show `capture.snapshot.isCapturing` in the app's session indicator. `Example/Sidecar`'s
 `DiagnosticsCapturePlugin` shows the capture and adds it to the report.
 
+**Bug reports from the production app.** For dogfooding on the build that ships: with their
+sidecar's session open, an employee who hits a problem triggers a report in the app, which takes a
+screenshot of its own key window, the diagnostics capture's recent lines and a state snapshot of
+the app's choosing, and hands them to the sidecar, where the employee annotates the report and
+sends it through the sidecar's uploader. The library adds no trigger: call `trigger(note:)` from
+one of your own, a shake handler, a Feedback menu item, a button on an internal screen:
+
+```swift
+struct CheckoutState: Encodable {
+    let screen: String
+    let cartItems: Int
+}
+
+let reports = DebugDrawerBugReports(sessions: sessions, diagnostics: capture) {
+    CheckoutState(screen: "checkout", cartItems: 2)
+}
+receiver.enable(.bugReports(reports))
+
+// The app's own trigger, such as its shake handler:
+reports.trigger(note: "Shaken on the checkout screen")
+```
+
+- **The risk: what was on screen.** A report holds what the employee had on screen, which can't be
+  redacted (it is an image, drawn by the app from its own window: no screen capture, nothing of
+  another app or the system), plus the app's log lines and its state, which are. The capability
+  limits that four ways.
+- **Off unless enabled, and no trigger of its own.** Until the app enables `.bugReports(_:)`, a
+  trigger in a session is refused as `unknownCapability`; nothing in the library calls
+  `trigger(note:)`, so with no trigger of the app's own nothing is ever taken.
+- **Only in a session, through the same gates as a command.** Outside a session `trigger(note:)`
+  returns `.refused(.noActiveSession)` at once: it draws nothing, reads no state and writes no
+  audit entry, so a trigger left wired up for every user does nothing for a customer. In a session,
+  a trigger meets the receiver's and the capability's gates (`receiverDisabled`,
+  `capabilityDisabled`) and, under a grant policy or after `.requiringGrant()`, needs a grant that
+  lists `DebugDrawerBugReports.pluginID`; a report taken is audited as `commandApplied`.
+- **The app never uploads.** A report goes only into the capability's snapshot in the app's own
+  directory of the store, which the sidecar reads; the sidecar sends it. `DebugDrawerReceiver`
+  depends on no other module, so a production app that links it links no uploader
+  (`DebugDrawerReportUploader` is in `DebugDrawer`, which a release build doesn't link).
+- **Redacted, bounded, and deleted with the session.** The note and the state (encoded as JSON) are
+  redacted by `DebugDrawerDiagnosticsRedaction` (`.standard` unless the app passes its own); the
+  log lines are the diagnostics capture's, redacted there, and only while a sidecar started that
+  capture in the session (otherwise `logs` is `.notCapturing`). `DebugDrawerBugReports.Limits`
+  (`.standard`: 3 reports, the newest 200 lines each, 64 KiB of state, 4 MiB of screenshot, drawn
+  again at one pixel per point before it is left out) drops the oldest report first and leaves out
+  a larger state or screenshot with its size. Reports are deleted as the session ends or expires
+  (audited `changeReverted`), as a gate turns the capability off, as the sidecar deletes one, and,
+  after a launch killed during a session, as the next launch enables the capability, so enable it
+  at startup. `export(id:)` records that the sidecar took a copy (`Snapshot.exports`, audited
+  `commandApplied`); the app keeps no copy for it.
+
+In the sidecar, the kit's `DebugDrawerSidecarPlugin.bugReports` shows each report with an
+annotation field and Include in Report; Create Report puts the report picked (the newest unless
+another is) in the zip, under `Bug Reports/` (`screenshot.png`, `note.txt` with the app's note and
+the annotation, `console.txt`, `state.json`), and Send Report sends it through
+`DebugDrawer.shared.reportUploader`.
+
 **Turning it off remotely.** To shut every sidecar out without a release (a leaked sidecar app,
 say), give the receiver a gate backed by your own remote configuration, and a capability one of
 its own; the library calls no configuration service itself (`RemoteConfig` here stands for yours):
@@ -3052,7 +3109,8 @@ DebugDrawerSidecarView(groupIdentifier: "group.com.example.debug", sessionDurati
 ```
 
 Below it, a picker shows the plugins the app serves, drawn by the plugins' own views over the
-transport: `.console` and `.network` by default. A plugin of your own whose model adopts
+transport: `.console` and `.network` by default, and `.bugReports` for an app that serves bug
+reports (above). A plugin of your own whose model adopts
 `DebugDrawerPluginModel` joins them with `DebugDrawerSidecarPlugin(id:title:icon:snapshot:command:plugin:)`,
 whose closure makes the plugin's view over the transport the kit hands it. Create Report writes the
 hosted plugins' report contributions, redacted by `DebugDrawer.shared.redaction`, under a summary
@@ -3085,6 +3143,7 @@ capability has something in the host that changes:
 | Analytics | Record Checkout Event's event appears in the sidecar, its `email` redacted |
 | MetricKit | The payloads MetricKit hands the host on a device; Crash leaves a crash diagnostic for the next launch |
 | Mocking | Mock Greeting answers the host's Fetch Greeting, and the host shows "Network mocking active" |
+| Bug Reports | Start Capture in Diagnostics and Log Sign-In, then Report a Bug in the host (or Feedback > Report a Bug, Shift-Command-B): the report appears in the sidecar with the window's screenshot, the line and the host's state, its email redacted; type an annotation, then Create Report, and Send Report with an uploader set; the session's end deletes it in the host |
 | Diagnostics | Start Capture, then Log Sign-In and Fetch Greeting: the line and the request appear in the sidecar, the email, session ID and token redacted, and the host shows "Capturing diagnostics for a sidecar"; Create Report adds them to the report, and Stop and Delete or the session's end deletes them in the host |
 
 While the session is open the host shows its own indicator (who holds the grant, until when, and
@@ -3256,7 +3315,7 @@ ContentView()
 | Module | Holds |
 |---|---|
 | `DebugDrawer` | The drawer: its window, the plugin protocol and registry, the views plugins are built from, and release-build stand-ins |
-| `DebugDrawerReceiver` | The one product a release build may link: serves a sidecar app, over the app group's store, only the capabilities the app enables (feature flag and experiment overrides, log level elevation, diagnostics capture, or any plugin model) within sessions the sidecar opens, refusing and auditing everything else; UI-less, no interception |
+| `DebugDrawerReceiver` | The one product a release build may link: serves a sidecar app, over the app group's store, only the capabilities the app enables (feature flag and experiment overrides, log level elevation, diagnostics capture, bug reports the app triggers, or any plugin model) within sessions the sidecar opens, refusing and auditing everything else; UI-less, no interception |
 | `DebugDrawerConsolePlugin` | `os_log` entries (stdout and stderr on macOS) and an app logger's lines through `ConsoleLogSink`, with metadata: level filter, text or regular-expression search, subsystem and category mutes, time range, auto-follow, copy, lines kept across launches |
 | `DebugDrawerViewInspectorPlugin` | View borders by depth, alignment grid, click indicators, animation speed, render counts of the views an app tracks with `.trackRenders(_:)`, hierarchy snapshot |
 | `DebugDrawerAccessibility` | The receiver capability (`.accessibilityEnvironmentOverrides()`) that lets a sidecar override Dynamic Type, Increase Contrast and Reduce Motion for its session, and the modifier the app's root view applies them with (`.accessibilityEnvironmentOverrides()`); no drawer, so a release build links it beside the receiver |
@@ -3298,7 +3357,7 @@ ContentView()
 | `DebugDrawerColorVisionPlugin` | Protanopia, deuteranopia, tritanopia and grayscale simulated live over the views marked `.debugColorVision()`, in linear RGB with Machado et al.'s matrices, picked in the drawer or cycled from the HUD, while the drawer keeps its colors |
 | `DebugDrawerAppStateResetPlugin` | The app's state cleared as a fresh install leaves it, by category: UserDefaults, keychain items, the container's files, caches, cookies, the URL cache and the app's own cleanup, each listed before a confirmation, then relaunched on macOS or quit elsewhere |
 | `DebugDrawerRemote` | Plugin models served to a viewer on another device over the local network: an opt-in Network.framework server advertised over Bonjour, each viewer paired with a six-digit code the device shows, and the viewer's transport and browser |
-| `DebugDrawerSidecarKit` | A sidecar app, as a library: `DebugDrawerSidecarView` lists the apps in the group that serve a sidecar, opens their sessions (with a grant the company's server gives, when they require one), shows their Console, Network and other model-backed plugins over the socket or the store, and makes and uploads a report of them; iOS, iPadOS and macOS, debug builds |
+| `DebugDrawerSidecarKit` | A sidecar app, as a library: `DebugDrawerSidecarView` lists the apps in the group that serve a sidecar, opens their sessions (with a grant the company's server gives, when they require one), shows their Console, Network, Bug Reports and other model-backed plugins over the socket or the store, and makes and uploads a report of them; iOS, iPadOS and macOS, debug builds |
 
 ## Development
 

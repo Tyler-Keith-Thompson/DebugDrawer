@@ -32,7 +32,7 @@ public extension DebugDrawerReceiverCapability {
     ///   session and reverted with ``DebugDrawerDiagnosticsCapture/Command/stop``.
     static func diagnosticsCapture(_ capture: DebugDrawerDiagnosticsCapture) -> Self {
         var capability = Self.model(capture, id: DebugDrawerDiagnosticsCapture.pluginID, scope: .session(revertWith: .stop))
-        capability.enabled = { snapshotFile in capture.attach(snapshotFile: snapshotFile) }
+        capability.enabled = { snapshotFile, _ in capture.attach(snapshotFile: snapshotFile) }
         return capability
     }
 }

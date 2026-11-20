@@ -274,7 +274,7 @@ public final class DebugDrawerReceiver {
     /// Performs the command `payload` encodes on the capability `id` names, if one is enabled
     /// there, within the sessions.
     private func perform(_ payload: Data, for id: String) {
-        guard passesGates(id) else { return }
+        guard gateRefusal(id) == nil else { return }
         guard id != DebugDrawerSessions.pluginID else {
             // A session with nothing to drive would show the host's indicator for nothing.
             guard !capabilities.isEmpty else {
@@ -295,6 +295,25 @@ public final class DebugDrawerReceiver {
             return
         }
         sessions.apply(to: id, scope: capability.scope, requiresGrant: capability.requiresGrant) { capability.perform(payload) }
+    }
+
+    /// Applies `change`, a change the host asked for itself rather than a sidecar's command (a bug
+    /// report it triggered), to the capability `id` names, through the gates and the sessions as a
+    /// sidecar's command goes, and audited the same way: refused while a gate is off, while the
+    /// capability isn't enabled, outside a session, or without a grant listing it where one is
+    /// needed, and its session-scoped change reverted as the session ends.
+    ///
+    /// - Returns: Why it was refused, or `nil` when it was applied.
+    func applyHostChange(to id: String, _ change: () -> DebugDrawerAuditEntry.Refusal?) -> DebugDrawerAuditEntry.Refusal? {
+        if let refusal = gateRefusal(id) {
+            return refusal
+        }
+        guard let capability = capabilities[id] else {
+            Self.logger.notice("Refused the host's change to \(id, privacy: .public): no capability is enabled under it")
+            sessions.refuse(id, .unknownCapability)
+            return .unknownCapability
+        }
+        return sessions.apply(to: id, scope: capability.scope, requiresGrant: capability.requiresGrant, change)
     }
 
     /// Writes the snapshots `snapshots` delivers to `id`'s file, in place of any written for it
