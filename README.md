@@ -1087,9 +1087,11 @@ struct CheckoutButton: View {
 ```
 
 `Tweak`, `TweakSection` and `TweakAction` exist in every configuration. In release there is no
-drawer and nothing is stored: `value` is always the declared default and `publisher` sends only
-that. Mark a tweak `.productionSafe()` to say it may be offered outside debug builds; the drawer
-shows it the same either way.
+drawer: `value` is the declared default and `publisher` sends only that. Mark a tweak
+`.productionSafe()` to let a sidecar app change it in a release build through the receiver's
+tweaks capability ("Production builds: the receiver" below); the drawer shows it the same either
+way. `Tweak`, its storage and its accessors live in `DebugDrawerTweaks`, a UI-free module that
+`DebugDrawerTweaksPlugin` re-exports and a release build links on its own.
 
 ### Feature Flags: overriding the app's flags
 
@@ -2187,7 +2189,7 @@ drawer's registry and servers are stand-ins that never reach them, so only a
 
 A release build gets none of the drawer. To let an employee-only sidecar app reach a production
 app, the app links one more product, `DebugDrawerReceiver`: UI-less, with no interception, no
-plugin and no dependency on the drawer. It serves a sidecar, over the app group's store, only the
+plugin and no dependency on the drawer (and, to offer tweaks, `DebugDrawerTweaks`, below). It serves a sidecar, over the app group's store, only the
 capabilities the app enables, within sessions the sidecar opens, and refuses everything else:
 
 ```swift
@@ -2247,6 +2249,39 @@ What the receiver does:
   as the session ends or expires (feature flag overrides default to `.session(revertWith:
   .clearAllOverrides)`), `.persistent` keeps it.
 - **The app draws the indicator.** Observe `sessions.snapshot` as in "Sidecar sessions" above.
+
+**Tweaks in production.** A tweak marked `.productionSafe()` where it is declared can be changed
+from the sidecar in a release build; every other tweak stays debug-only. Link
+`DebugDrawerTweaks` (`.product(name: "DebugDrawerTweaks", package: "DebugDrawer")`) beside the
+receiver, the UI-free half of the Tweaks plugin, and enable the capability with the tweaks a
+sidecar may change:
+
+```swift
+import DebugDrawerTweaks
+
+enum AppTweaks {
+    static let backend = Tweak.picker("Backend", key: "backend", default: Backend.production).productionSafe()
+    static let newCheckout = Tweak.toggle("New checkout", key: "newCheckout", default: false)
+}
+
+receiver.enable(.tweaks(AppTweaks.backend, AppTweaks.newCheckout))
+```
+
+- **Only production-safe tweaks.** The sidecar connects to `TweaksModel.pluginID` and its
+  `TweaksModel.Snapshot` lists only the tweaks marked `.productionSafe()` (here `backend`), each
+  with its title, key, control, default and current value. A `setValue` or `reset` naming any
+  other key, `newCheckout` included, is refused as `commandRefused(.notExposed)` even inside a
+  session, and a value that isn't one of the tweak's (a removed option, a number outside a
+  stepper's range, a string for a toggle) as `commandRefused(.malformedCommand)`; both are logged
+  and audited and change nothing.
+- **Values persist and reach the app.** A change goes into the tweaks' storage (the standard
+  defaults, or the `storage:` you pass, the same as `installTweaks(storage:)`'s), so
+  `AppTweaks.backend.value` and its `publisher` return it, now and after a relaunch. In a release
+  build a production-safe tweak reads its stored value only once the app has made the capability,
+  so make it at startup before reading tweaks; an app that never makes it reads every default, as
+  before.
+- **Persistent by default.** Pass `scope: .session(revertWith: .resetAll)` to reset the
+  production-safe tweaks to their defaults when the session ends instead.
 
 In a debug build the receiver runs beside the drawer: show the same model in a plugin through
 `DebugDrawerPluginTransport.direct(to:)`, and pass it to `.featureFlagOverrides(_:)` or
@@ -2459,7 +2494,8 @@ ContentView()
 | `DebugDrawerDeepLinkPlugin` | Opens URLs in the app's own handler or through the system, continues universal links and activities of the app's own type with their userInfo in the app, and keeps a history of each |
 | `DebugDrawerCookiesPlugin` | Browse, search, copy and delete `HTTPCookieStorage.shared`'s cookies, and `WKWebsiteDataStore.default()`'s where WebKit exists |
 | `DebugDrawerLaunchTimePlugin` | Launch time: process start to `installLaunchTime()` (pre-main), from there to the first frame, and the total |
-| `DebugDrawerTweaksPlugin` | The app's own debug settings: toggles, pickers, text fields, steppers and actions, in sections, read through typed accessors |
+| `DebugDrawerTweaks` | Tweak declarations, their storage and typed accessors, real in every build, and the receiver capability (`.tweaks(...)`) that lets a sidecar change the tweaks marked production-safe; UI-free, so a release build links it beside the receiver |
+| `DebugDrawerTweaksPlugin` | The app's own debug settings: toggles, pickers, text fields, steppers and actions, in sections, read through typed accessors; re-exports `DebugDrawerTweaks` |
 | `DebugDrawerFeatureFlagsPlugin` | The app's feature flags through an adapter to its flag service: live values, local overrides that persist, search, an overridden-only filter and Reset All |
 | `DebugDrawerCrashReportsPlugin` | Uncaught exceptions and fatal signals, handed on to the app's other crash handlers, shown on the next launch with a badge and stack trace; MetricKit crash diagnostics too |
 | `DebugDrawerHangDetectorPlugin` | Main-thread hangs over a threshold the drawer can change, each with its duration and the stack it was stuck on, a toast and a badge; MetricKit hang diagnostics too |

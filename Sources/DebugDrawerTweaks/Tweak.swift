@@ -1,7 +1,7 @@
 /// A setting the host declares for the drawer's Tweaks plugin, and the typed accessor the app
 /// reads it with: a toggle, a picker, a text field or a stepper.
 ///
-/// Declare each once, as a constant, and list it in a ``TweakSection``; read it through
+/// Declare each once, as a constant, and list it in a `TweakSection` of the Tweaks plugin; read it through
 /// ``value`` wherever the app needs it:
 ///
 /// ```swift
@@ -12,19 +12,23 @@
 /// if AppTweaks.newCheckout.value { ... }
 /// ```
 ///
-/// The type exists in every build. In release there is no drawer and nothing is stored, so
-/// ``value`` is always ``defaultValue``.
+/// The type exists in every build. In release there is no drawer: ``value`` is ``defaultValue``,
+/// except for a tweak marked ``productionSafe(_:)`` once the app has made the receiver's tweaks
+/// capability (`DebugDrawerReceiverCapability.tweaks(_:storage:scope:)`), which then reads what a
+/// sidecar stored.
 public struct Tweak<Value: Sendable & Equatable>: Sendable {
     /// What the drawer shows beside the control ("New checkout").
     public let title: String
     /// Identifies the stored value; keep it when the title changes, or the stored value is lost.
     public let key: String
-    /// The value until someone changes it, after a reset, and always in release.
+    /// The value until someone changes it, after a reset, and in release unless the tweak is
+    /// production-safe and offered to a sidecar.
     public let defaultValue: Value
     /// Whether the tweak may be offered outside debug builds. Set with ``productionSafe(_:)``.
     public private(set) var isProductionSafe = false
 
-    let control: TweakControl
+    /// How the drawer, or a sidecar, edits it.
+    package let control: TweakControl
     private let encode: @Sendable (Value) -> TweakStoredValue
     private let decode: @Sendable (TweakStoredValue) -> Value?
 
@@ -45,7 +49,8 @@ public struct Tweak<Value: Sendable & Equatable>: Sendable {
     }
 
     /// The same tweak, marked as safe (or, passing `false`, not safe) to offer outside debug
-    /// builds, such as to a companion tool. The drawer shows it the same either way.
+    /// builds: the receiver's tweaks capability lets a sidecar read and change it, in a release
+    /// build too, and leaves every other tweak out. The drawer shows it the same either way.
     public func productionSafe(_ isProductionSafe: Bool = true) -> Tweak {
         var tweak = self
         tweak.isProductionSafe = isProductionSafe
@@ -53,13 +58,13 @@ public struct Tweak<Value: Sendable & Equatable>: Sendable {
     }
 
     /// `value` as storage holds it.
-    func storedValue(of value: Value) -> TweakStoredValue {
+    package func storedValue(of value: Value) -> TweakStoredValue {
         encode(value)
     }
 
     /// The value `stored` holds, or the default when nothing is stored or what is stored isn't
     /// one of the tweak's values (a picker's removed option, a value of another type).
-    func value(from stored: TweakStoredValue?) -> Value {
+    package func value(from stored: TweakStoredValue?) -> Value {
         stored.flatMap(decode) ?? defaultValue
     }
 }
@@ -181,16 +186,35 @@ public extension Tweak where Value: CaseIterable & RawRepresentable, Value.RawVa
 
 // MARK: - Controls
 
-/// How the drawer edits a tweak.
-enum TweakControl: Hashable, Sendable {
+/// How a tweak is edited: what the drawer shows for it, and what a sidecar is told about it so it
+/// can show the same.
+///
+/// It encodes as a tagged JSON object, such as `{"stepper":{"range":[5,120],"step":5}}`.
+public enum TweakControl: Codable, Hashable, Sendable {
+    /// A switch over a Boolean.
     case toggle
+    /// A choice among `options`, in the order shown.
     case picker([TweakOption])
+    /// A text field over a string.
     case text
+    /// A stepper over the integers in `range`, moving `step` per press.
     case stepper(range: ClosedRange<Int>, step: Int)
 }
 
 /// One of a picker's choices: what it shows and what it stores.
-struct TweakOption: Hashable, Sendable {
-    let title: String
-    let value: TweakStoredValue
+public struct TweakOption: Codable, Hashable, Sendable {
+    /// What the picker shows for it.
+    public let title: String
+    /// What storage holds when it is chosen.
+    public let value: TweakStoredValue
+
+    /// A choice titled `title` that stores `value`.
+    ///
+    /// - Parameters:
+    ///   - title: What the picker shows for it.
+    ///   - value: What storage holds when it is chosen.
+    public init(title: String, value: TweakStoredValue) {
+        self.title = title
+        self.value = value
+    }
 }

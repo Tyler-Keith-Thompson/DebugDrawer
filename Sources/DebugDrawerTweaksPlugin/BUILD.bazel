@@ -10,6 +10,7 @@ swift_library(
     module_name = "DebugDrawerTweaksPlugin",
     deps = [
         "//Sources/DebugDrawer",
+        "//Sources/DebugDrawerTweaks",
     ],
     visibility = ["//visibility:public"],
 )
@@ -21,6 +22,7 @@ docc_archive(
     catalog = glob(["*.docc/**"], allow_empty = True),
     deps = [
         "//Sources/DebugDrawer:DebugDrawerDocumentation",
+        "//Sources/DebugDrawerTweaks:DebugDrawerTweaksDocumentation",
     ],
     tags = ["manual"],
     visibility = ["//visibility:public"],

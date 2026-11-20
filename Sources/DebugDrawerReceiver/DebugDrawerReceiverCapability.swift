@@ -22,8 +22,9 @@ public struct DebugDrawerReceiverCapability {
     public let id: String
     /// What becomes of its changes as the session ends.
     let scope: DebugDrawerSessions.CapabilityScope
-    /// Performs the command `payload` encodes; `false` when it isn't one of the model's commands.
-    let perform: @MainActor (_ payload: Data) -> Bool
+    /// Performs the command `payload` encodes, or returns why it was refused: when it isn't one of
+    /// the model's commands, or the capability refuses it.
+    let perform: @MainActor (_ payload: Data) -> DebugDrawerAuditEntry.Refusal?
     /// The model's snapshots as JSON.
     let snapshots: @MainActor () -> AsyncStream<Data>
 
@@ -37,13 +38,35 @@ public struct DebugDrawerReceiverCapability {
     ///     kept.
     /// - Returns: The capability, for ``DebugDrawerReceiver/enable(_:)``.
     public static func model<Model: DebugDrawerPluginModel>(_ model: Model, id: String, scope: DebugDrawerChangeScope<Model>) -> Self {
+        .model(model, id: id, scope: scope) { _ in nil }
+    }
+
+    /// A capability that drives `model`, refusing each decoded command `refusal` gives a reason
+    /// for, before the model performs it: for a capability that knows which of its commands a
+    /// sidecar may send, such as the tweaks capability, which takes only production-safe tweaks.
+    ///
+    /// - Parameters:
+    ///   - model: The model a sidecar may read and drive.
+    ///   - id: The ID a sidecar connects to it by, and the audit log names it by.
+    ///   - scope: What becomes of its changes when the session ends.
+    ///   - refusal: Why a command is refused, or `nil` to perform it.
+    /// - Returns: The capability, for ``DebugDrawerReceiver/enable(_:)``.
+    package static func model<Model: DebugDrawerPluginModel>(
+        _ model: Model,
+        id: String,
+        scope: DebugDrawerChangeScope<Model>,
+        refusal: @escaping @MainActor (Model.Command) -> DebugDrawerAuditEntry.Refusal?
+    ) -> Self {
         Self(
             id: id,
             scope: DebugDrawerSessions.CapabilityScope(scope, of: model),
             perform: { payload in
-                guard let command = try? JSONDecoder().decode(Model.Command.self, from: payload) else { return false }
+                guard let command = try? JSONDecoder().decode(Model.Command.self, from: payload) else { return .malformedCommand }
+                if let reason = refusal(command) {
+                    return reason
+                }
                 model.perform(command)
-                return true
+                return nil
             },
             snapshots: { encodedSnapshots(of: model) }
         )

@@ -1,6 +1,6 @@
 #if DEBUG
     import Combine
-    @testable import DebugDrawerTweaksPlugin
+    @testable import DebugDrawerTweaks
     import Foundation
     import Testing
 

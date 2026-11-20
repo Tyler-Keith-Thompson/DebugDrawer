@@ -2,10 +2,11 @@ import Foundation
 
 /// Where tweak values persist between launches, by key.
 ///
-/// The drawer reads and writes it on the main actor. The default, ``UserDefaultsTweakStorage``,
-/// keeps them in the standard defaults; pass another to `installTweaks(storage:_:)` to keep them
-/// elsewhere. The protocol exists in every build so a conformance compiles unchanged in release,
-/// where nothing calls it.
+/// The drawer and the receiver's tweaks capability read and write it on the main actor. The
+/// default, ``UserDefaultsTweakStorage``, keeps them in the standard defaults; pass another to
+/// `installTweaks(storage:_:)`, and the same to
+/// `DebugDrawerReceiverCapability.tweaks(_:storage:scope:)`, to keep them elsewhere. In release
+/// only the production-safe tweaks offered to a sidecar are read from it.
 public protocol TweakStorage {
     /// The value stored for `key`, or `nil` if none is.
     func value(forKey key: String) -> TweakStoredValue?

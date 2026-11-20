@@ -32,27 +32,6 @@ public struct TweakItem: Sendable {
     let kind: Kind
 }
 
-/// A ``Tweak`` without its value type, for the drawer, which edits stored values.
-struct AnyTweak: Sendable {
-    let title: String
-    let key: String
-    let isProductionSafe: Bool
-    let control: TweakControl
-    let defaultValue: TweakStoredValue
-    /// The stored value the tweak reads as: what is stored, if it is one of the tweak's values,
-    /// otherwise the default (a picker's removed option, a stepper's value clamped to its range).
-    let resolve: @Sendable (TweakStoredValue?) -> TweakStoredValue
-
-    init<Value>(_ tweak: Tweak<Value>) {
-        title = tweak.title
-        key = tweak.key
-        isProductionSafe = tweak.isProductionSafe
-        control = tweak.control
-        defaultValue = tweak.storedValue(of: tweak.defaultValue)
-        resolve = { tweak.storedValue(of: tweak.value(from: $0)) }
-    }
-}
-
 /// Lists a section's tweaks and actions, one per line, with `if`, `switch` and `for` as in a
 /// view builder.
 @resultBuilder

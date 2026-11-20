@@ -50,8 +50,12 @@ public struct DebugDrawerAuditEntry: Codable, Equatable, Sendable {
         case undeclaredScope
         /// No model is registered under the capability's ID.
         case unknownCapability
-        /// The command didn't decode as one of the capability's commands.
+        /// The command didn't decode as one of the capability's commands, or carried a value the
+        /// capability doesn't take.
         case malformedCommand
+        /// The command named something the capability doesn't expose to a sidecar, such as a
+        /// tweak the host didn't mark production-safe.
+        case notExposed
         /// A session was asked to open while one was open.
         case sessionAlreadyActive
         /// A session was asked to open for a duration that isn't a positive number.

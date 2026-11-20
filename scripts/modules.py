@@ -78,6 +78,12 @@ MODULES = [
     # and re-exports it, so `import DebugDrawer` still sees them.
     ("DebugDrawerReceiver", "Core", "The release-build sidecar receiver: serves a sidecar app, over the app group's store, only the capabilities the host enables (feature flag overrides, or any plugin model), within sessions the sidecar opens, refusing and auditing everything else; UI-less, with no interception.", []),
     ("DebugDrawer", "Core", "The drawer: its window, the plugin protocol and registry, the views plugins are built from, and release-build stand-ins.", ["DebugDrawerReceiver"]),
+    # Capabilities: a plugin's UI-free half that a release build links beside the receiver (the
+    # charter's D9), real in every build, with no drawer. Each depends on the receiver alone, and its
+    # plugin, named after it, depends on it and re-exports it.
+    # The Tweaks plugin's declarations, storage and typed accessors, and the receiver capability
+    # that offers the production-safe tweaks to a sidecar.
+    ("DebugDrawerTweaks", "Capabilities", "Tweak declarations, their storage and typed accessors, real in every build, and the receiver capability that lets a sidecar change the tweaks the host marked production-safe; UI-free.", ["DebugDrawerReceiver"]),
     # Plugins
     ("DebugDrawerConsolePlugin", "Plugins", "Captures os_log entries (stdout and stderr on macOS) and an app logger's lines through ConsoleLogSink, with metadata: level filter, text or regular-expression search, subsystem and category mutes, time range, auto-follow, copy, lines kept across launches.", ["DebugDrawer", "oslogclient/OSLogClient"]),
     ("DebugDrawerViewInspectorPlugin", "Plugins", "View borders by depth, alignment grid, click indicators, animation speed, render tracking, hierarchy snapshot.", ["DebugDrawer"]),
@@ -96,7 +102,7 @@ MODULES = [
     ("DebugDrawerDeepLinkPlugin", "Plugins", "Opens deep links, continues universal links and user activities, and keeps a history of them.", ["DebugDrawer"]),
     ("DebugDrawerCookiesPlugin", "Plugins", "Browse and delete HTTPCookieStorage's cookies, and WKWebView's where WebKit exists.", ["DebugDrawer"]),
     ("DebugDrawerLaunchTimePlugin", "Plugins", "Pre-main, app-init-to-first-frame and total launch time.", ["DebugDrawer"]),
-    ("DebugDrawerTweaksPlugin", "Plugins", "The host's own debug settings: toggles, pickers, text fields, steppers and actions, in sections.", ["DebugDrawer"]),
+    ("DebugDrawerTweaksPlugin", "Plugins", "The host's own debug settings: toggles, pickers, text fields, steppers and actions, in sections.", ["DebugDrawer", "DebugDrawerTweaks"]),
     ("DebugDrawerFeatureFlagsPlugin", "Plugins", "The app's feature flags through an adapter to its flag service: live values, local overrides that persist, search and reset.", ["DebugDrawer"]),
     ("DebugDrawerCrashReportsPlugin", "Plugins", "Uncaught exceptions and fatal signals, chained to the app's other crash handlers, shown on the next launch with a badge; MetricKit crash diagnostics too.", ["DebugDrawer"]),
     ("DebugDrawerHangDetectorPlugin", "Plugins", "Main-thread hangs over a threshold the drawer can change, each with its duration and the stack it was stuck on, a toast and a badge; MetricKit hang diagnostics too.", ["DebugDrawer"]),
@@ -133,11 +139,11 @@ IOS_MINIMUM = "17.0"
 # only on modules listed for it.
 EXTRA_PLATFORMS = {
     # visionOS 1 shipped with iOS 17's SwiftUI.
-    "visionOS": ("1.0", ["DebugDrawerReceiver", "DebugDrawer", "DebugDrawerAnalyticsPlugin", "DebugDrawerDatabaseBrowserPlugin", "DebugDrawerLocalizationPlugin", "DebugDrawerColorVisionPlugin", "DebugDrawerAppStateResetPlugin"]),
+    "visionOS": ("1.0", ["DebugDrawerReceiver", "DebugDrawerTweaks", "DebugDrawer", "DebugDrawerAnalyticsPlugin", "DebugDrawerDatabaseBrowserPlugin", "DebugDrawerLocalizationPlugin", "DebugDrawerColorVisionPlugin", "DebugDrawerAppStateResetPlugin"]),
     # tvOS 17 shipped with iOS 17's SwiftUI.
-    "tvOS": ("17.0", ["DebugDrawerReceiver", "DebugDrawer", "DebugDrawerAnalyticsPlugin", "DebugDrawerDatabaseBrowserPlugin", "DebugDrawerLocalizationPlugin", "DebugDrawerColorVisionPlugin", "DebugDrawerAppStateResetPlugin"]),
+    "tvOS": ("17.0", ["DebugDrawerReceiver", "DebugDrawerTweaks", "DebugDrawer", "DebugDrawerAnalyticsPlugin", "DebugDrawerDatabaseBrowserPlugin", "DebugDrawerLocalizationPlugin", "DebugDrawerColorVisionPlugin", "DebugDrawerAppStateResetPlugin"]),
     # watchOS 10 shipped with iOS 17's SwiftUI.
-    "watchOS": ("10.0", ["DebugDrawerReceiver", "DebugDrawer", "DebugDrawerAnalyticsPlugin", "DebugDrawerDatabaseBrowserPlugin", "DebugDrawerLocalizationPlugin"]),
+    "watchOS": ("10.0", ["DebugDrawerReceiver", "DebugDrawerTweaks", "DebugDrawer", "DebugDrawerAnalyticsPlugin", "DebugDrawerDatabaseBrowserPlugin", "DebugDrawerLocalizationPlugin"]),
 }
 
 # Test targets that also run in the simulator of iOS or of a platform in EXTRA_PLATFORMS, by
@@ -173,13 +179,13 @@ BAZEL_TESTED_PLATFORM_EXCLUDED_PACKAGES = {
 # beside each library compiles it for the IOS_MINIMUM Catalyst target triple instead. A module
 # listed here depends only on modules listed here, and on no C or Objective-C package, which that
 # rule would still build for macOS.
-CATALYST_MODULES = ["DebugDrawerReceiver", "DebugDrawer", "DebugDrawerAnalyticsPlugin", "DebugDrawerDatabaseBrowserPlugin", "DebugDrawerLocalizationPlugin", "DebugDrawerScreenRecordingPlugin", "DebugDrawerDesignOverlayPlugin", "DebugDrawerColorVisionPlugin", "DebugDrawerAppStateResetPlugin"]
+CATALYST_MODULES = ["DebugDrawerReceiver", "DebugDrawerTweaks", "DebugDrawer", "DebugDrawerAnalyticsPlugin", "DebugDrawerDatabaseBrowserPlugin", "DebugDrawerLocalizationPlugin", "DebugDrawerScreenRecordingPlugin", "DebugDrawerDesignOverlayPlugin", "DebugDrawerColorVisionPlugin", "DebugDrawerAppStateResetPlugin"]
 
 # Modules whose every public symbol must have a doc comment. Their DocC archive, and so `just docs`,
 # fails on one that has none (tools/documentation_coverage.py, run by docc_archive's
 # `require_documentation`). Checked against the debug build's symbol graph, which holds the drawer
 # as well as the API that exists in every build.
-DOCUMENTED_MODULES = ["DebugDrawerReceiver", "DebugDrawer"]
+DOCUMENTED_MODULES = ["DebugDrawerReceiver", "DebugDrawerTweaks", "DebugDrawer"]
 
 # Dynamic libraries: (name, description). Each is C sources under Sources/<name> (headers in
 # include/) with no dependencies, shipped as a `.dynamic` library product in Package.swift and as
@@ -220,7 +226,8 @@ TEST_TARGETS = [
     ("DebugDrawerLocationPluginTests", ["DebugDrawerLocationPlugin", "DebugDrawer", "DebugDrawerInterceptionContract", "viewinspector/ViewInspector", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
     ("DebugDrawerDeepLinkPluginTests", ["DebugDrawerDeepLinkPlugin", "DebugDrawer", "viewinspector/ViewInspector", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
     ("DebugDrawerCookiesPluginTests", ["DebugDrawerCookiesPlugin", "DebugDrawer", "viewinspector/ViewInspector", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
-    ("DebugDrawerTweaksPluginTests", ["DebugDrawerTweaksPlugin", "DebugDrawer", "viewinspector/ViewInspector", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
+    ("DebugDrawerTweaksTests", ["DebugDrawerTweaks", "DebugDrawerReceiver", "DebugDrawer"]),
+    ("DebugDrawerTweaksPluginTests", ["DebugDrawerTweaksPlugin", "DebugDrawerTweaks", "DebugDrawer", "viewinspector/ViewInspector", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
     ("DebugDrawerFeatureFlagsPluginTests", ["DebugDrawerFeatureFlagsPlugin", "DebugDrawer", "viewinspector/ViewInspector", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
     ("DebugDrawerCrashReportsPluginTests", ["DebugDrawerCrashReportsPlugin", "DebugDrawer", "viewinspector/ViewInspector", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
     ("DebugDrawerHangDetectorPluginTests", ["DebugDrawerHangDetectorPlugin", "DebugDrawer", "viewinspector/ViewInspector", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
@@ -426,10 +433,17 @@ def check():
             assert "/" not in d and d in CATALYST_MODULES, f"{name} builds for Mac Catalyst, so its dependency {d} must be listed for it"
     # The charter's vertical modules: a plugin depends on core and Apple's frameworks alone, so an
     # app links only the tools it picks. Console's OSLogClient is the one package allowed.
+    # A capability (a plugin's release-build half) depends on the receiver alone, and only its own
+    # plugin may depend on it.
+    capabilities = [m[0] for m in MODULES if m[1] == "Capabilities"]
     for name, group, _, deps in MODULES:
         if group in ("Plugins", "Transports"):
             allowed = ["DebugDrawer"] + (["oslogclient/OSLogClient"] if name == "DebugDrawerConsolePlugin" else [])
-            assert set(deps) <= set(allowed), f"{name} is a plugin or transport, so it depends on DebugDrawer alone, not {sorted(set(deps) - set(allowed))}"
+            allowed += [c for c in capabilities if name == c + "Plugin"]
+            assert set(deps) <= set(allowed), f"{name} is a plugin or transport, so it depends on DebugDrawer (and its own capability) alone, not {sorted(set(deps) - set(allowed))}"
+        if group == "Capabilities":
+            assert deps == ["DebugDrawerReceiver"], f"{name} is a capability, so it depends on DebugDrawerReceiver alone, not {deps}"
+            assert name + "Plugin" in names, f"{name} is a capability, so a plugin {name}Plugin holds its drawer half"
     for name, _, _, deps in MODULES:
         if name not in IOS_MODULES:
             for d in deps:

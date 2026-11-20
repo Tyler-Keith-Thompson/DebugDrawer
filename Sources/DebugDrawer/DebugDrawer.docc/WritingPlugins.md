@@ -506,7 +506,11 @@ enabled, and every command outside a session. A capability is a model:
 `.model(_:id:scope:)` for any plugin model, each with its ``DebugDrawerChangeScope``. So a plugin
 whose model should be drivable in production needs nothing more than its model: the host enables
 it in the receiver, and in a debug build can show the same model in its drawer through
-``DebugDrawerPluginTransport/direct(to:)``. The receiver's module holds
+``DebugDrawerPluginTransport/direct(to:)``. A shipped plugin whose data a release build must hold
+splits its UI-free half into a module of its own that depends on the receiver alone and that the
+plugin re-exports, with its capability there: `DebugDrawerTweaks` holds the tweaks and
+`.tweaks(...)`, which offers a sidecar only those marked production-safe and refuses a command
+naming any other as `notExposed`. The receiver's module holds
 ``DebugDrawerPluginModel``, the sessions and the store's wire format, real in every build, and
 `DebugDrawer` re-exports it; it serves no socket and holds no view. The README's "Production
 builds: the receiver" shows the setup.

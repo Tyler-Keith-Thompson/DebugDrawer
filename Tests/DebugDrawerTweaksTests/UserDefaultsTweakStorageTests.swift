@@ -1,4 +1,4 @@
-import DebugDrawerTweaksPlugin
+import DebugDrawerTweaks
 import Foundation
 import Testing
 

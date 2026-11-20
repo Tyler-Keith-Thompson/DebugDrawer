@@ -127,6 +127,17 @@ public final class DebugDrawerSessions: DebugDrawerPluginModel {
     ///   - scope: What becomes of its changes as the session ends; `nil` when undeclared.
     ///   - perform: Performs the command; `false` when it didn't decode.
     package func apply(to capability: String, scope: CapabilityScope?, _ perform: () -> Bool) {
+        apply(to: capability, scope: scope) { perform() ? nil : .malformedCommand }
+    }
+
+    /// Performs a command to `capability`, through `perform`, if a session is open and the
+    /// capability's scope is declared, and records what came of it.
+    ///
+    /// - Parameters:
+    ///   - capability: The ID the capability's model was registered under.
+    ///   - scope: What becomes of its changes as the session ends; `nil` when undeclared.
+    ///   - perform: Performs the command, or returns why it was refused, having changed nothing.
+    package func apply(to capability: String, scope: CapabilityScope?, _ perform: () -> DebugDrawerAuditEntry.Refusal?) {
         expireIfDue()
         guard let session = snapshot.session else {
             refuse(capability, .noActiveSession)
@@ -136,8 +147,8 @@ public final class DebugDrawerSessions: DebugDrawerPluginModel {
             refuse(capability, .undeclaredScope)
             return
         }
-        guard perform() else {
-            refuse(capability, .malformedCommand)
+        if let reason = perform() {
+            refuse(capability, reason)
             return
         }
         if case let .session(revert) = scope, !reverts.contains(where: { $0.capability == capability }) {
