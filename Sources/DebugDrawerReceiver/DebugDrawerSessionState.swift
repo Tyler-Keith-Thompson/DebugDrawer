@@ -2,7 +2,8 @@ import Foundation
 
 // What `DebugDrawerSessions` publishes, and what a sidecar sends it, as plain values: they cross
 // the transports as JSON, so a viewer connects to the sessions as it would to any plugin's model,
-// and they hold nothing secret (an ID and two dates). Real in every build: values do nothing by
+// and they hold nothing secret (an ID, two dates and, with a grant, what it allows, never the
+// token: the sidecar sends that once, with `open`, and it is never written back). Real in every build: values do nothing by
 // themselves, and a host's indicator reads `isActive` unchanged in release, where it is never
 // true.
 
@@ -37,8 +38,12 @@ public struct DebugDrawerSession: Codable, Equatable, Sendable {
     /// When it opened.
     public let opened: Date
     /// When it expires, unless it ends first: at most the host's
-    /// ``DebugDrawerSessions/maximumDuration`` after ``opened``.
+    /// ``DebugDrawerSessions/maximumDuration`` after ``opened``, and no later than its
+    /// ``grant``'s expiry.
     public let expires: Date
+    /// The grant it opened with, when the sessions have a ``DebugDrawerGrantPolicy``: who holds
+    /// it and the capabilities it covers. `nil` without a policy.
+    public let grant: DebugDrawerGrant?
 
     /// A session.
     ///
@@ -46,10 +51,12 @@ public struct DebugDrawerSession: Codable, Equatable, Sendable {
     ///   - id: Tells it from other sessions.
     ///   - opened: When it opened.
     ///   - expires: When it expires.
-    public init(id: UUID, opened: Date, expires: Date) {
+    ///   - grant: The grant it opened with, if any.
+    public init(id: UUID, opened: Date, expires: Date, grant: DebugDrawerGrant? = nil) {
         self.id = id
         self.opened = opened
         self.expires = expires
+        self.grant = grant
     }
 }
 
@@ -57,7 +64,12 @@ public struct DebugDrawerSession: Codable, Equatable, Sendable {
 public enum DebugDrawerSessionCommand: Codable, Equatable, Sendable {
     /// Opens a session lasting `duration` seconds, or the host's maximum if that is shorter.
     /// Refused while a session is open, and for a duration that isn't a positive number.
-    case open(duration: TimeInterval)
+    ///
+    /// When the sessions have a ``DebugDrawerGrantPolicy``, `grant` is the token the company's
+    /// server issued, and the session opens only if it is valid, then lasts no longer than it
+    /// does. Without a policy `grant` is ignored. A sidecar that sends none encodes the command
+    /// as one from before grants existed.
+    case open(duration: TimeInterval, grant: String? = nil)
     /// Ends the open session, reverting its session-scoped changes.
     case end
 }

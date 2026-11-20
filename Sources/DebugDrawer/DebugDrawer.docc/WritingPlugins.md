@@ -484,7 +484,7 @@ changes nothing. The gate is the same over the socket and the store. A refused c
 acknowledged, and its ID remembered, so a ``DebugDrawerSidecarTransport`` doesn't send it again
 on a switch: a refusal is final, and a sidecar sends the command anew once a session is open. `DebugDrawerSessions` is itself a model, served under
 `DebugDrawerSessions.pluginID`: a sidecar connects to it as to any plugin, sends
-`DebugDrawerSessionCommand.open(duration:)` and `DebugDrawerSessionCommand.end` as commands,
+`DebugDrawerSessionCommand.open(duration:grant:)` and `DebugDrawerSessionCommand.end` as commands,
 and reads `DebugDrawerSessionState` snapshots, so sessions need no message kind or capability
 of their own and work over every transport. A session expires at most
 `DebugDrawerSessions.maximumDuration` after it opens; as it ends or expires, each capability
@@ -529,6 +529,20 @@ alone, never a crash handler, so nothing intercepts in the build that ships. The
 `DebugDrawerPluginModel`, the sessions and the store's wire format, real in every build, and
 `DebugDrawer` re-exports it; it serves no socket and holds no view. The README's "Production
 builds: the receiver" shows the setup.
+
+**Grants.** Sessions made with a `DebugDrawerGrantPolicy`
+(`DebugDrawerSessions(maximumDuration:auditCapacity:grantPolicy:)`) open only with a signed grant
+the sidecar sends in `DebugDrawerSessionCommand.open(duration:grant:)`: the policy's verifier
+authenticates it (`DebugDrawerSignedGrantVerifier` reads a JSON Web Token signed with Ed25519 or
+P-256; a host conforms to `DebugDrawerGrantVerifier` for another format), then the sessions check
+its audience, its `notBefore` (less the clock-skew tolerance) and expiry, and that no session
+opened with it before. The session lasts no longer than the grant, and applies a command only to a
+capability the grant lists (`DebugDrawerAuditEntry.Refusal.capabilityNotGranted` otherwise). This
+holds for the debug registry's sessions as for the receiver's. A capability too risky to offer on
+team signing alone declares it with `DebugDrawerReceiverCapability.requiringGrant()`: in a session
+without a grant, which is every session without a policy, its commands are refused as
+`DebugDrawerAuditEntry.Refusal.grantMissing`. Without a policy, nothing changes. The README's
+"Signed grants" documents the format and a test signer.
 
 **In the background.** A `DebugDrawerBackgroundKeeper` made with the sessions keeps the app
 running while one is open, so a sidecar in the foreground keeps the socket, and ends every request

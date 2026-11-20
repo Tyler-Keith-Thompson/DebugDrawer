@@ -123,7 +123,7 @@ let targets: [Target] = [
     // Shared checks the test targets run (TEST_HELPERS in scripts/modules.py); no product names them.
     .target(name: "DebugDrawerInterceptionContract", dependencies: ["DebugDrawer"], path: "Tests/DebugDrawerInterceptionContract", exclude: bazelFiles),
 
-    .testTarget(name: "DebugDrawerReceiverTests", dependencies: ["DebugDrawerReceiver"], exclude: bazelFiles),
+    .testTarget(name: "DebugDrawerReceiverTests", dependencies: ["DebugDrawerReceiver", "DebugDrawer"], exclude: bazelFiles),
     .testTarget(name: "DebugDrawerAnalyticsTests", dependencies: ["DebugDrawerAnalytics", "DebugDrawerReceiver", "DebugDrawer"], exclude: ["BUILD.bazel", "Performance"]),
     .testTarget(name: "DebugDrawerLocalizationTests", dependencies: ["DebugDrawerLocalization", "DebugDrawerReceiver", "DebugDrawer"], exclude: ["BUILD.bazel", "Performance"]),
     .testTarget(name: "DebugDrawerAccessibilityTests", dependencies: ["DebugDrawerAccessibility", "DebugDrawerReceiver", "DebugDrawer", .product(name: "ViewInspector", package: "viewinspector", condition: .when(platforms: [.macOS, .macCatalyst, .iOS, .tvOS, .watchOS]))], exclude: bazelFiles),

@@ -46,6 +46,8 @@ import os
 /// A sidecar opens a session through ``DebugDrawerSessions/pluginID`` and, within it, drives the
 /// enabled capabilities. A command to a capability that isn't enabled, any command while none is,
 /// and any command outside a session is refused, logged and written to the sessions' audit log.
+/// Sessions made with a ``DebugDrawerGrantPolicy`` also need a signed grant for each session, and
+/// one that lists each capability a command is for.
 /// Show your own indicator while ``DebugDrawerSessions/snapshot`` is active.
 @MainActor
 public final class DebugDrawerReceiver {
@@ -208,7 +210,7 @@ public final class DebugDrawerReceiver {
             sessions.refuse(id, .unknownCapability)
             return
         }
-        sessions.apply(to: id, scope: capability.scope) { capability.perform(payload) }
+        sessions.apply(to: id, scope: capability.scope, requiresGrant: capability.requiresGrant) { capability.perform(payload) }
     }
 
     /// Writes the snapshots `snapshots` delivers to `id`'s file, in place of any written for it

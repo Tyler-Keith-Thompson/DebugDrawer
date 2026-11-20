@@ -21,8 +21,8 @@ import Foundation
 public struct DebugDrawerAuditEntry: Codable, Equatable, Sendable {
     /// What happened.
     public enum Event: Codable, Equatable, Sendable {
-        /// A session opened, to expire at `expires`.
-        case sessionOpened(expires: Date)
+        /// A session opened, to expire at `expires`, with the grant `grant` names, if any.
+        case sessionOpened(expires: Date, grant: GrantReference? = nil)
         /// The session ended, as `reason` says.
         case sessionEnded(Ending)
         /// A command was applied to the capability.
@@ -31,6 +31,25 @@ public struct DebugDrawerAuditEntry: Codable, Equatable, Sendable {
         case commandRefused(Refusal)
         /// A session-scoped change the capability made was reverted as its session ended.
         case changeReverted
+    }
+
+    /// The grant a session opened with, named but never copied: its ID and who holds it, never
+    /// the token or its signature.
+    public struct GrantReference: Codable, Equatable, Sendable {
+        /// The grant's ``DebugDrawerGrant/id``.
+        public let id: String
+        /// Who holds it: the grant's ``DebugDrawerGrant/subject``.
+        public let subject: String
+
+        /// A reference to a grant.
+        ///
+        /// - Parameters:
+        ///   - id: The grant's ID.
+        ///   - subject: Who holds it.
+        public init(id: String, subject: String) {
+            self.id = id
+            self.subject = subject
+        }
     }
 
     /// Why a session ended.
@@ -60,6 +79,24 @@ public struct DebugDrawerAuditEntry: Codable, Equatable, Sendable {
         case sessionAlreadyActive
         /// A session was asked to open for a duration that isn't a positive number.
         case invalidDuration
+        /// The sessions have a ``DebugDrawerGrantPolicy`` and a session was asked to open without
+        /// a grant; or a capability that requires a grant was sent a command in a session that
+        /// has none.
+        case grantMissing
+        /// The grant's verifier rejected it: it is malformed, or no trusted key signed it as it
+        /// is.
+        case grantInvalid
+        /// The grant was issued for another app: the policy's audience isn't among its
+        /// audiences.
+        case grantWrongAudience
+        /// The grant isn't valid yet, even allowing for the policy's clock-skew tolerance.
+        case grantNotYetValid
+        /// The grant has expired.
+        case grantExpired
+        /// A session already opened with the grant: each opens one session at most.
+        case grantReplayed
+        /// The session's grant doesn't list the capability the command was for.
+        case capabilityNotGranted
     }
 
     /// When it happened.

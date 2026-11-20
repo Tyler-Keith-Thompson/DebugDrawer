@@ -9,6 +9,13 @@ import Foundation
 // an enum the receiver switches over (every new one would change this module, and a host couldn't
 // add its own), and a closure taking the raw command (it could do anything with input it was never
 // meant to interpret).
+//
+// With a grant policy, every capability needs a grant that lists it (default-deny). A capability
+// whose risk is high (environment switching, network mocking, location spoofing) can also declare,
+// with `requiringGrant()`, that it needs one in every receiver: without a policy no session has a
+// grant, so its commands are refused, and a host that enables it must also configure grants.
+// Rejected: a flag on the policy listing the capabilities that need grants (the capability knows
+// its own risk, and the host would have to repeat it).
 
 /// A capability a ``DebugDrawerReceiver`` serves once the host enables it.
 ///
@@ -22,6 +29,9 @@ public struct DebugDrawerReceiverCapability {
     public let id: String
     /// What becomes of its changes as the session ends.
     let scope: DebugDrawerSessions.CapabilityScope
+    /// Whether its commands need a session whose grant lists it, even when the sessions have no
+    /// ``DebugDrawerGrantPolicy``: see ``requiringGrant()``.
+    public private(set) var requiresGrant = false
     /// Performs the command `payload` encodes, or returns why it was refused: when it isn't one of
     /// the model's commands, or the capability refuses it.
     let perform: @MainActor (_ payload: Data) -> DebugDrawerAuditEntry.Refusal?
@@ -70,6 +80,25 @@ public struct DebugDrawerReceiverCapability {
             },
             snapshots: { encodedSnapshots(of: model) }
         )
+    }
+
+    /// This capability, applying a command only in a session whose grant lists its ``id``, even
+    /// when the sessions have no ``DebugDrawerGrantPolicy``.
+    ///
+    /// Sessions with a policy already require a grant for every capability. Use this for a
+    /// capability too risky to offer on team signing alone: in a receiver whose sessions have no
+    /// policy, no session has a grant, so every command to it is refused as
+    /// ``DebugDrawerAuditEntry/Refusal/grantMissing``.
+    ///
+    /// ```swift
+    /// receiver.enable(.model(environments, id: "MyApp.Environment", scope: .session(revertWith: .reset)).requiringGrant())
+    /// ```
+    ///
+    /// - Returns: The capability, requiring a grant.
+    public func requiringGrant() -> Self {
+        var capability = self
+        capability.requiresGrant = true
+        return capability
     }
 
     /// Feature flag overrides through the host's adapter to its flag service: a sidecar sees the
