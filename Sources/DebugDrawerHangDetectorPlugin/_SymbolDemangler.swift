@@ -5,8 +5,10 @@
     /// header declares, found with `dlsym` the first time a frame is named.
     ///
     /// It allocates, so it runs only when the drawer draws a hang, never while the main thread is stopped.
-    struct _SymbolDemangler: SymbolDemangler {
-        func demangle(_ symbol: String) -> String? {
+    package struct _SymbolDemangler: SymbolDemangler {
+        package init() {}
+
+        package func demangle(_ symbol: String) -> String? {
             guard let swiftDemangle = Self.swiftDemangle else { return nil }
             return symbol.withCString { name in
                 // With no buffer passed in, it returns one it allocated with malloc, or nil for a

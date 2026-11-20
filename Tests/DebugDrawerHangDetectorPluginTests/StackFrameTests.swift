@@ -1,5 +1,6 @@
 #if DEBUG
     @testable import DebugDrawerHangDetectorPlugin
+    import DebugDrawerHangDetector
     import Foundation
     import Testing
 

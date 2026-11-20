@@ -3,6 +3,7 @@ import CryptoKit
 import DebugDrawerAccessibility
 import DebugDrawerAnalytics
 import DebugDrawerAppStateReset
+import DebugDrawerHangDetector
 import DebugDrawerLocalization
 import DebugDrawerMetricKit
 import DebugDrawerNetwork
@@ -19,8 +20,8 @@ import os
 /// session is open, the session whose requests a sidecar may mock, the diagnostics capture the
 /// app hands its log lines and requests, the bug reports its Report a Bug trigger takes, the
 /// push registration the app delegate hands the APNs device token, the scenarios a sidecar
-/// launches it into, the actions a sidecar takes on its sign-in, the state a sidecar may reset, and
-/// the backends a sidecar may point it at for a session.
+/// launches it into, the actions a sidecar takes on its sign-in, the state a sidecar may reset, the
+/// backends a sidecar may point it at for a session, and the hangs and signposts it records.
 ///
 /// Everything here is in the release build too: a production app links the receiver and the
 /// capability modules, never the drawer.
@@ -41,6 +42,8 @@ final class ExampleReceiverHost: ObservableObject {
     let appState: ProductionAppState
     /// The backends a sidecar's session points the app at: Production, Staging or Canary.
     let environments = ProductionEnvironments()
+    /// The freeze and the signposted load a sidecar's performance traces record.
+    let performance: ProductionPerformance
     let sessions: DebugDrawerSessions
     /// Keeps the app running while a session is open: a background task on iOS, an App Nap
     /// activity on the Mac.
@@ -125,11 +128,13 @@ final class ExampleReceiverHost: ObservableObject {
         self.bugReports = bugReports
         self.pushRegistration = pushRegistration
         self.appState = appState
+        performance = ProductionPerformance(sessions: sessions)
         keeper = DebugDrawerBackgroundKeeper(sessions: sessions)
         apiSession = Self.apiSession()
         receiver.enable(.scenarios(scenarios.scenarios, launchURL: ProductionScenarios.launchURL))
         receiver.enable(.authActions(signIn.actions, launchURL: ProductionSignIn.launchURL))
         receiver.enable(.environments(environments.model))
+        receiver.enable(.performanceTraces(performance.traces))
         // The audit log goes to the app's own log, as a host would forward it to its own.
         auditLogging = sessions.auditEntries.sink { entry in
             Self.logger.notice("Audit: \(entry.capability, privacy: .public) \(String(describing: entry.event), privacy: .public)")

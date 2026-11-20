@@ -3,7 +3,7 @@
 load("//tools:docc.bzl", "docc_archive")
 load("//tools:swift_rules.bzl", "swift_library")
 
-# The kit a sidecar app is built on: the apps in the group that serve it, listed as they start and stop, a session opened and ended for one, with an optional signed grant, the Console, Network, Bug Reports, Scenarios, Auth, Reset App State and Environment views (and any plugin's) over the socket or the store, and a bug report of them, created and sent; debug builds only.
+# The kit a sidecar app is built on: the apps in the group that serve it, listed as they start and stop, a session opened and ended for one, with an optional signed grant, the Console, Network, Bug Reports, Scenarios, Auth, Reset App State, Environment and Performance views (and any plugin's) over the socket or the store, and a bug report of them, created and sent; debug builds only.
 swift_library(
     name = "DebugDrawerSidecarKit",
     srcs = glob(["**/*.swift"]),
@@ -13,6 +13,7 @@ swift_library(
         "//Sources/DebugDrawerConsolePlugin",
         "//Sources/DebugDrawerNetworkPlugin",
         "//Sources/DebugDrawerAppStateResetPlugin",
+        "//Sources/DebugDrawerHangDetectorPlugin",
     ],
     visibility = ["//visibility:public"],
 )
@@ -27,6 +28,7 @@ docc_archive(
         "//Sources/DebugDrawerConsolePlugin:DebugDrawerConsolePluginDocumentation",
         "//Sources/DebugDrawerNetworkPlugin:DebugDrawerNetworkPluginDocumentation",
         "//Sources/DebugDrawerAppStateResetPlugin:DebugDrawerAppStateResetPluginDocumentation",
+        "//Sources/DebugDrawerHangDetectorPlugin:DebugDrawerHangDetectorPluginDocumentation",
     ],
     require_documentation = True,
     tags = ["manual"],

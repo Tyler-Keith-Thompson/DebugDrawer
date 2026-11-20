@@ -266,6 +266,7 @@ swift_library(
         "//Sources/DebugDrawerAccessibility",
         "//Sources/DebugDrawerAnalytics",
         "//Sources/DebugDrawerAppStateReset",
+        "//Sources/DebugDrawerHangDetector",
         "//Sources/DebugDrawerLocalization",
         "//Sources/DebugDrawerMetricKit",
         "//Sources/DebugDrawerNetwork",

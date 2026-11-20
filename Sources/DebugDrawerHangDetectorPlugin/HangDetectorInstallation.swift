@@ -1,6 +1,7 @@
 #if DEBUG
     import CoreFoundation
     import DebugDrawer
+    import DebugDrawerHangDetector
     import Foundation
 
     /// What `HangDetector.install(threshold:)` does in debug builds, and what the plugin's

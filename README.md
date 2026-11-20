@@ -1227,8 +1227,9 @@ The `MXHangDiagnostic`s MetricKit delivers, which describe earlier runs, are lis
 with a badge but no toast.
 
 With no hang, the cost is a clock read and an uncontended lock on each turn of the main run loop,
-and a watcher wake four times per threshold that does the same; `HangDetectorOverheadTests` measures
-both. The drawer lists the hangs newest first (the newest fifty); opening one shows its stack,
+and a watcher wake four times per threshold that does the same; `PerformanceTracesOverheadTests`
+measures both. The monitor lives in `DebugDrawerHangDetector`, which the plugin re-exports, so a
+production build can record hangs for a sidecar too (below, "Hangs and signposts in production"). The drawer lists the hangs newest first (the newest fifty); opening one shows its stack,
 selectable, with a button that copies it, and marks it seen. Its Threshold picker changes the
 threshold while the app runs, for this run only. Mark All Seen clears the badge, Clear All forgets
 them, and a bug report carries them all in `hangs.txt`.
@@ -2226,7 +2227,8 @@ plugin and no dependency on the drawer (and, to offer tweaks, `DebugDrawerTweaks
 analytics events, `DebugDrawerAnalytics`, for translators and accessibility reviewers,
 `DebugDrawerLocalization` and `DebugDrawerAccessibility`, to forward crash reports and
 MetricKit payloads, `DebugDrawerMetricKit`, to mock responses for a session, `DebugDrawerNetwork`,
-or to show the push token for test pushes, `DebugDrawerNotifications`, below). It serves a sidecar, over the app group's store, only the
+to show the push token for test pushes, `DebugDrawerNotifications`, or to record hangs and
+signposts, `DebugDrawerHangDetector`, below). It serves a sidecar, over the app group's store, only the
 capabilities the app enables, within sessions the sidecar opens, and refuses everything else:
 
 ```swift
@@ -3203,6 +3205,78 @@ struct EnvironmentIndicator: View {
 In the sidecar, the kit's `DebugDrawerSidecarPlugin.environments` lists the environments under a
 high-risk warning, the active one marked, with Switch for each other one and Reset to Default.
 
+**Hangs and signposts in production.** A hang a dogfooder hits on an optimized build can reach the
+team with the stack it was stuck on, and the app's own timings beside it: during a sidecar's
+session the app records the main thread's hitches and hangs, using the Hangs plugin's monitor, and
+the intervals the app marks, as `os_signpost` marks them. It is off unless the app enables it.
+Link `DebugDrawerHangDetector` (`.product(name: "DebugDrawerHangDetector", package:
+"DebugDrawer")`) beside the receiver, the UI-free half of the Hangs plugin, make the recorder with
+the receiver's sessions, enable the capability, and mark the intervals worth timing:
+
+```swift
+import DebugDrawerHangDetector
+import DebugDrawerReceiver
+import Foundation
+
+@MainActor
+final class ProductionPerformance {
+    let sessions = DebugDrawerSessions(maximumDuration: 15 * 60)
+    let traces: PerformanceTraces
+    let receiver: DebugDrawerReceiver
+
+    init(container: URL) throws {
+        traces = PerformanceTraces(sessions: sessions)
+        receiver = DebugDrawerReceiver(directory: container.appending(path: "DebugDrawer"), sessions: sessions)
+        receiver.enable(.performanceTraces(traces))
+        try receiver.start()
+    }
+
+    func loadFeed(from url: URL) async throws -> Data {
+        let interval = traces.beginInterval("Load feed")
+        defer { traces.endInterval(interval) }
+        return try await URLSession.shared.data(from: url).0
+    }
+}
+```
+
+- **The risk: low.** Whoever holds the sidecar sees stack traces and timings of the app's own
+  code. No user data is recorded (an interval's name is a `StaticString`, a literal in the app's
+  code), and nothing the sidecar sends is executed.
+- **Off until a sidecar records.** Until the app enables `.performanceTraces(_:)`, a command is
+  refused as `commandRefused(.unknownCapability)`. Enabled, nothing runs until a sidecar sends
+  `PerformanceTraces.Command.start` in an open session: no run loop observer, no watcher thread, no
+  interval kept, and `beginInterval(_:)` returns one that records nothing. A session opened for
+  something else starts nothing either.
+- **What it records.** Each stall of the main thread at least `hitchThreshold` long (100 ms unless
+  the app picks another) is a `Stall`: `.hitch`, or `.hang` from `hangThreshold` (250 ms), with
+  when it began, how long it lasted, and the main thread's frames, sampled once it reached the
+  hitch threshold. Each interval that begins and ends while recording is a `SignpostInterval` with
+  its name, start and duration. The newest 50 stalls and 500 intervals are kept (`limits:`); the
+  snapshot counts what the bounds dropped.
+- **Stacks from an optimized build.** A frame carries its address, its image's file name, the
+  image's UUID (`LC_UUID`) and the address's offset into the image, plus the nearest symbol the
+  image exports. A stripped App Store build exports few of its own, so the sidecar shows the app's
+  frames as `MyApp + 0x1c1f0` and the system's by name; the report's `performance.txt` ends with
+  the binary images, each with its load address and UUID, so `atos -o MyApp.app.dSYM -l <load
+  address> <address>` names the app's frames with the dSYM archived for that build.
+- **For the session, always.** As the sidecar sends `stop`, as the session ends or expires, and as
+  the receiver's or the capability's gate turns off, the observer is removed, the watcher thread
+  ends, and the recording is deleted (audited as `changeReverted`). It lives only in memory and in
+  the capability's snapshot file in the app's own directory of the store; a file a killed launch
+  left behind is removed as the next launch enables the capability, so enable it at startup. A
+  sidecar's export is its own copy, in its report (`Command.export` records it).
+- **What recording costs.** Measured in an optimized build on an Apple M1 Ultra by
+  `PerformanceTracesOverheadTests` (`just test-release`), with the default thresholds: about 0.6 µs
+  added to each turn of the main run loop (about 0.13 µs a checkpoint); a watcher wake 40 times a
+  second at about 0.08 µs of work each, about 3 µs of CPU a second; for each stall, a few µs with
+  the main thread stopped while its stack is read, then about 15 µs a frame on the main actor to
+  name its frames (at most 128); and about 0.45 µs to begin and end a signpost interval, 0.06 µs
+  while nothing records.
+
+In the sidecar, the kit's `DebugDrawerSidecarPlugin.performanceTraces` offers Start Recording, then
+lists the stalls, newest first, each open to its main-thread stack, and the intervals, with Stop
+and Delete; Create Report adds `performance.txt`.
+
 In a debug build the receiver runs beside the drawer: show the same model in a plugin through
 `DebugDrawerPluginTransport.direct(to:)`, and pass it to `.featureFlagOverrides(_:)` or
 `.model(_:id:scope:)`, so what a sidecar does is seen in the app's own drawer. `DebugDrawer`
@@ -3712,7 +3786,8 @@ ContentView()
 | `DebugDrawerTweaksPlugin` | The app's own debug settings: toggles, pickers, text fields, steppers and actions, in sections, read through typed accessors; re-exports `DebugDrawerTweaks` |
 | `DebugDrawerFeatureFlagsPlugin` | The app's feature flags through an adapter to its flag service: live values, local overrides that persist, search, an overridden-only filter and Reset All |
 | `DebugDrawerCrashReportsPlugin` | Uncaught exceptions and fatal signals, handed on to the app's other crash handlers, shown on the next launch with a badge and stack trace; MetricKit crash diagnostics too |
-| `DebugDrawerHangDetectorPlugin` | Main-thread hangs over a threshold the drawer can change, each with its duration and the stack it was stuck on, a toast and a badge; MetricKit hang diagnostics too |
+| `DebugDrawerHangDetector` | The main-thread stall monitor, real in every build, and the receiver capability (`.performanceTraces(_:)`) that records the hitches, the hangs with their main-thread stacks (addresses, image UUIDs and offsets, for a dSYM) and the signpost intervals the app marks on `PerformanceTraces`, while a sidecar records in its session; UI-free, so a release build links it beside the receiver |
+| `DebugDrawerHangDetectorPlugin` | Main-thread hangs over a threshold the drawer can change, each with its duration and the stack it was stuck on, a toast and a badge; MetricKit hang diagnostics too; re-exports `DebugDrawerHangDetector` |
 | `DebugDrawerLeakDetectorPlugin` | View controllers still alive a run-loop turn after their screen was dismissed, and opted-in classes with more live instances than allowed, by class with a count, a toast and a badge |
 | `DebugDrawerMetricKit` | MetricKit's payload kinds and subscriber, real in every build, and the receiver capability (`.metricKitPayloads(sessions:directory:redaction:capacity:)`) that keeps the payloads the app receives, crash diagnostics among them, redacted by `MetricKitRedaction` and across launches, and serves them while a sidecar's session is open; UI-free, so a release build links it beside the receiver |
 | `DebugDrawerMetricKitPlugin` | MetricKit's metric and diagnostic payloads, kept across launches and listed by date with a summary, each open as formatted JSON to copy or export; a toast and a badge for new ones; re-exports `DebugDrawerMetricKit` |
@@ -3731,7 +3806,7 @@ ContentView()
 | `DebugDrawerAppStateReset` | The receiver capability (`.appStateReset(_:)`) that lets a sidecar reset the categories a production app allows (never the keychain unless it opts in), listed and confirmed by revision, applied on the next foreground; no drawer, so a release build links it beside the receiver |
 | `DebugDrawerAppStateResetPlugin` | The app's state cleared as a fresh install leaves it, by category: UserDefaults, keychain items, the container's files, caches, cookies, the URL cache and the app's own cleanup, each listed before a confirmation, then relaunched on macOS or quit elsewhere; re-exports `DebugDrawerAppStateReset` |
 | `DebugDrawerRemote` | Plugin models served to a viewer on another device over the local network: an opt-in Network.framework server advertised over Bonjour, each viewer paired with a six-digit code the device shows, and the viewer's transport and browser |
-| `DebugDrawerSidecarKit` | A sidecar app, as a library: `DebugDrawerSidecarView` lists the apps in the group that serve a sidecar, opens their sessions (with a grant the company's server gives, when they require one), shows their Console, Network, Bug Reports, Scenarios, Auth, Reset App State, Environment and other model-backed plugins over the socket or the store, and makes and uploads a report of them; iOS, iPadOS and macOS, debug builds |
+| `DebugDrawerSidecarKit` | A sidecar app, as a library: `DebugDrawerSidecarView` lists the apps in the group that serve a sidecar, opens their sessions (with a grant the company's server gives, when they require one), shows their Console, Network, Bug Reports, Scenarios, Auth, Reset App State, Environment, Performance and other model-backed plugins over the socket or the store, and makes and uploads a report of them; iOS, iPadOS and macOS, debug builds |
 
 ## Development
 

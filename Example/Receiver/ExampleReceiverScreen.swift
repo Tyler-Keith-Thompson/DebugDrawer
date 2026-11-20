@@ -1,3 +1,4 @@
+import DebugDrawerHangDetector
 import DebugDrawerLocalization
 import DebugDrawerNetwork
 import DebugDrawerNotifications
@@ -20,6 +21,8 @@ struct ExampleReceiverScreen: View {
     @ObservedObject var diagnostics: DebugDrawerDiagnosticsCapture
     @ObservedObject var backend: ProductionBackend
     @ObservedObject var environments: DebugDrawerEnvironments
+    @ObservedObject var performance: ProductionPerformance
+    @ObservedObject var traces: PerformanceTraces
     @State private var greeting = ProductionTweaks.greeting.value
 
     var body: some View {
@@ -141,6 +144,27 @@ struct ExampleReceiverScreen: View {
                     Label("Capturing diagnostics for a sidecar", systemImage: "record.circle")
                         .accessibilityIdentifier("DiagnosticsCaptureActive")
                 }
+            }
+            Section {
+                Button("Freeze for 2 s", action: performance.freeze)
+                    .accessibilityHint("Keeps the main thread busy for two seconds: a hang a recording sidecar lists with its stack")
+                Button("Load Report") {
+                    Task { await performance.loadReport() }
+                }
+                .accessibilityHint("Loads a report marked as a signpost interval, which a recording sidecar lists with its duration")
+                Text(performance.lastLoad)
+                    .accessibilityIdentifier("PerformanceLastLoad")
+                LabeledContent(
+                    "Recorded",
+                    value: traces.snapshot.isRecording
+                        ? "\(traces.snapshot.stalls.count) stalls, \(traces.snapshot.intervals.count) intervals"
+                        : "Not recording"
+                )
+                .accessibilityIdentifier("PerformanceTracesRecorded")
+            } header: {
+                Text("Performance Traces")
+            } footer: {
+                Text("While a sidecar records, the app watches its main thread; the recording is deleted as the session ends.")
             }
             Section("Bug Reports") {
                 Button("Report a Bug", systemImage: "ladybug", action: host.reportBug)

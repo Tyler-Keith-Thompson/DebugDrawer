@@ -4,6 +4,7 @@
 #if os(macOS) && DEBUG
     import CoreFoundation
     @testable import DebugDrawer
+    import DebugDrawerHangDetector
     @testable import DebugDrawerHangDetectorPlugin
     import Foundation
     import Testing

@@ -4,6 +4,7 @@
 # Performance/, which the root BUILD.bazel cannot find from the directory layout alone.
 PERFORMANCE_TEST_PACKAGES = [
     "Tests/DebugDrawerHangDetectorPluginTests",
+    "Tests/DebugDrawerHangDetectorTests",
     "Tests/DebugDrawerLeakDetectorPluginTests",
     "Tests/DebugDrawerMetricKitPluginTests",
     "Tests/DebugDrawerPermissionsPluginTests",
