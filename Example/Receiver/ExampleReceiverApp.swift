@@ -7,7 +7,7 @@ import SwiftUI
 // plugin and no interception (`just release-check` builds it optimized). It serves the example
 // sidecar (Example/Sidecar) every capability the library ships: feature flag overrides,
 // experiment overrides, log levels, production-safe tweaks, localization review, accessibility
-// overrides, analytics events, MetricKit payloads and network mocking, within sessions of at most
+// overrides, analytics events, MetricKit payloads, network mocking and diagnostics capture, within sessions of at most
 // 15 minutes that open only with a grant the example's grant server signed. Each capability has
 // something on the screen that changes as the sidecar acts, and the app draws its own indicator
 // while a session is open. `just run sidecar` (iOS) and `just run sidecar macOS` launch it beside
@@ -21,7 +21,7 @@ struct ExampleReceiverApp: App {
         WindowGroup {
             ExampleReceiverScreen(
                 host: host, flags: host.flags, experiments: host.experiments, logging: host.logging, sessions: host.sessions,
-                keeper: host.keeper, mocking: host.mocking
+                keeper: host.keeper, mocking: host.mocking, diagnostics: host.diagnostics
             )
             .localizationReview()
             .accessibilityEnvironmentOverrides()

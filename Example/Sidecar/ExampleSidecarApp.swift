@@ -18,7 +18,7 @@ struct ExampleSidecarApp: App {
                 apps: DebugDrawerSidecarAppList(storeDirectory: ExampleSidecarStore.directory),
                 plugins: [
                     .featureFlagOverrides, .experimentOverrides, .logLevels, .tweaks, .localizationReview, .accessibilityEnvironment,
-                    .analyticsEvents, .metricKitPayloads, .networkMocking, .console, .network
+                    .analyticsEvents, .metricKitPayloads, .networkMocking, .diagnosticsCapture, .console, .network
                 ]
             ) { app in
                 try ExampleGrantServer.grant(for: app)

@@ -76,7 +76,7 @@ MODULES = [
     # The one module a release build may link (the charter's D6 and D9): UI-less, and real in every
     # build. Core depends on it for the wire format, the plugin model and the sidecar's sessions,
     # and re-exports it, so `import DebugDrawer` still sees them.
-    ("DebugDrawerReceiver", "Core", "The release-build sidecar receiver: serves a sidecar app, over the app group's store, only the capabilities the host enables (feature flag and experiment overrides, log level elevation, or any plugin model), within sessions the sidecar opens, refusing and auditing everything else; UI-less, with no interception.", []),
+    ("DebugDrawerReceiver", "Core", "The release-build sidecar receiver: serves a sidecar app, over the app group's store, only the capabilities the host enables (feature flag and experiment overrides, log level elevation, diagnostics capture, or any plugin model), within sessions the sidecar opens, refusing and auditing everything else; UI-less, with no interception.", []),
     ("DebugDrawer", "Core", "The drawer: its window, the plugin protocol and registry, the views plugins are built from, and release-build stand-ins.", ["DebugDrawerReceiver"]),
     # Capabilities: a plugin's UI-free half that a release build links beside the receiver (the
     # charter's D9), real in every build, with no drawer. Each depends on the receiver alone, and its

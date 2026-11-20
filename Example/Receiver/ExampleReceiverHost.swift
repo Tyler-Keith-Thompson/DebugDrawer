@@ -14,7 +14,8 @@ import os
 /// The production host's side of the sidecar, made once at launch: the receiver serving every
 /// capability the library ships, sessions that need a grant signed by the example's grant server
 /// (Example/Sidecar's stand-in for a company's), the keeper that holds the app running while a
-/// session is open, and the session whose requests a sidecar may mock.
+/// session is open, the session whose requests a sidecar may mock, and the diagnostics capture the
+/// app hands its log lines and requests.
 ///
 /// Everything here is in the release build too: a production app links the receiver and the
 /// capability modules, never the drawer.
@@ -32,6 +33,8 @@ final class ExampleReceiverHost: ObservableObject {
     /// activity on the Mac.
     let keeper: DebugDrawerBackgroundKeeper
     let mocking: NetworkMocking
+    /// What the app logs and sends, captured for a sidecar that starts it in its session.
+    let diagnostics: DebugDrawerDiagnosticsCapture
     /// Where the store is, as the screen says it.
     let storeSummary = ExampleSidecarStore.summary
     /// Why the receiver isn't serving, when it isn't.
@@ -67,6 +70,7 @@ final class ExampleReceiverHost: ObservableObject {
         )
         let receiver = DebugDrawerReceiver(directory: ExampleSidecarStore.directory, sessions: sessions)
         let mocking = NetworkMocking(sessions: sessions, allowedHosts: [.exact("api.example.com")])
+        let diagnostics = DebugDrawerDiagnosticsCapture(sessions: sessions)
         receiver.enable(.featureFlagOverrides(flags))
         receiver.enable(.experimentOverrides(experiments))
         receiver.enable(.logLevels(logging))
@@ -76,6 +80,7 @@ final class ExampleReceiverHost: ObservableObject {
         receiver.enable(.analyticsEvents(sessions: sessions))
         receiver.enable(.metricKitPayloads(sessions: sessions))
         receiver.enable(.networkMocking(mocking))
+        receiver.enable(.diagnosticsCapture(diagnostics))
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [NetworkMockingURLProtocol.self] + (configuration.protocolClasses ?? [])
         self.flags = flags
@@ -84,6 +89,7 @@ final class ExampleReceiverHost: ObservableObject {
         self.sessions = sessions
         self.receiver = receiver
         self.mocking = mocking
+        self.diagnostics = diagnostics
         keeper = DebugDrawerBackgroundKeeper(sessions: sessions)
         apiSession = URLSession(configuration: configuration)
         // The audit log goes to the app's own log, as a host would forward it to its own.
@@ -101,15 +107,35 @@ final class ExampleReceiverHost: ObservableObject {
 
     /// Sends the app's own request, which a sidecar's rule answers during its session; without
     /// one it goes to the network, where api.example.com doesn't answer.
+    ///
+    /// The request and its outcome go to the diagnostics capture, which keeps them, the token
+    /// redacted, while a sidecar captures.
     func fetchGreeting() async {
         greetingResponse = "Fetching…"
+        var request = URLRequest(url: Self.greetingURL)
+        request.setValue("Bearer example-token", forHTTPHeaderField: "Authorization")
+        let started = Date()
         do {
-            let (data, response) = try await apiSession.data(from: Self.greetingURL)
+            let (data, response) = try await apiSession.data(for: request)
+            diagnostics.record(request, response: response, body: data, started: started)
             let status = (response as? HTTPURLResponse)?.statusCode ?? 0
             greetingResponse = "\(status): \(String(bytes: data, encoding: .utf8) ?? "\(data.count) bytes")"
         } catch {
+            diagnostics.record(request, error: error, started: started)
             greetingResponse = "Failed: \(error.localizedDescription)"
         }
+    }
+
+    /// Logs a sign-in as the app's logger would, to os_log and, through the logger's backend, to
+    /// the diagnostics capture, which keeps it with the email address redacted while a sidecar
+    /// captures.
+    func logSignIn() {
+        let customer = "jane@example.com"
+        Self.logger.notice("Signed in \(customer, privacy: .private)")
+        diagnostics.log(
+            level: .notice, message: "Signed in \(customer)", metadata: ["screen": "checkout", "session_id": "s-1042"],
+            subsystem: "com.debugdrawer.example.receiver", category: "Account"
+        )
     }
 
     /// Records an analytics event as the app hands it to its analytics service: mirrored, with

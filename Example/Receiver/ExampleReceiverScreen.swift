@@ -13,6 +13,7 @@ struct ExampleReceiverScreen: View {
     @ObservedObject var sessions: DebugDrawerSessions
     @ObservedObject var keeper: DebugDrawerBackgroundKeeper
     @ObservedObject var mocking: NetworkMocking
+    @ObservedObject var diagnostics: DebugDrawerDiagnosticsCapture
     @State private var greeting = ProductionTweaks.greeting.value
 
     var body: some View {
@@ -75,6 +76,21 @@ struct ExampleReceiverScreen: View {
                 if mocking.snapshot.isActive {
                     Label("Network mocking active", systemImage: "network.badge.shield.half.filled")
                         .accessibilityIdentifier("NetworkMockingActive")
+                }
+            }
+            Section("Diagnostics Capture") {
+                Button("Log Sign-In", action: host.logSignIn)
+                    .accessibilityHint("Logs a line with the customer's email, which a capturing sidecar sees redacted")
+                LabeledContent(
+                    "Captured",
+                    value: diagnostics.snapshot.isCapturing
+                        ? "\(diagnostics.snapshot.lines.count) lines, \(diagnostics.snapshot.requests.count) requests"
+                        : "Not capturing"
+                )
+                .accessibilityIdentifier("DiagnosticsCaptured")
+                if diagnostics.snapshot.isCapturing {
+                    Label("Capturing diagnostics for a sidecar", systemImage: "record.circle")
+                        .accessibilityIdentifier("DiagnosticsCaptureActive")
                 }
             }
             Section {

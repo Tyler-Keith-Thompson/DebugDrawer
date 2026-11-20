@@ -69,6 +69,7 @@ extension DebugDrawerReceiver {
     }
 
     func enable(_ capability: DebugDrawerReceiverCapability, gate: (@MainActor () -> Bool)?) {
+        capability.enabled?(layout.snapshotFile(for: capability.id))
         capabilities[capability.id] = capability
         capabilityGates[capability.id] = gate
         paused.remove(capability.id)
