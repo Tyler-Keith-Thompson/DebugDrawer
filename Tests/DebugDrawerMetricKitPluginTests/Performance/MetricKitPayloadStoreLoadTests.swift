@@ -2,6 +2,7 @@
 // measured there; `--config=release` builds this target without it, and runs ReleaseInstallTests
 // instead.
 #if DEBUG
+    import DebugDrawerMetricKit
     @testable import DebugDrawerMetricKitPlugin
     import Foundation
     import Testing

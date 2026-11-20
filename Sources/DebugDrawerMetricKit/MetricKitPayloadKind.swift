@@ -1,7 +1,7 @@
 /// Which of MetricKit's two payloads one is.
 ///
-/// The type exists in every build, so ``MetricKitPayloads/add(json:kind:)`` compiles unchanged in
-/// release.
+/// Real in every build: `MetricKitPayloads.add(json:kind:)` takes it, and so does a payload the
+/// receiver's capability serves a sidecar (``MetricKitPayloadsMirror/Payload``).
 public enum MetricKitPayloadKind: String, Codable, Sendable {
     /// An `MXMetricPayload`: a day's metrics (launch times, hangs, disk writes, memory, energy).
     case metrics

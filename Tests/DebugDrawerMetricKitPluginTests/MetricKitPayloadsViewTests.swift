@@ -1,6 +1,7 @@
 // ViewInspector is linked on Apple platforms only, and the views are tested on the Mac.
 #if os(macOS)
     import DebugDrawer
+    import DebugDrawerMetricKit
     @testable import DebugDrawerMetricKitPlugin
     import Foundation
     import SwiftUI

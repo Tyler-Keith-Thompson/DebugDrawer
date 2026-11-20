@@ -1,12 +1,21 @@
-#if DEBUG && canImport(MetricKit)
+#if canImport(MetricKit)
     import MetricKit
 
+    // MetricKit's own subscriber API is the whole of the capture, in release as in debug: the
+    // system writes the crash and hang diagnostics itself, out of process, and hands them to the
+    // app on a later launch, so nothing in the app intercepts anything (the charter's N1).
+
     /// MetricKit's payloads, as an `MXMetricManager` subscriber. MetricKit delivers to every
-    /// subscriber, so this one coexists with the app's own and with Crash Reports' and Hangs'.
-    final class MetricManagerPayloadSource: NSObject, MetricKitPayloadSource, MXMetricManagerSubscriber {
+    /// subscriber, so this one coexists with the app's own, Crash Reports' and Hangs', and the
+    /// receiver's capability's.
+    package final class MetricManagerPayloadSource: NSObject, MetricKitPayloadSource, MXMetricManagerSubscriber {
         private var receive: (@MainActor ([ReceivedMetricKitPayload]) -> Void)?
 
-        func subscribe(_ receive: @escaping @MainActor ([ReceivedMetricKitPayload]) -> Void) {
+        package override init() {
+            super.init()
+        }
+
+        package func subscribe(_ receive: @escaping @MainActor ([ReceivedMetricKitPayload]) -> Void) {
             let isSubscribed = self.receive != nil
             self.receive = receive
             let manager = MXMetricManager.shared
@@ -17,19 +26,19 @@
             }
         }
 
-        func unsubscribe() {
+        package func unsubscribe() {
             guard receive != nil else { return }
             receive = nil
             MXMetricManager.shared.remove(self)
         }
 
         /// MetricKit calls this on a queue of its own.
-        nonisolated func didReceive(_ payloads: [MXMetricPayload]) {
+        package nonisolated func didReceive(_ payloads: [MXMetricPayload]) {
             deliver(payloads.map(\.received))
         }
 
         /// MetricKit calls this on a queue of its own.
-        nonisolated func didReceive(_ payloads: [MXDiagnosticPayload]) {
+        package nonisolated func didReceive(_ payloads: [MXDiagnosticPayload]) {
             deliver(payloads.map(\.received))
         }
 

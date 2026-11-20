@@ -10,6 +10,7 @@ swift_library(
     module_name = "DebugDrawerMetricKitPlugin",
     deps = [
         "//Sources/DebugDrawer",
+        "//Sources/DebugDrawerMetricKit",
     ],
     visibility = ["//visibility:public"],
 )
@@ -21,6 +22,7 @@ docc_archive(
     catalog = glob(["*.docc/**"], allow_empty = True),
     deps = [
         "//Sources/DebugDrawer:DebugDrawerDocumentation",
+        "//Sources/DebugDrawerMetricKit:DebugDrawerMetricKitDocumentation",
     ],
     tags = ["manual"],
     visibility = ["//visibility:public"],

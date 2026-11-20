@@ -8,7 +8,8 @@ import Foundation
 /// crash diagnostics the system delivers are kept too.
 ///
 /// The type exists in every build, so the install call compiles unchanged in release, where it
-/// installs nothing.
+/// installs nothing. A production app's crashes reach a sidecar through MetricKit instead: the
+/// receiver's `.metricKitPayloads(sessions:)` capability, in `DebugDrawerMetricKit`.
 public enum CrashReports {
     /// Where reports are kept unless `install(directory:)` is given another: a folder in the app's
     /// Application Support directory, named after its bundle identifier, as on macOS that

@@ -1,4 +1,5 @@
 #if DEBUG
+    import DebugDrawerMetricKit
     import Foundation
 
     /// One payload MetricKit delivered: its kind, the period it covers, when it arrived, and its

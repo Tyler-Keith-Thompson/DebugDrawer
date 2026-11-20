@@ -1190,6 +1190,10 @@ On macOS, AppKit catches an exception raised on the main thread while it handles
 it and carries on, so no uncaught exception reaches the handler; set the
 `NSApplicationCrashOnExceptions` default to `true` to have the app crash, and be recorded, instead.
 
+A release build installs no handlers. To get a production app's crashes, such as a dogfooder's,
+let the receiver forward MetricKit's crash diagnostics to a sidecar: see "Crash reports and
+MetricKit payloads in production" under "Production builds: the receiver".
+
 ### Hangs: the main thread, stuck
 
 A hang is the main thread going too long without turning its run loop, so the app can't draw or
@@ -1306,6 +1310,10 @@ period it covers and a line of what it holds (`App 1.2 (34) · 9 metric groups`,
 each new one. Opening one shows its JSON, indented with sorted keys and selectable, with Copy JSON
 and Export, which shares it as a `.json` file, and marks it seen. Mark All Seen clears the badge,
 and each payload can be deleted, or all of them. A bug report carries every payload as a JSON file.
+
+`MetricKitPayloadKind` and the subscriber live in `DebugDrawerMetricKit`, a UI-free module the
+plugin re-exports, which a release build can link beside the receiver to forward payloads to a
+sidecar ("Crash reports and MetricKit payloads in production", below).
 
 ### Permissions: why the camera doesn't work
 
@@ -2203,8 +2211,9 @@ drawer's registry and servers are stand-ins that never reach them, so only a
 A release build gets none of the drawer. To let an employee-only sidecar app reach a production
 app, the app links one more product, `DebugDrawerReceiver`: UI-less, with no interception, no
 plugin and no dependency on the drawer (and, to offer tweaks, `DebugDrawerTweaks`, to mirror
-analytics events, `DebugDrawerAnalytics`, or for translators and accessibility reviewers,
-`DebugDrawerLocalization` and `DebugDrawerAccessibility`, below). It serves a sidecar, over the app group's store, only the
+analytics events, `DebugDrawerAnalytics`, for translators and accessibility reviewers,
+`DebugDrawerLocalization` and `DebugDrawerAccessibility`, or to forward crash reports and
+MetricKit payloads, `DebugDrawerMetricKit`, below). It serves a sidecar, over the app group's store, only the
 capabilities the app enables, within sessions the sidecar opens, and refuses everything else:
 
 ```swift
@@ -2453,6 +2462,56 @@ struct ReviewedRoot: View {
   modifiers and the settable keys previews use, so a view that reads them, and every text style,
   follows. UIKit and AppKit views read the system's settings and don't see the overrides.
 
+**Crash reports and MetricKit payloads in production.** A dogfooder's crash can reach the team
+through the sidecar, without a crash SDK's dashboard: the app keeps the MetricKit payloads it
+receives, crash diagnostics among them, and serves them to the sidecar's next session. It is off
+unless the app enables it. Link `DebugDrawerMetricKit` (`.product(name: "DebugDrawerMetricKit",
+package: "DebugDrawer")`) beside the receiver, the UI-free half of the MetricKit plugin, and enable
+the capability:
+
+```swift
+import DebugDrawerMetricKit
+import DebugDrawerReceiver
+
+@MainActor
+final class ProductionDiagnostics {
+    let sessions = DebugDrawerSessions(maximumDuration: 15 * 60)
+    let receiver: DebugDrawerReceiver
+
+    init(container: URL) throws {
+        receiver = DebugDrawerReceiver(directory: container.appending(path: "DebugDrawer"), sessions: sessions)
+        receiver.enable(.metricKitPayloads(sessions: sessions))
+        try receiver.start()
+    }
+}
+```
+
+- **MetricKit alone captures.** Making the capability subscribes to `MXMetricManager`, and nothing
+  else: no signal or exception handler is installed in the build that ships, so a crash SDK the
+  app uses is undisturbed. The system writes a crash's `MXCrashDiagnostic` itself and delivers it
+  in a diagnostic payload on a later launch (on the next one, from iOS 15 and macOS 12), with
+  hangs, CPU and disk-write exceptions and slow launches; the day's metrics arrive about once a
+  day. The payloads MetricKit still holds from before are kept as the capability is made.
+- **Kept in the app, served during a session.** Each payload is kept once (the same kind and JSON
+  delivered again adds nothing), the newest ten (`capacity:`), in the app's own Application
+  Support directory (`directory:`), not the app group's, so a crash that arrives before anyone
+  opens a session waits there across launches. The sidecar connects to
+  `MetricKitPayloadsMirror.pluginID`; its `MetricKitPayloadsMirror.Snapshot` holds the open
+  session's ID and every payload kept, the latest period first, each with its ID (the same in
+  every session), kind (`.metrics` or `.diagnostics`, where a crash is in `crashDiagnostics`),
+  period, arrival and JSON. While no session is open it holds none, and it empties as the session
+  ends or expires. Within a session `MetricKitPayloadsMirror.Command.delete(id:)` and `deleteAll`
+  delete the app's copies, such as once the sidecar has sent them on, and MetricKit delivering one
+  again doesn't bring it back.
+- **Bounded.** A payload whose JSON is larger than a megabyte once redacted is dropped, so the
+  snapshot holds at most a megabyte per payload of its capacity.
+- **Redacted in the app.** MetricKit's payloads are the system's measurements: numbers,
+  histograms, stack frames and system text. The one place the app's own data lands in them is an
+  Objective-C exception's reason, so `MetricKitRedaction.standard` masks its `composedMessage` and
+  `arguments`, at any depth, before the payload is kept anywhere, and keeps its `formatString`,
+  the code's own text. `adding(keys:)` masks more of MetricKit's keys (matched exactly, as MetricKit
+  spells them), and `.none` keeps payloads whole. A masked value becomes `"[REDACTED]"`.
+
 In a debug build the receiver runs beside the drawer: show the same model in a plugin through
 `DebugDrawerPluginTransport.direct(to:)`, and pass it to `.featureFlagOverrides(_:)` or
 `.model(_:id:scope:)`, so what a sidecar does is seen in the app's own drawer. `DebugDrawer`
@@ -2671,7 +2730,8 @@ ContentView()
 | `DebugDrawerCrashReportsPlugin` | Uncaught exceptions and fatal signals, handed on to the app's other crash handlers, shown on the next launch with a badge and stack trace; MetricKit crash diagnostics too |
 | `DebugDrawerHangDetectorPlugin` | Main-thread hangs over a threshold the drawer can change, each with its duration and the stack it was stuck on, a toast and a badge; MetricKit hang diagnostics too |
 | `DebugDrawerLeakDetectorPlugin` | View controllers still alive a run-loop turn after their screen was dismissed, and opted-in classes with more live instances than allowed, by class with a count, a toast and a badge |
-| `DebugDrawerMetricKitPlugin` | MetricKit's metric and diagnostic payloads, kept across launches and listed by date with a summary, each open as formatted JSON to copy or export; a toast and a badge for new ones |
+| `DebugDrawerMetricKit` | MetricKit's payload kinds and subscriber, real in every build, and the receiver capability (`.metricKitPayloads(sessions:directory:redaction:capacity:)`) that keeps the payloads the app receives, crash diagnostics among them, redacted by `MetricKitRedaction` and across launches, and serves them while a sidecar's session is open; UI-free, so a release build links it beside the receiver |
+| `DebugDrawerMetricKitPlugin` | MetricKit's metric and diagnostic payloads, kept across launches and listed by date with a summary, each open as formatted JSON to copy or export; a toast and a badge for new ones; re-exports `DebugDrawerMetricKit` |
 | `DebugDrawerPermissionsPlugin` | Every privacy permission the app declares in its Info.plist, with its live status, a button that asks when it is undecided and one that opens Settings |
 | `DebugDrawerNotificationsPlugin` | The APNs device token to copy, notification authorization and settings, pending and delivered notifications to inspect and remove, and a pasted APNs payload sent as a local notification |
 | `DebugDrawerBackgroundTasksPlugin` | The BGTaskScheduler identifiers the Info.plist permits and the pending task requests, with their kind and earliest begin date, each cancellable; a request scheduled on demand, and the LLDB commands that simulate a launch or an expiration |

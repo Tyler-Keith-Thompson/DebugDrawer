@@ -1,4 +1,5 @@
 #if DEBUG
+    import DebugDrawerMetricKit
     import Foundation
 
     /// What a payload holds, read from its JSON: for metrics, the app's version and how many

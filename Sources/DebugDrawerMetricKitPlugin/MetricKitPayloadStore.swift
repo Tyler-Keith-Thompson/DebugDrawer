@@ -1,6 +1,7 @@
 #if DEBUG
     import Combine
     import DebugDrawer
+    import DebugDrawerMetricKit
     import Foundation
 
     /// The payloads kept in a directory, one JSON file each, the newest ``limit`` kept, so the

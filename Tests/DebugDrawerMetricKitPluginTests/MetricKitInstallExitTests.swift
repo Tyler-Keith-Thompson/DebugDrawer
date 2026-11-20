@@ -4,6 +4,7 @@
 // core alone.
 #if os(macOS) && DEBUG
     import DebugDrawer
+    import DebugDrawerMetricKit
     @testable import DebugDrawerMetricKitPlugin
     import Foundation
     import Testing

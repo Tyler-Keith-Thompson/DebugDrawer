@@ -1,5 +1,6 @@
 #if DEBUG
     import DebugDrawer
+    import DebugDrawerMetricKit
     import Foundation
 
     /// What `MetricKitPayloads.install(directory:)` and `add(json:kind:)` do in debug builds, and

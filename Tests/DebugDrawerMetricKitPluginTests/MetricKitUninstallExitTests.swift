@@ -3,6 +3,7 @@
 // own, as exit tests need one.
 #if os(macOS) && DEBUG
     @testable import DebugDrawer
+    import DebugDrawerMetricKit
     @testable import DebugDrawerMetricKitPlugin
     import Foundation
     import Testing

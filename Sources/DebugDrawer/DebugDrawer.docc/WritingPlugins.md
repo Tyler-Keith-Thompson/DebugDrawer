@@ -521,7 +521,11 @@ it draws nothing: `DebugDrawerAccessibility` holds `.accessibilityEnvironmentOve
 the receiver and the same-named modifier for the host's root view. Both are session-scoped, with
 no scope to choose. A model that follows the sessions this
 way keeps nothing from before a session or after it, and redacts on the way in, since its snapshot
-is written to the store as it is. The receiver's module holds
+is written to the store as it is. Data that arrives before any session can, such as a crash's
+MetricKit diagnostic on a later launch, is kept in the app's own storage instead and put in the
+snapshot only while a session is open: `DebugDrawerMetricKit` holds the MetricKit subscriber and
+`.metricKitPayloads(sessions:directory:redaction:capacity:)`, which captures through MetricKit
+alone, never a crash handler, so nothing intercepts in the build that ships. The receiver's module holds
 `DebugDrawerPluginModel`, the sessions and the store's wire format, real in every build, and
 `DebugDrawer` re-exports it; it serves no socket and holds no view. The README's "Production
 builds: the receiver" shows the setup.

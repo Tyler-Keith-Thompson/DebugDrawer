@@ -1,4 +1,5 @@
 #if DEBUG
+    import DebugDrawerMetricKit
     @testable import DebugDrawerMetricKitPlugin
     import Foundation
     import Testing

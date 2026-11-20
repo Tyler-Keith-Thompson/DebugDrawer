@@ -1,3 +1,4 @@
+import DebugDrawerMetricKit
 import Foundation
 
 /// MetricKit's payloads in the debug drawer: the daily metrics and the diagnostics the system
