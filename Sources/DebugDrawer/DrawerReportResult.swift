@@ -4,9 +4,9 @@
     /// What the drawer shows under its header after Create Report: progress, the finished zip
     /// with a share button (and Send Report when the app set an uploader), the upload's progress
     /// and outcome, or why the report failed, with a button that dismisses it.
-    struct DrawerReportResult: View {
+    package struct DrawerReportResult: View {
         /// Where the report is.
-        enum State: Equatable {
+        package enum State: Equatable {
             /// Being written.
             case creating
             /// Written to this zip.
@@ -21,7 +21,7 @@
             case uploadFailed(URL, reason: String)
 
             /// The report is being written or sent: it can't be dismissed, and another can't be started.
-            var isInProgress: Bool {
+            package var isInProgress: Bool {
                 switch self {
                 case .creating, .uploading: true
                 case .ready, .sent, .failed, .uploadFailed: false
@@ -34,7 +34,17 @@
         var send: ((URL) -> Void)?
         let dismiss: () -> Void
 
-        var body: some View {
+        /// - Parameters:
+        ///   - state: Where the report is.
+        ///   - send: Sends the zip; nil hides Send Report and Retry.
+        ///   - dismiss: Dismisses the result.
+        package init(state: State, send: ((URL) -> Void)? = nil, dismiss: @escaping () -> Void) {
+            self.state = state
+            self.send = send
+            self.dismiss = dismiss
+        }
+
+        package var body: some View {
             // The detail gets a line of its own, the panel's full width: a report's file name is
             // too long to share a row with the buttons.
             VStack(alignment: .leading, spacing: 0) {

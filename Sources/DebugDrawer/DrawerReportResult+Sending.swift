@@ -6,7 +6,7 @@
         /// 0, uploading at every fraction the uploader reports, then sent, or upload failed with
         /// the uploader's error. The archive is left on disk either way, so a failure can be retried.
         @MainActor
-        static func send(_ archive: URL, with uploader: some DebugDrawerReportUploader, update: (Self) -> Void) async {
+        package static func send(_ archive: URL, with uploader: some DebugDrawerReportUploader, update: (Self) -> Void) async {
             update(.uploading(archive, progress: 0))
             // The uploader reports progress from any thread; a stream brings each fraction to the
             // main actor in order, and it finishes before the outcome is mapped, so a late

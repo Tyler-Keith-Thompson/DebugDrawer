@@ -2,17 +2,27 @@
     import Foundation
 
     /// What a bug report's `summary.txt` says about the app and the device it ran on.
-    struct ReportSummary: Equatable {
-        var appName: String
-        var bundleID: String
-        var version: String
-        var build: String
-        var operatingSystem: String
-        var deviceModel: String
-        var date: Date
+    package struct ReportSummary: Equatable {
+        package var appName: String
+        package var bundleID: String
+        package var version: String
+        package var build: String
+        package var operatingSystem: String
+        package var deviceModel: String
+        package var date: Date
+
+        package init(appName: String, bundleID: String, version: String, build: String, operatingSystem: String, deviceModel: String, date: Date) {
+            self.appName = appName
+            self.bundleID = bundleID
+            self.version = version
+            self.build = build
+            self.operatingSystem = operatingSystem
+            self.deviceModel = deviceModel
+            self.date = date
+        }
 
         /// The running app, this process and this device, at `date`.
-        static func current(at date: Date, bundle: Bundle = .main, process: ProcessInfo = .processInfo) -> ReportSummary {
+        package static func current(at date: Date, bundle: Bundle = .main, process: ProcessInfo = .processInfo) -> ReportSummary {
             ReportSummary(
                 appName: bundle.object(forInfoDictionaryKey: "CFBundleName") as? String ?? process.processName,
                 bundleID: bundle.bundleIdentifier ?? "—",

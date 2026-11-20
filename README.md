@@ -2754,6 +2754,64 @@ receiver makes it with `DebugDrawerBackgroundKeeper(sessions: receiver.sessions)
 socket server to pass), and it holds a request only while a session is open, which the receiver
 allows only for the capabilities the host enables.
 
+### Building a sidecar app with the kit
+
+`DebugDrawerSidecarKit` is the sidecar app, as a library: a company builds its own app from it,
+under its own name, signing and app group, rather than installing one DebugDrawer ships. One view
+is the whole app:
+
+```swift
+import DebugDrawerSidecarKit
+import SwiftUI
+
+@main
+struct CompanySidecar: App {
+    var body: some Scene {
+        WindowGroup {
+            DebugDrawerSidecarView(groupIdentifier: "group.com.example.debug")
+        }
+    }
+}
+```
+
+The sidecar app and the apps it reaches list the same group in their
+`com.apple.security.application-groups` entitlement and keep their store in its `DebugDrawer`
+folder (`DebugDrawerAppGroupContainer.storeDirectory`). The view's sidebar lists every app there
+that serves a sidecar: a release build running `DebugDrawerReceiver`, or a debug build running
+`DebugDrawerAppGroupStoreServer`, each with its name, version, build and bundle ID. Each writes a
+presence file (`<store>/presence/<bundle ID>.json`) as it starts, rewrites it as the capabilities it
+serves change and as it comes to the foreground, and removes it as it stops; the list watches the
+folder and changes as the files do, with no polling. An app that was killed stays listed, with when
+it was last seen. An app whose host has turned its receiver off (`DebugDrawerReceiver.isAllowed`)
+stays listed as turned off, serving nothing.
+
+Picking an app connects to it with `DebugDrawerSidecarTransport`: live over its socket while it
+answers, through the store while it is suspended. For an app whose commands need a session (it
+serves `DebugDrawer.Sessions`), the detail shows the session's state with Open Session and End
+Session. When its sessions require a signed grant, pass `grant`, which fetches one from the
+company's server for the app picked; what it throws is shown, and no session opens:
+
+```swift
+DebugDrawerSidecarView(groupIdentifier: "group.com.example.debug", sessionDuration: 10 * 60) { app in
+    try await GrantService.shared.grant(for: app.bundleIdentifier)
+}
+```
+
+Below it, a picker shows the plugins the app serves, drawn by the plugins' own views over the
+transport: `.console` and `.network` by default. A plugin of your own whose model adopts
+`DebugDrawerPluginModel` joins them with `DebugDrawerSidecarPlugin(id:title:icon:snapshot:command:plugin:)`,
+whose closure makes the plugin's view over the transport the kit hands it. Create Report writes the
+hosted plugins' report contributions, redacted by `DebugDrawer.shared.redaction`, under a summary
+naming the app picked, and offers Share; with `DebugDrawer.shared.reportUploader` set, Send Report
+uploads it, as in the drawer.
+
+For a layout of your own, the pieces are public: `DebugDrawerSidecarAppList` (the apps, as they
+come and go), `DebugDrawerSidecarConnection` (one app: its channel, sessions, hosted plugins and
+`createReport(redaction:in:)`) and `DebugDrawerSidecarApp`. The kit builds for iOS, iPadOS and macOS,
+in debug builds: like the transports it is built on, a release build gets stand-ins that list no
+app, so archive a TestFlight sidecar in the Debug configuration. `Example/Sidecar` is the example's
+sidecar app (`just run sidecar`, beside `just run iOS`).
+
 ### What the plugins need from the app
 
 No plugin needs an Info.plist key or an entitlement to install. Some of what they show depends on
@@ -2923,6 +2981,7 @@ ContentView()
 | `DebugDrawerColorVisionPlugin` | Protanopia, deuteranopia, tritanopia and grayscale simulated live over the views marked `.debugColorVision()`, in linear RGB with Machado et al.'s matrices, picked in the drawer or cycled from the HUD, while the drawer keeps its colors |
 | `DebugDrawerAppStateResetPlugin` | The app's state cleared as a fresh install leaves it, by category: UserDefaults, keychain items, the container's files, caches, cookies, the URL cache and the app's own cleanup, each listed before a confirmation, then relaunched on macOS or quit elsewhere |
 | `DebugDrawerRemote` | Plugin models served to a viewer on another device over the local network: an opt-in Network.framework server advertised over Bonjour, each viewer paired with a six-digit code the device shows, and the viewer's transport and browser |
+| `DebugDrawerSidecarKit` | A sidecar app, as a library: `DebugDrawerSidecarView` lists the apps in the group that serve a sidecar, opens their sessions (with a grant the company's server gives, when they require one), shows their Console, Network and other model-backed plugins over the socket or the store, and makes and uploads a report of them; iOS, iPadOS and macOS, debug builds |
 
 ## Development
 

@@ -62,6 +62,7 @@ extension DebugDrawerReceiver {
         capabilities[capability.id] = capability
         capabilityGates[capability.id] = gate
         paused.remove(capability.id)
+        defer { presence?.update(capabilities: servedIDs) }
         guard isRunning else { return }
         if servesSnapshot(of: capability.id) {
             serve(capability.id, capability.snapshots())
@@ -110,6 +111,8 @@ extension DebugDrawerReceiver {
                 pause(id)
             }
         }
+        // The app's presence lists only what is served now: nothing while the receiver is off.
+        presence?.update(capabilities: servedIDs)
     }
 
     /// Stops writing `id`'s snapshot and removes its file from the store.

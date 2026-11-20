@@ -4,9 +4,16 @@ import Foundation
 extension NetworkPlugin: DebugDrawerReportContributor {
     /// Adds every captured request and WebSocket connection as `network.har`, and the newest
     /// session an earlier launch kept as `network-previous.har`: after a crash, the requests
-    /// that led up to it. Release builds capture nothing, so it adds nothing there.
+    /// that led up to it. A plugin over a transport adds the requests and connections its latest
+    /// snapshot captured, as `network.har`. Release builds capture nothing, so it adds nothing
+    /// there.
     public func contribute(to report: inout DebugDrawerReport, redaction: DebugDrawerRedaction) {
         #if DEBUG
+            if let transport {
+                let log = transport.snapshot.log
+                Self.contribute(log.captured, webSockets: log.webSockets, to: &report, redaction: redaction)
+                return
+            }
             let store = (model ?? .shared).store
             Self.contribute(store.entries, webSockets: store.webSockets, to: &report, redaction: redaction)
             // Read here, on the main actor, as the report is built now: a session is at most the

@@ -17,24 +17,50 @@ public struct ConsolePlugin: DebugDrawerPlugin {
     #if DEBUG
         /// The model the plugin shows, or `nil` for the shared one.
         let model: ConsoleModel?
+        /// The transport the plugin draws from, in place of a model in this process: a model in
+        /// another app's, such as a sidecar's view of the app.
+        let transport: DebugDrawerPluginTransport<ConsoleSnapshot, ConsoleCommand>?
 
         /// The plugin over ``ConsoleModel/shared``, whose store `installConsole()` sets up.
         public init() {
             model = nil
+            transport = nil
         }
 
         /// - Parameter model: The model to show, in place of the shared one; its store gets the
         ///   captured lines while a drawer holding this plugin is the latest to have installed it.
         init(model: ConsoleModel) {
             self.model = model
+            transport = nil
+        }
+
+        /// The plugin over `transport`: it shows the lines of the model at its other end, usually
+        /// in another process, and sends it the filter and the other commands. Installing it
+        /// captures nothing, and its report holds the lines the console's filter passes.
+        ///
+        /// ```swift
+        /// let console = try await sidecar.connect(toPlugin: ConsolePlugin().id, snapshot: ConsoleSnapshot.self, command: ConsoleCommand.self)
+        /// let plugin = ConsolePlugin(transport: console)
+        /// ```
+        ///
+        /// - Parameter transport: The transport to the app's ``ConsoleModel``, as a
+        ///   `DebugDrawerTransport` hands it out.
+        public init(transport: DebugDrawerPluginTransport<ConsoleSnapshot, ConsoleCommand>) {
+            model = nil
+            self.transport = transport
         }
     #else
         public init() {}
+
+        /// The plugin over `transport`; release builds draw nothing.
+        ///
+        /// - Parameter transport: Ignored.
+        public init(transport: DebugDrawerPluginTransport<ConsoleSnapshot, ConsoleCommand>) {}
     #endif
 
     public var body: some View {
         #if DEBUG
-            ConsolePluginView(transport: .direct(to: model ?? .shared))
+            ConsolePluginView(transport: transport ?? .direct(to: model ?? .shared))
         #else
             EmptyView()
         #endif
@@ -43,7 +69,7 @@ public struct ConsolePlugin: DebugDrawerPlugin {
     /// How many lines the console holds.
     public var headerAccessory: some View {
         #if DEBUG
-            ConsoleHeaderAccessoryView(transport: .direct(to: model ?? .shared))
+            ConsoleHeaderAccessoryView(transport: transport ?? .direct(to: model ?? .shared))
         #else
             EmptyView()
         #endif
@@ -55,6 +81,8 @@ public struct ConsolePlugin: DebugDrawerPlugin {
     /// once that one removes it. Release builds capture nothing.
     @MainActor public func install(in drawer: DebugDrawer) {
         #if DEBUG
+            // A plugin over a transport shows another process's lines: nothing here to capture.
+            guard transport == nil else { return }
             (model ?? .shared).store.install(in: ObjectIdentifier(drawer))
         #endif
     }
@@ -66,6 +94,7 @@ public struct ConsolePlugin: DebugDrawerPlugin {
     /// Earlier sessions on disk and the mutes stay.
     @MainActor public func uninstall(from drawer: DebugDrawer) {
         #if DEBUG
+            guard transport == nil else { return }
             (model ?? .shared).store.uninstall(from: ObjectIdentifier(drawer))
         #endif
     }

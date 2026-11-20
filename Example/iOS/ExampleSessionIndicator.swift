@@ -1,12 +1,17 @@
 import DebugDrawer
+import DebugDrawerConsolePlugin
+import DebugDrawerNetworkPlugin
 import ExampleTestBench
 import SwiftUI
 
 extension View {
     /// Serves a sidecar's sessions through the app group's store (the test bench's Sidecar Session
-    /// actions play the sidecar; -RunTestBench sidecar.open opens one at launch), and shows
+    /// actions play the sidecar; -RunTestBench sidecar.open opens one at launch), with the Console
+    /// and Network models for the example sidecar app (Example/Sidecar) to show, and shows
     /// ``ExampleSessionIndicator`` along the bottom, above the app's content, while one is open.
     func sidecarSessionIndicator() -> some View {
+        ExampleSidecar.offer(ConsoleModel.shared, id: ConsolePlugin().id)
+        ExampleSidecar.offer(NetworkModel.shared, id: NetworkPlugin().id)
         ExampleSidecar.install()
         return safeAreaInset(edge: .bottom, spacing: 0) {
             ExampleSessionIndicator(sessions: ExampleSidecar.sessions, logLevel: ExampleSidecar.logLevel, keeper: ExampleSidecar.keeper)

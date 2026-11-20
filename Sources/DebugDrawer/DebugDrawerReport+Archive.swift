@@ -2,14 +2,17 @@ import Foundation
 
 extension DebugDrawerReport {
     /// Thrown when the report can't be written or zipped; nothing is left in the destination.
-    public struct WriteFailed: Error, Equatable {}
+    public struct WriteFailed: Error, Equatable {
+        /// For the modules that write a report too (the sidecar kit), and its release stand-in.
+        package init() {}
+    }
 }
 
 #if DEBUG
     extension DebugDrawerReport {
         /// The report of every plugin in `plugins` that adopts ``DebugDrawerReportContributor``,
         /// each in a folder named after its title; the others are left out.
-        @MainActor init(contributionsOf plugins: [AnyDebugDrawerPlugin], redaction: DebugDrawerRedaction) {
+        @MainActor package init(contributionsOf plugins: [AnyDebugDrawerPlugin], redaction: DebugDrawerRedaction) {
             self.init()
             for plugin in plugins where plugin.contributesToReport {
                 var contribution = DebugDrawerReport()
@@ -26,7 +29,7 @@ extension DebugDrawerReport {
         ///
         /// - Returns: The zip's URL.
         /// - Throws: `WriteFailed` when a file can't be written or the folder can't be zipped.
-        func writeArchive(summary: ReportSummary, in directory: URL) throws(WriteFailed) -> URL {
+        package func writeArchive(summary: ReportSummary, in directory: URL) throws(WriteFailed) -> URL {
             // The drawer's own work, which Disk I/O leaves out; through a Result, as binding a
             // task-local value doesn't keep the error's type.
             try DebugDrawerActivity.$isDrawerWork.withValue(true) {

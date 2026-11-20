@@ -52,6 +52,12 @@ import os
         private var watcher: DirectoryWatcher?
         private var performing: Task<Void, Never>?
         private var foregroundObservation: (any NSObjectProtocol)?
+        /// The app's presence file, which lists it in a sidecar's app list, while the server runs,
+        /// and the registry observation that keeps its IDs current.
+        private var presence: PresenceAnnouncement?
+        private var registryObservation: UUID?
+        /// Who the presence file says the app is: the main bundle, unless a test names another app.
+        package var identity = AppPresence.Identity.of(.main)
 
         /// A server of `registry`'s models into `directory`; it writes once started.
         ///
@@ -72,7 +78,9 @@ import os
 
         /// Writes every registered model's snapshot, performs the commands waiting in the store,
         /// and goes on doing both as they change, and as the app comes back to the foreground.
-        /// Does nothing while the server runs.
+        /// It also keeps a presence file in the store's `presence/` directory, the app's bundle
+        /// ID, name, version and build and the IDs it serves, so a sidecar built on
+        /// `DebugDrawerSidecarKit` lists the app. Does nothing while the server runs.
         ///
         /// - Throws: ``DebugDrawerTransportError/accessDenied`` when the system refuses access to
         ///   the store's directories (the app group missing from the app's entitlements, or the
@@ -103,10 +111,26 @@ import os
                     self?.performWaitingCommands()
                 }
             }
+            let presence = PresenceAnnouncement(
+                directory: directory, identity: identity, capabilities: registry.servedIDs, foreground: Self.foreground
+            )
+            // Weak: the registry holds the observer, so a strong capture would keep both alive.
+            registryObservation = registry.observe { [weak registry, weak presence] _ in
+                guard let registry else { return }
+                presence?.update(capabilities: registry.servedIDs)
+            }
+            self.presence = presence
         }
 
-        /// Stops writing snapshots and performing commands. The snapshots written stay in the store.
+        /// Stops writing snapshots and performing commands. The snapshots written stay in the
+        /// store; the app's presence file goes, so a sidecar no longer lists it.
         public func stop() {
+            presence?.withdraw()
+            presence = nil
+            if let registryObservation {
+                registry.removeObserver(registryObservation)
+            }
+            registryObservation = nil
             if let foregroundObservation {
                 NotificationCenter.default.removeObserver(foregroundObservation)
             }
@@ -198,5 +222,14 @@ import os
 
         /// Does nothing.
         public func stop() {}
+    }
+#endif
+
+#if DEBUG
+    extension DebugDrawerModelRegistry {
+        /// The IDs of the models registered, which a presence file lists.
+        fileprivate var servedIDs: [String] {
+            Array(models.keys)
+        }
     }
 #endif

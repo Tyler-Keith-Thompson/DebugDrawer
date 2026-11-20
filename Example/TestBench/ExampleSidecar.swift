@@ -4,8 +4,9 @@ import Foundation
 
 // The example host's side of a sidecar: sessions of at most five minutes, a registry gated by them
 // offering one session-scoped capability (a log level), and an app-group store server for a
-// sidecar app to reach it through. The example ships no sidecar app, so the test bench plays one:
-// its Sidecar Session actions connect to the app's own store with the transport a sidecar uses and
+// sidecar app to reach it through. The example sidecar app (Example/Sidecar) lists the app and
+// shows the models the app offers (`offer(_:id:)`: its Console and Network), and the test bench
+// plays a sidecar too: its Sidecar Session actions connect to the app's own store with the transport a sidecar uses and
 // leave their commands there, so they take the path a sidecar's take, gate included. The iOS
 // examples show an indicator while `sessions.snapshot` is active, styled their own way. The app
 // also serves the socket a sidecar app connects to live, and a background keeper holds the app
@@ -73,7 +74,13 @@ public enum ExampleSidecar {
     private static var storeDirectory: URL {
         let container = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: "group.com.debugdrawer.example")
             ?? URL.cachesDirectory
-        return container.appending(path: "DebugDrawerSidecar", directoryHint: .isDirectory)
+        return container.appending(path: "DebugDrawer", directoryHint: .isDirectory)
+    }
+
+    /// Offers `model` to a sidecar under `id`, to read: a sidecar shows it, and its commands are
+    /// refused, as it is registered without a scope.
+    public static func offer<Model: DebugDrawerPluginModel>(_ model: Model, id: String) {
+        registry.register(model, id: id)
     }
 
     /// Registers the capability, starts serving the store, and forwards the audit log to the

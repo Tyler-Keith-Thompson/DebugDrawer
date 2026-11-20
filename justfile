@@ -304,7 +304,7 @@ VISIONOS_DEVICE := env("VISIONOS_DEVICE", "Apple Vision Pro")
 TVOS_DEVICE := env("TVOS_DEVICE", "Apple TV 4K (4th generation)")
 WATCHOS_DEVICE := env("WATCHOS_DEVICE", "Apple Watch Series 12 (46mm)")
 
-[doc('Build and launch an example app: just run, just run iOS, just run appkit, just run uikit, just run catalyst, just run visionOS, just run tvOS or just run watchOS')]
+[doc('Build and launch an example app: just run, just run iOS, just run appkit, just run uikit, just run sidecar, just run catalyst, just run visionOS, just run tvOS or just run watchOS')]
 run target="macOS" *args="":
     #!/usr/bin/env bash
     set -euo pipefail
@@ -361,6 +361,11 @@ run target="macOS" *args="":
             # The UIKit-only iOS example: no SwiftUI root, the test bench behind its Test Bench button.
             {{BAZEL}} run //Example:ExampleApp_iOSUIKit
             ;;
+        sidecar|Sidecar)
+            # The example sidecar app, built from DebugDrawerSidecarKit, beside the iOS example in
+            # the same simulator, so it lists that app (run `just run iOS` too).
+            {{BAZEL}} run //Example:ExampleApp_Sidecar_iOS
+            ;;
         catalyst|Catalyst)
             # The iOS example as a Mac Catalyst app, built through SwiftPM (Bazel has no Catalyst).
             python3 {{PROJECT_ROOT}}/scripts/catalyst_example.py build
@@ -379,7 +384,7 @@ run target="macOS" *args="":
                 /tmp/debugdrawer-example-watchos
             ;;
         *)
-            echo "Unknown target: {{target}}. Use 'macOS', 'iOS', 'appkit', 'uikit', 'catalyst', 'visionOS', 'tvOS' or 'watchOS'"
+            echo "Unknown target: {{target}}. Use 'macOS', 'iOS', 'appkit', 'uikit', 'sidecar', 'catalyst', 'visionOS', 'tvOS' or 'watchOS'"
             exit 1
             ;;
     esac

@@ -91,6 +91,10 @@ public final class DebugDrawerReceiver {
     var capabilityGates: [String: @MainActor () -> Bool] = [:]
     /// The capabilities whose snapshots aren't served while a gate is off, by ID.
     var paused: Set<String> = []
+    /// The app's presence file, which lists it in a sidecar's app list, while the receiver runs.
+    var presence: PresenceAnnouncement?
+    /// Who the presence file says the app is: the main bundle, unless a test names another app.
+    package var identity = AppPresence.Identity.of(.main)
 
     /// A receiver of the store in `directory`, gating every command with `sessions`; it serves
     /// once started, and nothing until a capability is enabled.
@@ -150,11 +154,14 @@ public final class DebugDrawerReceiver {
         paused.remove(id)
         writing.removeValue(forKey: id)?.cancel()
         try? FileManager.default.removeItem(at: layout.snapshotFile(for: id))
+        presence?.update(capabilities: servedIDs)
     }
 
     /// Writes the sessions' and each enabled capability's snapshot, performs the commands waiting in
     /// the store, and goes on doing both as they change, and as the app comes back to the
-    /// foreground. Does nothing while the receiver runs.
+    /// foreground. It also keeps a presence file in the store's `presence/` directory, the app's
+    /// bundle ID, name, version and build and the IDs it serves, so a sidecar built on
+    /// `DebugDrawerSidecarKit` lists the app. Does nothing while the receiver runs.
     ///
     /// - Throws: ``DebugDrawerReceiverError/cannotServe`` when the store's directories can't be
     ///   made or watched.
@@ -185,11 +192,15 @@ public final class DebugDrawerReceiver {
                 self?.performWaitingCommands()
             }
         }
+        presence = PresenceAnnouncement(directory: directory, identity: identity, capabilities: servedIDs, foreground: Self.foreground)
     }
 
     /// Stops writing snapshots and performing commands. The snapshots written stay in the store, and
-    /// commands left meanwhile wait for the next start.
+    /// commands left meanwhile wait for the next start; the app's presence file goes, so a
+    /// sidecar no longer lists it.
     public func stop() {
+        presence?.withdraw()
+        presence = nil
         if let foregroundObservation {
             NotificationCenter.default.removeObserver(foregroundObservation)
         }
@@ -280,6 +291,13 @@ public final class DebugDrawerReceiver {
                 }
             }
         }
+    }
+
+    /// The IDs the presence file lists: the sessions' and each enabled capability's whose gate is
+    /// on, or none while the receiver's gate is off, so a sidecar shows the app as turned off.
+    var servedIDs: [String] {
+        guard isAllowed() else { return [] }
+        return [DebugDrawerSessions.pluginID] + capabilities.keys.filter { !paused.contains($0) }
     }
 
     /// Removes every snapshot file that is neither the sessions' nor an enabled capability's.

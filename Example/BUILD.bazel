@@ -194,6 +194,41 @@ macos_application(
     visibility = ["//visibility:public"],
 )
 
+# ── Sidecar (iOS, iPadOS and macOS) ──────────────────────────────────
+# A company's sidecar app built from DebugDrawerSidecarKit: one source file, for every platform the
+# kit builds on. It lists the apps in group.com.debugdrawer.example that serve a sidecar (the iOS
+# example; a receiver's app), and shows their sessions, Console, Network and a report.
+
+swift_library(
+    name = "ExampleAppLib_Sidecar",
+    srcs = glob(["Sidecar/*.swift"]),
+    module_name = "ExampleApp_Sidecar",
+    deps = ["//Sources/DebugDrawerSidecarKit"],
+)
+
+ios_application(
+    name = "ExampleApp_Sidecar_iOS",
+    bundle_id = "com.debugdrawer.example.sidecar",
+    bundle_name = "DebugDrawerSidecarExample",
+    families = ["iphone", "ipad"],
+    infoplists = ["Sidecar/Info.plist"],
+    minimum_os_version = "17.0",
+    entitlements = "Sidecar/Sidecar.entitlements",
+    deps = [":ExampleAppLib_Sidecar"],
+    visibility = ["//visibility:public"],
+)
+
+macos_application(
+    name = "ExampleApp_Sidecar_macOS",
+    bundle_id = "com.debugdrawer.example.sidecar",
+    bundle_name = "DebugDrawerSidecarExample",
+    infoplists = ["Sidecar/Info.plist"],
+    minimum_os_version = "15.0",
+    entitlements = "Sidecar/Sidecar.entitlements",
+    deps = [":ExampleAppLib_Sidecar"],
+    visibility = ["//visibility:public"],
+)
+
 # ── macOS, production receiver ───────────────────────────────────────
 # A production app's use of DebugDrawer: the release-safe receiver and the capability modules,
 # nothing else, serving a sidecar its feature flag overrides, production-safe tweaks, localization

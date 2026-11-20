@@ -18,11 +18,11 @@ import os
 
 #if DEBUG
     /// Makes and checks the directories the socket and store transports keep their files in.
-    enum DirectoryAccess {
+    package enum DirectoryAccess {
         private static let logger = Logger(subsystem: "DebugDrawer", category: "DirectoryAccess")
 
         /// What a side needs of a directory, as `faccessat` takes it.
-        enum Need {
+        package enum Need {
             /// Reading its entries and searching it: a viewer watching a socket's directory.
             case read
             /// Reading, writing and searching it: a server's, or the store's, own directory.
@@ -41,7 +41,7 @@ import os
         ///
         /// - Throws: ``DebugDrawerTransportError/accessDenied`` when the system refuses either
         ///   step, and `otherwise` when it fails for any other reason.
-        static func prepare(_ directory: URL, need: Need, otherwise: DebugDrawerTransportError) throws(DebugDrawerTransportError) {
+        package static func prepare(_ directory: URL, need: Need, otherwise: DebugDrawerTransportError) throws(DebugDrawerTransportError) {
             do {
                 try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
             } catch {

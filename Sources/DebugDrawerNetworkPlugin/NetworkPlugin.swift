@@ -18,10 +18,14 @@ public struct NetworkPlugin: DebugDrawerPlugin {
     #if DEBUG
         /// The model the plugin shows, or `nil` for the shared one.
         let model: NetworkModel?
+        /// The transport the plugin draws from, in place of a model in this process: a model in
+        /// another app's, such as a sidecar's view of the app.
+        let transport: DebugDrawerPluginTransport<NetworkSnapshot, NetworkCommand>?
 
         /// The plugin over ``NetworkModel/shared``, whose stores `installNetwork()` sets up.
         public init() {
             model = nil
+            transport = nil
         }
 
         /// - Parameter model: The model to show, in place of the shared one; its stores capture
@@ -29,14 +33,37 @@ public struct NetworkPlugin: DebugDrawerPlugin {
         ///   latest to have installed it.
         init(model: NetworkModel) {
             self.model = model
+            transport = nil
+        }
+
+        /// The plugin over `transport`: it shows the requests of the model at its other end,
+        /// usually in another process, and sends it the filter, mocks, conditions and the other
+        /// commands. Installing it intercepts nothing, and its report holds the requests its
+        /// latest snapshot captured.
+        ///
+        /// ```swift
+        /// let network = try await sidecar.connect(toPlugin: NetworkPlugin().id, snapshot: NetworkSnapshot.self, command: NetworkCommand.self)
+        /// let plugin = NetworkPlugin(transport: network)
+        /// ```
+        ///
+        /// - Parameter transport: The transport to the app's ``NetworkModel``, as a
+        ///   `DebugDrawerTransport` hands it out.
+        public init(transport: DebugDrawerPluginTransport<NetworkSnapshot, NetworkCommand>) {
+            model = nil
+            self.transport = transport
         }
     #else
         public init() {}
+
+        /// The plugin over `transport`; release builds draw nothing.
+        ///
+        /// - Parameter transport: Ignored.
+        public init(transport: DebugDrawerPluginTransport<NetworkSnapshot, NetworkCommand>) {}
     #endif
 
     public var body: some View {
         #if DEBUG
-            NetworkPluginView(transport: .direct(to: model ?? .shared))
+            NetworkPluginView(transport: transport ?? .direct(to: model ?? .shared))
         #else
             EmptyView()
         #endif
@@ -46,7 +73,7 @@ public struct NetworkPlugin: DebugDrawerPlugin {
     /// on, when any are.
     public var headerAccessory: some View {
         #if DEBUG
-            NetworkHeaderAccessoryView(transport: .direct(to: model ?? .shared))
+            NetworkHeaderAccessoryView(transport: transport ?? .direct(to: model ?? .shared))
         #else
             EmptyView()
         #endif
@@ -56,7 +83,7 @@ public struct NetworkPlugin: DebugDrawerPlugin {
     /// release builds.
     @MainActor public var hud: NetworkConditionsHUD? {
         #if DEBUG
-            NetworkConditionsHUD(transport: .direct(to: model ?? .shared))
+            NetworkConditionsHUD(transport: transport ?? .direct(to: model ?? .shared))
         #else
             nil
         #endif
@@ -68,6 +95,8 @@ public struct NetworkPlugin: DebugDrawerPlugin {
     /// and again once that one removes it. Release builds capture nothing.
     @MainActor public func install(in drawer: DebugDrawer) {
         #if DEBUG
+            // A plugin over a transport shows another process's requests: nothing here to take.
+            guard transport == nil else { return }
             NetworkInterception.install(model ?? .shared, for: drawer)
         #endif
     }
@@ -78,6 +107,7 @@ public struct NetworkPlugin: DebugDrawerPlugin {
     /// unregistered and every replaced method gets its original implementation back.
     @MainActor public func uninstall(from drawer: DebugDrawer) {
         #if DEBUG
+            guard transport == nil else { return }
             NetworkInterception.uninstall(for: drawer)
         #endif
     }
