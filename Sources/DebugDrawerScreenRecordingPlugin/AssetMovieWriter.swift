@@ -7,8 +7,9 @@
     /// Writes frames as H.264 in a QuickTime movie with AVAssetWriter.
     ///
     /// Main-actor isolated like the frames it is handed: each is drawn into a pixel buffer from the
-    /// adaptor's pool and appended at once, and the encoder works on its own queue. Rejected:
-    /// ReplayKit's and ScreenCaptureKit's writers, which record the screen, drawer included.
+    /// adaptor's pool and appended at once, lasting one frame, and the encoder works on its own
+    /// queue. Rejected: ReplayKit's and ScreenCaptureKit's writers, which record the screen, drawer
+    /// included.
     @MainActor
     final class AssetMovieWriter: MovieWriter {
         private let url: URL
@@ -28,7 +29,7 @@
             /// The last frame appended's time, `nil` until the first is.
             var lastTime: TimeInterval?
             /// The latest frame the encoder wasn't ready for, appended at finish if no later one is
-            /// and the encoder is ready for it then.
+            /// and the encoder is ready for it then, and left out of the movie if it isn't.
             var heldFrame: RecordedFrame?
         }
 
@@ -68,7 +69,7 @@
         }
 
         /// Finishes without waiting for the encoder: a held frame it isn't ready for is not written,
-        /// and the frame before it stays on screen until the held one's time instead. Rejected:
+        /// and the movie ends one frame after the frame before it instead. Rejected:
         /// waiting for `requestMediaDataWhenReady`, which a writer that fails or is cancelled
         /// meanwhile, or a real-time input on a healthy one, may never call, so finish never
         /// returned.
@@ -79,12 +80,12 @@
             return try await close()
         }
 
-        /// Ends the movie at its last frame, or at a held frame's time, and closes the file.
+        /// Ends the movie one frame after its last frame written, and closes the file.
         private func close() async throws(RecordingFailure) -> Duration {
             guard let session else { throw hasFailed ? .writeFailed : .noFrames }
             self.session = nil
             // A writer that failed or was cancelled has no movie to close, and a cancelled one
-            // raises an Objective-C exception on endSession.
+            // raises an Objective-C exception as it is finished.
             let isWriting = session.writer.status == .writing
             guard isWriting, let lastTime = session.lastTime else {
                 if session.writer.status != .cancelled { session.writer.cancelWriting() }
@@ -92,11 +93,26 @@
                 DebugDrawerActivity.$isDrawerWork.withValue(true) { try? FileManager.default.removeItem(at: url) }
                 throw hasFailed || !isWriting ? .writeFailed : .noFrames
             }
-            // The last frame stays on screen for one frame's length rather than none, and until a
-            // held frame's time when that one wasn't written.
-            let length = max(lastTime, session.heldFrame?.time ?? lastTime) - session.firstTime + Self.frameLength
+            // Each frame lasts until the next, and the last one for its own sample buffer's
+            // duration, one frame, as finishWriting ends a session no endSession ended at its last
+            // sample's end. So the movie runs from the first frame to one frame after the last.
+            //
+            // No endSession(atSourceTime:): a writer that fails on the encoder's queue after the
+            // status check above, as one can on its own (disk full, media services reset), makes
+            // endSession crash inside AVFoundation, which a host app can't catch. SIGSEGV, "Bad
+            // pointer dereference at 0x10":
+            //     0 <unknown> + 280 in MediaToolbox
+            //     1 -[AVAssetWriterWritingHelper endSessionAtSourceTime:] + 328 in AVFCore
+            //     2 -[AVAssetWriter endSessionAtSourceTime:] + 72 in AVFCore
+            //     3 AssetMovieWriter.close()
+            // The writer posts no KVO change of status as it fails this way, so there is no event
+            // to wait for. markAsFinished and finishWriting don't crash there: a failure lands as
+            // a failed status, which throws below. Rejected: a final duplicate frame one frame
+            // after the last (the movie ends a frame late, the encoder giving the duplicate a
+            // length of its own), and the adaptor's appends without endSession (the encoder then
+            // guesses the last frame's length, from a frame's to half a second's).
+            let length = lastTime - session.firstTime + Self.frameLength
             session.input.markAsFinished()
-            session.writer.endSession(atSourceTime: CMTime(seconds: length, preferredTimescale: Self.timescale))
             let writer = UncheckedWriter(writer: session.writer)
             await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
                 writer.writer.finishWriting { continuation.resume() }
@@ -108,14 +124,31 @@
             return .seconds(length)
         }
 
-        /// Draws `frame` into a pixel buffer and appends it at its time from the first frame.
+        /// Draws `frame` into a pixel buffer and appends it at its time from the first frame,
+        /// lasting one frame.
+        ///
+        /// The buffer goes to the input in a sample buffer of its own rather than through the
+        /// adaptor, whose append takes no duration; the adaptor still provides the pool, whose
+        /// buffers suit the encoder.
         private func write(_ frame: RecordedFrame) {
             guard var session, let pool = session.adaptor.pixelBufferPool else { return }
             var buffer: CVPixelBuffer?
             guard CVPixelBufferPoolCreatePixelBuffer(nil, pool, &buffer) == kCVReturnSuccess, let buffer else { return }
             Self.draw(frame.image, into: buffer, width: session.width, height: session.height)
-            let time = CMTime(seconds: frame.time - session.firstTime, preferredTimescale: Self.timescale)
-            guard session.adaptor.append(buffer, withPresentationTime: time) else {
+            var format: CMVideoFormatDescription?
+            guard CMVideoFormatDescriptionCreateForImageBuffer(allocator: nil, imageBuffer: buffer, formatDescriptionOut: &format) == noErr,
+                  let format
+            else { return }
+            var timing = CMSampleTimingInfo(
+                duration: Self.frameDuration,
+                presentationTimeStamp: CMTime(seconds: frame.time - session.firstTime, preferredTimescale: Self.timescale),
+                decodeTimeStamp: .invalid
+            )
+            var sample: CMSampleBuffer?
+            guard CMSampleBufferCreateReadyWithImageBuffer(
+                allocator: nil, imageBuffer: buffer, formatDescription: format, sampleTiming: &timing, sampleBufferOut: &sample
+            ) == noErr, let sample else { return }
+            guard session.input.append(sample) else {
                 hasFailed = true
                 return
             }
@@ -131,7 +164,10 @@
         }
 
         /// How long a frame shows at the recorder's 30 frames a second.
-        static let frameLength: TimeInterval = 1.0 / 30
+        static let frameLength: TimeInterval = frameDuration.seconds
+
+        /// ``frameLength`` exactly, as each sample buffer's duration.
+        private static let frameDuration = CMTime(value: 1, timescale: 30)
 
         private static let timescale: CMTimeScale = 600
 
@@ -146,7 +182,13 @@
                 AVVideoHeightKey: height,
                 // About two bits a pixel at 30 frames a second: text stays sharp, and a minute of
                 // an iPad's screen is around 50 MB.
-                AVVideoCompressionPropertiesKey: [AVVideoAverageBitRateKey: width * height * 2]
+                // Frame reordering off: with B-frames the encoder ignores the sample buffers'
+                // durations and guesses the last frame's length, so the movie's length would
+                // change from one recording to the next.
+                AVVideoCompressionPropertiesKey: [
+                    AVVideoAverageBitRateKey: width * height * 2,
+                    AVVideoAllowFrameReorderingKey: false
+                ]
             ])
             input.expectsMediaDataInRealTime = true
             let adaptor = AVAssetWriterInputPixelBufferAdaptor(assetWriterInput: input, sourcePixelBufferAttributes: [

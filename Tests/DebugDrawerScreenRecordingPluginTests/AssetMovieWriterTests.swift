@@ -1,5 +1,6 @@
 #if DEBUG
     import AVFoundation
+    import Combine
     import CoreGraphics
     @testable import DebugDrawerScreenRecordingPlugin
     import Foundation
@@ -21,12 +22,29 @@
             context.setFillColor(CGColor(red: 1, green: 0, blue: 0, alpha: 1))
             context.fill(CGRect(x: 0, y: 0, width: 101, height: 61))
             let image = try #require(context.makeImage())
-            let sut = AssetMovieWriter(url: url)
+            var assetWriter: AVAssetWriter?
+            let sut = AssetMovieWriter(url: url) { url in
+                let writer = try AVAssetWriter(outputURL: url, fileType: .mov)
+                assetWriter = writer
+                return writer
+            }
             let expectedLength = 1.0 + 1.0 / 30
 
-            for frame in 0 ... 30 {
+            sut.append(RecordedFrame(image: image, time: 100))
+            let input = try #require(assetWriter?.inputs.first)
+            // The encoder takes about eight frames handed over at once; each waits until it is
+            // ready, as frames 1/30 s apart find it in a recording. Sendable: KVO tells on the
+            // encoder's queue.
+            var ready: AnyCancellable?
+            for frame in 1 ... 30 {
+                await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+                    ready = input.publisher(for: \.isReadyForMoreMediaData, options: [.initial, .new])
+                        .first { @Sendable isReady in isReady }
+                        .sink { @Sendable _ in continuation.resume() }
+                }
                 sut.append(RecordedFrame(image: image, time: 100 + Double(frame) / 30))
             }
+            ready?.cancel()
             let actual = try await sut.finish()
 
             let asset = AVURLAsset(url: url)
@@ -161,9 +179,7 @@
 
             sut.append(RecordedFrame(image: image, time: 0))
             sut.append(RecordedFrame(image: image, time: 0.1))
-            // Failed before finish, synchronously. Rejected: failing a writing writer with a sample
-            // before the session's start, which fails it on the encoder's queue at no moment a test
-            // can wait for (no KVO change of status), and AVFoundation's endSession can then crash.
+            // Failed before finish, synchronously; failedOnTheEncodersQueue fails one as it finishes.
             let actual = try #require(assetWriter).status
 
             #expect(actual == expectedStatus)
@@ -173,7 +189,76 @@
             #expect(!FileManager.default.fileExists(atPath: url.path))
         }
 
-        @Test("A last frame the encoder isn't ready for doesn't hold finish up: the movie runs to that frame's time plus one frame")
+        @Test("A writer that fails on the encoder's queue as the movie is finished makes finish throw writeFailed, and nothing crashes")
+        func failedOnTheEncodersQueue() async throws {
+            let url = FileManager.default.temporaryDirectory.appending(path: "\(UUID().uuidString).mov")
+            defer { try? FileManager.default.removeItem(at: url) }
+            let context = try #require(CGContext(
+                data: nil, width: 32, height: 32, bitsPerComponent: 8, bytesPerRow: 0,
+                space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+            ))
+            let image = try #require(context.makeImage())
+            var assetWriter: AVAssetWriter?
+            let sut = AssetMovieWriter(url: url) { url in
+                let writer = try AVAssetWriter(outputURL: url, fileType: .mov)
+                assetWriter = writer
+                return writer
+            }
+            sut.append(RecordedFrame(image: image, time: 0))
+            sut.append(RecordedFrame(image: image, time: 0.1))
+            let input = try #require(assetWriter?.inputs.first)
+            var buffer: CVPixelBuffer?
+            CVPixelBufferCreate(nil, 32, 32, kCVPixelFormatType_32BGRA, nil, &buffer)
+            var format: CMVideoFormatDescription?
+            CMVideoFormatDescriptionCreateForImageBuffer(allocator: nil, imageBuffer: try #require(buffer), formatDescriptionOut: &format)
+            var timing = CMSampleTimingInfo(
+                duration: CMTime(value: 1, timescale: 30), presentationTimeStamp: CMTime(value: -1, timescale: 1), decodeTimeStamp: .invalid
+            )
+            var sample: CMSampleBuffer?
+            CMSampleBufferCreateReadyWithImageBuffer(
+                allocator: nil, imageBuffer: try #require(buffer), formatDescription: try #require(format), sampleTiming: &timing,
+                sampleBufferOut: &sample
+            )
+            // A sample before the session's start, which the encoder fails the writer for on its
+            // own queue, with no change of status a test could wait for: the failure lands
+            // before, during or after finish's check of the status, as a disk filling up during
+            // Stop would.
+            try #require(input.isReadyForMoreMediaData)
+            input.append(try #require(sample))
+
+            await #expect(throws: RecordingFailure.writeFailed) {
+                try await sut.finish()
+            }
+            #expect(!FileManager.default.fileExists(atPath: url.path))
+        }
+
+        @Test("Frames at uneven times make a movie from the first to one frame after the last, each shown until the next")
+        func unevenFrames() async throws {
+            let url = FileManager.default.temporaryDirectory.appending(path: "\(UUID().uuidString).mov")
+            defer { try? FileManager.default.removeItem(at: url) }
+            let context = try #require(CGContext(
+                data: nil, width: 32, height: 32, bitsPerComponent: 8, bytesPerRow: 0,
+                space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+            ))
+            let image = try #require(context.makeImage())
+            let sut = AssetMovieWriter(url: url)
+            let expectedLength = 1.0 + 1.0 / 30
+
+            for time in [50, 50.1, 50.2, 51] {
+                sut.append(RecordedFrame(image: image, time: time))
+            }
+            let actual = try await sut.finish()
+
+            let asset = AVURLAsset(url: url)
+            let duration = try await asset.load(.duration)
+            let track = try #require(try await asset.loadTracks(withMediaType: .video).first)
+            let segments = try await track.load(.segments)
+            #expect(abs(actual / .seconds(1) - expectedLength) < 0.001)
+            #expect(abs(duration.seconds - expectedLength) < 0.01)
+            #expect(segments.count == 1 && segments.allSatisfy { !$0.isEmpty })
+        }
+
+        @Test("A last frame the encoder isn't ready for doesn't hold finish up: the movie ends one frame after the last frame written")
         func heldLastFrame() async throws {
             let url = FileManager.default.temporaryDirectory.appending(path: "\(UUID().uuidString).mov")
             defer { try? FileManager.default.removeItem(at: url) }
@@ -190,21 +275,35 @@
             }
             sut.append(RecordedFrame(image: image, time: 0))
             let input = try #require(assetWriter?.inputs.first)
-            // Frames handed over faster than the encoder takes them fill its queue in about a
-            // hundred; the next one is held.
+            // Frames handed over faster than the encoder takes them fill its queue in about
+            // eight; the next one is held.
             var frame = 1
             while input.isReadyForMoreMediaData, frame < 10000 {
                 sut.append(RecordedFrame(image: image, time: Double(frame) / 30))
                 frame += 1
             }
             let wasReady = input.isReadyForMoreMediaData
-            sut.append(RecordedFrame(image: image, time: Double(frame) / 30))
-            let expectedLength = Double(frame + 1) / 30
+            let heldTime = Double(frame) / 30
+            sut.append(RecordedFrame(image: image, time: heldTime))
 
             let actual = try await sut.finish()
 
-            let duration = try await AVURLAsset(url: url).load(.duration)
+            // Finish writes the held frame if the encoder has caught up by then, and leaves it out
+            // if not; the movie ends one frame after whichever was written last.
+            let asset = AVURLAsset(url: url)
+            let duration = try await asset.load(.duration)
+            let track = try #require(try await asset.loadTracks(withMediaType: .video).first)
+            let reader = try AVAssetReader(asset: asset)
+            let output = AVAssetReaderTrackOutput(track: track, outputSettings: nil)
+            reader.add(output)
+            reader.startReading()
+            var lastWritten = -1.0
+            while let sample = output.copyNextSampleBuffer() {
+                if CMSampleBufferGetNumSamples(sample) > 0 { lastWritten = max(lastWritten, sample.presentationTimeStamp.seconds) }
+            }
+            let expectedLength = lastWritten + 1.0 / 30
             #expect(!wasReady)
+            #expect(abs(lastWritten - heldTime) < 0.001 || abs(lastWritten - (heldTime - 1.0 / 30)) < 0.001)
             #expect(abs(actual / .seconds(1) - expectedLength) < 0.001)
             #expect(abs(duration.seconds - expectedLength) < 0.01)
         }
