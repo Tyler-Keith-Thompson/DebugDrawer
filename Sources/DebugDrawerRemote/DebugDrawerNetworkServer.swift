@@ -7,7 +7,7 @@ import os
 // The device's end of the network transport. Nothing listens or advertises until the app calls
 // `start()`: making a server, or linking the module, does neither. Each connection must pair
 // before it reaches a model: it asks with its name, the device shows a new six-digit code beside
-// that name (wherever the app shows `pairingRequests`, such as a plugin of its own in the
+// that name (wherever the app shows `pairingRequests`, such as the Remote Viewing plugin in the
 // drawer), and the person types the code into the viewer. The right code pairs that
 // one connection, which a `RegistrySession` (core's, the socket server's) then serves; any other
 // message, a wrong code or the person's Reject closes it. A code is good for one try on one
@@ -34,9 +34,9 @@ import os
     /// try await server.start()
     /// ```
     ///
-    /// A viewer that connects appears in ``pairingRequests`` with a code; show it, in a plugin
-    /// of the app's own in the drawer for instance, and the viewer pairs when its person types
-    /// it. Release builds get a stand-in that never listens.
+    /// A viewer that connects appears in ``pairingRequests`` with a code; show it with
+    /// ``/DebugDrawerRemote/RemoteViewingPlugin`` in the drawer, and the viewer pairs when its
+    /// person types it. Release builds get a stand-in that never listens.
     @MainActor
     public final class DebugDrawerNetworkServer: ObservableObject {
         private static let logger = Logger(subsystem: "DebugDrawerRemote", category: "DebugDrawerNetworkServer")
@@ -50,9 +50,14 @@ import os
         /// The port the server listens on, or `nil` while it doesn't.
         @Published public private(set) var port: UInt16?
         /// The viewers waiting for their code, oldest first.
-        @Published public private(set) var pairingRequests: [DebugDrawerPairingRequest] = []
+        @Published public private(set) var pairingRequests: [DebugDrawerPairingRequest] = [] {
+            didSet { badge.update(pairingRequests.count) }
+        }
         /// The viewers paired, oldest first.
         @Published public private(set) var pairedViewers: [DebugDrawerPairedViewer] = []
+        /// The ``RemoteViewingPlugin``'s badge, counting the viewers waiting for their code in
+        /// each drawer that installed the plugin over this server.
+        let badge = DebugDrawerPluginBadge(pluginID: RemoteViewingPlugin.pluginID)
         /// Each connection, from accepted until closed.
         private var viewers: [UUID: Viewer] = [:]
         /// Incremented by each start and stop, so a connection accepted by a listener since stopped

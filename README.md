@@ -2061,35 +2061,21 @@ The server listens on a port the system picks and advertises itself over Bonjour
 name. `DebugDrawerNetworkServerConfiguration` picks the name and the port, or `.loopback`
 listens on 127.0.0.1 only and advertises nothing, for a viewer on the same Mac as a simulator.
 
-When a viewer connects, the server lists it in `pairingRequests` with a new six-digit code. Show
-the code where the person holding the device sees it, such as a plugin of the app's own in the
-drawer, with a Reject button:
+When a viewer connects, the server lists it in `pairingRequests` with a new six-digit code.
+`RemoteViewingPlugin` shows it in the drawer, where the person holding the device sees it: whether
+the server listens and on which port, with Start Serving and Stop Serving, each viewer asking to
+pair with its name, its code and a Reject button, and each paired viewer with a Disconnect button.
+Its badge counts the viewers waiting for their code:
 
 ```swift
-struct RemotePairingPlugin: DebugDrawerPlugin {
-    let server: DebugDrawerNetworkServer
-    var title = "Remote Viewing"
-    var icon = "laptopcomputer.and.iphone"
-
-    var body: some View {
-        RemotePairingList(server: server)
-    }
-}
-
-struct RemotePairingList: View {
-    @ObservedObject var server: DebugDrawerNetworkServer
-
-    var body: some View {
-        ForEach(server.pairingRequests) { request in
-            DebugDrawerKeyValueRow(request.viewerName, value: request.code)
-            Button("Reject \(request.viewerName)") { server.reject(request) }
-        }
-        ForEach(server.pairedViewers) { viewer in
-            Button("Disconnect \(viewer.name)") { server.disconnect(viewer) }
-        }
-    }
+@MainActor
+func showRemoteViewing(_ remote: RemoteViewing) {
+    DebugDrawer.shared.registerGlobal(RemoteViewingPlugin(server: remote.server))
 }
 ```
+
+With the plugin listed, the app needn't call `enable()` at all: the person starts serving from the
+drawer when they want a viewer in.
 
 The person types the code into the viewer, which is then paired for as long as its connection
 lasts. A wrong code, or anything sent before pairing, closes the connection; each code is good for
@@ -2168,8 +2154,7 @@ struct DeviceView: View {
 The macOS example app has such a viewer under Debug > Remote Viewer: it lists the devices it finds
 once you click Look for Devices, or connects to an address (`127.0.0.1:<port>` for a server on
 loopback), asks for the code, and shows the device's Network and Console. The example apps serve
-themselves through a Remote Viewing plugin in their drawer, which starts the server and shows each
-viewer's code; launch them with `-ServeRemoteViewers` to start it at launch, plus
+themselves through `RemoteViewingPlugin` in their drawer; launch them with `-ServeRemoteViewers` to start it at launch, plus
 `-RemoteViewersOnLoopback` to listen on 127.0.0.1 alone.
 
 **Info.plist.** iOS asks the person before an app uses the local network, and both the device's
@@ -4156,7 +4141,7 @@ ContentView()
 | `DebugDrawerColorVisionPlugin` | Protanopia, deuteranopia, tritanopia and grayscale simulated live over the views marked `.debugColorVision()`, in linear RGB with Machado et al.'s matrices, picked in the drawer or cycled from the HUD, while the drawer keeps its colors |
 | `DebugDrawerAppStateReset` | The receiver capability (`.appStateReset(_:)`) that lets a sidecar reset the categories a production app allows (never the keychain unless it opts in), listed and confirmed by revision, applied on the next foreground; no drawer, so a release build links it beside the receiver |
 | `DebugDrawerAppStateResetPlugin` | The app's state cleared as a fresh install leaves it, by category: UserDefaults, keychain items, the container's files, caches, cookies, the URL cache and the app's own cleanup, each listed before a confirmation, then relaunched on macOS or quit elsewhere; re-exports `DebugDrawerAppStateReset` |
-| `DebugDrawerRemote` | Plugin models served to a viewer on another device over the local network: an opt-in Network.framework server advertised over Bonjour, each viewer paired with a six-digit code the device shows, and the viewer's transport and browser |
+| `DebugDrawerRemote` | Plugin models served to a viewer on another device over the local network: an opt-in Network.framework server advertised over Bonjour, each viewer paired with a six-digit code the device shows (and its Remote Viewing plugin, which shows the codes), and the viewer's transport and browser |
 | `DebugDrawerSidecarKit` | A sidecar app, as a library: `DebugDrawerSidecarView` lists the apps in the group that serve a sidecar, opens their sessions (with a grant the company's server gives, when they require one), shows their Console, Network, Bug Reports, Scenarios, Auth, Reset App State, Environment, UserDefaults, Performance, App State and other model-backed plugins over the socket or the store, and makes and uploads a report of them, the app state attached to each; iOS, iPadOS and macOS, debug builds |
 
 ## Development

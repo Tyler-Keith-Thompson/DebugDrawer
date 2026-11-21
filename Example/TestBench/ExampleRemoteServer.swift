@@ -1,15 +1,15 @@
 import DebugDrawer
 import DebugDrawerRemote
 import Foundation
-import SwiftUI
 
 // The example's device side of remote viewing: a network server over the models the app offers
-// (its Console and Network), started only when asked (the Remote Viewing plugin's Start button, or
-// the launch argument), and the plugin that shows each viewer's pairing code. The macOS example's
-// Remote window is the viewer; it can view this app too, on the same Mac. Everything compiles in
-// release, where the server never listens and the plugin isn't listed.
+// (its Console and Network), started only when asked (the shipped Remote Viewing plugin's Start
+// Serving button, or the launch argument), and that plugin in the drawer to show each viewer's
+// pairing code. The macOS example's Remote window is the viewer; it can view this app too, on the
+// same Mac. Everything compiles in release, where the server never listens and the plugin draws
+// nothing.
 
-/// The example's remote viewing server and the drawer plugin that shows its pairing codes.
+/// The example's remote viewing server, shown in the drawer by `RemoteViewingPlugin`.
 @MainActor
 public enum ExampleRemoteServer {
     /// Launched with this argument, the app starts serving at launch.
@@ -35,14 +35,15 @@ public enum ExampleRemoteServer {
     public static func install() {
         guard !isInstalled else { return }
         isInstalled = true
-        DebugDrawer.shared.registerGlobal(ExampleRemotePairingPlugin(server: server))
+        DebugDrawer.shared.registerGlobal(RemoteViewingPlugin(server: server))
         if ProcessInfo.processInfo.arguments.contains(launchArgument) {
             start()
         }
     }
 
-    /// Starts listening, and advertising unless on loopback; logs why it couldn't.
-    static func start() {
+    /// Starts listening, and advertising unless on loopback, for the launch argument; logs why it
+    /// couldn't. The plugin's Start Serving shows its own failure.
+    private static func start() {
         Task {
             do {
                 try await server.start()
@@ -51,58 +52,5 @@ public enum ExampleRemoteServer {
                 print("[Remote] The server didn't start: \(error)")
             }
         }
-    }
-}
-
-/// Serving or not, the code for each viewer asking to pair, with Reject, and the paired viewers,
-/// with Disconnect.
-struct ExampleRemotePairingPlugin: DebugDrawerPlugin {
-    let server: DebugDrawerNetworkServer
-    var title = "Remote Viewing"
-    var icon = "laptopcomputer.and.iphone"
-    var category = "Logs & Network"
-
-    var body: some View {
-        ExampleRemotePairingList(server: server)
-    }
-}
-
-struct ExampleRemotePairingList: View {
-    @ObservedObject var server: DebugDrawerNetworkServer
-
-    var body: some View {
-        DebugDrawerSection("Server") {
-            DebugDrawerKeyValueRow("Status", value: status)
-            if server.isRunning {
-                Button("Stop Serving") { server.stop() }
-                    .debugDrawerButtonStyle(.secondary)
-            } else {
-                Button("Start Serving") { ExampleRemoteServer.start() }
-                    .debugDrawerButtonStyle(.secondary)
-            }
-        }
-        if !server.pairingRequests.isEmpty {
-            DebugDrawerSection("Pairing Codes") {
-                ForEach(server.pairingRequests) { request in
-                    DebugDrawerKeyValueRow(request.viewerName, value: request.code)
-                    Button("Reject \(request.viewerName)") { server.reject(request) }
-                        .debugDrawerButtonStyle(.secondary)
-                }
-            }
-        }
-        if !server.pairedViewers.isEmpty {
-            DebugDrawerSection("Paired Viewers") {
-                ForEach(server.pairedViewers) { viewer in
-                    Button("Disconnect \(viewer.name)") { server.disconnect(viewer) }
-                        .debugDrawerButtonStyle(.secondary)
-                }
-            }
-        }
-    }
-
-    private var status: String {
-        guard server.isRunning, let port = server.port else { return "Not serving" }
-        let scope = server.configuration.loopbackOnly ? "127.0.0.1" : "the local network"
-        return "Port \(port) on \(scope)"
     }
 }

@@ -3,7 +3,7 @@
 load("//tools:docc.bzl", "docc_archive")
 load("//tools:swift_rules.bzl", "swift_library")
 
-# Plugin models served to a viewer on another device over the local network: an opt-in Network.framework server with Bonjour, each viewer paired with a code the device shows, and the viewer's transport and browser.
+# Plugin models served to a viewer on another device over the local network: an opt-in Network.framework server with Bonjour, each viewer paired with a code the device shows in its Remote Viewing plugin, and the viewer's transport and browser.
 swift_library(
     name = "DebugDrawerRemote",
     srcs = glob(["**/*.swift"]),

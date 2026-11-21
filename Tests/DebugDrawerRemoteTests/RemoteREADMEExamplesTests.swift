@@ -24,28 +24,9 @@
         }
     }
 
-    struct RemotePairingPlugin: DebugDrawerPlugin {
-        let server: DebugDrawerNetworkServer
-        var title = "Remote Viewing"
-        var icon = "laptopcomputer.and.iphone"
-
-        var body: some View {
-            RemotePairingList(server: server)
-        }
-    }
-
-    struct RemotePairingList: View {
-        @ObservedObject var server: DebugDrawerNetworkServer
-
-        var body: some View {
-            ForEach(server.pairingRequests) { request in
-                DebugDrawerKeyValueRow(request.viewerName, value: request.code)
-                Button("Reject \(request.viewerName)") { server.reject(request) }
-            }
-            ForEach(server.pairedViewers) { viewer in
-                Button("Disconnect \(viewer.name)") { server.disconnect(viewer) }
-            }
-        }
+    @MainActor
+    func showRemoteViewing(_ remote: RemoteViewing) {
+        DebugDrawer.shared.registerGlobal(RemoteViewingPlugin(server: remote.server))
     }
 
     @MainActor
