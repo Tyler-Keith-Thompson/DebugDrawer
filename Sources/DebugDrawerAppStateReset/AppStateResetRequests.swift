@@ -30,9 +30,9 @@ import Foundation
 //
 // Persistent scope, with no revert: deleted state can't come back.
 
-/// The model behind the app state reset ``DebugDrawerReceiverCapability``: what each allowed
-/// category would clear, read when a sidecar asks within a session, and the reset it confirms,
-/// run as the app next comes to the foreground.
+/// The model behind the app state reset ``/DebugDrawerReceiver/DebugDrawerReceiverCapability``:
+/// what each allowed category would clear, read when a sidecar asks within a session, and the
+/// reset it confirms, run as the app next comes to the foreground.
 ///
 /// ```swift
 /// let reset = AppStateResetRequests(sessions: sessions, allowing: [.caches, .urlCache])

@@ -21,8 +21,8 @@ public struct TweakSection: Sendable {
     }
 }
 
-/// One entry of a ``TweakSection``: a ``Tweak`` or a ``TweakAction``, as ``TweakItemBuilder``
-/// makes it.
+/// One entry of a ``TweakSection``: a ``/DebugDrawerTweaks/Tweak`` or a ``TweakAction``, as
+/// ``TweakItemBuilder`` makes it.
 public struct TweakItem: Sendable {
     enum Kind: Sendable {
         case tweak(AnyTweak)

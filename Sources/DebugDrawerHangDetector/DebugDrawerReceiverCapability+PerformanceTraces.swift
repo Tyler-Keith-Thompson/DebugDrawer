@@ -24,9 +24,9 @@ public extension DebugDrawerReceiverCapability {
     /// the observer removed and the thread ended, as the sidecar stops it, as the session ends or
     /// expires, as a gate turns it off, and, for a launch killed during a session, as the next
     /// launch enables it, so enable it at startup. Each command is audited as
-    /// ``DebugDrawerAuditEntry/Event/commandApplied``, the stop at the session's end as
-    /// ``DebugDrawerAuditEntry/Event/changeReverted``. ``PerformanceTraces`` documents what
-    /// recording costs.
+    /// ``/DebugDrawerReceiver/DebugDrawerAuditEntry/Event/commandApplied``, the stop at the
+    /// session's end as ``/DebugDrawerReceiver/DebugDrawerAuditEntry/Event/changeReverted``.
+    /// ``PerformanceTraces`` documents what recording costs.
     ///
     /// ```swift
     /// receiver.enable(.performanceTraces(traces))

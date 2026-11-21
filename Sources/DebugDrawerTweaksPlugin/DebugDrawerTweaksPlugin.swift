@@ -70,7 +70,7 @@ public extension DebugDrawer {
     ///
     /// - Parameters:
     ///   - storage: Where values persist; the standard defaults, under
-    ///     ``UserDefaultsTweakStorage/defaultKeyPrefix``, unless given.
+    ///     ``/DebugDrawerTweaks/UserDefaultsTweakStorage/defaultKeyPrefix``, unless given.
     ///   - sections: The sections, in the order shown.
     /// - Precondition: No two tweaks in `sections` share a key.
     func installTweaks(

@@ -90,8 +90,8 @@ public extension DebugDrawer {
     /// simulator's, so spoofing kept from the last launch is in effect at once.
     ///
     /// The spoofing switch, the coordinate and the route playing are this drawer's: on
-    /// ``DebugDrawer/DebugDrawer/shared`` they are ``LocationModel/shared``'s, kept in the shared
-    /// drawer's defaults, and a drawer made with ``DebugDrawer/DebugDrawer/init(defaults:)`` gets
+    /// ``/DebugDrawer/DebugDrawer/shared`` they are ``LocationModel/shared``'s, kept in the shared
+    /// drawer's defaults, and a drawer made with ``/DebugDrawer/DebugDrawer/init(defaults:)`` gets
     /// a model of its own, kept in its defaults. The app's managers get the locations of the
     /// drawer that installed the plugin last, and the one before's once it removes the plugin.
     ///

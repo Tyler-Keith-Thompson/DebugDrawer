@@ -20,12 +20,14 @@ public extension DebugDrawerReceiverCapability {
     /// Nothing is read until the sidecar asks, in a session: the listing names keys, paths, sizes,
     /// cookie domains and keychain services, never a value or an account. A reset confirms each
     /// category's listing at its revision: one of a category the host didn't allow is refused
-    /// (``DebugDrawerAuditEntry/Refusal/notExposed``), one whose listing changed since
-    /// (``DebugDrawerAuditEntry/Refusal/staleConfirmation``), and one whose categories hold
-    /// something else by the time it runs deletes nothing (``AppStateResetRequests/Outcome/notApplied(changed:)``).
+    /// (``/DebugDrawerReceiver/DebugDrawerAuditEntry/Refusal/notExposed``), one whose listing
+    /// changed since (``/DebugDrawerReceiver/DebugDrawerAuditEntry/Refusal/staleConfirmation``),
+    /// and one whose categories hold something else by the time it runs deletes nothing
+    /// (``AppStateResetRequests/Outcome/notApplied(changed:)``).
     /// DebugDrawer's own state stays: its defaults keys, its files and the receiver's store,
     /// sessions and audit log. Each request is written to the audit log as
-    /// ``DebugDrawerAuditEntry/Event/commandApplied``. Add ``requiringGrant()`` to need a signed
+    /// ``/DebugDrawerReceiver/DebugDrawerAuditEntry/Event/commandApplied``. Add
+    /// ``/DebugDrawerReceiver/DebugDrawerReceiverCapability/requiringGrant()`` to need a signed
     /// grant for it.
     ///
     /// The app keeps running after a reset, so what it holds in memory stays until it next

@@ -97,8 +97,8 @@ public extension DebugDrawer {
     /// says so.
     ///
     /// The URLs opened and activities continued are kept in this drawer's defaults, so a drawer
-    /// made with ``DebugDrawer/DebugDrawer/init(defaults:)`` keeps its history apart from
-    /// ``DebugDrawer/DebugDrawer/shared``'s.
+    /// made with ``/DebugDrawer/DebugDrawer/init(defaults:)`` keeps its history apart from
+    /// ``/DebugDrawer/DebugDrawer/shared``'s.
     ///
     /// Calling it again replaces the plugin and its handlers.
     ///

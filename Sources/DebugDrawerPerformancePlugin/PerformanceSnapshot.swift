@@ -8,7 +8,7 @@ import Foundation
 #if DEBUG
     /// Everything the Performance plugin shows, as a value: the frame rate and frames dropped, the
     /// memory footprint and its peak against the device's memory, each second's frame rate and
-    /// footprint over the last ``historyLength`` seconds, the process's threads by CPU, and when a
+    /// footprint over the last `historyLength` seconds, the process's threads by CPU, and when a
     /// memory warning was last posted.
     ///
     /// ``PerformanceModel`` makes it; the plugin's view and its HUD readout draw it. It is

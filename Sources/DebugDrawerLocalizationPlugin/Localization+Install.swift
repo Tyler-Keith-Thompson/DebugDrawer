@@ -11,7 +11,8 @@ public extension Localization {
     /// the mode. Removing the plugin from the drawer puts the lookups back.
     ///
     /// - Parameter mode: What the app's strings show until the drawer changes it, such as
-    ///   ``Mode/pseudoLocalized`` for a launch argument of the app's own.
+    ///   ``/DebugDrawerLocalization/Localization/Mode/pseudoLocalized`` for a launch argument of
+    ///   the app's own.
     @MainActor
     static func install(mode: Mode = .standard) {
         #if DEBUG
