@@ -3,8 +3,10 @@
 
     extension EnvironmentValues {
         /// The drawer whose views these are, told as each plugin's content comes on and leaves the
-        /// screen; `nil` outside a drawer, as in a test that draws a section alone.
-        @Entry var showingDrawer: DebugDrawer?
+        /// screen; `nil` outside a drawer, as in a test that draws a section alone. A plugin's view
+        /// masks by this drawer's rules (`DebugDrawerRedactionReader`), so a plugin installed in
+        /// a `DebugDrawer(defaults:)` of its own follows that drawer rather than the shared one.
+        @Entry package var showingDrawer: DebugDrawer?
     }
 
     extension View {

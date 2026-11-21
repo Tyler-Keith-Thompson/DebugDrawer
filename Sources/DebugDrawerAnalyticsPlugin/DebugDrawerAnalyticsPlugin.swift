@@ -77,24 +77,30 @@ public struct AnalyticsPlugin: DebugDrawerPlugin {
 
 #if DEBUG
     /// Reads the model and hands its events to `AnalyticsEventsView`, keeping the filter and which
-    /// event is open; while it is on screen, every event is seen.
+    /// event is open; while it is on screen, every event is seen. What it shows and copies is
+    /// masked by the redaction rules of the drawer it is shown in, followed as they change.
     struct AnalyticsPluginView: View {
         @ObservedObject var model: AnalyticsEventsModel
-        @ObservedObject private var drawer = DebugDrawer.shared
+        /// The drawer the plugin is shown in; `nil` outside any drawer.
+        @Environment(\.showingDrawer) var showingDrawer
         @State private var query = ""
         @State private var selected: AnalyticsEvent.ID?
+        let inspection = Inspection<Self>() // from/for ViewInspector.
 
         var body: some View {
-            AnalyticsEventsView(
-                events: model.events,
-                capacity: model.log.capacity,
-                query: $query,
-                selected: $selected,
-                redaction: drawer.redaction,
-                onClear: { model.clear() }
-            )
-            .onAppear { model.setShowing(true) }
-            .onDisappear { model.setShowing(false) }
+            DebugDrawerRedactionReader(showingDrawer) { redaction in
+                AnalyticsEventsView(
+                    events: model.events,
+                    capacity: model.log.capacity,
+                    query: $query,
+                    selected: $selected,
+                    redaction: redaction,
+                    onClear: { model.clear() }
+                )
+                .onAppear { model.setShowing(true) }
+                .onDisappear { model.setShowing(false) }
+            }
+            .onReceive(inspection.notice) { inspection.visit(self, $0) }
         }
     }
 
