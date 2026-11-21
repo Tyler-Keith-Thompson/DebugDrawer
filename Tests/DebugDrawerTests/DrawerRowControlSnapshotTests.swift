@@ -1,6 +1,6 @@
 // iOS draws the row's controls with UIKit and scales text with Dynamic Type, so these run on the
 // iOS simulator.
-#if os(iOS) && !targetEnvironment(macCatalyst)
+#if os(iOS) && !targetEnvironment(macCatalyst) && canImport(SnapshotTesting)
     import DebugDrawer
     import SnapshotTesting
     import SwiftUI

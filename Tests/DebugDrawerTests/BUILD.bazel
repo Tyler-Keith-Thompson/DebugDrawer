@@ -4,6 +4,7 @@ load("@rules_apple//apple:macos.bzl", "macos_unit_test")
 load("@rules_apple//apple:tvos.bzl", "tvos_unit_test")
 load("@rules_apple//apple:visionos.bzl", "visionos_unit_test")
 load("@rules_apple//apple:watchos.bzl", "watchos_unit_test")
+load("//tools:catalyst.bzl", "catalyst_test")
 load("//tools:swift_rules.bzl", "swift_library", "swift_test")
 
 # The tests, built once and linked into two runners.
@@ -42,6 +43,10 @@ swift_library(
         "@platforms//os:watchos": [
             "@swiftpkg_viewinspector//:ViewInspector",
             "@swiftpkg_swift_snapshot_testing//:SnapshotTesting",
+            "@swiftpkg_xctest_dynamic_overlay//:IssueReportingTestSupport",
+        ],
+        "//tools:catalyst": [
+            "@swiftpkg_viewinspector//:ViewInspector",
             "@swiftpkg_xctest_dynamic_overlay//:IssueReportingTestSupport",
         ],
         "//conditions:default": [],
@@ -104,4 +109,14 @@ watchos_unit_test(
     runner = "//tools:watchos_test_runner",
     tags = ["debug-only", "resources:simulator:1"],
     deps = [":DebugDrawerTestsLibrary"],
+)
+
+# `bazel test` / `just test` for Mac Catalyst: the swift_test above, built with the Catalyst
+# target triple by //tools:catalyst.bzl and run on the Mac (CATALYST_TESTS in scripts/modules.py).
+catalyst_test(
+    name = "DebugDrawerTests_macCatalyst",
+    size = "small",
+    minimum_os_version = "17.0",
+    tags = ["debug-only"],
+    test = ":DebugDrawerTests",
 )

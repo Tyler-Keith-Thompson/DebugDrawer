@@ -228,6 +228,16 @@ BAZEL_TESTED_PLATFORM_EXCLUDED_PACKAGES = {
 # rule would still build for macOS.
 CATALYST_MODULES = ["DebugDrawerReceiver", "DebugDrawerTweaks", "DebugDrawerAnalytics", "DebugDrawerLocalization", "DebugDrawerAccessibility", "DebugDrawer", "DebugDrawerAnalyticsPlugin", "DebugDrawerDatabaseBrowserPlugin", "DebugDrawerLocalizationPlugin", "DebugDrawerScreenRecordingPlugin", "DebugDrawerDesignOverlayPlugin", "DebugDrawerColorVisionPlugin", "DebugDrawerAppStateReset", "DebugDrawerAppStateResetPlugin"]
 
+# Test targets that also run for Mac Catalyst under Bazel: a `catalyst_test` (tools/catalyst.bzl),
+# `<name>_macCatalyst`, builds the target's swift_test with the CATALYST_MODULES' Catalyst triple
+# and runs it on the Mac, so `just test` runs the `targetEnvironment(macCatalyst)` branches. Its
+# library leaves out the Apple-only packages that don't build for Catalyst
+# (APPLE_ONLY_PACKAGE_EXCLUDED_PLATFORMS), and the tests that need one sit under
+# `#if canImport(...)`. Its first-party dependencies must be CATALYST_MODULES, and its packages
+# Swift alone, as for CATALYST_MODULES. `just spm-catalyst-test` runs every test target for
+# Catalyst through SwiftPM.
+CATALYST_TESTS = ["DebugDrawerTests"]
+
 # Modules whose every public symbol must have a doc comment. Their DocC archive, and so `just docs`,
 # fails on one that has none (tools/documentation_coverage.py, run by docc_archive's
 # `require_documentation`). Checked against the debug build's symbol graph, which holds the drawer
@@ -505,6 +515,12 @@ def check():
         assert name not in IOS_MODULES, f"{name} is in IOS_MODULES, so it can't build for Mac Catalyst"
         for d in dict((m[0], m[3]) for m in MODULES)[name]:
             assert "/" not in d and d in CATALYST_MODULES, f"{name} builds for Mac Catalyst, so its dependency {d} must be listed for it"
+    for name in CATALYST_TESTS:
+        assert name in tests, f"CATALYST_TESTS names unknown test target {name}"
+        assert not simulator_test(name), f"{name} runs in the iOS simulator, so it can't run for Mac Catalyst"
+        assert name not in PERFORMANCE_TESTS, f"{name} is in PERFORMANCE_TESTS, which CATALYST_TESTS doesn't support"
+        for d in dict(TEST_TARGETS)[name]:
+            assert "/" in d or d in CATALYST_MODULES, f"{name} runs for Mac Catalyst, so its dependency {d} must be in CATALYST_MODULES"
     # The charter's vertical modules: a plugin depends on core and Apple's frameworks alone, so an
     # app links only the tools it picks. Console's OSLogClient is the one package allowed.
     # A capability (a plugin's release-build half) depends on the receiver alone, and only its own
@@ -601,7 +617,7 @@ def apple_only(d):
 
 def bazel_deps(deps, platforms=()):
     """A `deps` attribute, or nothing when there are none; Apple-only products sit in a `select` on
-    macOS and on each of `platforms` (EXTRA_PLATFORMS names) that builds them."""
+    macOS and on each of `platforms` (EXTRA_PLATFORMS names, or macCatalyst) that builds them."""
     if not deps:
         return ""
     listed = "".join(f'        "{bazel_label(d)}",\n' for d in deps if not apple_only(d))
@@ -612,7 +628,9 @@ def bazel_deps(deps, platforms=()):
                         if apple_only(d) and platform not in APPLE_ONLY_PACKAGE_EXCLUDED_PLATFORMS.get(d.split("/")[0], [])
                         and d.split("/")[0] not in BAZEL_TESTED_PLATFORM_EXCLUDED_PACKAGES.get(platform, []))
         if apple:
-            branches += f'        "@platforms//os:{platform.lower()}": [\n{apple}        ],\n'
+            # Catalyst is a macOS configuration (tools/catalyst.bzl), told apart by a config setting.
+            key = "//tools:catalyst" if platform == "macCatalyst" else f"@platforms//os:{platform.lower()}"
+            branches += f'        "{key}": [\n{apple}        ],\n'
     if branches:
         text += (
             " + select({\n"
@@ -1004,7 +1022,7 @@ def test_targets_bazel(name, deps, size, srcs, tags, test_tags=()):
         f"{tags_attr}"
         "    # Read by //:package_swift_test, which checks Package.swift against the Bazel graph.\n"
         '    visibility = ["//:__pkg__"],\n'
-        f"{bazel_deps(deps, [platform for platform, _ in tested_platforms(name)])}"
+        f"{bazel_deps(deps, [platform for platform, _ in tested_platforms(name)] + (['macCatalyst'] if name in CATALYST_TESTS else []))}"
         ")\n\n"
         "# `bazel test` / `just test`: a standalone executable, fast to start and run in Bazel's sandbox.\n"
         "swift_test(\n"
@@ -1028,6 +1046,7 @@ def test_targets_bazel(name, deps, size, srcs, tags, test_tags=()):
         f'    deps = [":{name}Library"],\n'
         ")\n"
         + "".join(platform_test_bazel(name, platform, minimum, tags) for platform, minimum in tested_platforms(name))
+        + (catalyst_test_bazel(name, size, tags) if name in CATALYST_TESTS else "")
     )
 
 
@@ -1059,6 +1078,22 @@ def platform_test_bazel(name, platform, minimum, tags):
         f"{tags_attr}"
         f"{host[1]}"
         f'    deps = [":{name}Library"],\n'
+        ")\n"
+    )
+
+
+def catalyst_test_bazel(name, size, tags):
+    """The catalyst_test that builds test target `name`'s swift_test for Mac Catalyst and runs it."""
+    tags_attr = f"    tags = {list(tags)},\n".replace("'", '"') if tags else ""
+    return (
+        "\n# `bazel test` / `just test` for Mac Catalyst: the swift_test above, built with the Catalyst\n"
+        "# target triple by //tools:catalyst.bzl and run on the Mac (CATALYST_TESTS in scripts/modules.py).\n"
+        "catalyst_test(\n"
+        f'    name = "{name}_macCatalyst",\n'
+        f'    size = "{size}",\n'
+        f'    minimum_os_version = "{IOS_MINIMUM}",\n'
+        f"{tags_attr}"
+        f'    test = ":{name}",\n'
         ")\n"
     )
 
@@ -1118,9 +1153,11 @@ def test_build_bazel(name, deps):
         f'load("@rules_apple//apple:{platform}.bzl", "{platform}_unit_test")\n'
         for platform in sorted(["macos", *(platform.lower() for platform, _ in tested_platforms(name))])
     )
+    catalyst_load = 'load("//tools:catalyst.bzl", "catalyst_test")\n' if name in CATALYST_TESTS else ""
     header = (
         "# GENERATED by scripts/modules.py — edit the table there, then run `just modules`.\n\n"
         f"{unit_test_loads}"
+        f"{catalyst_load}"
         'load("//tools:swift_rules.bzl", "swift_library", "swift_test")\n\n'
     )
     excluded_note = (

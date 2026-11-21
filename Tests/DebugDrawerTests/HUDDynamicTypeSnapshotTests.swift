@@ -1,5 +1,5 @@
 // iOS scales text with Dynamic Type, so the large-text snapshots run on the iOS simulator.
-#if os(iOS) && !targetEnvironment(macCatalyst)
+#if os(iOS) && !targetEnvironment(macCatalyst) && canImport(SnapshotTesting)
     import SnapshotTesting
     import SwiftUI
     import Testing

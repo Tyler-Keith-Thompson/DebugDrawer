@@ -1,5 +1,5 @@
 // Views render on the Mac; the snapshot packages are linked on Apple platforms only.
-#if os(macOS)
+#if os(macOS) && canImport(SnapshotTesting)
     @testable import DebugDrawer
     import AppKit
     import SnapshotTesting

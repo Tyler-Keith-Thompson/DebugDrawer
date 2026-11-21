@@ -1,5 +1,5 @@
 // iOS scales text with Dynamic Type, so the drawer's iOS snapshots run on the iOS simulator.
-#if os(iOS) && !targetEnvironment(macCatalyst)
+#if os(iOS) && !targetEnvironment(macCatalyst) && canImport(SnapshotTesting)
     @testable import DebugDrawer
     import SnapshotTesting
     import SwiftUI

@@ -2,6 +2,7 @@
 
 load("@rules_apple//apple/testing/default_runner:ios_xctestrun_runner.bzl", "ios_xctestrun_runner")
 load("@rules_shell//shell:sh_binary.bzl", "sh_binary")
+load(":catalyst.bzl", "catalyst_build_setting")
 load(":python_test.bzl", "python_test")
 load(":simulator_test_runner.bzl", "simulator_test_runner")
 
@@ -67,6 +68,23 @@ simulator_test_runner(
     platform_name = "watchOS",
     runtime_platform = "watchOS",
     simulator_platform = "WatchSimulator",
+    visibility = ["//visibility:public"],
+)
+
+# Mac Catalyst (tools/catalyst.bzl): true where catalyst_build_test and catalyst_test build their
+# targets. Not a flag to set by hand: only their transition gives it the Catalyst target triple.
+catalyst_build_setting(
+    name = "catalyst_build",
+    build_setting_default = False,
+    visibility = ["//visibility:public"],
+)
+
+# A `select` key for code built for Mac Catalyst. It names macOS too, so where both match it wins
+# over `@platforms//os:macos`: a Catalyst build is a macOS configuration.
+config_setting(
+    name = "catalyst",
+    constraint_values = ["@platforms//os:macos"],
+    flag_values = {":catalyst_build": "True"},
     visibility = ["//visibility:public"],
 )
 
