@@ -5,12 +5,17 @@
     import SwiftUI
     import Testing
 
-    // Serialized: these tests attach windows to the one shared drawer.
+    // Each test makes a drawer of its own over a UserDefaults suite named for the test, removed
+    // when the test ends.
     @MainActor
-    @Suite("Drawer hit testing", .serialized)
+    @Suite("Drawer hit testing")
     struct DrawerHitTestingTests {
         @Test("While the drawer is open, a click beside the panel lands in the app's window, outside the panel's")
         func clickBesidePanelReachesApp() throws {
+            let suite = "DrawerHitTestingTests.\(#function).\(UUID().uuidString)"
+            let defaults = try #require(UserDefaults(suiteName: suite))
+            defer { defaults.removePersistentDomain(forName: suite) }
+            let drawer = DebugDrawer(defaults: defaults)
             // Borderless and far off screen: ordered in, so the panel can be, but never seen.
             let window = NSWindow(
                 contentRect: CGRect(x: -30000, y: -30000, width: 900, height: 600),
@@ -20,8 +25,8 @@
             window.contentView = NSHostingView(rootView: Color.red.frame(width: 900, height: 600))
             window.orderFront(nil)
             defer { window.close() }
-            DebugDrawer.shared.attach(to: window)
-            let attachment = try #require(DebugDrawer.shared.attachments.first { $0.window === window })
+            drawer.attach(to: window)
+            let attachment = try #require(drawer.attachments.first { $0.window === window })
             attachment.presentation.isOpen = true
             // 100 points from the window's leading edge; the panel is 316 points at the trailing edge.
             let besidePanel = CGPoint(x: window.frame.minX + 100, y: window.frame.midY)
@@ -37,6 +42,10 @@
 
         @Test("While the drawer is closed, its panel is off screen, so a click anywhere reaches the app")
         func clickWhileClosedReachesApp() throws {
+            let suite = "DrawerHitTestingTests.\(#function).\(UUID().uuidString)"
+            let defaults = try #require(UserDefaults(suiteName: suite))
+            defer { defaults.removePersistentDomain(forName: suite) }
+            let drawer = DebugDrawer(defaults: defaults)
             let window = NSWindow(
                 contentRect: CGRect(x: -30000, y: -30000, width: 900, height: 600),
                 styleMask: .borderless, backing: .buffered, defer: false
@@ -45,8 +54,8 @@
             window.contentView = NSHostingView(rootView: Color.red.frame(width: 900, height: 600))
             window.orderFront(nil)
             defer { window.close() }
-            DebugDrawer.shared.attach(to: window)
-            let attachment = try #require(DebugDrawer.shared.attachments.first { $0.window === window })
+            drawer.attach(to: window)
+            let attachment = try #require(drawer.attachments.first { $0.window === window })
 
             let actual = attachment.panel.isVisible
 
@@ -68,11 +77,15 @@
         // NSApplication.
         #if !targetEnvironment(macCatalyst)
             @Test("While the drawer is open, its window takes a touch on the panel and lets one beside it fall through to the app's windows")
-            func touchBesidePanelFallsThrough() {
+            func touchBesidePanelFallsThrough() throws {
+                let suite = "DrawerHitTestingTests.\(#function).\(UUID().uuidString)"
+                let defaults = try #require(UserDefaults(suiteName: suite))
+                defer { defaults.removePersistentDomain(forName: suite) }
+                let drawer = DebugDrawer(defaults: defaults)
                 let presentation = DrawerPresentation()
                 presentation.isOpen = true
                 presentation.panelFrame = CGRect(x: 700, y: 20, width: 316, height: 728)
-                let sut = DrawerSceneWindow(scene: nil, drawer: .shared, presentation: presentation)
+                let sut = DrawerSceneWindow(scene: nil, drawer: drawer, presentation: presentation)
                 sut.frame = CGRect(x: 0, y: 0, width: 1024, height: 768)
                 sut.isHidden = false
                 defer { sut.isHidden = true }
@@ -88,10 +101,14 @@
             }
 
             @Test("While the drawer is closed, its window takes no touch, even where the panel was")
-            func touchWhileClosedFallsThrough() {
+            func touchWhileClosedFallsThrough() throws {
+                let suite = "DrawerHitTestingTests.\(#function).\(UUID().uuidString)"
+                let defaults = try #require(UserDefaults(suiteName: suite))
+                defer { defaults.removePersistentDomain(forName: suite) }
+                let drawer = DebugDrawer(defaults: defaults)
                 let presentation = DrawerPresentation()
                 presentation.panelFrame = CGRect(x: 700, y: 20, width: 316, height: 728)
-                let sut = DrawerSceneWindow(scene: nil, drawer: .shared, presentation: presentation)
+                let sut = DrawerSceneWindow(scene: nil, drawer: drawer, presentation: presentation)
                 sut.frame = CGRect(x: 0, y: 0, width: 1024, height: 768)
                 let wherePanelWas = CGPoint(x: 800, y: 384)
 
@@ -101,12 +118,16 @@
             }
 
             @Test("While a compact drawer is open, its window takes a touch outside the panel, where its backdrop closes the drawer")
-            func touchOutsideCompactPanelIsTaken() {
+            func touchOutsideCompactPanelIsTaken() throws {
+                let suite = "DrawerHitTestingTests.\(#function).\(UUID().uuidString)"
+                let defaults = try #require(UserDefaults(suiteName: suite))
+                defer { defaults.removePersistentDomain(forName: suite) }
+                let drawer = DebugDrawer(defaults: defaults)
                 let presentation = DrawerPresentation()
                 presentation.isOpen = true
                 presentation.layout = .compact
                 presentation.panelFrame = CGRect(x: 8, y: 70, width: 386, height: 760)
-                let sut = DrawerSceneWindow(scene: nil, drawer: .shared, presentation: presentation)
+                let sut = DrawerSceneWindow(scene: nil, drawer: drawer, presentation: presentation)
                 sut.frame = CGRect(x: 0, y: 0, width: 402, height: 874)
                 sut.isHidden = false
                 defer { sut.isHidden = true }

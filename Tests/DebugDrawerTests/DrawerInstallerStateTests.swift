@@ -24,8 +24,8 @@
     struct DrawerInstallerStateTests {
         @Test("A drawer makes its object for a type once and hands the same one back, apart from another drawer's and another type's")
         func keptPerDrawerAndType() throws {
-            let firstSuite = "DrawerInstallerStateTests.\(UUID().uuidString)"
-            let secondSuite = "DrawerInstallerStateTests.\(UUID().uuidString)"
+            let firstSuite = "DrawerInstallerStateTests.\(#function).first.\(UUID().uuidString)"
+            let secondSuite = "DrawerInstallerStateTests.\(#function).second.\(UUID().uuidString)"
             defer {
                 UserDefaults().removePersistentDomain(forName: firstSuite)
                 UserDefaults().removePersistentDomain(forName: secondSuite)
@@ -51,7 +51,7 @@
 
         @Test("A drawer lets go of what it kept as it goes")
         func releasedWithTheDrawer() throws {
-            let suite = "DrawerInstallerStateTests.\(UUID().uuidString)"
+            let suite = "DrawerInstallerStateTests.\(#function).\(UUID().uuidString)"
             defer { UserDefaults().removePersistentDomain(forName: suite) }
             weak var kept: InstalledCounter?
 

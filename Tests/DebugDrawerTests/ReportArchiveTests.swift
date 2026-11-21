@@ -9,11 +9,12 @@
     struct ReportArchiveTests {
         @Test("Create Report zips a summary and every adopter's files, each text, JSON, HAR or PNG, redacted, and nothing of a non-adopter")
         func createReportWritesTheArchive() throws {
+            let suite = "ReportArchiveTests.\(#function).\(UUID().uuidString)"
+            let defaults = try #require(UserDefaults(suiteName: suite))
+            defer { defaults.removePersistentDomain(forName: suite) }
+            let drawer = DebugDrawer(defaults: defaults)
             let workspace = FileManager.default.temporaryDirectory.appendingPathComponent("ReportArchiveTests-\(UUID().uuidString)")
             defer { try? FileManager.default.removeItem(at: workspace) }
-            let drawer = DebugDrawer.shared
-            let previousRedaction = drawer.redaction
-            drawer.redaction = .standard
             drawer.registerGlobal(ReportSilentPlugin())
             drawer.registerGlobal(ReportNotesPlugin())
             drawer.registerGlobal(ReportHeadersPlugin())
@@ -21,12 +22,6 @@
             let allowedExtensions: Set = ["txt", "json", "har", "png"]
 
             let zip = Result { try drawer.createReport(in: workspace.appendingPathComponent("out")) }
-
-            // Leave the shared drawer as the other suites expect it, within this one main-actor turn.
-            drawer.unregisterGlobal(id: ReportSilentPlugin().id)
-            drawer.unregisterGlobal(id: ReportNotesPlugin().id)
-            drawer.unregisterGlobal(id: ReportHeadersPlugin().id)
-            drawer.redaction = previousRedaction
 
             let unzipped = workspace.appendingPathComponent("unzipped")
             let ditto = Process()

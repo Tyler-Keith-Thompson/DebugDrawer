@@ -13,23 +13,20 @@
         var hud: Text? { Text("42 FPS") }
     }
 
-    // Serialized: these tests attach windows to the one shared drawer, and pin and post to it.
+    // Each test that needs a drawer makes one of its own over a UserDefaults suite named for the
+    // test, removed when the test ends.
     @MainActor
-    @Suite("Drawer HUD and toast windows", .serialized)
+    @Suite("Drawer HUD and toast windows")
     struct DrawerChromeWindowTests {
         @Test("An AppKit window attached with attach(to:) shows the HUD at its corner and the toast top trailing, each in a panel just its size")
         func attachedWindowShowsHUDAndToast() throws {
-            let drawer = DebugDrawer.shared
-            let previous = drawer.hudLayout
+            let suite = "DrawerChromeWindowTests.\(#function).\(UUID().uuidString)"
+            let defaults = try #require(UserDefaults(suiteName: suite))
+            defer { defaults.removePersistentDomain(forName: suite) }
+            let drawer = DebugDrawer(defaults: defaults)
             drawer.registerGlobal(ChromeReadoutPlugin())
-            drawer.hudLayout = HUDLayout()
             drawer.hudLayout.pinned = ["ChromeReadoutPlugin"]
             drawer.postToast("Saved the order", fromPlugin: "ChromeReadoutPlugin")
-            defer {
-                drawer.dismissToast()
-                drawer.hudLayout = previous
-                drawer.unregisterGlobal(id: "ChromeReadoutPlugin")
-            }
             // Borderless and far off screen: ordered in, so the panels can be, but never seen.
             let window = NSWindow(
                 contentRect: CGRect(x: -30000, y: -30000, width: 900, height: 600),
@@ -64,98 +61,15 @@
             ))
         }
 
-        @Test("A debugDrawer() window and an AppKit window attached with attach(to:) show the same HUD and toast")
-        func bothEntryPointsShowTheSameChrome() throws {
-            let drawer = DebugDrawer.shared
-            let previous = drawer.hudLayout
-            drawer.registerGlobal(ChromeReadoutPlugin())
-            drawer.hudLayout = HUDLayout()
-            drawer.hudLayout.pinned = ["ChromeReadoutPlugin"]
-            drawer.postToast("Saved the order", fromPlugin: "ChromeReadoutPlugin")
-            defer {
-                drawer.dismissToast()
-                drawer.hudLayout = previous
-                drawer.unregisterGlobal(id: "ChromeReadoutPlugin")
-            }
-            let swiftUIWindow = NSWindow(
-                contentRect: CGRect(x: -30000, y: -30000, width: 900, height: 600),
-                styleMask: .borderless, backing: .buffered, defer: false
-            )
-            let appKitWindow = NSWindow(
-                contentRect: CGRect(x: -31000, y: -30000, width: 900, height: 600),
-                styleMask: .borderless, backing: .buffered, defer: false
-            )
-            let host = NSHostingView(rootView: Text("SwiftUI").frame(width: 900, height: 600).debugDrawer())
-            swiftUIWindow.contentView = host
-            appKitWindow.contentView = NSTextField(labelWithString: "AppKit")
-            for window in [swiftUIWindow, appKitWindow] {
-                window.isReleasedWhenClosed = false
-                window.orderFront(nil)
-            }
-            defer { [swiftUIWindow, appKitWindow].forEach { $0.close() } }
-            host.layoutSubtreeIfNeeded()
-
-            drawer.attach(to: appKitWindow)
-            let swiftUIDrawer = try #require(drawer.attachments.first { $0.window === swiftUIWindow })
-            let appKitDrawer = try #require(drawer.attachments.first { $0.window === appKitWindow })
-            let panels = [swiftUIDrawer.hud, swiftUIDrawer.toast, appKitDrawer.hud, appKitDrawer.toast]
-            for panel in panels {
-                panel.contentView?.subviews.first?.layoutSubtreeIfNeeded()
-            }
-
-            #expect(panels.allSatisfy { $0.isVisible && $0.alphaValue == 1 })
-            #expect(swiftUIDrawer.hud.frame.size == appKitDrawer.hud.frame.size)
-            #expect(swiftUIDrawer.toast.frame.size == appKitDrawer.toast.frame.size)
-            #expect(swiftUIDrawer.hud.frame.offsetBy(dx: -1000, dy: 0) == appKitDrawer.hud.frame)
-            #expect(swiftUIDrawer.toast.frame.offsetBy(dx: -1000, dy: 0) == appKitDrawer.toast.frame)
-        }
-
-        @Test("A window with both debugDrawer() and attach(to:) has one HUD and one toast")
-        func bothInOneWindowDrawOnce() throws {
-            let drawer = DebugDrawer.shared
-            let previous = drawer.hudLayout
-            drawer.registerGlobal(ChromeReadoutPlugin())
-            drawer.hudLayout = HUDLayout()
-            drawer.hudLayout.pinned = ["ChromeReadoutPlugin"]
-            drawer.postToast("Saved the order", fromPlugin: "ChromeReadoutPlugin")
-            defer {
-                drawer.dismissToast()
-                drawer.hudLayout = previous
-                drawer.unregisterGlobal(id: "ChromeReadoutPlugin")
-            }
-            let window = NSWindow(
-                contentRect: CGRect(x: -30000, y: -30000, width: 900, height: 600),
-                styleMask: .borderless, backing: .buffered, defer: false
-            )
-            window.isReleasedWhenClosed = false
-            let host = NSHostingView(rootView: Text("SwiftUI").frame(width: 900, height: 600).debugDrawer())
-            window.contentView = host
-            window.orderFront(nil)
-            defer { window.close() }
-            host.layoutSubtreeIfNeeded()
-
-            drawer.attach(to: window)
-
-            let attachments = drawer.attachments.filter { $0.window === window }
-            let chrome = (window.childWindows ?? []).compactMap { $0 as? DrawerChromePanel }
-            #expect(attachments.count == 1)
-            #expect(chrome.filter { $0.role == .hud }.count == 1)
-            #expect(chrome.filter { $0.role == .toast }.count == 1)
-        }
-
         @Test("A click beside the HUD and the toast lands in the app's window: neither panel covers it")
         func clickBesideChromeReachesApp() throws {
-            let drawer = DebugDrawer.shared
-            let previous = drawer.hudLayout
+            let suite = "DrawerChromeWindowTests.\(#function).\(UUID().uuidString)"
+            let defaults = try #require(UserDefaults(suiteName: suite))
+            defer { defaults.removePersistentDomain(forName: suite) }
+            let drawer = DebugDrawer(defaults: defaults)
             drawer.registerGlobal(ChromeReadoutPlugin())
-            drawer.hudLayout = HUDLayout()
             drawer.hudLayout.pinned = ["ChromeReadoutPlugin"]
             drawer.postToast("Saved the order", fromPlugin: "ChromeReadoutPlugin")
-            defer {
-                drawer.dismissToast()
-                drawer.hudLayout = previous
-                drawer.unregisterGlobal(id: "ChromeReadoutPlugin")
-            }
             let window = NSWindow(
                 contentRect: CGRect(x: -30000, y: -30000, width: 900, height: 600),
                 styleMask: .borderless, backing: .buffered, defer: false
@@ -183,7 +97,7 @@
 
         @Test("With nothing pinned and no toast, the HUD and toast panels are clear and ignore the mouse")
         func emptyPanelsLetClicksThrough() throws {
-            let suite = "DrawerChromeWindowTests.\(UUID().uuidString)"
+            let suite = "DrawerChromeWindowTests.\(#function).\(UUID().uuidString)"
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let drawer = DebugDrawer(defaults: defaults)
@@ -208,7 +122,7 @@
 
         @Test("Dragging the HUD moves its panel with the mouse, kept inside the window, and saves where it was dropped")
         func draggingMovesThePanel() throws {
-            let suite = "DrawerChromeWindowTests.\(UUID().uuidString)"
+            let suite = "DrawerChromeWindowTests.\(#function).\(UUID().uuidString)"
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let drawer = DebugDrawer(defaults: defaults)
@@ -271,16 +185,12 @@
 
         @Test("A readout in an attached window's HUD panel makes its plugin visible, once per window")
         func hudPanelReportsVisibility() throws {
-            let drawer = DebugDrawer.shared
-            let previous = drawer.hudLayout
+            let suite = "DrawerChromeWindowTests.\(#function).\(UUID().uuidString)"
+            let defaults = try #require(UserDefaults(suiteName: suite))
+            defer { defaults.removePersistentDomain(forName: suite) }
+            let drawer = DebugDrawer(defaults: defaults)
             drawer.registerGlobal(ChromeReadoutPlugin())
-            drawer.hudLayout = HUDLayout()
             drawer.hudLayout.pinned = ["ChromeReadoutPlugin"]
-            defer {
-                drawer.hudLayout = previous
-                drawer.unregisterGlobal(id: "ChromeReadoutPlugin")
-            }
-            let before = drawer.visibleContentCounts["ChromeReadoutPlugin", default: 0]
             let window = NSWindow(
                 contentRect: CGRect(x: -30000, y: -30000, width: 900, height: 600),
                 styleMask: .borderless, backing: .buffered, defer: false
@@ -294,7 +204,94 @@
             let attachment = try #require(drawer.attachments.first { $0.window === window })
             attachment.hud.contentView?.subviews.first?.layoutSubtreeIfNeeded()
 
-            #expect(drawer.visibleContentCounts["ChromeReadoutPlugin", default: 0] == before + 1)
+            #expect(drawer.visibleContentCounts["ChromeReadoutPlugin", default: 0] == 1)
+        }
+    }
+
+    // debugDrawer() shows the shared drawer, so these tests stay on it, in the serialized suite of
+    // the shared drawer's tests.
+    extension SharedDrawerTests {
+        @MainActor
+        @Suite("Drawer HUD and toast windows under debugDrawer()")
+        struct SharedDrawerChromeWindowTests {
+            @Test("A debugDrawer() window and an AppKit window attached with attach(to:) show the same HUD and toast")
+            func bothEntryPointsShowTheSameChrome() throws {
+                let drawer = DebugDrawer.shared
+                let previous = drawer.hudLayout
+                drawer.registerGlobal(ChromeReadoutPlugin())
+                drawer.hudLayout = HUDLayout()
+                drawer.hudLayout.pinned = ["ChromeReadoutPlugin"]
+                drawer.postToast("Saved the order", fromPlugin: "ChromeReadoutPlugin")
+                defer {
+                    drawer.dismissToast()
+                    drawer.hudLayout = previous
+                    drawer.unregisterGlobal(id: "ChromeReadoutPlugin")
+                }
+                let swiftUIWindow = NSWindow(
+                    contentRect: CGRect(x: -30000, y: -30000, width: 900, height: 600),
+                    styleMask: .borderless, backing: .buffered, defer: false
+                )
+                let appKitWindow = NSWindow(
+                    contentRect: CGRect(x: -31000, y: -30000, width: 900, height: 600),
+                    styleMask: .borderless, backing: .buffered, defer: false
+                )
+                let host = NSHostingView(rootView: Text("SwiftUI").frame(width: 900, height: 600).debugDrawer())
+                swiftUIWindow.contentView = host
+                appKitWindow.contentView = NSTextField(labelWithString: "AppKit")
+                for window in [swiftUIWindow, appKitWindow] {
+                    window.isReleasedWhenClosed = false
+                    window.orderFront(nil)
+                }
+                defer { [swiftUIWindow, appKitWindow].forEach { $0.close() } }
+                host.layoutSubtreeIfNeeded()
+
+                drawer.attach(to: appKitWindow)
+                let swiftUIDrawer = try #require(drawer.attachments.first { $0.window === swiftUIWindow })
+                let appKitDrawer = try #require(drawer.attachments.first { $0.window === appKitWindow })
+                let panels = [swiftUIDrawer.hud, swiftUIDrawer.toast, appKitDrawer.hud, appKitDrawer.toast]
+                for panel in panels {
+                    panel.contentView?.subviews.first?.layoutSubtreeIfNeeded()
+                }
+
+                #expect(panels.allSatisfy { $0.isVisible && $0.alphaValue == 1 })
+                #expect(swiftUIDrawer.hud.frame.size == appKitDrawer.hud.frame.size)
+                #expect(swiftUIDrawer.toast.frame.size == appKitDrawer.toast.frame.size)
+                #expect(swiftUIDrawer.hud.frame.offsetBy(dx: -1000, dy: 0) == appKitDrawer.hud.frame)
+                #expect(swiftUIDrawer.toast.frame.offsetBy(dx: -1000, dy: 0) == appKitDrawer.toast.frame)
+            }
+
+            @Test("A window with both debugDrawer() and attach(to:) has one HUD and one toast")
+            func bothInOneWindowDrawOnce() throws {
+                let drawer = DebugDrawer.shared
+                let previous = drawer.hudLayout
+                drawer.registerGlobal(ChromeReadoutPlugin())
+                drawer.hudLayout = HUDLayout()
+                drawer.hudLayout.pinned = ["ChromeReadoutPlugin"]
+                drawer.postToast("Saved the order", fromPlugin: "ChromeReadoutPlugin")
+                defer {
+                    drawer.dismissToast()
+                    drawer.hudLayout = previous
+                    drawer.unregisterGlobal(id: "ChromeReadoutPlugin")
+                }
+                let window = NSWindow(
+                    contentRect: CGRect(x: -30000, y: -30000, width: 900, height: 600),
+                    styleMask: .borderless, backing: .buffered, defer: false
+                )
+                window.isReleasedWhenClosed = false
+                let host = NSHostingView(rootView: Text("SwiftUI").frame(width: 900, height: 600).debugDrawer())
+                window.contentView = host
+                window.orderFront(nil)
+                defer { window.close() }
+                host.layoutSubtreeIfNeeded()
+
+                drawer.attach(to: window)
+
+                let attachments = drawer.attachments.filter { $0.window === window }
+                let chrome = (window.childWindows ?? []).compactMap { $0 as? DrawerChromePanel }
+                #expect(attachments.count == 1)
+                #expect(chrome.filter { $0.role == .hud }.count == 1)
+                #expect(chrome.filter { $0.role == .toast }.count == 1)
+            }
         }
     }
 #elseif os(iOS)
@@ -319,7 +316,7 @@
         #if !targetEnvironment(macCatalyst)
             @Test("The HUD window draws the HUD and the toast and takes a touch only on them; one beside them reaches the app's windows")
             func touchesOnlyOnHUDAndToast() throws {
-                let suite = "DrawerChromeWindowTests.\(UUID().uuidString)"
+                let suite = "DrawerChromeWindowTests.\(#function).\(UUID().uuidString)"
                 let defaults = try #require(UserDefaults(suiteName: suite))
                 defer { defaults.removePersistentDomain(forName: suite) }
                 let drawer = DebugDrawer(defaults: defaults)
@@ -356,7 +353,7 @@
             // way stands in for them, as opening a real menu takes a touch.
             @Test("While an added view, such as an open context menu's, is in the HUD window it takes every touch; once it's gone, the app gets them")
             func addedViewTakesEveryTouch() throws {
-                let suite = "DrawerChromeWindowTests.\(UUID().uuidString)"
+                let suite = "DrawerChromeWindowTests.\(#function).\(UUID().uuidString)"
                 let defaults = try #require(UserDefaults(suiteName: suite))
                 defer { defaults.removePersistentDomain(forName: suite) }
                 let drawer = DebugDrawer(defaults: defaults)
@@ -384,7 +381,7 @@
 
             @Test("With nothing pinned and no toast, the drawer's HUD window takes no touch")
             func emptyWindowTakesNoTouch() throws {
-                let suite = "DrawerChromeWindowTests.\(UUID().uuidString)"
+                let suite = "DrawerChromeWindowTests.\(#function).\(UUID().uuidString)"
                 let defaults = try #require(UserDefaults(suiteName: suite))
                 defer { defaults.removePersistentDomain(forName: suite) }
                 let sut = DrawerChromeWindow(scene: nil, drawer: DebugDrawer(defaults: defaults))

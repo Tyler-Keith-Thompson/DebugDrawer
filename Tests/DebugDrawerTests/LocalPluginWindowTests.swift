@@ -10,31 +10,33 @@
 
     #if os(macOS)
         // Real windows, borderless and far off screen: ordered in, so the drawer's panels can be,
-        // but never seen. Serialized: these tests attach windows to the one shared drawer, whose
-        // panels detach through it as their windows close.
+        // but never seen. Each test makes a drawer of its own over a UserDefaults suite named for
+        // the test, removed when the test ends.
         @MainActor
-        @Suite("Local plugins registered for an NSWindow", .serialized)
+        @Suite("Local plugins registered for an NSWindow")
         struct LocalPluginNSWindowTests {
             @Test("registerLocal(_:in:) lists the plugin only in that window's drawer; global plugins in both")
             func listedOnlyInItsWindow() throws {
-                DebugDrawer.shared.registerGlobal(WindowLocalPlugin(id: "window-local.global"))
-                defer { DebugDrawer.shared.unregisterGlobal(id: "window-local.global") }
+                let suite = "LocalPluginNSWindowTests.\(#function).\(UUID().uuidString)"
+                let defaults = try #require(UserDefaults(suiteName: suite))
+                defer { defaults.removePersistentDomain(forName: suite) }
+                let sut = DebugDrawer(defaults: defaults)
+                sut.registerGlobal(WindowLocalPlugin(id: "window-local.global"))
                 let first = OffscreenWindow(left: -30000)
                 let second = OffscreenWindow(left: -31000)
                 defer { [first, second].forEach { $0.close() } }
-                DebugDrawer.shared.attach(to: first)
-                DebugDrawer.shared.attach(to: second)
-                let firstDrawer = try #require(DebugDrawer.shared.attachments.first { $0.window === first })
-                let secondDrawer = try #require(DebugDrawer.shared.attachments.first { $0.window === second })
+                sut.attach(to: first)
+                sut.attach(to: second)
+                let firstDrawer = try #require(sut.attachments.first { $0.window === first })
+                let secondDrawer = try #require(sut.attachments.first { $0.window === second })
                 let expectedFirst = ["window-local.first", "window-local.global"]
                 let expectedSecond = ["window-local.global"]
 
-                let token = DebugDrawer.shared.registerLocal(WindowLocalPlugin(id: "window-local.first"), in: first)
+                sut.registerLocal(WindowLocalPlugin(id: "window-local.first"), in: first)
 
-                defer { DebugDrawer.shared.unregisterLocal(id: "window-local.first", token: token) }
-                let actualFirst = DebugDrawerOverlay(drawer: .shared, presentation: firstDrawer.presentation)
+                let actualFirst = DebugDrawerOverlay(drawer: sut, presentation: firstDrawer.presentation)
                     .allPlugins.map(\.id).filter { $0.hasPrefix("window-local.") }
-                let actualSecond = DebugDrawerOverlay(drawer: .shared, presentation: secondDrawer.presentation)
+                let actualSecond = DebugDrawerOverlay(drawer: sut, presentation: secondDrawer.presentation)
                     .allPlugins.map(\.id).filter { $0.hasPrefix("window-local.") }
                 #expect(actualFirst == expectedFirst)
                 #expect(actualSecond == expectedSecond)
@@ -50,7 +52,10 @@
                     [sheet, parent].forEach { $0.close() }
                 }
                 try #require(sheet.sheetParent === parent)
-                let sut = DebugDrawer(defaults: try #require(UserDefaults(suiteName: "LocalPluginNSWindowTests.sheet")))
+                let suite = "LocalPluginNSWindowTests.\(#function).\(UUID().uuidString)"
+                let defaults = try #require(UserDefaults(suiteName: suite))
+                defer { defaults.removePersistentDomain(forName: suite) }
+                let sut = DebugDrawer(defaults: defaults)
                 let expected = ["window-local.sheet"]
 
                 sut.registerLocal(WindowLocalPlugin(id: "window-local.sheet"), in: sheet)
@@ -67,7 +72,10 @@
                 defer { staying.close() }
                 // A drawer of its own that no window is attached to, so only registerLocal(_:in:)'s
                 // own watch on the window can remove the plugins.
-                let sut = DebugDrawer(defaults: try #require(UserDefaults(suiteName: "LocalPluginNSWindowTests.closing")))
+                let suite = "LocalPluginNSWindowTests.\(#function).\(UUID().uuidString)"
+                let defaults = try #require(UserDefaults(suiteName: suite))
+                defer { defaults.removePersistentDomain(forName: suite) }
+                let sut = DebugDrawer(defaults: defaults)
                 sut.registerLocal(WindowLocalPlugin(id: "window-local.closing.one"), in: closing)
                 sut.registerLocal(WindowLocalPlugin(id: "window-local.closing.two"), in: closing)
                 sut.registerLocal(WindowLocalPlugin(id: "window-local.staying"), in: staying)
@@ -85,7 +93,10 @@
             func unregisterBeforeClosing() throws {
                 let window = OffscreenWindow(left: -30000)
                 defer { window.close() }
-                let sut = DebugDrawer(defaults: try #require(UserDefaults(suiteName: "LocalPluginNSWindowTests.unregister")))
+                let suite = "LocalPluginNSWindowTests.\(#function).\(UUID().uuidString)"
+                let defaults = try #require(UserDefaults(suiteName: suite))
+                defer { defaults.removePersistentDomain(forName: suite) }
+                let sut = DebugDrawer(defaults: defaults)
                 let token = sut.registerLocal(WindowLocalPlugin(id: "window-local.unregister"), in: window)
 
                 sut.unregisterLocal(id: "window-local.unregister", token: token)
@@ -117,7 +128,10 @@
             func listedOnlyInItsScene() throws {
                 let first = NSObject()
                 let second = NSObject()
-                let sut = DebugDrawer(defaults: try #require(UserDefaults(suiteName: "LocalPluginWindowSceneTests.listed")))
+                let suite = "LocalPluginWindowSceneTests.\(#function).\(UUID().uuidString)"
+                let defaults = try #require(UserDefaults(suiteName: suite))
+                defer { defaults.removePersistentDomain(forName: suite) }
+                let sut = DebugDrawer(defaults: defaults)
                 sut.registerGlobal(WindowLocalPlugin(id: "scene-local.global"))
                 let firstDrawer = DrawerPresentation()
                 let secondDrawer = DrawerPresentation()
@@ -141,7 +155,10 @@
             func disconnectingRemovesItsRegistrations() throws {
                 let disconnecting = NSObject()
                 let staying = NSObject()
-                let sut = DebugDrawer(defaults: try #require(UserDefaults(suiteName: "LocalPluginWindowSceneTests.disconnecting")))
+                let suite = "LocalPluginWindowSceneTests.\(#function).\(UUID().uuidString)"
+                let defaults = try #require(UserDefaults(suiteName: suite))
+                defer { defaults.removePersistentDomain(forName: suite) }
+                let sut = DebugDrawer(defaults: defaults)
                 let registrations = [
                     ("scene-local.disconnecting.one", disconnecting),
                     ("scene-local.disconnecting.two", disconnecting),

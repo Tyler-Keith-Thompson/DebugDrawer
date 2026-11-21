@@ -21,83 +21,116 @@
         var body: some View { EmptyView() }
     }
 
-    // Serialized: every test works on the one shared drawer.
-    @MainActor
-    @Suite("Badges and toasts", .serialized)
-    struct BadgeAndToastTests {
-        init() {
-            let drawer = DebugDrawer.shared
-            drawer.close()
-            drawer.dismissToast()
-            drawer.revealRequest = nil
-            for id in drawer.badges.keys {
-                drawer.setBadge(0, forPlugin: id)
+    // A plugin's setBadge(_:), clearBadge() and postToast(_:) reach the shared drawer, so the
+    // tests of them stay on it, in the serialized suite of the shared drawer's tests.
+    extension SharedDrawerTests {
+        @MainActor
+        @Suite("Badges and toasts a plugin raises")
+        struct PluginNoticeTests {
+            init() {
+                let drawer = DebugDrawer.shared
+                drawer.close()
+                drawer.dismissToast()
+                drawer.revealRequest = nil
+                for id in drawer.badges.keys {
+                    drawer.setBadge(0, forPlugin: id)
+                }
+            }
+
+            @Test("A plugin's badge shows its count, and clearing it removes it")
+            func aBadgeShowsItsCountUntilCleared() {
+                let sut = NoticePlugin()
+
+                sut.setBadge(3)
+                let shown = DebugDrawer.shared.badges["DebugDrawerTests.NoticePlugin"]
+                sut.clearBadge()
+
+                #expect(shown == 3)
+                #expect(DebugDrawer.shared.badges["DebugDrawerTests.NoticePlugin"] == nil)
+            }
+
+            @Test("A plugin's posts reach the shared drawer as one toast that counts them")
+            func aPluginsPostsRaiseOneToast() {
+                let sut = NoticePlugin()
+                let expected = DebugDrawerToast(pluginID: "DebugDrawerTests.NoticePlugin", message: "Request 2 failed", count: 2)
+                defer { DebugDrawer.shared.dismissToast() }
+
+                sut.postToast("Request 1 failed")
+                sut.postToast("Request 2 failed")
+
+                #expect(DebugDrawer.shared.toast == expected)
             }
         }
+    }
 
-        @Test("A plugin's badge shows its count, and clearing it removes it")
-        func aBadgeShowsItsCountUntilCleared() {
-            let sut = NoticePlugin()
-
-            sut.setBadge(3)
-            let shown = DebugDrawer.shared.badges["DebugDrawerTests.NoticePlugin"]
-            sut.clearBadge()
-
-            #expect(shown == 3)
-            #expect(DebugDrawer.shared.badges["DebugDrawerTests.NoticePlugin"] == nil)
-        }
-
+    // Each test makes a drawer of its own over a UserDefaults suite named for the test, removed
+    // when the test ends, and posts to it as a plugin's calls post to the shared drawer.
+    @MainActor
+    @Suite("Badges and toasts")
+    struct BadgeAndToastTests {
         @Test("A badge of zero or less clears it")
-        func aBadgeOfZeroOrLessClears() {
-            let sut = NoticePlugin()
-            sut.setBadge(2)
+        func aBadgeOfZeroOrLessClears() throws {
+            let suite = "BadgeAndToastTests.\(#function).\(UUID().uuidString)"
+            let defaults = try #require(UserDefaults(suiteName: suite))
+            defer { defaults.removePersistentDomain(forName: suite) }
+            let sut = DebugDrawer(defaults: defaults)
+            sut.setBadge(2, forPlugin: "DebugDrawerTests.NoticePlugin")
 
-            sut.setBadge(-1)
+            sut.setBadge(-1, forPlugin: "DebugDrawerTests.NoticePlugin")
 
-            #expect(DebugDrawer.shared.badges.isEmpty)
+            #expect(sut.badges.isEmpty)
         }
 
         @Test("A burst of 100 posts from one plugin in one run-loop turn shows a single toast that counts them")
-        func aBurstShowsOneToast() {
-            let sut = NoticePlugin()
+        func aBurstShowsOneToast() throws {
+            let suite = "BadgeAndToastTests.\(#function).\(UUID().uuidString)"
+            let defaults = try #require(UserDefaults(suiteName: suite))
+            defer { defaults.removePersistentDomain(forName: suite) }
+            let sut = DebugDrawer(defaults: defaults)
             let expected = DebugDrawerToast(pluginID: "DebugDrawerTests.NoticePlugin", message: "Request 100 failed", count: 100)
 
             for request in 1 ... 100 {
-                sut.postToast("Request \(request) failed")
+                sut.postToast("Request \(request) failed", fromPlugin: "DebugDrawerTests.NoticePlugin")
             }
 
-            #expect(DebugDrawer.shared.toast == expected)
+            #expect(sut.toast == expected)
         }
 
         @Test("A post from another plugin replaces the toast and restarts its count")
-        func anotherPluginReplacesTheToast() {
-            NoticePlugin().postToast("first")
-            NoticePlugin().postToast("second")
+        func anotherPluginReplacesTheToast() throws {
+            let suite = "BadgeAndToastTests.\(#function).\(UUID().uuidString)"
+            let defaults = try #require(UserDefaults(suiteName: suite))
+            defer { defaults.removePersistentDomain(forName: suite) }
+            let sut = DebugDrawer(defaults: defaults)
+            sut.postToast("first", fromPlugin: "DebugDrawerTests.NoticePlugin")
+            sut.postToast("second", fromPlugin: "DebugDrawerTests.NoticePlugin")
             let expected = DebugDrawerToast(pluginID: "DebugDrawerTests.OtherNoticePlugin", message: "other", count: 1)
 
-            OtherNoticePlugin().postToast("other")
+            sut.postToast("other", fromPlugin: "DebugDrawerTests.OtherNoticePlugin")
 
-            #expect(DebugDrawer.shared.toast == expected)
+            #expect(sut.toast == expected)
         }
 
         @Test("A post while the drawer is open is dropped")
-        func aPostWhileOpenIsDropped() {
-            DebugDrawer.shared.open()
-            defer { DebugDrawer.shared.close() }
+        func aPostWhileOpenIsDropped() throws {
+            let suite = "BadgeAndToastTests.\(#function).\(UUID().uuidString)"
+            let defaults = try #require(UserDefaults(suiteName: suite))
+            defer { defaults.removePersistentDomain(forName: suite) }
+            let sut = DebugDrawer(defaults: defaults)
+            sut.open()
 
-            NoticePlugin().postToast("ignored")
+            sut.postToast("ignored", fromPlugin: "DebugDrawerTests.NoticePlugin")
 
-            #expect(DebugDrawer.shared.toast == nil)
+            #expect(sut.toast == nil)
         }
 
         @Test("Opening a toast opens the drawer at its plugin and removes the toast")
-        func openingAToastRevealsItsPlugin() {
-            NoticePlugin().postToast("Disk write on main")
-            let sut = DebugDrawer.shared
-            defer {
-                sut.close()
-                sut.revealRequest = nil
-            }
+        func openingAToastRevealsItsPlugin() throws {
+            let suite = "BadgeAndToastTests.\(#function).\(UUID().uuidString)"
+            let defaults = try #require(UserDefaults(suiteName: suite))
+            defer { defaults.removePersistentDomain(forName: suite) }
+            let sut = DebugDrawer(defaults: defaults)
+            sut.postToast("Disk write on main", fromPlugin: "DebugDrawerTests.NoticePlugin")
 
             sut.openToast()
 
@@ -107,13 +140,17 @@
         }
 
         @Test("Dismissing a toast removes it and leaves the drawer closed")
-        func dismissingAToastLeavesTheDrawerClosed() {
-            NoticePlugin().postToast("Disk write on main")
+        func dismissingAToastLeavesTheDrawerClosed() throws {
+            let suite = "BadgeAndToastTests.\(#function).\(UUID().uuidString)"
+            let defaults = try #require(UserDefaults(suiteName: suite))
+            defer { defaults.removePersistentDomain(forName: suite) }
+            let sut = DebugDrawer(defaults: defaults)
+            sut.postToast("Disk write on main", fromPlugin: "DebugDrawerTests.NoticePlugin")
 
-            DebugDrawer.shared.dismissToast()
+            sut.dismissToast()
 
-            #expect(DebugDrawer.shared.toast == nil)
-            #expect(!DebugDrawer.shared.isOpen)
+            #expect(sut.toast == nil)
+            #expect(!sut.isOpen)
         }
 
         #if !os(visionOS)

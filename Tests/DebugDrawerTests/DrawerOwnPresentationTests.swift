@@ -15,7 +15,7 @@
     struct DrawerOwnPresentationTests {
         @Test("Toggling a drawer of its own opens and closes it, and the shared drawer neither changes nor publishes")
         func toggleOwnDrawer() throws {
-            let suite = "DrawerOwnPresentationTests.toggleOwnDrawer"
+            let suite = "DrawerOwnPresentationTests.\(#function).\(UUID().uuidString)"
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let sut = DebugDrawer(defaults: defaults)
@@ -42,7 +42,7 @@
 
         @Test("Opening and closing a drawer of its own publish each change through its $isOpen, and repeating either publishes nothing more")
         func openAndCloseOwnDrawer() throws {
-            let suite = "DrawerOwnPresentationTests.openAndCloseOwnDrawer"
+            let suite = "DrawerOwnPresentationTests.\(#function).\(UUID().uuidString)"
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let sut = DebugDrawer(defaults: defaults)
@@ -77,7 +77,7 @@
         #if os(macOS)
             @Test("toggle(in:) on a drawer of its own opens and closes that window's drawer and updates its isOpen, not the shared drawer's")
             func toggleInWindowOnOwnDrawer() throws {
-                let suite = "DrawerOwnPresentationTests.toggleInWindowOnOwnDrawer"
+                let suite = "DrawerOwnPresentationTests.\(#function).\(UUID().uuidString)"
                 let defaults = try #require(UserDefaults(suiteName: suite))
                 defer { defaults.removePersistentDomain(forName: suite) }
                 // Borderless, far off screen and never ordered in: a real window that is never

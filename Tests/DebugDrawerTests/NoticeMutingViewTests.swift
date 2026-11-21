@@ -19,7 +19,7 @@
     struct NoticeMutingViewTests {
         @Test("A global plugin's section header menu silences its notices with Silence Notices")
         func contextMenuSilences() throws {
-            let name = "NoticeMutingViewTests.\(UUID().uuidString)"
+            let name = "NoticeMutingViewTests.\(#function).\(UUID().uuidString)"
             let suite = try #require(UserDefaults(suiteName: name))
             defer { suite.removePersistentDomain(forName: name) }
             let drawer = DebugDrawer(defaults: suite)
@@ -38,7 +38,7 @@
 
         @Test("A silenced local plugin's section header menu offers Allow Notices, not Silence Notices, which allows them again")
         func contextMenuAllows() throws {
-            let name = "NoticeMutingViewTests.\(UUID().uuidString)"
+            let name = "NoticeMutingViewTests.\(#function).\(UUID().uuidString)"
             let suite = try #require(UserDefaults(suiteName: name))
             defer { suite.removePersistentDomain(forName: name) }
             let drawer = DebugDrawer(defaults: suite)

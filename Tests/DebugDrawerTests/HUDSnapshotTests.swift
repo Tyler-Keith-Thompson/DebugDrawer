@@ -49,7 +49,7 @@
         // laid over the window where it sits.
         @Test("Over an AppKit window, the HUD's panel draws the pinned readouts at the top leading corner", arguments: [ColorScheme.light, .dark])
         func hudOverTheApp(colorScheme: ColorScheme) throws {
-            let suite = "HUDSnapshotTests.\(UUID().uuidString)"
+            let suite = "HUDSnapshotTests.\(#function).\(UUID().uuidString)"
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let drawer = DebugDrawer(defaults: defaults)

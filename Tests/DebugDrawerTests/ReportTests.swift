@@ -218,22 +218,20 @@
         }
 
         @Test("The drawer's contributors are its global, then local, plugins that adopt the protocol, each ID once")
-        func contributorsAreDeduplicated() {
-            let drawer = DebugDrawer.shared
+        func contributorsAreDeduplicated() throws {
+            let suite = "ReportTests.\(#function).\(UUID().uuidString)"
+            let defaults = try #require(UserDefaults(suiteName: suite))
+            defer { defaults.removePersistentDomain(forName: suite) }
+            let drawer = DebugDrawer(defaults: defaults)
             drawer.registerGlobal(ReportNotesPlugin())
             drawer.registerGlobal(ReportSilentPlugin())
-            let token = drawer.registerLocal(ReportNotesPlugin())
-            let headersToken = drawer.registerLocal(ReportHeadersPlugin())
+            drawer.registerLocal(ReportNotesPlugin())
+            drawer.registerLocal(ReportHeadersPlugin())
+            let expected = ["DebugDrawerTests.ReportNotesPlugin", "DebugDrawerTests.ReportHeadersPlugin"]
 
             let actual = drawer.reportContributors.map(\.id)
 
-            // Leave the shared drawer as the other suites expect it, within this one main-actor turn.
-            drawer.unregisterLocal(id: ReportNotesPlugin().id, token: token)
-            drawer.unregisterLocal(id: ReportHeadersPlugin().id, token: headersToken)
-            drawer.unregisterGlobal(id: ReportNotesPlugin().id)
-            drawer.unregisterGlobal(id: ReportSilentPlugin().id)
-            let expected = ["DebugDrawerTests.ReportNotesPlugin", "DebugDrawerTests.ReportHeadersPlugin"]
-            #expect(actual.filter { $0.hasPrefix("DebugDrawerTests.Report") } == expected)
+            #expect(actual == expected)
         }
     }
 

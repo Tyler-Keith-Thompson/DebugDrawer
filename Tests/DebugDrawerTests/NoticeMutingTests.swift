@@ -10,7 +10,7 @@
     struct NoticeMutingTests {
         @Test("A plugin's notices are allowed until silenced")
         func noticesAreAllowedByDefault() throws {
-            let name = "NoticeMutingTests.\(UUID().uuidString)"
+            let name = "NoticeMutingTests.\(#function).\(UUID().uuidString)"
             let suite = try #require(UserDefaults(suiteName: name))
             defer { suite.removePersistentDomain(forName: name) }
             let sut = DebugDrawer(defaults: suite)
@@ -22,7 +22,7 @@
 
         @Test("While a plugin is silenced, its badge shows nothing and its toast is not raised")
         func silencedPluginRaisesNothing() throws {
-            let name = "NoticeMutingTests.\(UUID().uuidString)"
+            let name = "NoticeMutingTests.\(#function).\(UUID().uuidString)"
             let suite = try #require(UserDefaults(suiteName: name))
             defer { suite.removePersistentDomain(forName: name) }
             let sut = DebugDrawer(defaults: suite)
@@ -37,7 +37,7 @@
 
         @Test("Silencing one plugin leaves another plugin's badge and toast")
         func silencingIsPerPlugin() throws {
-            let name = "NoticeMutingTests.\(UUID().uuidString)"
+            let name = "NoticeMutingTests.\(#function).\(UUID().uuidString)"
             let suite = try #require(UserDefaults(suiteName: name))
             defer { suite.removePersistentDomain(forName: name) }
             let sut = DebugDrawer(defaults: suite)
@@ -54,7 +54,7 @@
 
         @Test("Silencing a plugin removes the badge and toast it already shows")
         func silencingRemovesCurrentNotices() throws {
-            let name = "NoticeMutingTests.\(UUID().uuidString)"
+            let name = "NoticeMutingTests.\(#function).\(UUID().uuidString)"
             let suite = try #require(UserDefaults(suiteName: name))
             defer { suite.removePersistentDomain(forName: name) }
             let sut = DebugDrawer(defaults: suite)
@@ -70,7 +70,7 @@
 
         @Test("Silencing a plugin leaves another plugin's toast on screen")
         func silencingLeavesAnotherPluginsToast() throws {
-            let name = "NoticeMutingTests.\(UUID().uuidString)"
+            let name = "NoticeMutingTests.\(#function).\(UUID().uuidString)"
             let suite = try #require(UserDefaults(suiteName: name))
             defer { suite.removePersistentDomain(forName: name) }
             let sut = DebugDrawer(defaults: suite)
@@ -84,7 +84,7 @@
 
         @Test("Allowing a plugin's notices again shows the badges and toasts it sets afterwards")
         func allowingShowsLaterNotices() throws {
-            let name = "NoticeMutingTests.\(UUID().uuidString)"
+            let name = "NoticeMutingTests.\(#function).\(UUID().uuidString)"
             let suite = try #require(UserDefaults(suiteName: name))
             defer { suite.removePersistentDomain(forName: name) }
             let sut = DebugDrawer(defaults: suite)
@@ -105,7 +105,7 @@
 
         @Test("A new drawer reading the same UserDefaults sees the plugin as silenced, and as allowed once allowed again")
         func muteStateSurvivesRelaunch() throws {
-            let name = "NoticeMutingTests.\(UUID().uuidString)"
+            let name = "NoticeMutingTests.\(#function).\(UUID().uuidString)"
             let suite = try #require(UserDefaults(suiteName: name))
             defer { suite.removePersistentDomain(forName: name) }
             let first = DebugDrawer(defaults: suite)

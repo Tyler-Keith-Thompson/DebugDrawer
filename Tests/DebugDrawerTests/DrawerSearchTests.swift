@@ -141,8 +141,12 @@
         struct DrawerSearchShortcutTests {
             @Test("Cmd-K is not bound while the drawer is closed, so it can't open it")
             func commandKIsUnboundWhileClosed() throws {
+                let suite = "DrawerSearchShortcutTests.\(#function).\(UUID().uuidString)"
+                let defaults = try #require(UserDefaults(suiteName: suite))
+                defer { defaults.removePersistentDomain(forName: suite) }
+                let drawer = DebugDrawer(defaults: defaults)
                 let presentation = DrawerPresentation()
-                let sut = DebugDrawerOverlay(drawer: .shared, presentation: presentation)
+                let sut = DebugDrawerOverlay(drawer: drawer, presentation: presentation)
 
                 let actual = try sut.inspect().findAll(ViewType.Button.self) {
                     // ViewInspector can't read a shortcut; the Cmd-K button is the one with this label.
@@ -154,9 +158,13 @@
 
             @Test("While the drawer is open, Cmd-K is bound and the search field is shown")
             func commandKIsBoundWhileOpen() throws {
+                let suite = "DrawerSearchShortcutTests.\(#function).\(UUID().uuidString)"
+                let defaults = try #require(UserDefaults(suiteName: suite))
+                defer { defaults.removePersistentDomain(forName: suite) }
+                let drawer = DebugDrawer(defaults: defaults)
                 let presentation = DrawerPresentation()
                 presentation.isOpen = true
-                let sut = DebugDrawerOverlay(drawer: .shared, presentation: presentation)
+                let sut = DebugDrawerOverlay(drawer: drawer, presentation: presentation)
 
                 let shortcuts = try sut.inspect().findAll(ViewType.Button.self) {
                     // ViewInspector can't read a shortcut; the Cmd-K button is the one with this label.

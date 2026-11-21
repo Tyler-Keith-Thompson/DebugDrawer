@@ -257,18 +257,6 @@
             #expect(sut.droppedCount == 1)
         }
 
-        @Test("Installing in SwiftUI: the app registers its global plugins when it starts")
-        func installingInSwiftUI() {
-            let expectedTitle = "Cache"
-
-            _ = OrdersApp()
-
-            let actual = DebugDrawer.shared.globalPlugins.map(\.title)
-            // Leave the shared drawer as the other suites expect it, within this one main-actor turn.
-            DebugDrawer.shared.unregisterGlobal(id: CachePlugin().id)
-            #expect(actual.contains(expectedTitle))
-        }
-
         @Test("Writing plugins: a local plugin's ID is its type's fully qualified name")
         func localPlugin() {
             let sut = OrderPlugin(orderID: "42")
@@ -280,18 +268,22 @@
         }
 
         @Test("Writing plugins: a stale local registration's token leaves the newer one in place")
-        func localPluginTokens() {
+        func localPluginTokens() throws {
+            let suite = "DocumentationExamplesTests.\(#function).\(UUID().uuidString)"
+            let defaults = try #require(UserDefaults(suiteName: suite))
+            defer { defaults.removePersistentDomain(forName: suite) }
+            let sut = DebugDrawer(defaults: defaults)
             let id = "DebugDrawerTests.OrderPlugin"
-            let stale = DebugDrawer.shared.registerLocal(OrderPlugin(orderID: "1"))
-            let current = DebugDrawer.shared.registerLocal(OrderPlugin(orderID: "2"))
+            let expected = [id]
+            let stale = sut.registerLocal(OrderPlugin(orderID: "1"))
+            let current = sut.registerLocal(OrderPlugin(orderID: "2"))
 
-            DebugDrawer.shared.unregisterLocal(id: id, token: stale)
+            sut.unregisterLocal(id: id, token: stale)
 
-            let actual = DebugDrawer.shared.localPlugins.map(\.id)
-            // Leave the shared drawer as the other suites expect it, within this one main-actor turn.
-            DebugDrawer.shared.unregisterLocal(id: id, token: current)
-            #expect(actual.filter { $0 == id }.count == 1)
-            #expect(!DebugDrawer.shared.localPlugins.contains { $0.id == id })
+            let actual = sut.localPlugins.map(\.id)
+            sut.unregisterLocal(id: id, token: current)
+            #expect(actual == expected)
+            #expect(sut.localPlugins.isEmpty)
         }
 
         @Test("Writing plugins: a plugin declares its category, header accessory and HUD readout")
@@ -304,20 +296,40 @@
             #expect(actual.headerAccessory != nil)
             #expect(actual.hasHUD)
         }
+    }
 
-        @Test("Release builds: the calls that set the drawer up need no #if DEBUG")
-        func releaseBuilds() throws {
-            let reportsEndpoint = try #require(URL(string: "https://bugs.example.com/reports"))
-            let previous = DebugDrawer.shared.reportUploader
+    // The articles' examples that call the shared drawer (an app's init registering with it, the
+    // release-build calls), in the serialized suite of the shared drawer's tests.
+    extension SharedDrawerTests {
+        @MainActor
+        @Suite("Documentation examples on the shared drawer")
+        struct DocumentationSharedDrawerExamplesTests {
+            @Test("Installing in SwiftUI: the app registers its global plugins when it starts")
+            func installingInSwiftUI() {
+                let expectedTitle = "Cache"
 
-            DebugDrawer.shared.registerGlobal(CachePlugin())
-            DebugDrawer.shared.reportUploader = TeamReportUploader(endpoint: reportsEndpoint)
+                _ = OrdersApp()
 
-            let actual = DebugDrawer.shared.reportUploader as? TeamReportUploader
-            // Leave the shared drawer as the other suites expect it, within this one main-actor turn.
-            DebugDrawer.shared.reportUploader = previous
-            DebugDrawer.shared.unregisterGlobal(id: CachePlugin().id)
-            #expect(actual?.endpoint == reportsEndpoint)
+                let actual = DebugDrawer.shared.globalPlugins.map(\.title)
+                // Leave the shared drawer as the other suites expect it, within this one main-actor turn.
+                DebugDrawer.shared.unregisterGlobal(id: CachePlugin().id)
+                #expect(actual.contains(expectedTitle))
+            }
+
+            @Test("Release builds: the calls that set the drawer up need no #if DEBUG")
+            func releaseBuilds() throws {
+                let reportsEndpoint = try #require(URL(string: "https://bugs.example.com/reports"))
+                let previous = DebugDrawer.shared.reportUploader
+
+                DebugDrawer.shared.registerGlobal(CachePlugin())
+                DebugDrawer.shared.reportUploader = TeamReportUploader(endpoint: reportsEndpoint)
+
+                let actual = DebugDrawer.shared.reportUploader as? TeamReportUploader
+                // Leave the shared drawer as the other suites expect it, within this one main-actor turn.
+                DebugDrawer.shared.reportUploader = previous
+                DebugDrawer.shared.unregisterGlobal(id: CachePlugin().id)
+                #expect(actual?.endpoint == reportsEndpoint)
+            }
         }
     }
 
@@ -334,27 +346,31 @@
             }
         }
 
-        @MainActor
-        @Suite("Documentation examples: windows")
-        struct DocumentationWindowExamplesTests {
-            @Test("Installing in SwiftUI: a window controller opens the drawer in its own window, attaching it first")
-            func toggleInWindow() throws {
-                // Borderless and far off screen: ordered in, so the drawer's panel can be, but never seen.
-                let window = NSWindow(
-                    contentRect: CGRect(x: -30000, y: -30000, width: 900, height: 600),
-                    styleMask: .borderless, backing: .buffered, defer: false
-                )
-                window.isReleasedWhenClosed = false
-                window.orderFront(nil)
-                defer { window.close() }
-                let sut = InvoiceWindowController(window: window)
+        // The window controller opens the shared drawer, so this test stays on it, in the serialized
+        // suite of the shared drawer's tests.
+        extension SharedDrawerTests {
+            @MainActor
+            @Suite("Documentation examples: windows")
+            struct DocumentationWindowExamplesTests {
+                @Test("Installing in SwiftUI: a window controller opens the drawer in its own window, attaching it first")
+                func toggleInWindow() throws {
+                    // Borderless and far off screen: ordered in, so the drawer's panel can be, but never seen.
+                    let window = NSWindow(
+                        contentRect: CGRect(x: -30000, y: -30000, width: 900, height: 600),
+                        styleMask: .borderless, backing: .buffered, defer: false
+                    )
+                    window.isReleasedWhenClosed = false
+                    window.orderFront(nil)
+                    defer { window.close() }
+                    let sut = InvoiceWindowController(window: window)
 
-                sut.toggleDebugDrawer(nil)
+                    sut.toggleDebugDrawer(nil)
 
-                // The drawer's panel is a child window of the window it opens in.
-                let actual = window.childWindows?.contains(where: \.isVisible) == true
-                DebugDrawer.shared.toggle(in: window)
-                #expect(actual)
+                    // The drawer's panel is a child window of the window it opens in.
+                    let actual = window.childWindows?.contains(where: \.isVisible) == true
+                    DebugDrawer.shared.toggle(in: window)
+                    #expect(actual)
+                }
             }
         }
 

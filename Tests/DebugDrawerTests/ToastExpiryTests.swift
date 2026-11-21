@@ -89,7 +89,7 @@
     struct ToastExpiryTests {
         @Test("A toast goes away by itself six seconds after its post, and not before")
         func aToastExpires() throws {
-            let suite = "ToastExpiryTests.\(UUID().uuidString)"
+            let suite = "ToastExpiryTests.\(#function).\(UUID().uuidString)"
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let scheduler = TestScheduler()
@@ -108,7 +108,7 @@
 
         @Test("A new post to the toast starts its countdown again")
         func aPostRestartsTheCountdown() throws {
-            let suite = "ToastExpiryTests.\(UUID().uuidString)"
+            let suite = "ToastExpiryTests.\(#function).\(UUID().uuidString)"
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let scheduler = TestScheduler()
@@ -128,7 +128,7 @@
 
         @Test("A post from another plugin, replacing the toast, starts its countdown again")
         func anotherPluginsPostRestartsTheCountdown() throws {
-            let suite = "ToastExpiryTests.\(UUID().uuidString)"
+            let suite = "ToastExpiryTests.\(#function).\(UUID().uuidString)"
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let scheduler = TestScheduler()
@@ -148,7 +148,7 @@
 
         @Test("A held toast stays, and goes six seconds after the hold ends", arguments: [DrawerToastHold.pointer, .accessibilityFocus])
         func aHeldToastStays(hold: DrawerToastHold) throws {
-            let suite = "ToastExpiryTests.\(UUID().uuidString)"
+            let suite = "ToastExpiryTests.\(#function).\(UUID().uuidString)"
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let scheduler = TestScheduler()
@@ -172,7 +172,7 @@
 
         @Test("The toast stays until the last of two holds ends")
         func theLastHoldKeepsTheToast() throws {
-            let suite = "ToastExpiryTests.\(UUID().uuidString)"
+            let suite = "ToastExpiryTests.\(#function).\(UUID().uuidString)"
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let scheduler = TestScheduler()
@@ -194,7 +194,7 @@
 
         @Test("Ending a hold that never started doesn't start the countdown again")
         func aStrayReleaseChangesNothing() throws {
-            let suite = "ToastExpiryTests.\(UUID().uuidString)"
+            let suite = "ToastExpiryTests.\(#function).\(UUID().uuidString)"
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let scheduler = TestScheduler()
@@ -210,7 +210,7 @@
 
         @Test("A toast dismissed and posted again gets a whole countdown of its own")
         func aDismissedToastPostedAgainLastsItsLifetime() throws {
-            let suite = "ToastExpiryTests.\(UUID().uuidString)"
+            let suite = "ToastExpiryTests.\(#function).\(UUID().uuidString)"
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let scheduler = TestScheduler()
@@ -232,7 +232,7 @@
         #if !os(visionOS)
             @Test("Accessibility focus on the toast's buttons holds it, and it goes six seconds after focus leaves")
             func accessibilityFocusHoldsTheToast() throws {
-                let suite = "ToastExpiryTests.\(UUID().uuidString)"
+                let suite = "ToastExpiryTests.\(#function).\(UUID().uuidString)"
                 let defaults = try #require(UserDefaults(suiteName: suite))
                 defer { defaults.removePersistentDomain(forName: suite) }
                 let scheduler = TestScheduler()
@@ -262,7 +262,7 @@
             // never shown.
             @Test("On the Mac the toast's panel tracks the pointer while it isn't key")
             func thePanelTracksThePointer() throws {
-                let suite = "ToastExpiryTests.\(UUID().uuidString)"
+                let suite = "ToastExpiryTests.\(#function).\(UUID().uuidString)"
                 let defaults = try #require(UserDefaults(suiteName: suite))
                 defer { defaults.removePersistentDomain(forName: suite) }
                 let drawer = DebugDrawer(defaults: defaults, toastScheduler: TestScheduler())

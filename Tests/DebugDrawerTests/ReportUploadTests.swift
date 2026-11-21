@@ -57,23 +57,29 @@
     @Suite("Sending reports", .timeLimit(.minutes(1)))
     struct ReportUploadTests {
         @Test("The drawer starts with no uploader, so a report is never sent")
-        func noUploaderByDefault() {
-            let actual = DebugDrawer.shared.reportUploader
+        func noUploaderByDefault() throws {
+            let suite = "ReportUploadTests.\(#function).\(UUID().uuidString)"
+            let defaults = try #require(UserDefaults(suiteName: suite))
+            defer { defaults.removePersistentDomain(forName: suite) }
+            let drawer = DebugDrawer(defaults: defaults)
+
+            let actual = drawer.reportUploader
 
             #expect(actual == nil)
         }
 
         @Test("Creating a report sends nothing, even with an uploader set; only Send Report does")
         func creatingDoesNotUpload() async throws {
+            let suite = "ReportUploadTests.\(#function).\(UUID().uuidString)"
+            let defaults = try #require(UserDefaults(suiteName: suite))
+            defer { defaults.removePersistentDomain(forName: suite) }
+            let drawer = DebugDrawer(defaults: defaults)
             let uploader = GatedReportUploader()
             let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-            let previous = DebugDrawer.shared.reportUploader
-            DebugDrawer.shared.reportUploader = uploader
+            drawer.reportUploader = uploader
 
-            let zip = try DebugDrawer.shared.createReport(in: directory)
+            let zip = try drawer.createReport(in: directory)
 
-            // Leave the shared drawer as the other suites expect it, within this one main-actor turn.
-            DebugDrawer.shared.reportUploader = previous
             defer { try? FileManager.default.removeItem(at: directory) }
             let actual = await uploader.archives
             #expect(FileManager.default.fileExists(atPath: zip.path))

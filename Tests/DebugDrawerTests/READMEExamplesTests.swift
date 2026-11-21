@@ -422,68 +422,6 @@
             }
         #endif
 
-        @Test("Sending reports")
-        func sendingReports() throws {
-            let reportsEndpoint = try #require(URL(string: "https://bugs.example.com/reports"))
-            let previous = DebugDrawer.shared.reportUploader
-
-            DebugDrawer.shared.reportUploader = TeamReportUploader(endpoint: reportsEndpoint)
-
-            let actual = DebugDrawer.shared.reportUploader as? TeamReportUploader
-            // Leave the shared drawer as the other suites expect it, within this one main-actor turn.
-            DebugDrawer.shared.reportUploader = previous
-            #expect(actual?.endpoint == reportsEndpoint)
-        }
-
-        @Test("Bug reports")
-        func bugReports() throws {
-            let previous = DebugDrawer.shared.redaction
-            DebugDrawer.shared.redaction = .standard
-            // Leave the shared drawer as the other suites expect it, within this one main-actor turn.
-            defer {
-                DebugDrawer.shared.unregisterGlobal(id: CartPlugin().id)
-                DebugDrawer.shared.redaction = previous
-            }
-
-            DebugDrawer.shared.registerGlobal(CartPlugin())
-            let reports = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
-            let zip = try DebugDrawer.shared.createReport(in: reports) // the same zip the button makes
-
-            defer { try? FileManager.default.removeItem(at: reports) }
-            var contribution = DebugDrawerReport()
-            CartPlugin().contribute(to: &contribution, redaction: DebugDrawer.shared.redaction)
-            let checkout = try #require(contribution.files.last)
-            #expect(zip.pathExtension == "zip")
-            #expect(FileManager.default.fileExists(atPath: zip.path))
-            #expect(contribution.files.map(\.name) == ["cart.txt", "checkout.json"])
-            #expect(String(bytes: checkout.data, encoding: .utf8) == #"{"card":"4111","token":"[REDACTED]"}"#)
-        }
-
-        @Test("Usage")
-        func usage() {
-            let wasOpen = DebugDrawer.shared.isOpen
-
-            // Global: registered once at startup, always in the drawer.
-            DebugDrawer.shared.registerGlobal(CachePlugin())
-
-            // The drawer, attached once to the root view.
-            let root = Text("Home").debugDrawer()
-
-            // Local: in the drawer while its view is on screen.
-            let settings = Text("Settings").debugLocalPlugin(CachePlugin())
-
-            // Open or close it from whatever trigger suits the app.
-            DebugDrawer.shared.toggle()
-
-            _ = (root, settings)
-            #expect(DebugDrawer.shared.globalPlugins.contains { $0.title == "Cache" })
-            #expect(DebugDrawer.shared.isOpen != wasOpen)
-
-            // Leave the shared drawer as the other suites expect it, within this one main-actor turn.
-            DebugDrawer.shared.toggle()
-            DebugDrawer.shared.unregisterGlobal(id: CachePlugin().id)
-        }
-
         @Test("A plugin's lifecycle, and drawers of your own")
         func lifecycleAndDrawersOfYourOwn() {
             let monitor = SocketMonitor()
@@ -496,6 +434,8 @@
             #expect(drawer.globalPlugins.isEmpty)
             drawer.registerGlobal(SocketPlugin(monitor: monitor))
             #expect(monitor.isRunning)
+            // The shared drawer is read only to show it holds none of this; the test is
+            // synchronous on the main actor, so no other suite's work on it runs in between.
             #expect(!DebugDrawer.shared.globalPlugins.contains { $0.title == "Sockets" })
         }
 
@@ -506,48 +446,6 @@
 
             #expect(queue.hasHUD)
             #expect(!uploads.hasHUD)
-        }
-
-        @Test("Badges and toasts")
-        func badgesAndToasts() {
-            let wasOpen = DebugDrawer.shared.isOpen
-            DebugDrawer.shared.close()
-
-            let uploads = UploadsPlugin()
-            uploads.setBadge(2)
-            uploads.postToast("Upload of report.pdf failed")
-            let badge = DebugDrawer.shared.badges["DebugDrawerTests.UploadsPlugin"]
-            let toast = DebugDrawer.shared.toast
-            uploads.clearBadge()
-
-            // Leave the shared drawer as the other suites expect it, within this one main-actor turn.
-            DebugDrawer.shared.dismissToast()
-            if wasOpen { DebugDrawer.shared.open() }
-            #expect(badge == 2)
-            #expect(toast?.pluginID == "DebugDrawerTests.UploadsPlugin")
-            #expect(toast?.message == "Upload of report.pdf failed")
-            #expect(DebugDrawer.shared.badges["DebugDrawerTests.UploadsPlugin"] == nil)
-        }
-
-        @Test("Redacting sensitive values")
-        func redactingSensitiveValues() throws {
-            let previous = DebugDrawer.shared.redaction
-
-            DebugDrawer.shared.redact(
-                headers: ["X-Api-Signature"],
-                keys: ["pin"],
-                jsonPaths: ["user.ssn", "cards.number"]
-            )
-            let actual = DebugDrawer.shared.redaction
-            let body = Data(#"{"cards":[{"number":"4111","exp":"12/30"}],"user":{"ssn":"1"}}"#.utf8)
-            let redactedBody = try #require(String(bytes: actual.redacting(json: body), encoding: .utf8))
-
-            // Leave the shared drawer as the other suites expect it, within this one main-actor turn.
-            DebugDrawer.shared.redaction = previous
-            #expect(actual.masksHeader("x-api-signature"))
-            #expect(actual.masksHeader("Authorization"))
-            #expect(actual.masksKey("userPin"))
-            #expect(redactedBody == #"{"cards":[{"exp":"12/30","number":"[REDACTED]"}],"user":{"ssn":"[REDACTED]"}}"#)
         }
 
         @Test("Searching plugins and actions")
@@ -575,6 +473,118 @@
         }
     }
 
+    // The README's examples that call the shared drawer (its reportUploader and redact, a plugin's
+    // badges and toasts, debugDrawer()), in the serialized suite of the shared drawer's tests.
+    extension SharedDrawerTests {
+        @MainActor
+        @Suite("README examples on the shared drawer")
+        struct READMESharedDrawerExamplesTests {
+            @Test("Sending reports")
+            func sendingReports() throws {
+                let reportsEndpoint = try #require(URL(string: "https://bugs.example.com/reports"))
+                let previous = DebugDrawer.shared.reportUploader
+
+                DebugDrawer.shared.reportUploader = TeamReportUploader(endpoint: reportsEndpoint)
+
+                let actual = DebugDrawer.shared.reportUploader as? TeamReportUploader
+                // Leave the shared drawer as the other suites expect it, within this one main-actor turn.
+                DebugDrawer.shared.reportUploader = previous
+                #expect(actual?.endpoint == reportsEndpoint)
+            }
+
+            @Test("Bug reports")
+            func bugReports() throws {
+                let previous = DebugDrawer.shared.redaction
+                DebugDrawer.shared.redaction = .standard
+                // Leave the shared drawer as the other suites expect it, within this one main-actor turn.
+                defer {
+                    DebugDrawer.shared.unregisterGlobal(id: CartPlugin().id)
+                    DebugDrawer.shared.redaction = previous
+                }
+
+                DebugDrawer.shared.registerGlobal(CartPlugin())
+                let reports = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+                let zip = try DebugDrawer.shared.createReport(in: reports) // the same zip the button makes
+
+                defer { try? FileManager.default.removeItem(at: reports) }
+                var contribution = DebugDrawerReport()
+                CartPlugin().contribute(to: &contribution, redaction: DebugDrawer.shared.redaction)
+                let checkout = try #require(contribution.files.last)
+                #expect(zip.pathExtension == "zip")
+                #expect(FileManager.default.fileExists(atPath: zip.path))
+                #expect(contribution.files.map(\.name) == ["cart.txt", "checkout.json"])
+                #expect(String(bytes: checkout.data, encoding: .utf8) == #"{"card":"4111","token":"[REDACTED]"}"#)
+            }
+
+            @Test("Usage")
+            func usage() {
+                let wasOpen = DebugDrawer.shared.isOpen
+
+                // Global: registered once at startup, always in the drawer.
+                DebugDrawer.shared.registerGlobal(CachePlugin())
+
+                // The drawer, attached once to the root view.
+                let root = Text("Home").debugDrawer()
+
+                // Local: in the drawer while its view is on screen.
+                let settings = Text("Settings").debugLocalPlugin(CachePlugin())
+
+                // Open or close it from whatever trigger suits the app.
+                DebugDrawer.shared.toggle()
+
+                _ = (root, settings)
+                #expect(DebugDrawer.shared.globalPlugins.contains { $0.title == "Cache" })
+                #expect(DebugDrawer.shared.isOpen != wasOpen)
+
+                // Leave the shared drawer as the other suites expect it, within this one main-actor turn.
+                DebugDrawer.shared.toggle()
+                DebugDrawer.shared.unregisterGlobal(id: CachePlugin().id)
+            }
+
+            @Test("Badges and toasts")
+            func badgesAndToasts() {
+                let wasOpen = DebugDrawer.shared.isOpen
+                DebugDrawer.shared.close()
+
+                let uploads = UploadsPlugin()
+                uploads.setBadge(2)
+                uploads.postToast("Upload of report.pdf failed")
+                let badge = DebugDrawer.shared.badges["DebugDrawerTests.UploadsPlugin"]
+                let toast = DebugDrawer.shared.toast
+                uploads.clearBadge()
+
+                // Leave the shared drawer as the other suites expect it, within this one main-actor turn.
+                DebugDrawer.shared.dismissToast()
+                if wasOpen { DebugDrawer.shared.open() }
+                #expect(badge == 2)
+                #expect(toast?.pluginID == "DebugDrawerTests.UploadsPlugin")
+                #expect(toast?.message == "Upload of report.pdf failed")
+                #expect(DebugDrawer.shared.badges["DebugDrawerTests.UploadsPlugin"] == nil)
+            }
+
+            @Test("Redacting sensitive values")
+            func redactingSensitiveValues() throws {
+                let previous = DebugDrawer.shared.redaction
+
+                DebugDrawer.shared.redact(
+                    headers: ["X-Api-Signature"],
+                    keys: ["pin"],
+                    jsonPaths: ["user.ssn", "cards.number"]
+                )
+                let actual = DebugDrawer.shared.redaction
+                let body = Data(#"{"cards":[{"number":"4111","exp":"12/30"}],"user":{"ssn":"1"}}"#.utf8)
+                let redactedBody = try #require(String(bytes: actual.redacting(json: body), encoding: .utf8))
+
+                // Leave the shared drawer as the other suites expect it, within this one main-actor turn.
+                DebugDrawer.shared.redaction = previous
+                #expect(actual.masksHeader("x-api-signature"))
+                #expect(actual.masksHeader("Authorization"))
+                #expect(actual.masksKey("userPin"))
+                #expect(redactedBody == #"{"cards":[{"exp":"12/30","number":"[REDACTED]"}],"user":{"ssn":"[REDACTED]"}}"#)
+            }
+        }
+    }
+
     #if os(macOS)
         import AppKit
 
@@ -587,27 +597,31 @@
             }
         }
 
-        @MainActor
-        @Suite("README examples: windows")
-        struct READMEWindowExamplesTests {
-            @Test("A window controller registers a local plugin for its window, removed as the window closes")
-            func registerLocalInWindow() {
-                // Borderless and far off screen, so showing it shows nothing.
-                let window = NSWindow(
-                    contentRect: CGRect(x: -30000, y: -30000, width: 900, height: 600),
-                    styleMask: .borderless, backing: .buffered, defer: false
-                )
-                window.isReleasedWhenClosed = false
-                let sut = CacheWindowController(window: window)
-                let id = CachePlugin().id
+        // The window controller registers with the shared drawer, so this test stays on it, in the
+        // serialized suite of the shared drawer's tests.
+        extension SharedDrawerTests {
+            @MainActor
+            @Suite("README examples: windows")
+            struct READMEWindowExamplesTests {
+                @Test("A window controller registers a local plugin for its window, removed as the window closes")
+                func registerLocalInWindow() {
+                    // Borderless and far off screen, so showing it shows nothing.
+                    let window = NSWindow(
+                        contentRect: CGRect(x: -30000, y: -30000, width: 900, height: 600),
+                        styleMask: .borderless, backing: .buffered, defer: false
+                    )
+                    window.isReleasedWhenClosed = false
+                    let sut = CacheWindowController(window: window)
+                    let id = CachePlugin().id
 
-                sut.showWindow(nil)
+                    sut.showWindow(nil)
 
-                let actualWhileOpen = DebugDrawer.shared.localPlugins.contains { $0.id == id }
-                window.close()
-                let actualAfterClosing = DebugDrawer.shared.localPlugins.contains { $0.id == id }
-                #expect(actualWhileOpen)
-                #expect(!actualAfterClosing)
+                    let actualWhileOpen = DebugDrawer.shared.localPlugins.contains { $0.id == id }
+                    window.close()
+                    let actualAfterClosing = DebugDrawer.shared.localPlugins.contains { $0.id == id }
+                    #expect(actualWhileOpen)
+                    #expect(!actualAfterClosing)
+                }
             }
         }
     #endif

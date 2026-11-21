@@ -134,22 +134,28 @@
 
         @MainActor
         @Test("One call on the drawer adds header names, key patterns and JSON paths to its rules")
-        func drawerRedact() {
-            let drawer = DebugDrawer.shared
-            let previous = drawer.redaction
+        func drawerRedact() throws {
+            let suite = "RedactionTests.\(#function).\(UUID().uuidString)"
+            let defaults = try #require(UserDefaults(suiteName: suite))
+            defer { defaults.removePersistentDomain(forName: suite) }
+            let drawer = DebugDrawer(defaults: defaults)
             drawer.redaction = .none
 
             drawer.redact(headers: ["X-Session-Id"], keys: ["pin"], jsonPaths: ["user.ssn"])
             let actual = drawer.redaction
-            drawer.redaction = previous
 
             #expect(actual == DebugDrawerRedaction(headers: ["X-Session-Id"], keys: ["pin"], jsonPaths: ["user.ssn"]))
         }
 
         @MainActor
         @Test("The drawer starts with the standard rules")
-        func drawerDefault() {
-            let actual = DebugDrawer.shared.redaction
+        func drawerDefault() throws {
+            let suite = "RedactionTests.\(#function).\(UUID().uuidString)"
+            let defaults = try #require(UserDefaults(suiteName: suite))
+            defer { defaults.removePersistentDomain(forName: suite) }
+            let drawer = DebugDrawer(defaults: defaults)
+
+            let actual = drawer.redaction
 
             #expect(actual == .standard)
         }
