@@ -24,10 +24,13 @@
         let presentation: DrawerPresentation
         /// The window the panel is attached to.
         private(set) weak var host: NSWindow?
+        /// The drawer that attached the panel, which forgets it as its window closes.
+        private weak var drawer: DebugDrawer?
         private var observers: [any NSObjectProtocol] = []
 
         init(host: NSWindow, drawer: DebugDrawer, presentation: DrawerPresentation) {
             self.host = host
+            self.drawer = drawer
             self.presentation = presentation
             super.init(contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: true)
             isOpaque = false
@@ -121,8 +124,8 @@
             appIsActive && hostIsMain ? raisedLevel : host.level
         }
 
-        /// Follows the window's size, its main status and the app's activation, and detaches when
-        /// the window closes.
+        /// Follows the window's size, its main status and the app's activation, and detaches from
+        /// the drawer that attached it when the window closes.
         private func observe(_ host: NSWindow) {
             let center = NotificationCenter.default
             let resize: [Notification.Name] = [
@@ -149,7 +152,7 @@
                     guard let self else { return }
                     self.host?.removeChildWindow(self)
                     self.orderOut(nil)
-                    DebugDrawer.shared.detach(self.presentation)
+                    self.drawer?.detach(self.presentation)
                 }
             })
         }

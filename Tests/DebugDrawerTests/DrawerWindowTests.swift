@@ -140,6 +140,28 @@
             #expect(!drawer.detachedPresentation.isOpen)
         }
 
+        @Test("Closing a window detaches it from the drawer that attached it and takes its panel off screen")
+        func closingTheWindowDetaches() throws {
+            let suite = "DrawerWindowTests.\(#function).\(UUID().uuidString)"
+            let defaults = try #require(UserDefaults(suiteName: suite))
+            defer { defaults.removePersistentDomain(forName: suite) }
+            let drawer = DebugDrawer(defaults: defaults)
+            let window = NSWindow(
+                contentRect: CGRect(x: -30000, y: -30000, width: 900, height: 600),
+                styleMask: .borderless, backing: .buffered, defer: false
+            )
+            window.isReleasedWhenClosed = false
+            window.orderFront(nil)
+            drawer.attach(to: window)
+            let attachment = try #require(drawer.attachments.first { $0.window === window })
+            attachment.presentation.isOpen = true
+
+            window.close()
+
+            #expect(!drawer.attachments.contains { $0.presentation === attachment.presentation })
+            #expect(!attachment.panel.isVisible)
+        }
+
         @Test("The panel rises over sheets and app-modal alerts only while its window is the active app's main window")
         func panelLevel() {
             let window = NSWindow(contentRect: .zero, styleMask: .borderless, backing: .buffered, defer: true)
@@ -192,9 +214,9 @@
         }
     }
 
-    // debugDrawer() shows the shared drawer, and a window's panel detaches from the shared drawer as
-    // the window closes (DrawerChildPanel's willClose observer calls DebugDrawer.shared.detach), so
-    // these tests stay on it, in the serialized suite of the shared drawer's tests.
+    // debugDrawer() shows the shared drawer, so these tests stay on it, in the serialized suite of
+    // the shared drawer's tests, as does the one that reads the shared drawer as another drawer's
+    // window closes.
     extension SharedDrawerTests {
         @MainActor
         @Suite("Drawer window on the shared drawer")
@@ -266,24 +288,46 @@
                 #expect(swiftUIDrawer.panel.frame.size == appKitDrawer.panel.frame.size)
             }
 
-            @Test("Closing a window detaches its drawer and takes its panel off screen")
-            func closingTheWindowDetaches() throws {
-                let window = NSWindow(
+            @Test("Closing a window another drawer attached leaves the shared drawer's attachments and that window's local plugins as they were")
+            func closingAnotherDrawersWindowLeavesTheSharedDrawer() throws {
+                let suite = "DrawerWindowTests.\(#function).\(UUID().uuidString)"
+                let defaults = try #require(UserDefaults(suiteName: suite))
+                defer { defaults.removePersistentDomain(forName: suite) }
+                let drawer = DebugDrawer(defaults: defaults)
+                let sharedWindow = NSWindow(
                     contentRect: CGRect(x: -30000, y: -30000, width: 900, height: 600),
                     styleMask: .borderless, backing: .buffered, defer: false
                 )
-                window.isReleasedWhenClosed = false
-                window.orderFront(nil)
-                DebugDrawer.shared.attach(to: window)
-                let attachment = try #require(DebugDrawer.shared.attachments.first { $0.window === window })
-                attachment.presentation.isOpen = true
+                let window = NSWindow(
+                    contentRect: CGRect(x: -31000, y: -30000, width: 900, height: 600),
+                    styleMask: .borderless, backing: .buffered, defer: false
+                )
+                for each in [sharedWindow, window] {
+                    each.isReleasedWhenClosed = false
+                    each.orderFront(nil)
+                }
+                defer { sharedWindow.close() }
+                DebugDrawer.shared.attach(to: sharedWindow)
+                // As debugLocalPlugin(_:) registers it for a view in the window, with no close observer.
+                let token = DebugDrawer.shared.registerLocal(ClosingWindowPlugin(), scope: DebugDrawer.scope(of: window))
+                defer { DebugDrawer.shared.unregisterLocal(id: ClosingWindowPlugin().id, token: token) }
+                drawer.attach(to: window)
+                let expected = DebugDrawer.shared.attachments.map { ObjectIdentifier($0.presentation) }
 
                 window.close()
 
-                #expect(!DebugDrawer.shared.attachments.contains { $0.presentation === attachment.presentation })
-                #expect(!attachment.panel.isVisible)
+                let actual = DebugDrawer.shared.attachments.map { ObjectIdentifier($0.presentation) }
+                #expect(actual == expected)
+                #expect(DebugDrawer.shared.localRegistrations.contains { $0.token == token })
             }
         }
+    }
+
+    /// A local plugin of the window that closes.
+    private struct ClosingWindowPlugin: DebugDrawerPlugin {
+        let title = "Closing Window"
+        let icon = "macwindow"
+        var body: some View { Text(title) }
     }
 
     /// Whether each update of the probe ran in an animated transaction.

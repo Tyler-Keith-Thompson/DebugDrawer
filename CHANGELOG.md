@@ -31,6 +31,7 @@ the entry becomes the GitHub release's notes.
 
 ### Fixed
 
+- DD-273: on the Mac, closing a window detaches its panel from the drawer that attached it, rather than from `DebugDrawer.shared`, so a `DebugDrawer()` of your own no longer keeps a closed window's attachment, and the shared drawer keeps the local plugins of a window another drawer attached.
 - DD-270: under a `DebugDrawerGrantPolicy`, `AnalyticsEventsMirror` and `MetricKitPayloadsMirror` serve only a session whose grant lists their capability (`AnalyticsEventsMirror.pluginID`, `MetricKitPayloadsMirror.pluginID`), as `PushRegistrationMirror` and `DebugDrawerAppState` do. A session whose grant doesn't list it is served its ID and no events or payloads, and the analytics mirror keeps nothing recorded during it. Before, a grant meant for another capability also exposed the app's analytics events and MetricKit payloads. Without a grant policy nothing changes. The security article's table and the README describe the new behaviour.
 - DD-269: `DebugDrawerSidecarConnection.host(_:)` finds a plugin it hosted by the `DebugDrawerSidecarPlugin.id` it was asked for, so hosting one again returns the first and keeps one copy (concurrent calls too), and Create Report holds its contribution once, whatever the made plugin's own `id` is. Before, a plugin keeping its type's default `id` (as `Example/Sidecar`'s capability plugins do) was hosted again on every call and contributed to the report once per copy. The kit's Bug Reports plugin no longer sets its `id` to the capability's to work around it.
 
