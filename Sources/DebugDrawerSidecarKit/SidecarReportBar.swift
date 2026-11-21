@@ -9,6 +9,7 @@
         // The sidecar's uploader and redaction rules, set on its drawer as in a debug build.
         @ObservedObject private var drawer = DebugDrawer.shared
         @State private var result: DrawerReportResult.State?
+        @Environment(\.sidecarPluginLayout) private var layout
 
         var body: some View {
             if let result {
@@ -17,9 +18,10 @@
                 }
             } else {
                 HStack {
-                    #if !os(watchOS)
+                    // At the bar's trailing end; a list's row starts at its leading edge.
+                    if layout == .picker {
                         Spacer()
-                    #endif
+                    }
                     Button("Create Report", systemImage: "doc.zipper", action: createReport)
                         .debugDrawerButtonStyle(.secondary)
                         .disabled(connection.hosted.isEmpty)

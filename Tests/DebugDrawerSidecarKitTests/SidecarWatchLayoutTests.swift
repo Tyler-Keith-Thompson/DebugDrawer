@@ -87,12 +87,13 @@
                 ) { LevelPlugin(transport: $0) }
             }
             let connection = try DebugDrawerSidecarConnection(app: app)
-            let sut = SidecarConnectedScreen(connection: connection, plugins: plugins, sessionDuration: 60, grant: nil)
+            let sut = SidecarConnectedScreen(connection: connection, plugins: plugins, layout: .platform, sessionDuration: 60, grant: nil)
 
             let view = try sut.inspect()
             let rows = view.findAll(ViewType.NavigationLink.self)
             let titles = try rows.map { try $0.labelView().find(ViewType.Label.self).title().text().string() }
 
+            #expect(SidecarPluginLayout.platform == .rows)
             #expect(titles == ["Shop.LogLevel", "Shop.Theme"])
             #expect(throws: (any Error).self) { try view.find(ViewType.Picker.self) }
             #expect(try view.find(button: "Create Report").isDisabled())

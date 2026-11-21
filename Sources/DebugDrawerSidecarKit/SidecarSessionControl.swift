@@ -81,14 +81,25 @@
 
     extension View {
         /// The margins of a row along the top or bottom of an app's screen, at the plugin header's
-        /// inset; none on watchOS, whose list rows inset themselves.
+        /// inset; none in the rows layout, whose list insets its rows itself.
         func sidecarBarPadding() -> some View {
-            #if os(watchOS)
-                self
-            #else
-                padding(.horizontal, 14)
+            modifier(SidecarBarPadding())
+        }
+    }
+
+    /// The margins `sidecarBarPadding()` gives a bar, for the layout it is in.
+    private struct SidecarBarPadding: ViewModifier {
+        @Environment(\.sidecarPluginLayout) private var layout
+
+        func body(content: Content) -> some View {
+            switch layout {
+            case .picker:
+                content
+                    .padding(.horizontal, 14)
                     .padding(.vertical, 6)
-            #endif
+            case .rows:
+                content
+            }
         }
     }
 
