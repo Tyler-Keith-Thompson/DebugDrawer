@@ -25,7 +25,8 @@ Example/                         The macOS, iOS, visionOS, tvOS and watchOS exam
                                  AppKit-only one, a sidecar (Sidecar) and the production host it drives (Receiver)
                                  for iOS and macOS, and the libraries they share: TestBench (actions that give each
                                  plugin data) and Plugins (every plugin with its defaults) (hand-written BUILD.bazel)
-Benchmarks/                      The interception benchmarks: a SwiftPM package of its own (ordo-one/benchmark),
+Benchmarks/                      The benchmarks (interception, the stall monitor, the leak detector, network mocking, the
+                                 network log's filter): a SwiftPM package of its own (ordo-one/benchmark),
                                  generated from BENCHMARKS, with the committed main baseline (Benchmarks/README.md)
 scripts/modules.py               The module graph
 scripts/catalyst_example.py      The iOS example as a Mac Catalyst app: a SwiftPM package derived from Example's sources
@@ -104,8 +105,8 @@ Every shell command gets a timeout. macOS has no `timeout`; use
 | `just template-update` | Merge the project template's changes since `.template.json`'s commit; resolve conflicts, then `just modules`, `just test` |
 | `just lint` | SwiftLint and a11y-check over every first-party target; `just test` runs it first |
 | `just record-snapshots` | Re-record every snapshot reference (through SwiftPM) after a change to how a view looks |
-| `just bench [--target X]` | The interception benchmarks (Network, DiskIO, Console), installed against not installed; `just bench-compare` against the `main` baseline |
-| `just bench-check` | The regression gate for CI: fails when a benchmark's instructions or mallocs regress past its threshold against the committed `main` baseline; `just bench-baseline` re-records it (Benchmarks/README.md) |
+| `just bench [--target X]` | The benchmarks: Network, DiskIO and Console interception, installed against not installed; the stall monitor's, the leak detector's and network mocking's costs per call and per run loop turn; the network log's filter against one parse of its bodies; `just bench-compare` against the `main` baseline |
+| `just bench-check` | The regression gate for CI: fails when a benchmark's instructions or mallocs regress past its threshold against the committed `main` baseline; `just bench-baseline` re-records it (Benchmarks/README.md). Not part of `just test`: the counts need a quiet machine and a baseline from the same Mac |
 | `bazel query 'rdeps(//Tests/..., //Sources/X)'` | Test targets affected by a change to X |
 
 - `just deploy` first runs the release gates (`scripts/release.py`, tested by
@@ -281,7 +282,7 @@ Watch for these:
 | Any library code | `bazel test` for every target in `bazel query 'rdeps(//Tests/..., //Sources/X)'`, then `just test-release` |
 | `scripts/modules.py` | `just modules`, `just test` (which runs `//:package_swift_test`), `just spm` |
 | A public API the example apps call, or `Example/` | `bazel build //Example/...`, then `just run` (and `just run iOS`) to look at it |
-| Network, DiskIO or Console interception, or `Benchmarks/` | `just bench-check`; after a deliberate change in cost, `just bench-baseline` and commit the baseline with it |
+| Network, DiskIO or Console interception, the stall monitor (`DebugDrawerHangDetector`), the leak detector, network mocking's URL protocol, the network log's filter, or `Benchmarks/` | `just bench-check` (`--target X` for the one changed); after a deliberate change in cost, `just bench-baseline --target X` and commit the baseline with it |
 | A view module, or anything a view draws with | `just test` (lint, view and snapshot tests); `just record-snapshots` if it should look different, then review the images; `just spm-test` |
 
 ### Pushing

@@ -2,10 +2,21 @@ import Foundation
 import Network
 import Synchronization
 
-/// An HTTP/1.1 server on 127.0.0.1 that answers every GET with the same small JSON body, keeping
-/// each connection alive, so a benchmark's requests never leave the machine.
+/// An HTTP/1.1 server on 127.0.0.1 that answers every GET with the same JSON body, keeping each
+/// connection alive, so a benchmark's requests never leave the machine.
 final class LoopbackHTTPServer: Sendable {
+    /// A small feed of three items: what the server answers unless given a body.
+    static let smallBody = Data(#"{"items":[{"id":1,"title":"First"},{"id":2,"title":"Second"},{"id":3,"title":"Third"}],"next":null}"#.utf8)
+
     private let queue = DispatchQueue(label: "LoopbackHTTPServer")
+    /// The whole response every request gets: the head, then the body.
+    private let response: Data
+
+    /// A server that answers every request with `body`, as JSON.
+    init(body: Data = smallBody) {
+        let head = "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: \(body.count)\r\nCache-Control: no-store\r\n\r\n"
+        response = Data(head.utf8) + body
+    }
     /// The running listener and the URL it answers; `nil` until `start()` returns.
     private let running = Mutex<(listener: NWListener, url: URL)?>(nil)
 
@@ -22,9 +33,10 @@ final class LoopbackHTTPServer: Sendable {
         parameters.requiredLocalEndpoint = .hostPort(host: .ipv4(.loopback), port: .any)
         let listener = try NWListener(using: parameters)
         let queue = queue
+        let response = response
         listener.newConnectionHandler = { connection in
             connection.start(queue: queue)
-            Self.answer(on: connection, buffered: Data())
+            Self.answer(on: connection, with: response, buffered: Data())
         }
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, any Error>) in
             listener.stateUpdateHandler = { [self] state in
@@ -53,15 +65,9 @@ final class LoopbackHTTPServer: Sendable {
 
     private static let endOfHeaders = Data("\r\n\r\n".utf8)
 
-    private static let response: Data = {
-        let body = Data(#"{"items":[{"id":1,"title":"First"},{"id":2,"title":"Second"},{"id":3,"title":"Third"}],"next":null}"#.utf8)
-        let head = "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: \(body.count)\r\nCache-Control: no-store\r\n\r\n"
-        return Data(head.utf8) + body
-    }()
-
-    /// Answers each request read from `connection` (GETs, so a request ends with its headers),
-    /// then reads on until the client closes it.
-    private static func answer(on connection: NWConnection, buffered: Data) {
+    /// Answers each request read from `connection` (GETs, so a request ends with its headers) with
+    /// `response`, then reads on until the client closes it.
+    private static func answer(on connection: NWConnection, with response: Data, buffered: Data) {
         connection.receive(minimumIncompleteLength: 1, maximumLength: 65536) { data, _, isComplete, error in
             var buffer = buffered
             if let data {
@@ -75,7 +81,7 @@ final class LoopbackHTTPServer: Sendable {
                 connection.cancel()
                 return
             }
-            answer(on: connection, buffered: buffer)
+            answer(on: connection, with: response, buffered: buffer)
         }
     }
 }
