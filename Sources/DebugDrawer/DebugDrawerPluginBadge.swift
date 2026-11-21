@@ -22,7 +22,7 @@
         /// The plugin's ``DebugDrawerPlugin/id``, which the badge is set under.
         package let pluginID: String
         /// The drawers that installed the plugin over the store, held weakly.
-        private let drawers = NSHashTable<DebugDrawer>.weakObjects()
+        private var drawers = WeakSet<DebugDrawer>()
 
         /// A badge shown in no drawer yet.
         ///
