@@ -3970,6 +3970,14 @@ named `group.` needs a provisioning profile, so `just run sidecar macOS` signs b
 Apple Development identity into `<team ID>.com.debugdrawer.example`, a group macOS gives them
 without asking. Signed ad hoc (no identity, or `DEBUGDRAWER_SIGN_IDENTITY=-`) the apps get no group
 and share a folder in Caches instead, without a group container's protection.
+Launched with `-ScriptSession <bundle ID>` (`open -g /tmp/debugdrawer-example-sidecar/DebugDrawerSidecarExample.app
+--args -ScriptSession com.debugdrawer.example.receiver`), the sidecar drives a session with that app
+without anyone at the screen: it opens one with a grant, overrides `new-checkout` to true, waits
+for the host to report it, ends the session and waits for the flag to come back, logging each step
+and the channel that carried it (`log show --predicate 'subsystem == "com.debugdrawer.example.sidecar"'`),
+while the host logs its audit entries (`subsystem == "com.debugdrawer.example.receiver"`). The
+receiver serves the store only, so on the Mac too the channel is the store, each command performed
+as its file lands.
 
 ### The sidecar on Apple TV, Vision Pro, Apple Watch and Mac Catalyst
 

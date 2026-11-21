@@ -212,13 +212,15 @@ swift_library(
 )
 
 # The sidecar: the kit's view with its plugin for each capability the production host serves, the
-# example's grant server, and Mocking's presets (DebugDrawerNetwork's rule types).
+# example's grant server, Mocking's presets (DebugDrawerNetwork's rule types), and the unattended
+# session script (-ScriptSession), which uses DebugDrawer's sidecar transport directly.
 swift_library(
     name = "ExampleAppLib_Sidecar",
     srcs = glob(["Sidecar/*.swift"]),
     module_name = "ExampleApp_Sidecar",
     deps = [
         ":ExampleSidecarStore",
+        "//Sources/DebugDrawer",
         "//Sources/DebugDrawerNetwork",
         "//Sources/DebugDrawerReceiver",
         "//Sources/DebugDrawerSidecarKit",

@@ -9,10 +9,16 @@ import SwiftUI
 // the kit's plugin for each capability the production host serves, and makes a report of what it
 // shows. The only thing of the example's own is Mocking's presets, for the host's Fetch Greeting.
 // On the Mac the store is the one `just run sidecar macOS` signed both apps for
-// (ExampleSidecarStore).
+// (ExampleSidecarStore). `-ScriptSession <bundle ID>` opens a session with that app, overrides a
+// flag in it and ends it, unattended (ExampleSessionScript).
 
 @main
 struct ExampleSidecarApp: App {
+    init() {
+        // `-ScriptSession <bundle ID>` drives a session with that app unattended.
+        ExampleSessionScript.startIfAsked()
+    }
+
     var body: some Scene {
         WindowGroup {
             DebugDrawerSidecarView(
