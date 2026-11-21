@@ -263,7 +263,7 @@ TEST_TARGETS = [
     ("DebugDrawerNetworkTests", ["DebugDrawerNetwork", "DebugDrawerReceiver", "DebugDrawer"]),
     ("DebugDrawerNetworkPluginTests", ["DebugDrawerNetworkPlugin", "DebugDrawerNetwork", "DebugDrawer", "DebugDrawerInterceptionContract", "DebugDrawerTestSupport", "viewinspector/ViewInspector", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
     ("DebugDrawerKeychainPluginTests", ["DebugDrawerKeychainPlugin", "DebugDrawer", "viewinspector/ViewInspector", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
-    ("DebugDrawerScreenshotPluginTests", ["DebugDrawerScreenshotPlugin", "DebugDrawer", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
+    ("DebugDrawerScreenshotPluginTests", ["DebugDrawerScreenshotPlugin", "DebugDrawer", "viewinspector/ViewInspector", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
     ("DebugDrawerFileBrowserPluginTests", ["DebugDrawerFileBrowserPlugin", "DebugDrawer", "viewinspector/ViewInspector", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
     ("DebugDrawerDiskIOPluginTests", ["DebugDrawerDiskIOPlugin", "DebugDrawer", "DebugDrawerInterceptionContract", "DebugDrawerDiskIOInterposer", "viewinspector/ViewInspector", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
     ("DebugDrawerEnergyPluginTests", ["DebugDrawerEnergyPlugin", "DebugDrawer", "viewinspector/ViewInspector", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),

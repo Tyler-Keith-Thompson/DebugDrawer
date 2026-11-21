@@ -15,6 +15,7 @@
     /// Writing the clipboard, and on the Mac the save panel a refused save falls back to, stay here.
     struct ScreenshotPluginView: View {
         @StateObject private var transport: DebugDrawerPluginTransport<ScreenshotSnapshot, ScreenshotCommand>
+        let inspection = Inspection<Self>() // from/for ViewInspector.
 
         /// - Parameter transport: Joins the view to the model; made once, for the view's lifetime.
         init(transport: @escaping @autoclosure () -> DebugDrawerPluginTransport<ScreenshotSnapshot, ScreenshotCommand>) {
@@ -93,6 +94,7 @@
             // made once it shows again.
             .onAppear(perform: copyIfAsked)
             .onChange(of: snapshot.status) { copyIfAsked() }
+            .onReceive(inspection.notice) { inspection.visit(self, $0) }
             #if os(macOS)
                 .fileExporter(
                     isPresented: needsLocation,
