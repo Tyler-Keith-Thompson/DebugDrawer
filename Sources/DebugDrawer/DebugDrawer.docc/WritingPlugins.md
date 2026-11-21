@@ -542,7 +542,10 @@ naming any other as `notExposed`, and `DebugDrawerAnalytics` holds the analytics
 open session, redacted in the app before anything is kept. A capability that would otherwise
 intercept, as the Localization plugin's live modes replace `Bundle`'s lookup, has the host opt
 in instead: `DebugDrawerLocalization` holds `LocalizationReview`, which the host reads strings
-through, and `.localizationReview()`, which shows their keys or pseudo text for the session. One
+through, and `.localizationReview()`, which shows their keys or pseudo text for the session, and
+`DebugDrawerLocation` holds `LocationSpoofing`, which the host passes its location readings
+through where the Location plugin exchanges `CLLocationManager`'s methods, and
+`.locationSpoofing(_:)`, which replaces them for the session and tells the host as it does. One
 whose effect is in SwiftUI's environment keeps the modifier that applies it in its module, where
 it draws nothing: `DebugDrawerAccessibility` holds `.accessibilityEnvironmentOverrides()` for
 the receiver and the same-named modifier for the host's root view. Both are session-scoped, with

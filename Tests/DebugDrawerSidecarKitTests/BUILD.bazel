@@ -22,6 +22,7 @@ swift_library(
         "//Sources/DebugDrawer",
         "//Sources/DebugDrawerReceiver",
         "//Sources/DebugDrawerAppInfo",
+        "//Sources/DebugDrawerLocation",
         "//Sources/DebugDrawerAppStateReset",
         "//Sources/DebugDrawerHangDetectorPlugin",
         "//Sources/DebugDrawerNetworkPlugin",

@@ -1037,6 +1037,9 @@ which on the iOS simulator is the one Xcode or `xcrun simctl location` sets:
 Authorization isn't simulated: `authorizationStatus` is the real one, and a spoofed location is
 delivered whether or not the app is authorized.
 
+The plugin is debug-only: a release build swaps nothing. To spoof the location a production build
+reads, for a sidecar's session, see "Location spoofing in production" below.
+
 ### Tweaks: the app's own debug settings
 
 The Tweaks plugin shows the settings the app declares: toggles, pickers over an enumeration or a
@@ -2241,8 +2244,8 @@ analytics events, `DebugDrawerAnalytics`, for translators and accessibility revi
 `DebugDrawerLocalization` and `DebugDrawerAccessibility`, to forward crash reports and
 MetricKit payloads, `DebugDrawerMetricKit`, to mock responses for a session, `DebugDrawerNetwork`,
 to show the push token for test pushes, `DebugDrawerNotifications`, to record hangs and
-signposts, `DebugDrawerHangDetector`, or to show a snapshot of the app's state, `DebugDrawerAppInfo`,
-below). It serves a sidecar, over the app group's store, only the
+signposts, `DebugDrawerHangDetector`, to spoof its location for a session, `DebugDrawerLocation`,
+or to show a snapshot of the app's state, `DebugDrawerAppInfo`, below). It serves a sidecar, over the app group's store, only the
 capabilities the app enables, within sessions the sidecar opens, and refuses everything else.
 Before shipping it, read the receiver's "Security Model and Distribution" article
 ([`SecurityModel.md`](Sources/DebugDrawerReceiver/DebugDrawerReceiver.docc/SecurityModel.md)): what
@@ -3235,6 +3238,120 @@ struct EnvironmentIndicator: View {
 In the sidecar, the kit's `DebugDrawerSidecarPlugin.environments` lists the environments under a
 high-risk warning, the active one marked, with Switch for each other one and Reset to Default.
 
+**Location spoofing in production.** To test geo features (a store finder, a delivery zone, a
+regional price) on the build that ships, a sidecar can replace the locations the app reads with a
+coordinate of its own, for its session. Many apps forbid this for fraud or compliance reasons, so
+it is off unless the app enables it, nothing is intercepted, and the app is told as spoofing starts
+and ends, so its own fraud checks can react. Link `DebugDrawerLocation` (`.product(name:
+"DebugDrawerLocation", package: "DebugDrawer")`) beside the receiver, pass the readings a tester
+should be able to move through the model, and enable the capability:
+
+```swift
+import CoreLocation
+import CryptoKit
+import DebugDrawerLocation
+import DebugDrawerReceiver
+import Foundation
+import SwiftUI
+
+/// What the app knows of where the device is: the location its features use, and whether it is
+/// spoofed, which the app's own fraud checks read.
+@MainActor
+final class LocationSignals: ObservableObject {
+    @Published private(set) var location: CLLocation?
+    @Published private(set) var isSpoofed = false
+
+    /// Told by `LocationSpoofing` as a spoof starts, moves and ends.
+    func spoofingDidChange(_ spoofed: CLLocation?) {
+        isSpoofed = spoofed != nil
+        // At the end, drop the spoofed location until Core Location delivers a real one.
+        location = spoofed
+    }
+
+    func update(_ location: CLLocation?) {
+        self.location = location
+    }
+}
+
+@MainActor
+final class ProductionLocation {
+    let sessions: DebugDrawerSessions
+    let signals: LocationSignals
+    let spoofing: LocationSpoofing
+    let receiver: DebugDrawerReceiver
+
+    init(grantServerKey: Curve25519.Signing.PublicKey, container: URL) throws {
+        sessions = DebugDrawerSessions(maximumDuration: 15 * 60, grantPolicy: DebugDrawerGrantPolicy(
+            verifier: DebugDrawerSignedGrantVerifier(keys: [.ed25519(grantServerKey)]),
+            audience: "com.example.MyApp"
+        ))
+        let signals = LocationSignals()
+        self.signals = signals
+        spoofing = LocationSpoofing(sessions: sessions, spoofingDidChange: signals.spoofingDidChange)
+        receiver = DebugDrawerReceiver(directory: container.appending(path: "DebugDrawer"), sessions: sessions)
+        receiver.enable(.locationSpoofing(spoofing))
+        try receiver.start()
+    }
+
+    /// From the app's CLLocationManagerDelegate, locationManager(_:didUpdateLocations:).
+    func didUpdateLocations(_ locations: [CLLocation]) {
+        signals.update(spoofing.locations(replacing: locations).last)
+    }
+}
+
+struct LocationSpoofingIndicator: View {
+    @ObservedObject var spoofing: LocationSpoofing
+
+    var body: some View {
+        if let coordinate = spoofing.snapshot.coordinate {
+            Label("Location spoofed: \(coordinate.latitude), \(coordinate.longitude)", systemImage: "location.slash")
+        }
+    }
+}
+```
+
+- **The risk: high.** Whoever holds the sidecar, a leaked copy included, can make the app believe
+  the device is anywhere, which is what location fraud does: claim a region's offer, check in
+  somewhere they aren't, appear inside a delivery zone.
+- **Nothing intercepted: only what the app passes through.** A release build replaces no method
+  and swaps no delegate. Only the readings the app passes through
+  `spoofing.location(replacing:)` or `spoofing.locations(replacing:)` are spoofed, so route the
+  ones a tester should be able to move and leave the ones your fraud checks rely on on Core
+  Location's own. Both are safe from any thread, and so are `spoofing.isSpoofing` and
+  `spoofing.spoofedLocation`; a spoofed reading is dated when it is read.
+- **The app is told.** `spoofingDidChange`, which the model requires, is called on the main actor
+  with the spoofed location as a spoof lands or moves, and with `nil` as it ends, whatever ends it;
+  `spoofing.snapshot.isSpoofing` and `spoofing.isSpoofing` say the same. Raise your own fraud signal
+  from it (`LocationSignals.isSpoofed` above), and treat what the app read meanwhile as not the
+  device's.
+- **A coordinate, only.** The sidecar connects to `LocationSpoofing.pluginID` with
+  `LocationSpoofing.Snapshot` (the spoofed `coordinate`, or `nil`) and `LocationSpoofing.Command`:
+  `spoof(_:)`, with a `LocationCoordinate`, and `stop`. A coordinate off the Earth (latitude beyond
+  ±90, longitude beyond ±180, or not a number) is refused as `commandRefused(.malformedCommand)`.
+  Until the app enables `.locationSpoofing(_:)`, a spoof is refused as
+  `commandRefused(.unknownCapability)`, even inside a session; outside a session it is refused
+  (`noActiveSession`), and a spoof the model is handed directly outside one is ignored.
+- **A grant when a verifier is configured.** With a `DebugDrawerGrantPolicy` on the sessions, as
+  above, a spoof needs a session whose grant lists `LocationSpoofing.pluginID`: without a grant no
+  session opens, and a grant for other capabilities is refused as
+  `commandRefused(.capabilityNotGranted)`. Grants stay optional (without a policy a spoof needs only
+  a session); add `.requiringGrant()` to the capability to refuse spoofs as
+  `commandRefused(.grantMissing)` in any session without one.
+- **For the session, always.** As the session ends, expires or the receiver's or the capability's
+  gate turns off, the readings are real again, the app is told `nil`, and the end is audited as
+  `changeReverted`; the readings stop being spoofed at the session's expiry date even before the
+  sessions' timer fires in an app that was suspended. The coordinate is kept in memory only, so a
+  kill ends the spoof with the process; a flag (never the coordinate) kept in the defaults while
+  spoofing lets the next launch tell the app `nil` as it makes the capability, so a location the
+  app kept from that launch can be dropped. Make it as the app starts.
+- **The app shows it.** Show the spoofed location in the session indicator, as
+  `LocationSpoofingIndicator` does, so the person holding the device knows the app isn't using
+  where they are.
+
+In the sidecar, the kit's `DebugDrawerSidecarPlugin.locationSpoofing` shows the spoofed location
+under a high-risk warning, with latitude and longitude fields, a few places to pick, and Stop
+Spoofing.
+
 **Allowlisted UserDefaults in production.** To try a production build with a setting changed
 (another plan, tips turned on, a longer page), a sidecar can read and edit the UserDefaults keys
 the app allowlists, and no other. It is off unless the app enables it, and enabled with no key it
@@ -3749,7 +3866,7 @@ DebugDrawerSidecarView(groupIdentifier: "group.com.example.debug", sessionDurati
 Below it, a picker shows the plugins the app serves, drawn by the plugins' own views over the
 transport: `.console` and `.network` by default, `.bugReports` for an app that serves bug
 reports, `.scenarios` for one that registers scenarios, `.authActions` for one that registers
-auth actions, `.appStateReset` for one that allows a reset, `.environments` for one that lets a sidecar switch its backend, `.userDefaults` for one that allowlists defaults keys and `.appState` for one that shows its state, which the view hosts as the app is reached so every report carries it (above). A plugin of your own whose model adopts
+auth actions, `.appStateReset` for one that allows a reset, `.environments` for one that lets a sidecar switch its backend, `.locationSpoofing` for one that lets a sidecar spoof its location, `.userDefaults` for one that allowlists defaults keys and `.appState` for one that shows its state, which the view hosts as the app is reached so every report carries it (above). A plugin of your own whose model adopts
 `DebugDrawerPluginModel` joins them with `DebugDrawerSidecarPlugin(id:title:icon:snapshot:command:plugin:)`,
 whose closure makes the plugin's view over the transport the kit hands it. Create Report writes the
 hosted plugins' report contributions, redacted by `DebugDrawer.shared.redaction`, under a summary
@@ -3984,7 +4101,8 @@ ContentView()
 | `DebugDrawerKeychainPlugin` | Generic and internet passwords, certificates and keys, each with every attribute the keychain returns (a key's or certificate's data is never read), filtered by access group and text; generic passwords added and edited, any item deleted; on the Mac, the data protection keychain |
 | `DebugDrawerScreenshotPlugin` | The app's key window captured without the drawer or the HUD: to a PNG on the Desktop or the clipboard on macOS, to the clipboard on iOS |
 | `DebugDrawerFileBrowserPlugin` | The app's Documents, Library, tmp, bundle and app group containers, with folder totals and dates, previews of text, JSON, property lists and images, and files imported, renamed, deleted and shared, the bundle read-only |
-| `DebugDrawerLocationPlugin` | Spoofed CLLocationManager locations: presets, a custom latitude and longitude, and GPX routes played at a chosen speed |
+| `DebugDrawerLocation` | `LocationCoordinate`, real in every build, and the high-risk receiver capability (`.locationSpoofing(_:)`) that lets a sidecar, within its session, replace the locations the app reads through `LocationSpoofing` with a coordinate of its own, telling the app as spoofing starts and ends so its own fraud checks can react; no interception and no drawer, so a release build links it beside the receiver |
+| `DebugDrawerLocationPlugin` | Spoofed CLLocationManager locations: presets, a custom latitude and longitude, and GPX routes played at a chosen speed |; re-exports `DebugDrawerLocation`
 | `DebugDrawerLoadedLibrariesPlugin` | Every loaded image, grouped as app, third-party and system, with UUIDs and load addresses |
 | `DebugDrawerDeepLinkPlugin` | Opens URLs in the app's own handler or through the system, continues universal links and activities of the app's own type with their userInfo in the app, and keeps a history of each |
 | `DebugDrawerCookiesPlugin` | Browse, search, copy and delete `HTTPCookieStorage.shared`'s cookies, and `WKWebsiteDataStore.default()`'s where WebKit exists |

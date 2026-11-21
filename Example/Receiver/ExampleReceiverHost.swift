@@ -6,6 +6,7 @@ import DebugDrawerAppInfo
 import DebugDrawerAppStateReset
 import DebugDrawerHangDetector
 import DebugDrawerLocalization
+import DebugDrawerLocation
 import DebugDrawerMetricKit
 import DebugDrawerNetwork
 import DebugDrawerNotifications
@@ -22,9 +23,9 @@ import os
 /// app hands its log lines and requests, the bug reports its Report a Bug trigger takes, the
 /// push registration the app delegate hands the APNs device token, the scenarios a sidecar
 /// launches it into, the actions a sidecar takes on its sign-in, the state a sidecar may reset, the
-/// backends a sidecar may point it at for a session, the settings keys a sidecar may edit, the
-/// hangs and signposts it records, and the read-only snapshot of its state every sidecar report
-/// carries.
+/// backends a sidecar may point it at for a session, the location a sidecar may spoof for one,
+/// the settings keys a sidecar may edit, the hangs and signposts it records, and the read-only
+/// snapshot of its state every sidecar report carries.
 ///
 /// Everything here is in the release build too: a production app links the receiver and the
 /// capability modules, never the drawer.
@@ -49,6 +50,10 @@ final class ExampleReceiverHost: ObservableObject {
     let appState: ProductionAppState
     /// The backends a sidecar's session points the app at: Production, Staging or Canary.
     let environments: ProductionEnvironments
+    /// The store finder's location and fraud signal, which follow a sidecar's spoof.
+    let location = ProductionLocation()
+    /// What the store finder reads its location through, which a sidecar's session may spoof.
+    let locationSpoofing: LocationSpoofing
     /// The settings keys a sidecar may read and edit for its session, and no other.
     let settings: DebugDrawerUserDefaults
     /// The freeze and the signposted load a sidecar's performance traces record.
@@ -135,6 +140,7 @@ final class ExampleReceiverHost: ObservableObject {
         self.snapshot = snapshot
         self.signIn = signIn
         self.environments = environments
+        locationSpoofing = LocationSpoofing(sessions: sessions, spoofingDidChange: location.spoofingDidChange)
         self.settings = settings
         self.logging = logging
         self.sessions = sessions
@@ -180,6 +186,7 @@ final class ExampleReceiverHost: ObservableObject {
         receiver.enable(.scenarios(scenarios.scenarios, launchURL: ProductionScenarios.launchURL))
         receiver.enable(.authActions(signIn.actions, launchURL: ProductionSignIn.launchURL))
         receiver.enable(.environments(environments.model))
+        receiver.enable(.locationSpoofing(locationSpoofing))
         receiver.enable(.userDefaults(settings))
         receiver.enable(.performanceTraces(performance.traces))
     }

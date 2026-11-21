@@ -180,12 +180,6 @@ import Foundation
             simulator.coordinate = location
         }
     }
-
-    extension LocationCoordinate {
-        fileprivate init(_ coordinate: CLLocationCoordinate2D) {
-            self.init(latitude: coordinate.latitude, longitude: coordinate.longitude)
-        }
-    }
 #else
     // The release stand-in: the same members, and nothing behind them.
 

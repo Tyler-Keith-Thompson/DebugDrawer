@@ -20,6 +20,7 @@ swift_library(
     visibility = ["//:__pkg__"],
     deps = [
         "//Sources/DebugDrawerLocationPlugin",
+        "//Sources/DebugDrawerLocation",
         "//Sources/DebugDrawer",
         "//Tests/DebugDrawerInterceptionContract",
     ] + select({

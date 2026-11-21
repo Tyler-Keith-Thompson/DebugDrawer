@@ -19,7 +19,8 @@ struct ExampleSidecarApp: App {
                 plugins: [
                     .featureFlagOverrides, .experimentOverrides, .logLevels, .tweaks, .localizationReview, .accessibilityEnvironment,
                     .analyticsEvents, .metricKitPayloads, .networkMocking, .diagnosticsCapture, .bugReports, .pushRegistration,
-                    .scenarios, .authActions, .appStateReset, .environments, .userDefaults, .performanceTraces, .appState, .console, .network
+                    .scenarios, .authActions, .appStateReset, .environments, .locationSpoofing, .userDefaults, .performanceTraces, .appState,
+                    .console, .network
                 ]
             ) { app in
                 try ExampleGrantServer.grant(for: app)

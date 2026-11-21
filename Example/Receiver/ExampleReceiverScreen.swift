@@ -1,5 +1,6 @@
 import DebugDrawerHangDetector
 import DebugDrawerLocalization
+import DebugDrawerLocation
 import DebugDrawerNetwork
 import DebugDrawerNotifications
 import DebugDrawerReceiver
@@ -21,6 +22,7 @@ struct ExampleReceiverScreen: View {
     @ObservedObject var diagnostics: DebugDrawerDiagnosticsCapture
     @ObservedObject var backend: ProductionBackend
     @ObservedObject var environments: DebugDrawerEnvironments
+    @ObservedObject var location: ProductionLocation
     @ObservedObject var performance: ProductionPerformance
     @ObservedObject var traces: PerformanceTraces
     @State private var greeting = ProductionTweaks.greeting.value
@@ -77,6 +79,21 @@ struct ExampleReceiverScreen: View {
                 Text(
                     "A sidecar may switch to Staging or Canary for its session; the app is back on Production as it ends. "
                         + "The base URLs stay in the app."
+                )
+            }
+            Section {
+                LabeledContent("Searching From", value: location.summary)
+                    .accessibilityIdentifier("LocationSearchingFrom")
+                LabeledContent("Fraud Signal", value: location.isSpoofed ? "Location spoofed" : "None")
+                    .accessibilityIdentifier("LocationFraudSignal")
+                Button("Refresh") { location.refresh(through: host.locationSpoofing) }
+                    .accessibilityHint("Reads the device's location again, through the spoofing")
+            } header: {
+                Text("Store Finder")
+            } footer: {
+                Text(
+                    "A sidecar may spoof the location the store finder reads for its session; the app is told, "
+                        + "raises its fraud signal, and reads the device's location again as the session ends."
                 )
             }
             ProductionSettingsSection()
@@ -203,7 +220,8 @@ struct ExampleReceiverScreen: View {
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             ExampleReceiverSessionIndicator(
-                sessions: sessions, keeper: keeper, environments: environments, keepRunning: host.keepRunningInBackground
+                sessions: sessions, keeper: keeper, environments: environments, spoofing: host.locationSpoofing,
+                keepRunning: host.keepRunningInBackground
             )
         }
     }

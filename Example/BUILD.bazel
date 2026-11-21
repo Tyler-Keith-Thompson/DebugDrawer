@@ -269,6 +269,7 @@ swift_library(
         "//Sources/DebugDrawerAppStateReset",
         "//Sources/DebugDrawerHangDetector",
         "//Sources/DebugDrawerLocalization",
+        "//Sources/DebugDrawerLocation",
         "//Sources/DebugDrawerMetricKit",
         "//Sources/DebugDrawerNetwork",
         "//Sources/DebugDrawerNotifications",

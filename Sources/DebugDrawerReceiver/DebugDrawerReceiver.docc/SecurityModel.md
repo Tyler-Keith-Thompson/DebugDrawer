@@ -95,7 +95,8 @@ Every outcome, applied or refused, is written to the audit log.
 The receiver acts on nothing until the app enables a capability with
 `receiver.enable(...)`, and acts on a capability only within the values the app declared for it:
 the flags its adapter lists, the experiments and their variants, the UserDefaults keys and their
-kinds, the environments in its allowlist, the hosts a mock may answer. That is what keeps a
+kinds, the environments in its allowlist, the hosts a mock may answer, the readings it passes
+through location spoofing. That is what keeps a
 leaked sidecar from doing more than the app chose to offer, and why a capability added to the
 library reaches no app until that app enables it.
 
@@ -126,7 +127,7 @@ The library draws no indicator: drawing one is the host's job, and it should. Ob
 is engaged, until when, who holds the grant (``DebugDrawerSession/grant``) and an End button that
 calls ``DebugDrawerSessions/end()``. Add what changes what the person sees: the backend from
 ``DebugDrawerEnvironments/Snapshot/isSwitched``, "Network mocking active" from `NetworkMocking`'s
-`snapshot.isActive`, "Capturing diagnostics" from
+`snapshot.isActive`, the spoofed location from `LocationSpoofing`'s `snapshot.coordinate`, "Capturing diagnostics" from
 ``DebugDrawerDiagnosticsCapture/Snapshot/isCapturing``. On iOS 26 and later,
 ``DebugDrawerBackgroundKeeper/startSession(duration:title:subtitle:)`` also gets the system's own
 progress indicator; elsewhere the app's indicator is the only one.
@@ -191,7 +192,8 @@ grant lists it:
   (production-safe ones and their values), environments (the list and the active one),
   allowlisted UserDefaults (each key and its value), scenarios and auth actions (what is
   registered and the last run), localization and accessibility review (the mode and overrides),
-  network mocking (the allowed hosts) and app state reset (the allowed categories).
+  network mocking (the allowed hosts), location spoofing (the coordinate a session spoofed, never
+  the device's) and app state reset (the allowed categories).
 - Served only during a session: diagnostics capture, bug reports, analytics events, MetricKit
   payloads, performance traces, the app state reset listing, the push registration and the app
   state snapshot. Of these, analytics events, MetricKit payloads, the push registration and the
@@ -225,6 +227,7 @@ receiver, as network mocking always does.
 | Accessibility overrides | Low | Session, always | Under a policy |
 | Crash reports and MetricKit payloads | Low | Persistent (deletions) | Under a policy, to be served too |
 | Network mocking | High | Session, always | Always |
+| Location spoofing | High | Session, always | Under a policy |
 | Push token | Low to medium | Nothing to revert | Under a policy, to be served too |
 | App state reset | Medium (data loss) | Persistent (can't be undone) | Under a policy |
 | Performance traces | Low | Session, always | Under a policy |
@@ -352,6 +355,19 @@ didn't configure with `NetworkMockingURLProtocol`, `URLSession.shared`, or the r
 regular expressions and file bodies are refused. **Limits:** always needs a grant listing it;
 rules clear with the session; show `snapshot.isActive` in the session indicator.
 
+### Location spoofing
+
+`LocationSpoofing` (`.locationSpoofing(_:)`, `DebugDrawerLocation`). **Can:** make the app take a
+coordinate of their choice for the device's location during their session, which is what
+location fraud does (a region's offer, a check-in, a delivery zone). **Can't:** move a reading the
+app doesn't pass through `location(replacing:)` or `locations(replacing:)`: nothing is
+intercepted, so Core Location, MapKit and the system keep the real location; read the device's
+location, which is never in the snapshot; or keep a spoof past the session, its expiry date or a
+kill. **Limits:** the app is told as spoofing starts and ends (`spoofingDidChange`, required), so
+its own fraud checks can flag what it read meanwhile; route only the readings a tester should
+move, and keep fraud checks on Core Location's own; configure a grant policy, or add
+`requiringGrant()`, and show the spoofed location in the session indicator.
+
 ### Push token
 
 `PushRegistrationMirror` (`.pushRegistration(_:)`, `DebugDrawerNotifications`). **Can:** read the
@@ -462,7 +478,8 @@ receiver:
   type and picks among what the app declared in its source.
 - It makes no network connection and installs no interception: no method replacement, no
   `URLProtocol` registered for the app. Network mocking, if you enable it, answers only through a
-  URL protocol the app lists in its own session configurations.
+  URL protocol the app lists in its own session configurations; location spoofing, only through
+  the readings the app passes through it.
 - Its background request, while a session is open, is a UIKit background task, or on iOS 26 and
   later a `BGContinuedProcessingTask` the person starts and the system shows. It claims no audio,
   location or VoIP mode.
