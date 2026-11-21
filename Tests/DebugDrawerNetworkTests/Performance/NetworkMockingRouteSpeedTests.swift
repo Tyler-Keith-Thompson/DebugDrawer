@@ -21,10 +21,14 @@ private struct ZeroRandomSource: NetworkConditionRandomSource {
     }
 }
 
-// 10,000 questions against 50 wildcard rules, only the last of which matches, take about a tenth
-// of a second on an Apple silicon Mac in debug builds, less in release; the bound is far above
-// that, so a loaded machine passes and a route that recompiled patterns per request, or matched
-// hosts the app doesn't allow, fails.
+// 10,000 questions against 50 wildcard rules, only the last of which matches, take about 0.75 s of
+// CPU time on an Apple silicon Mac in debug builds and about 0.5 s in release; the bound is several
+// times that, so a route that recompiled patterns per request, or matched hosts the app doesn't allow,
+// fails. Each batch is timed in the test thread's CPU time (CLOCK_THREAD_CPUTIME_ID), which stops
+// while the thread is descheduled, so other processes loading the machine don't show up as cost;
+// the route answers in the call, on this thread. The test keeps each side's fastest of several
+// batches, run in turn, which leaves out a batch slowed by a context switch's cold caches or a
+// stretch on an efficiency core, and compares those.
 @MainActor
 @Suite(.timeLimit(.minutes(1)))
 struct NetworkMockingRouteSpeedTests {
@@ -45,26 +49,34 @@ struct NetworkMockingRouteSpeedTests {
         )
         let matching = try #require(URL(string: "https://api.example.com/v49/orders/7"))
         let elsewhere = try #require(URL(string: "https://api.other.com/v49/orders/7"))
+        let batches = 5
         let count = 10000
         let bound = Duration.seconds(3)
-        let clock = ContinuousClock()
         var claimed = 0
         var claimedElsewhere = 0
+        var fastest = Duration.seconds(60)
+        var fastestElsewhere = Duration.seconds(60)
 
-        let elapsed = clock.measure {
+        for _ in 0 ..< batches {
+            claimed = 0
+            claimedElsewhere = 0
+            let start = clock_gettime_nsec_np(CLOCK_THREAD_CPUTIME_ID)
             for _ in 0 ..< count where route.claims(method: "GET", url: matching) {
                 claimed += 1
             }
-        }
-        let elapsedElsewhere = clock.measure {
+            let middle = clock_gettime_nsec_np(CLOCK_THREAD_CPUTIME_ID)
             for _ in 0 ..< count where route.claims(method: "GET", url: elsewhere) {
                 claimedElsewhere += 1
             }
+            let end = clock_gettime_nsec_np(CLOCK_THREAD_CPUTIME_ID)
+            fastest = min(fastest, .nanoseconds(middle - start))
+            fastestElsewhere = min(fastestElsewhere, .nanoseconds(end - middle))
         }
 
+        print("Network mocking: \(count) requests take \(fastest) of CPU time against the rules, \(fastestElsewhere) to other hosts")
         #expect(claimed == count)
         #expect(claimedElsewhere == 0)
-        #expect(elapsed < bound)
-        #expect(elapsedElsewhere < elapsed)
+        #expect(fastest < bound)
+        #expect(fastestElsewhere < fastest)
     }
 }
