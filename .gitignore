@@ -16,9 +16,9 @@
 # pins Bazel's dependencies and is.
 /Package.resolved
 
-# Xcode (generated from the Bazel graph by `just generate`; the root one is where it was before
-# DD-217)
+# Xcode (generated from the Bazel graph by `just generate`)
 /xcode/
+# Where `just generate` wrote it before DD-217; scripts/generate-xcodeproj.sh warns while one remains.
 /DebugDrawer.xcodeproj/
 xcuserdata/
 

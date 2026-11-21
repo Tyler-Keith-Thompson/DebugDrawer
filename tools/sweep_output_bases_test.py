@@ -115,6 +115,26 @@ class SweepTests(unittest.TestCase):
         self.assertEqual(actual, [])
         self.assertTrue(os.path.isdir(base))
 
+    def test_a_release_output_base_whose_checkout_is_gone_is_deleted(self):
+        checkout = os.path.join(self.directory, "deleted-checkout")
+        # Named as the justfile's BAZEL_RELEASE_OUTPUT_BASE names it.
+        name = hashlib.sha256(f"{checkout}:release".encode()).hexdigest()[:32]
+        base = self.make_output_base(checkout, name=name)
+
+        actual = self.sweep()
+
+        self.assertEqual(actual, [base])
+        self.assertFalse(os.path.lexists(base))
+
+    def test_the_current_checkouts_release_output_base_is_kept_however_long_it_was_idle(self):
+        name = hashlib.sha256(f"{self.workspace}:release".encode()).hexdigest()[:32]
+        base = self.make_output_base(self.workspace, idle_days=30, name=name)
+
+        actual = self.sweep()
+
+        self.assertEqual(actual, [])
+        self.assertTrue(os.path.isdir(base))
+
     def test_install_cache_and_other_entries_of_the_root_are_never_deleted(self):
         expected = ["cache", "install", "notes"]
         for name in expected:

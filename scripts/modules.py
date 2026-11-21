@@ -22,8 +22,10 @@ TEST_SUPPORT = f"{PROJECT}TestSupport"
 # External packages: (identity, url, minimum version). A dependency written "identity/Product"
 # in the tables below refers to a product of one of these. A version written "exact:1.2.3" pins
 # that release, for a package whose later releases resolve differently on different toolchains
-# (Bazel resolves on each machine with its own swift). After adding one: `just modules`,
-# add `swiftpkg_<identity>` (hyphens as underscores) to use_repo in MODULE.bazel, `just resolve`.
+# (Bazel resolves on each machine with its own swift). One written "minor:0.1.3" takes patch
+# releases only, for a 0.x package whose minor releases break its API. After adding one:
+# `just modules`, add `swiftpkg_<identity>` (hyphens as underscores) to use_repo in MODULE.bazel,
+# `just resolve`.
 PACKAGES = [
     # Console: reads the unified log (os_log) of the host process.
     ("oslogclient", "https://github.com/CheekyGhost-Labs/OSLogClient", "2.0.0"),
@@ -552,9 +554,12 @@ def spm_dep(d):
 
 
 def requirement(version):
-    """A package's version requirement in a manifest: `from:` the minimum, or `exact:` a pinned release."""
+    """A package's version requirement in a manifest: `from:` the minimum, `exact:` a pinned release,
+    or `.upToNextMinor(from:)` for `minor:`, patch releases only."""
     if version.startswith("exact:"):
         return f'exact: "{version.removeprefix("exact:")}"'
+    if version.startswith("minor:"):
+        return f'.upToNextMinor(from: "{version.removeprefix("minor:")}")'
     return f'from: "{version}"'
 
 
@@ -1083,11 +1088,12 @@ def simulator_test_build_bazel(name, deps, size):
         "# `bazel test` and the generated Xcode project both run this bundle in the simulator, inside the\n"
         "# test host (tools/test_host), which gives windows a scene. The runner drives xcodebuild\n"
         "# directly; the default one fails a run that holds only Swift Testing tests.\n"
+        f"# `{SIMULATOR_TEST_TAG}` runs one simulator test at a time (.bazelrc).\n"
         "ios_unit_test(\n"
         f'    name = "{name}",\n'
         f'    size = "{size}",\n'
         f'    minimum_os_version = "{IOS_MINIMUM}",\n'
-        f'    tags = ["{RELEASE_EXCLUDED_TAG}", "{SIMULATOR_TEST_TAG}"],\n'
+        f'    tags = [\n        "{RELEASE_EXCLUDED_TAG}",\n        "{SIMULATOR_TEST_TAG}",\n    ],\n'
         '    runner = "@rules_apple//apple/testing/default_runner:ios_xctestrun_ordered_runner",\n'
         '    test_host = "//tools/test_host",\n'
         '    visibility = ["//visibility:public"],\n'

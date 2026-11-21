@@ -7,11 +7,7 @@
 swift/.build
 swift/.swiftpm
 
-# Convenience symlinks.
-bazel-DebugDrawer
-bazel-bin
-bazel-out
-bazel-testlogs
+# The convenience symlinks (bazel-*) are ignored by glob in REPO.bazel.
 
 # Overlays the bootstrap script copies over the template (server and embedded types); not built in place.
 templates
