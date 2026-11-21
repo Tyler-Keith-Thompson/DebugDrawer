@@ -128,8 +128,9 @@ package struct ActiveNetworkMocks: Sendable {
     func answer(method: String, url: URL) -> NetworkMockAnswer? {
         guard url.scheme == "http" || url.scheme == "https" else { return nil }
         guard let host = url.host(), allowedHosts.contains(where: { $0.allows(host) }) else { return nil }
-        guard now() < expires else { return nil }
-        return rules.first { $0.matcher.matches(method: method, url: url) }?.answer
+        guard now() < expires, !rules.isEmpty else { return nil }
+        let request = CompiledNetworkMockMatcher.Request(method: method, url: url)
+        return rules.first { $0.matcher.matches(request) }?.answer
     }
 
     /// How the first profile matching `url`'s host conditions the answer, with its failure decided

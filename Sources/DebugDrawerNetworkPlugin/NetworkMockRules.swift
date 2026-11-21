@@ -42,7 +42,9 @@
         /// - Complexity: O(*n*) in the number of active rules.
         func answer(method: String, url: URL) -> NetworkMockAnswer? {
             active.withLock { rules in
-                rules.first { $0.matcher.matches(method: method, url: url) }?.answer
+                guard !rules.isEmpty else { return nil }
+                let request = CompiledNetworkMockMatcher.Request(method: method, url: url)
+                return rules.first { $0.matcher.matches(request) }?.answer
             }
         }
     }

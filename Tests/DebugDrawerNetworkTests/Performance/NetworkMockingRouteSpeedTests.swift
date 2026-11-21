@@ -21,8 +21,8 @@ private struct ZeroRandomSource: NetworkConditionRandomSource {
     }
 }
 
-// 10,000 questions against 50 wildcard rules, only the last of which matches, take about 0.75 s of
-// CPU time on an Apple silicon Mac in debug builds and about 0.5 s in release; the bound is several
+// 10,000 questions against 50 wildcard rules, only the last of which matches, take about 0.55 s of
+// CPU time on an Apple silicon Mac in debug builds and about 0.3 s in release; the bound is several
 // times that, so a route that recompiled patterns per request, or matched hosts the app doesn't allow,
 // fails. Each batch is timed in the test thread's CPU time (CLOCK_THREAD_CPUTIME_ID), which stops
 // while the thread is descheduled, so other processes loading the machine don't show up as cost;
