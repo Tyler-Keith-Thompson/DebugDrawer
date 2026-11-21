@@ -41,19 +41,29 @@
             set { boundRoute.withLock { $0 = newValue } }
         }
 
-        /// The drawers holding the Network plugin, in the order they installed it, each with its
-        /// plugin's route; capturing runs while there is one.
-        private static var installations: [(drawer: ObjectIdentifier, route: NetworkRoute)] = []
+        /// A drawer holding the Network plugin, with its plugin's route.
+        private struct Installation {
+            let id: ObjectIdentifier
+            /// The drawer itself, whose rules mask what its store writes to the session; weak, as
+            /// the drawer holds the plugin.
+            weak var drawer: DebugDrawer?
+            let route: NetworkRoute
+        }
+
+        /// The drawers holding the Network plugin, in the order they installed it; capturing runs
+        /// while there is one.
+        private static var installations: [Installation] = []
         private nonisolated static let boundRoute = OSAllocatedUnfairLock(initialState: NetworkRoute.shared)
 
         /// Counts `drawer` as holding the plugin over `model`, whose stores capture from now on;
         /// the first install starts capturing. A drawer that holds it already changes nothing.
         static func install(_ model: NetworkModel, for drawer: DebugDrawer) {
             let id = ObjectIdentifier(drawer)
-            guard !installations.contains(where: { $0.drawer == id }) else { return }
+            guard !installations.contains(where: { $0.id == id }) else { return }
             let route = NetworkRoute(model)
-            installations.append((id, route))
+            installations.append(Installation(id: id, drawer: drawer, route: route))
             Self.route = route
+            model.store.recordingDrawer = drawer
             model.store.install()
         }
 
@@ -61,9 +71,10 @@
         /// store no drawer holds any more forgets what it captured, and once no drawer holds the
         /// plugin, capturing stops.
         static func uninstall(for drawer: DebugDrawer) {
-            guard let index = installations.firstIndex(where: { $0.drawer == ObjectIdentifier(drawer) }) else { return }
+            guard let index = installations.firstIndex(where: { $0.id == ObjectIdentifier(drawer) }) else { return }
             let store = installations.remove(at: index).route.store
             route = installations.last?.route ?? .shared
+            store.recordingDrawer = installations.last { $0.route.store === store }?.drawer
             if installations.isEmpty {
                 store.uninstall()
             } else if !installations.contains(where: { $0.route.store === store }) {

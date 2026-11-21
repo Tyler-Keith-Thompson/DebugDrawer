@@ -22,8 +22,9 @@
         }
 
         @StateObject private var transport: DebugDrawerPluginTransport<NetworkSnapshot, NetworkCommand>
-        // The drawer's redaction rules, which mask what the rows show and what an export holds.
-        @ObservedObject private var drawer = DebugDrawer.shared
+        /// The drawer the plugin is shown in, whose redaction rules mask what the rows show and
+        /// what an export holds; `nil` outside any drawer.
+        @Environment(\.showingDrawer) private var showingDrawer
         @Environment(\.locale) private var locale
         @Environment(\.timeZone) private var timeZone
         @State private var selectedId: UUID?
@@ -35,6 +36,7 @@
         /// The tallest the request list grows before it scrolls; scales with Dynamic Type, as its
         /// rows do.
         @ScaledMetric(relativeTo: .body) private var listHeight: CGFloat = 300
+        let inspection = Inspection<Self>() // from/for ViewInspector.
 
         /// - Parameter transport: Joins the view to the model; made once, for the view's lifetime.
         init(transport: @escaping @autoclosure () -> DebugDrawerPluginTransport<NetworkSnapshot, NetworkCommand>) {
@@ -42,9 +44,17 @@
         }
 
         var body: some View {
+            shownScreen
+                .onReceive(inspection.notice) { inspection.visit(self, $0) }
+        }
+
+        /// The log, or the editor open in its place.
+        @ViewBuilder private var shownScreen: some View {
             switch screen {
             case .requests:
-                requests(transport.snapshot)
+                DebugDrawerRedactionReader(showingDrawer) { redaction in
+                    requests(transport.snapshot, redaction: redaction)
+                }
             case let .mock(draft):
                 NetworkMockEditor(
                     draft: draft,
@@ -85,7 +95,8 @@
             }
         }
 
-        private func requests(_ snapshot: NetworkSnapshot) -> some View {
+        /// The log and its sections, masked by `redaction`.
+        private func requests(_ snapshot: NetworkSnapshot, redaction: DebugDrawerRedaction) -> some View {
             let log = snapshot.log
             return VStack(alignment: .leading, spacing: 0) {
                 sourceRows(snapshot)
@@ -96,7 +107,7 @@
                 NetworkToolbar(
                     filterStatus: binding(\.log.filterStatus) { .log(.setFilterStatus($0)) },
                     clear: { send(.log(.clearShown)) },
-                    export: NetworkArchiveFile(entries: filtered, redaction: drawer.redaction, webSockets: webSockets),
+                    export: NetworkArchiveFile(entries: filtered, redaction: redaction, webSockets: webSockets),
                     isFiltered: filtered.count < shown.count || webSockets.count < log.shownWebSockets.count,
                     importArchive: { isImporting = true },
                     source: log.source
@@ -108,7 +119,7 @@
                     }
                 }
 
-                requestList(snapshot, entries: filtered)
+                requestList(snapshot, entries: filtered, redaction: redaction)
 
                 NetworkIgnoredHint(count: log.ignoredCount, isShowing: log.showsIgnored) {
                     send(.log(.setShowsIgnored(!log.showsIgnored)))
@@ -116,7 +127,7 @@
 
                 // WebSocket traffic bypasses the URL protocol, so its connections are listed
                 // apart from the requests, under the same filters.
-                NetworkWebSocketsSection(connections: webSockets, redaction: drawer.redaction, selected: $selectedWebSocket)
+                NetworkWebSocketsSection(connections: webSockets, redaction: redaction, selected: $selectedWebSocket)
 
                 // Below the log, which is what the plugin is opened for most often.
                 sections(snapshot)
@@ -160,7 +171,7 @@
         }
 
         /// The filter field and the requests that pass it.
-        private func requestList(_ snapshot: NetworkSnapshot, entries filtered: [NetworkEntry]) -> some View {
+        private func requestList(_ snapshot: NetworkSnapshot, entries filtered: [NetworkEntry], redaction: DebugDrawerRedaction) -> some View {
             let log = snapshot.log
             return DebugDrawerSearchableList(
                 "Filter URL...",
@@ -175,7 +186,7 @@
                 ForEach(filtered) { entry in
                     let isSelected = selectedId == entry.id
                     NetworkRequestRow(
-                        entry: entry, redaction: drawer.redaction, isSelected: isSelected,
+                        entry: entry, redaction: redaction, isSelected: isSelected,
                         onSelect: { selectedId = isSelected ? nil : entry.id },
                         onMock: { mock($0) },
                         onResend: isReadOnly ? nil : { send(.replays(.resend($0.id))) },

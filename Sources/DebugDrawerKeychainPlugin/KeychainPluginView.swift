@@ -8,10 +8,13 @@
     /// It draws ``KeychainModel``'s snapshots from its transport and sends it what the user does;
     /// Copy, which writes the clipboard, and the masking of sensitive values stay in the views. The
     /// snapshot holds no password, so the open item's and the edit form's come from the model in
-    /// this process, by `revealedValue`.
+    /// this process, by `revealedValue`. Sensitive values are masked by the redaction rules of the
+    /// drawer it is shown in, followed as they change.
     struct KeychainPluginView: View {
         @StateObject private var transport: DebugDrawerPluginTransport<KeychainSnapshot, KeychainCommand>
-        @ObservedObject private var drawer = DebugDrawer.shared
+        /// The drawer the plugin is shown in; `nil` outside any drawer.
+        @Environment(\.showingDrawer) private var showingDrawer
+        let inspection = Inspection<Self>() // from/for ViewInspector.
         /// The password read for an item, from the model in this process; the snapshot holds none.
         private let revealedValue: @MainActor (KeychainItem.ID) -> Data?
 
@@ -29,7 +32,7 @@
 
         var body: some View {
             let snapshot = transport.snapshot
-            Group {
+            DebugDrawerRedactionReader(showingDrawer) { redaction in
                 if let editor = snapshot.editor {
                     KeychainPasswordForm(
                         editor: revealed(editor), accessGroups: snapshot.accessGroups, issue: snapshot.issue,
@@ -43,7 +46,7 @@
                         selection: snapshot.selection.map(revealed),
                         failure: snapshot.contents.failure,
                         issue: snapshot.issue,
-                        redaction: drawer.redaction,
+                        redaction: redaction,
                         actions: KeychainListActions(
                             select: { send(.toggle($0.id)) }, edit: { send(.startEditing($0.id)) }, delete: { send(.delete($0.id)) },
                             add: { send(.startAdding) }, reload: { send(.reload) }
@@ -54,6 +57,7 @@
             .onAppear {
                 if transport.snapshot.contents == .unread { send(.reload) }
             }
+            .onReceive(inspection.notice) { inspection.visit(self, $0) }
         }
 
         /// The filter, read from the snapshot and changed through the model.

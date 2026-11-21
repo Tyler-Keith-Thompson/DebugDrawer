@@ -6,10 +6,12 @@
     /// time it appears.
     ///
     /// It draws ``CookiesModel``'s snapshots from its transport and sends it what the user does;
-    /// Copy, which writes the clipboard, stays here.
+    /// Copy, which writes the clipboard, stays here. What it shows and copies is masked by the
+    /// redaction rules of the drawer it is shown in, followed as they change.
     struct CookiesPluginView: View {
         @StateObject private var transport: DebugDrawerPluginTransport<CookiesSnapshot, CookiesCommand>
-        @ObservedObject private var drawer = DebugDrawer.shared
+        /// The drawer the plugin is shown in; `nil` outside any drawer.
+        @Environment(\.showingDrawer) private var showingDrawer
         // Kept by cookie, not by position, so a row deleted above another doesn't pass its
         // expanded state on.
         @State var expanded: Set<StoredCookie.ID> = []
@@ -23,13 +25,22 @@
         }
 
         var body: some View {
+            DebugDrawerRedactionReader(showingDrawer) { redaction in
+                content(redaction: redaction)
+            }
+            .onAppear { transport.send(CookiesCommand(.reload)) }
+            .onReceive(inspection.notice) { inspection.visit(self, $0) }
+        }
+
+        /// The toolbar, the filter and the cookies, masked by `redaction`.
+        private func content(redaction: DebugDrawerRedaction) -> some View {
             let snapshot = transport.snapshot
-            VStack(alignment: .leading, spacing: 6) {
+            return VStack(alignment: .leading, spacing: 6) {
                 CookiesToolbar(
                     count: snapshot.count,
                     refresh: { transport.send(CookiesCommand(.reload)) },
                     deleteAll: { transport.send(CookiesCommand(.deleteShown)) },
-                    copy: { debugDrawerCopyToClipboard(transport.snapshot.shownCookies.report(redaction: drawer.redaction)) }
+                    copy: { debugDrawerCopyToClipboard(transport.snapshot.shownCookies.report(redaction: redaction)) }
                 )
 
                 TextField("Filter by name or domain...", text: filter)
@@ -48,7 +59,7 @@
                         LazyVStack(alignment: .leading, spacing: 8) {
                             ForEach(shown) { stored in
                                 CookieRow(
-                                    stored: stored, redaction: drawer.redaction, isExpanded: expanded.contains(stored.id),
+                                    stored: stored, redaction: redaction, isExpanded: expanded.contains(stored.id),
                                     toggle: { toggle(stored.id) },
                                     onDelete: { transport.send(CookiesCommand(.delete(stored.id))) }
                                 )
@@ -58,8 +69,6 @@
                     .frame(maxHeight: listHeight)
                 }
             }
-            .onAppear { transport.send(CookiesCommand(.reload)) }
-            .onReceive(inspection.notice) { inspection.visit(self, $0) }
         }
 
         /// The filter, read from the snapshot and changed through the model.

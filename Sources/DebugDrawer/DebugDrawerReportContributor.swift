@@ -10,6 +10,7 @@ public protocol DebugDrawerReportContributor {
     ///
     /// - Parameters:
     ///   - report: The plugin's part of the report; files added here land in the plugin's folder.
-    ///   - redaction: The drawer's rules, `DebugDrawer.shared.redaction`, to apply to what's added.
+    ///   - redaction: The rules of the drawer writing the report, its
+    ///     ``DebugDrawer/redaction``, to apply to what's added.
     @MainActor func contribute(to report: inout DebugDrawerReport, redaction: DebugDrawerRedaction)
 }

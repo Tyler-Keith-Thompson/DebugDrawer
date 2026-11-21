@@ -316,8 +316,9 @@ struct QueuePlugin: DebugDrawerPlugin {
 
 Network's Copy cURL, Keychain's and UserDefaults' Copy Value, Cookies' Copy and Analytics' Copy
 JSON mask what the drawer's redaction rules call sensitive, and the same values are masked on
-screen until the eye button beside them reveals them. Analytics installed in a `DebugDrawer()` of
-your own masks by that drawer's rules. Revealing never changes a copy. The rules start as
+screen until the eye button beside them reveals them. A plugin installed in a `DebugDrawer()` of
+your own masks by that drawer's rules, and Network writes its sessions to disk by them. Revealing
+never changes a copy. The rules start as
 `DebugDrawerRedaction.standard`: the `Authorization`, `Proxy-Authorization`, `Cookie` and
 `Set-Cookie` headers, and keys containing `token`, `secret`, `password`, `session`, `auth` or
 `apikey`. Add your own with one call:

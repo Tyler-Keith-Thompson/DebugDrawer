@@ -143,6 +143,9 @@ import Foundation
         /// - Returns: The zip's URL.
         /// - Throws: `DebugDrawerReport.WriteFailed` when a file can't be written or zipped.
         public func createReport(
+            // The shared drawer's by default: a connection belongs to no drawer, and the sidecar's
+            // own drawer, whose rules its person sets, is the shared one. A caller in a drawer of
+            // its own passes that drawer's.
             redaction: DebugDrawerRedaction = DebugDrawer.shared.redaction,
             in directory: URL = FileManager.default.temporaryDirectory
         ) throws(DebugDrawerReport.WriteFailed) -> URL {
@@ -219,6 +222,7 @@ import Foundation
         /// - Returns: Never.
         /// - Throws: `DebugDrawerReport.WriteFailed`, always.
         public func createReport(
+            // The same default as the debug build's, so callers compile unchanged.
             redaction: DebugDrawerRedaction = DebugDrawer.shared.redaction,
             in directory: URL = FileManager.default.temporaryDirectory
         ) throws(DebugDrawerReport.WriteFailed) -> URL {

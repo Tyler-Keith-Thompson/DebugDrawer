@@ -74,11 +74,23 @@ public struct NotificationsPlugin: DebugDrawerPlugin {
 
 #if DEBUG
     /// Reads the model and hands its state to `NotificationsView`; every action runs on the model.
+    /// The device token and payloads are masked by the redaction rules of the drawer it is shown
+    /// in, followed as they change.
     struct NotificationsPluginView: View {
         @ObservedObject var model: NotificationsModel
-        @ObservedObject private var drawer = DebugDrawer.shared
+        /// The drawer the plugin is shown in; `nil` outside any drawer.
+        @Environment(\.showingDrawer) private var showingDrawer
+        let inspection = Inspection<Self>() // from/for ViewInspector.
 
         var body: some View {
+            DebugDrawerRedactionReader(showingDrawer) { redaction in
+                notifications(redaction: redaction)
+            }
+            .onReceive(inspection.notice) { inspection.visit(self, $0) }
+        }
+
+        /// The model's state, masked by `redaction`.
+        private func notifications(redaction: DebugDrawerRedaction) -> some View {
             NotificationsView(
                 registration: model.registration,
                 center: model.center,
@@ -86,7 +98,7 @@ public struct NotificationsPlugin: DebugDrawerPlugin {
                 sendState: model.sendState,
                 draft: $model.draft,
                 delay: $model.delay,
-                redaction: drawer.redaction,
+                redaction: redaction,
                 actions: NotificationsActions(
                     requestAuthorization: { Task { await model.requestAuthorization() } },
                     refresh: { Task { await model.refresh() } },

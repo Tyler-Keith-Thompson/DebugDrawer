@@ -121,7 +121,7 @@ public extension NetworkStore {
         func showWebSockets(_ connections: [NetworkWebSocketConnection]) {
             webSockets = connections
             guard let recorder else { return }
-            let redaction = DebugDrawer.shared.redaction
+            let redaction = recordingRedaction
             for connection in connections where connection.state != .open && !recordedWebSockets.contains(connection.id) {
                 recorder.record(connection, redaction: redaction)
             }
@@ -278,13 +278,9 @@ public extension NetworkStore {
             shownEnd = change.endID
         }
 
-        /// Writes `entry`, complete, to the current session, masked by the drawer's rules as they
-        /// are now, with the request it resends when the log still holds it.
-        private func persist(_ entry: NetworkEntry) {
-            guard let recorder else { return }
-            let original = entry.replayOf.flatMap { id in entries.first { $0.id == id } }
-            recorder.record(entry, original: original, redaction: DebugDrawer.shared.redaction)
-        }
+        /// The drawer whose redaction rules mask what this store writes to the session; weak, as
+        /// the drawer holds the plugin that holds this store (`NetworkStore+Recording.swift`).
+        weak var recordingDrawer: DebugDrawer?
 
         func recordMetrics(id: UUID, metrics: NetworkTimingMetrics) {
             update(id) { $0.metrics = metrics }
