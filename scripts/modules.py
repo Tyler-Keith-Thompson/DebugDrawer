@@ -164,7 +164,7 @@ MODULES = [
     # Sidecar: what a company builds its employee-only sidecar app on (the charter's D6). It hosts
     # the views of the plugins it depends on, so it may depend on plugins, and only an app links
     # it: no module depends on it, and a production app never does.
-    ("DebugDrawerSidecarKit", "Sidecar", "The kit a sidecar app is built on: the apps in the group that serve it, listed as they start and stop, a session opened and ended for one, with an optional signed grant, the Console, Network, Bug Reports, Scenarios, Auth, Reset App State, Environment, Location, UserDefaults, Performance and App State views (and any plugin's) over the socket or the store, and a bug report of them, created and sent; debug builds only.", ["DebugDrawer", "DebugDrawerConsolePlugin", "DebugDrawerNetworkPlugin", "DebugDrawerAppStateResetPlugin", "DebugDrawerHangDetectorPlugin", "DebugDrawerAppInfo", "DebugDrawerLocation"]),
+    ("DebugDrawerSidecarKit", "Sidecar", "The kit a sidecar app is built on: the apps in the group that serve it, listed as they start and stop, a session opened and ended for one, with an optional signed grant, the Console, Network, Bug Reports, Scenarios, Auth, Reset App State, Environment, Location, UserDefaults, Performance and App State views (and any plugin's) over the socket or the store, and a bug report of them, created and sent; debug builds only.", ["DebugDrawer", "DebugDrawerConsolePlugin", "DebugDrawerNetworkPlugin", "DebugDrawerAppStateReset", "DebugDrawerHangDetectorPlugin", "DebugDrawerAppInfo", "DebugDrawerLocation"]),
 ]
 
 # Modules only iOS builds: SwiftUI views and what they draw with. Bazel builds them for the
@@ -187,8 +187,29 @@ EXTRA_PLATFORMS = {
     "visionOS": ("1.0", ["DebugDrawerReceiver", "DebugDrawerTweaks", "DebugDrawerAnalytics", "DebugDrawerLocalization", "DebugDrawerAccessibility", "DebugDrawer", "DebugDrawerAnalyticsPlugin", "DebugDrawerDatabaseBrowserPlugin", "DebugDrawerLocalizationPlugin", "DebugDrawerColorVisionPlugin", "DebugDrawerAppStateReset", "DebugDrawerAppStateResetPlugin"]),
     # tvOS 17 shipped with iOS 17's SwiftUI.
     "tvOS": ("17.0", ["DebugDrawerReceiver", "DebugDrawerTweaks", "DebugDrawerAnalytics", "DebugDrawerLocalization", "DebugDrawerAccessibility", "DebugDrawer", "DebugDrawerAnalyticsPlugin", "DebugDrawerDatabaseBrowserPlugin", "DebugDrawerLocalizationPlugin", "DebugDrawerColorVisionPlugin", "DebugDrawerAppStateReset", "DebugDrawerAppStateResetPlugin"]),
-    # watchOS 10 shipped with iOS 17's SwiftUI.
-    "watchOS": ("10.0", ["DebugDrawerReceiver", "DebugDrawerTweaks", "DebugDrawerAnalytics", "DebugDrawerLocalization", "DebugDrawerAccessibility", "DebugDrawer", "DebugDrawerAnalyticsPlugin", "DebugDrawerDatabaseBrowserPlugin", "DebugDrawerLocalizationPlugin"]),
+    # watchOS 10 shipped with iOS 17's SwiftUI. The sidecar kit builds there for a watch sidecar
+    # (DD-106: a watch app on the same watch), without the plugins not ported there
+    # (PLATFORM_CONDITIONAL_DEPENDENCIES).
+    "watchOS": ("10.0", ["DebugDrawerReceiver", "DebugDrawerTweaks", "DebugDrawerAnalytics", "DebugDrawerLocalization", "DebugDrawerAccessibility", "DebugDrawer", "DebugDrawerAnalyticsPlugin", "DebugDrawerDatabaseBrowserPlugin", "DebugDrawerLocalizationPlugin", "DebugDrawerAppInfo", "DebugDrawerLocation", "DebugDrawerAppStateReset", "DebugDrawerSidecarKit"]),
+}
+
+# Dependencies a module or test target links only on the platforms that build them, by target. A
+# target listed for a platform (EXTRA_PLATFORMS, TESTED_PLATFORMS) that doesn't build one of these
+# builds there without it, and the code that uses it sits under `#if canImport(<dependency>)`.
+# Package.swift names each as `.target(name:condition: .when(platforms:))` over the platforms that
+# build it (macOS, Mac Catalyst and iOS, and each of EXTRA_PLATFORMS that lists it), and Bazel in a
+# `select` on them, so the generated graphs agree on every platform. Xcode builds a package target
+# with its whole dependency closure, a conditional dependency's own dependencies included, and
+# filters only the edges that carry a condition, so Package.swift also links the dependencies of
+# such a dependency that don't build where its dependent does (packages, and modules not listed
+# for that platform) on the dependency's own platforms, which changes nothing for the dependency
+# itself (closure_conditions()).
+PLATFORM_CONDITIONAL_DEPENDENCIES = {
+    # The kit hosts, on each platform, the plugins ported there: Console, Network and the Hang
+    # Detector (whose stack demangling the kit's Performance view uses) aren't ported to watchOS,
+    # where the hang monitor's thread_suspend and thread_get_state don't exist.
+    "DebugDrawerSidecarKit": ["DebugDrawerConsolePlugin", "DebugDrawerNetworkPlugin", "DebugDrawerHangDetectorPlugin"],
+    "DebugDrawerSidecarKitTests": ["DebugDrawerConsolePlugin", "DebugDrawerNetworkPlugin", "DebugDrawerHangDetectorPlugin"],
 }
 
 # Test targets that also run in the simulator of iOS or of a platform in EXTRA_PLATFORMS, by
@@ -208,7 +229,8 @@ TESTED_PLATFORMS = {
     "iOS": ["DebugDrawerAppStateResetPluginTests", "DebugDrawerKeychainPluginTests", "DebugDrawerViewInspectorPluginTests"],
     "visionOS": ["DebugDrawerTests"],
     "tvOS": ["DebugDrawerTests"],
-    "watchOS": ["DebugDrawerTests"],
+    # The kit's: a watch sidecar lists the apps in its group and opens and ends their sessions.
+    "watchOS": ["DebugDrawerTests", "DebugDrawerSidecarKitTests"],
 }
 
 # Apple-only packages Bazel leaves out of a TESTED_PLATFORMS run, by platform. On iOS the views are
@@ -487,7 +509,8 @@ def check():
             assert name in names, f"EXTRA_PLATFORMS[{platform!r}] names unknown module {name}"
             assert name not in IOS_MODULES, f"{name} is in IOS_MODULES, so it can't build for {platform}"
             for d in dict((m[0], m[3]) for m in MODULES)[name]:
-                assert "/" in d or d in modules, f"{name} builds for {platform}, so its dependency {d} must be listed for it"
+                assert "/" in d or d in modules or d in PLATFORM_CONDITIONAL_DEPENDENCIES.get(name, []), \
+                    f"{name} builds for {platform}, so its dependency {d} must be listed for it, or in PLATFORM_CONDITIONAL_DEPENDENCIES"
     for name, deps in BENCHMARKS:
         for d in deps:
             if "/" in d:
@@ -500,8 +523,17 @@ def check():
             assert name in tests, f"TESTED_PLATFORMS[{platform!r}] names unknown test target {name}"
             assert not simulator_test(name), f"{name} runs in the iOS simulator already, so it can't run on {platform}"
             for d in dict(TEST_TARGETS)[name]:
-                assert "/" in d or platform == "iOS" or d in EXTRA_PLATFORMS[platform][1], \
-                    f"{name} runs on {platform}, so its dependency {d} must be listed for it in EXTRA_PLATFORMS"
+                assert "/" in d or platform == "iOS" or d in EXTRA_PLATFORMS[platform][1] or d in PLATFORM_CONDITIONAL_DEPENDENCIES.get(name, []), \
+                    f"{name} runs on {platform}, so its dependency {d} must be listed for it in EXTRA_PLATFORMS, or in PLATFORM_CONDITIONAL_DEPENDENCIES"
+    all_deps = dict([(m[0], m[3]) for m in MODULES] + TEST_TARGETS)
+    for name, conditional in PLATFORM_CONDITIONAL_DEPENDENCIES.items():
+        assert name in all_deps, f"PLATFORM_CONDITIONAL_DEPENDENCIES names unknown target {name}"
+        assert name not in PERFORMANCE_TESTS, f"{name} is in PERFORMANCE_TESTS, which PLATFORM_CONDITIONAL_DEPENDENCIES doesn't support"
+        for d in conditional:
+            assert d in all_deps[name], f"PLATFORM_CONDITIONAL_DEPENDENCIES lists {d} for {name}, which doesn't depend on it"
+            assert d in names and d not in IOS_MODULES, f"PLATFORM_CONDITIONAL_DEPENDENCIES lists {d} for {name}, which isn't a module every Apple platform's Package.swift declares"
+            assert any(name in targets_on(p) and d not in EXTRA_PLATFORMS[p][1] for p in EXTRA_PLATFORMS), \
+                f"PLATFORM_CONDITIONAL_DEPENDENCIES lists {d} for {name}, which builds wherever {name} does"
     for platform, packages in BAZEL_TESTED_PLATFORM_EXCLUDED_PACKAGES.items():
         assert platform in TESTED_PLATFORMS, f"BAZEL_TESTED_PLATFORM_EXCLUDED_PACKAGES names {platform}, which TESTED_PLATFORMS doesn't"
         for package in packages:
@@ -544,6 +576,58 @@ def check():
                 assert d not in IOS_MODULES, f"{name} depends on the iOS module {d}, so it must be in IOS_MODULES"
 
 
+def targets_on(platform):
+    """The modules EXTRA_PLATFORMS lists for `platform` and the test targets TESTED_PLATFORMS runs there."""
+    return EXTRA_PLATFORMS[platform][1] + TESTED_PLATFORMS.get(platform, [])
+
+
+def module_platforms(name):
+    """The platforms, as Package.swift's `Platform` spells them, that build module `name`: macOS, Mac
+    Catalyst and iOS, and each of EXTRA_PLATFORMS that lists it."""
+    return [p for p in APPLE_PLATFORMS if p in ("macOS", "macCatalyst", "iOS") or name in EXTRA_PLATFORMS.get(p, ("", []))[1]]
+
+
+def platforms_variable(name):
+    """The Package.swift constant holding module `name`'s platforms: DebugDrawerConsolePlugin ->
+    consolePluginPlatforms."""
+    short = name.removeprefix(PROJECT) or name
+    return short[0].lower() + short[1:] + "Platforms"
+
+
+def conditional(target, d):
+    """Whether `target` links dependency `d` only on the platforms that build it."""
+    return d in PLATFORM_CONDITIONAL_DEPENDENCIES.get(target, [])
+
+
+def closure_conditions():
+    """The (module, dependency) edges inside PLATFORM_CONDITIONAL_DEPENDENCIES' closures that
+    Package.swift links on the module's own platforms: a dependency that is a package (not an
+    Apple-only one, which is conditioned already), or a module that doesn't build on every platform
+    the conditioning target does. Without them Xcode would build, say, the Console plugin's
+    OSLogClient for the sidecar kit on watchOS, though it leaves out the plugin itself."""
+    deps = dict((m[0], m[3]) for m in MODULES)
+    edges = set()
+    for target, conditional_deps in PLATFORM_CONDITIONAL_DEPENDENCIES.items():
+        # Where the target builds: a module's platforms, or a test target's (TESTED_PLATFORMS).
+        wanted = set(module_platforms(target) if target in deps else
+                     ["macOS", "macCatalyst", "iOS"] + [p for p, targets in TESTED_PLATFORMS.items() if target in targets])
+        pending = list(conditional_deps)
+        seen = set()
+        while pending:
+            module = pending.pop()
+            if module in seen:
+                continue
+            seen.add(module)
+            for d in deps[module]:
+                if "/" in d:
+                    if not apple_only(d):
+                        edges.add((module, d))
+                elif not wanted <= set(module_platforms(d)):
+                    edges.add((module, d))
+                    pending.append(d)
+    return edges
+
+
 def snapshot_name_clashes(root, name):
     """The snapshot references of test target `name` (under `root`/Tests) that share a base name.
 
@@ -565,7 +649,15 @@ def simulator_test(name):
     return any(d in IOS_MODULES or d.startswith("//") for d in deps)
 
 
-def spm_dep(d):
+def spm_dep(d, target=None):
+    """Dependency `d` of `target` as a Package.swift target's dependencies list it."""
+    if conditional(target, d):
+        return f'.target(name: "{d}", condition: .when(platforms: {platforms_variable(d)}))'
+    if (target, d) in closure_conditions():
+        if "/" in d:
+            package, product = d.split("/")
+            return f'.product(name: "{product}", package: "{package}", condition: .when(platforms: {platforms_variable(target)}))'
+        return f'.target(name: "{d}", condition: .when(platforms: {platforms_variable(target)}))'
     if "/" in d:
         package, product = d.split("/")
         excluded = APPLE_ONLY_PACKAGE_EXCLUDED_PLATFORMS.get(package, [])
@@ -615,13 +707,28 @@ def apple_only(d):
     return "/" in d and d.split("/")[0] in APPLE_ONLY_PACKAGES
 
 
-def bazel_deps(deps, platforms=()):
+def bazel_deps(deps, platforms=(), target=None):
     """A `deps` attribute, or nothing when there are none; Apple-only products sit in a `select` on
-    macOS and on each of `platforms` (EXTRA_PLATFORMS names, or macCatalyst) that builds them."""
+    macOS and on each of `platforms` (EXTRA_PLATFORMS names, or macCatalyst) that builds them, and
+    `target`'s PLATFORM_CONDITIONAL_DEPENDENCIES in one on the platforms that build each."""
     if not deps:
         return ""
-    listed = "".join(f'        "{bazel_label(d)}",\n' for d in deps if not apple_only(d))
+    listed = "".join(f'        "{bazel_label(d)}",\n' for d in deps if not apple_only(d) and not conditional(target, d))
     text = f"    deps = [\n{listed}    ]"
+    conditional_branches = ""
+    # Catalyst is a macOS configuration (tools/catalyst.bzl), so the macOS branch covers it.
+    for platform in ["macOS", "iOS", *EXTRA_PLATFORMS]:
+        linked = "".join(f'            "{bazel_label(d)}",\n' for d in deps if conditional(target, d) and platform in module_platforms(d))
+        if linked:
+            conditional_branches += f'        "@platforms//os:{platform.lower()}": [\n{linked}        ],\n'
+    if conditional_branches:
+        text += (
+            " + select({\n"
+            "        # Linked where they build (PLATFORM_CONDITIONAL_DEPENDENCIES in scripts/modules.py).\n"
+            f"{conditional_branches}"
+            '        "//conditions:default": [],\n'
+            "    })"
+        )
     branches = ""
     for platform in ["macOS", *platforms]:
         apple = "".join(f'            "{bazel_label(d)}",\n' for d in deps
@@ -698,6 +805,12 @@ def package_swift():
             "let applePlatforms: [Platform] = [" + ", ".join(f".{p}" for p in APPLE_PLATFORMS) + "]",
             "",
         ]
+    conditional_modules = sorted({d for deps in PLATFORM_CONDITIONAL_DEPENDENCIES.values() for d in deps}
+                                 | {module for module, _ in closure_conditions()})
+    if conditional_modules:
+        lines.append("// The platforms that build each module linked under a condition (PLATFORM_CONDITIONAL_DEPENDENCIES in scripts/modules.py).")
+        lines += [f"let {platforms_variable(d)}: [Platform] = [" + ", ".join(f".{p}" for p in module_platforms(d)) + "]" for d in conditional_modules]
+        lines.append("")
     lines += [
         "// Typed arrays of their own: as one `Package(...)` expression, a large manifest is too big for",
         "// the type checker.",
@@ -719,7 +832,7 @@ def package_swift():
         ex = exclude_arg(f"Sources/{name}")
         settings = ', swiftSettings: [.define("MOCKING", .when(configuration: .debug))]' if MOCKING in deps else ""
         if deps:
-            dl = ", ".join(spm_dep(d) for d in deps)
+            dl = ", ".join(spm_dep(d, name) for d in deps)
             lines.append(f'    .target(name: "{name}", dependencies: [{dl}]{ex}{settings}),')
         else:
             lines.append(f'    .target(name: "{name}"{ex}),')
@@ -754,7 +867,7 @@ def package_swift():
             lines.append(f'    .target(name: "{name}", dependencies: [{dl}], path: "Tests/{name}", exclude: bazelFiles),')
         lines.append("")
     for name, deps in package_tests():
-        dl = ", ".join(spm_dep(d) for d in deps)
+        dl = ", ".join(spm_dep(d, name) for d in deps)
         files = excluded(f"Tests/{name}")
         ex = "[" + ", ".join(f'"{f}"' for f in files) + "]" if files != ["BUILD.bazel"] else "bazelFiles"
         lines.append(f'    .testTarget(name: "{name}", dependencies: [{dl}], exclude: {ex}),')
@@ -800,7 +913,7 @@ def dependency_manifest():
 
 
 def build_bazel(name, description, deps):
-    deps_attr = bazel_deps(deps)
+    deps_attr = bazel_deps(deps, target=name)
     defines_attr = (
         "    # Mock<Protocol> types from @Mockable, in debug builds only (MOCKING in scripts/modules.py).\n"
         '    defines = select({"//tools:debug": ["MOCKING"], "//conditions:default": []}),\n'
@@ -1022,7 +1135,7 @@ def test_targets_bazel(name, deps, size, srcs, tags, test_tags=()):
         f"{tags_attr}"
         "    # Read by //:package_swift_test, which checks Package.swift against the Bazel graph.\n"
         '    visibility = ["//:__pkg__"],\n'
-        f"{bazel_deps(deps, [platform for platform, _ in tested_platforms(name)] + (['macCatalyst'] if name in CATALYST_TESTS else []))}"
+        f"{bazel_deps(deps, [platform for platform, _ in tested_platforms(name)] + (['macCatalyst'] if name in CATALYST_TESTS else []), target=name)}"
         ")\n\n"
         "# `bazel test` / `just test`: a standalone executable, fast to start and run in Bazel's sandbox.\n"
         "swift_test(\n"

@@ -6,6 +6,11 @@ import SwiftUI
 // app picked, with its session control, the plugins it serves and the report. Everything the
 // company adds (a sign-in screen, its logo, its colors, a grant from its server) goes around this
 // view or into the grant closure; the view holds no service of its own.
+//
+// On watchOS the split view becomes the watch's navigation model, as the drawer's does
+// (DrawerWatchList): the list of apps, each row pushing its app's screen, which lists the app's
+// plugins, each row pushing that plugin. A NavigationSplitView would collapse to the same stack,
+// but a path of its own lets the list push the only app listed as it shows up.
 
 #if DEBUG
     /// A sidecar app's screen: the apps in the group that serve it, and for the one picked, its
@@ -48,7 +53,7 @@ import SwiftUI
         ///     sessions without a grant.
         public init(
             groupIdentifier: String,
-            plugins: [DebugDrawerSidecarPlugin] = [.console, .network],
+            plugins: [DebugDrawerSidecarPlugin] = DebugDrawerSidecarPlugin.defaults,
             sessionDuration: TimeInterval = 15 * 60,
             grant: (@MainActor (DebugDrawerSidecarApp) async throws -> String)? = nil
         ) {
@@ -71,7 +76,7 @@ import SwiftUI
         ///     sessions require one; `nil` opens sessions without a grant.
         public init(
             groupIdentifiers: [String],
-            plugins: [DebugDrawerSidecarPlugin] = [.console, .network],
+            plugins: [DebugDrawerSidecarPlugin] = DebugDrawerSidecarPlugin.defaults,
             sessionDuration: TimeInterval = 15 * 60,
             grant: (@MainActor (DebugDrawerSidecarApp) async throws -> String)? = nil
         ) {
@@ -90,7 +95,7 @@ import SwiftUI
         ///     sessions without one.
         public init(
             apps: @escaping @autoclosure () -> DebugDrawerSidecarAppList,
-            plugins: [DebugDrawerSidecarPlugin] = [.console, .network],
+            plugins: [DebugDrawerSidecarPlugin] = DebugDrawerSidecarPlugin.defaults,
             sessionDuration: TimeInterval = 15 * 60,
             grant: (@MainActor (DebugDrawerSidecarApp) async throws -> String)? = nil
         ) {
@@ -101,31 +106,61 @@ import SwiftUI
         }
 
         public var body: some View {
-            NavigationSplitView {
-                SidecarAppListView(apps: apps.apps, error: apps.error, selection: $selection)
-                    .navigationTitle("Apps")
-            } detail: {
-                if let app = apps.apps.first(where: { $0.id == selection }), !app.isServing {
-                    DebugDrawerEmptyState("Turned Off", systemImage: "power") {
-                        Text("\(app.displayName)'s host has turned its receiver off: it serves nothing and refuses every command.")
-                    }
-                } else if let app = apps.apps.first(where: { $0.id == selection }) {
-                    SidecarAppScreen(app: app, plugins: plugins, sessionDuration: sessionDuration, grant: grant)
-                        // A new connection for each app picked, not the last one's.
-                        .id(app.id)
-                } else {
-                    DebugDrawerEmptyState("No App Selected", systemImage: "app.connected.to.app.below.fill") {
-                        Text("Pick an app to open a session and see its plugins.")
-                    }
+            #if os(watchOS)
+                NavigationStack(path: path) {
+                    SidecarAppListView(apps: apps.apps, error: apps.error, selection: $selection)
+                        .navigationTitle("Apps")
+                        .navigationDestination(for: DebugDrawerSidecarApp.ID.self) { id in
+                            detail(for: id)
+                        }
                 }
-            }
-            // The only app listed is the one to show, as soon as it shows up.
-            .onChange(of: apps.apps.map(\.id), initial: true) { _, ids in
-                if selection.map({ !ids.contains($0) }) ?? true, ids.count == 1 {
-                    selection = ids.first
+                .onChange(of: apps.apps.map(\.id), initial: true) { _, ids in selectOnlyApp(of: ids) }
+            #else
+                NavigationSplitView {
+                    SidecarAppListView(apps: apps.apps, error: apps.error, selection: $selection)
+                        .navigationTitle("Apps")
+                } detail: {
+                    detail(for: selection)
+                }
+                .onChange(of: apps.apps.map(\.id), initial: true) { _, ids in selectOnlyApp(of: ids) }
+            #endif
+        }
+
+        /// The app picked: its screen, why it serves nothing, or a prompt to pick one.
+        @ViewBuilder
+        private func detail(for id: DebugDrawerSidecarApp.ID?) -> some View {
+            if let app = apps.apps.first(where: { $0.id == id }), !app.isServing {
+                DebugDrawerEmptyState("Turned Off", systemImage: "power") {
+                    Text("\(app.displayName)'s host has turned its receiver off: it serves nothing and refuses every command.")
+                }
+            } else if let app = apps.apps.first(where: { $0.id == id }) {
+                SidecarAppScreen(app: app, plugins: plugins, sessionDuration: sessionDuration, grant: grant)
+                    // A new connection for each app picked, not the last one's.
+                    .id(app.id)
+            } else {
+                DebugDrawerEmptyState("No App Selected", systemImage: "app.connected.to.app.below.fill") {
+                    Text("Pick an app to open a session and see its plugins.")
                 }
             }
         }
+
+        /// The only app listed is the one to show, as soon as it shows up.
+        private func selectOnlyApp(of ids: [DebugDrawerSidecarApp.ID]) {
+            if selection.map({ !ids.contains($0) }) ?? true, ids.count == 1 {
+                selection = ids.first
+            }
+        }
+
+        #if os(watchOS)
+            /// The selection as the navigation stack's path: the app picked, pushed over the list.
+            private var path: Binding<[DebugDrawerSidecarApp.ID]> {
+                Binding {
+                    selection.map { [$0] } ?? []
+                } set: { path in
+                    selection = path.last
+                }
+            }
+        #endif
     }
 #else
     // The release stand-in: the same members, and a line saying why there is nothing to show.
@@ -141,7 +176,7 @@ import SwiftUI
         ///   - grant: Never called.
         public init(
             groupIdentifier: String,
-            plugins: [DebugDrawerSidecarPlugin] = [.console, .network],
+            plugins: [DebugDrawerSidecarPlugin] = DebugDrawerSidecarPlugin.defaults,
             sessionDuration: TimeInterval = 15 * 60,
             grant: (@MainActor (DebugDrawerSidecarApp) async throws -> String)? = nil
         ) {}
@@ -155,7 +190,7 @@ import SwiftUI
         ///   - grant: Never called.
         public init(
             groupIdentifiers: [String],
-            plugins: [DebugDrawerSidecarPlugin] = [.console, .network],
+            plugins: [DebugDrawerSidecarPlugin] = DebugDrawerSidecarPlugin.defaults,
             sessionDuration: TimeInterval = 15 * 60,
             grant: (@MainActor (DebugDrawerSidecarApp) async throws -> String)? = nil
         ) {}
@@ -169,7 +204,7 @@ import SwiftUI
         ///   - grant: Never called.
         public init(
             apps: @escaping @autoclosure () -> DebugDrawerSidecarAppList,
-            plugins: [DebugDrawerSidecarPlugin] = [.console, .network],
+            plugins: [DebugDrawerSidecarPlugin] = DebugDrawerSidecarPlugin.defaults,
             sessionDuration: TimeInterval = 15 * 60,
             grant: (@MainActor (DebugDrawerSidecarApp) async throws -> String)? = nil
         ) {}

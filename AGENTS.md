@@ -66,6 +66,14 @@ the umbrella module and `swift/Package.swift` from it. Never edit the generated 
 - A package only Apple platforms build (Objective-C, a wrapper of an Apple framework) goes in
   `APPLE_ONLY_PACKAGES` too: its products are linked on Apple platforms only, so the targets still
   build on Linux, and the code that uses them sits under `#if canImport(...)`.
+- A module that builds on a platform where one of its dependencies doesn't (the sidecar kit on
+  watchOS, without Console, Network and the Hang Detector): list the dependency for it in
+  `PLATFORM_CONDITIONAL_DEPENDENCIES`. Package.swift then links it with `.target(name:condition:)`
+  and Bazel in a `select`, on the platforms that build it, and the code that uses it sits under
+  `#if canImport(...)`. Xcode builds a package target's whole dependency closure and filters only
+  edges that carry a condition, so the generator also conditions that dependency's own
+  dependencies that don't build there (`closure_conditions()`: the Console plugin's OSLogClient,
+  the Network plugin's DebugDrawerNetwork), on the dependency's platforms.
 - A module name takes a `Module` suffix only when it would otherwise equal its main type's name
   (`GreetingModule` would hold `Greeting`). No catch-all modules ("Core", "Utilities").
 
@@ -151,7 +159,7 @@ the *default* sections below where they differ:
   are the platforms built today (`PLATFORMS` in `scripts/modules.py`). Core also builds for
   visionOS, tvOS and watchOS (`EXTRA_PLATFORMS`): a plugin ported to one joins its list, and
   `just build` and `just build-spm` then build it for that platform's simulator. Core's tests also
-  run on visionOS, tvOS and watchOS (`TESTED_PLATFORMS`): a test that can't run there
+  run on visionOS, tvOS and watchOS, and the sidecar kit's on watchOS (`TESTED_PLATFORMS`): a test that can't run there
   (ViewInspector and SnapshotTesting don't build for visionOS,
   `APPLE_ONLY_PACKAGE_EXCLUDED_PLATFORMS`; tvOS binds no keyboard shortcut; watchOS has no panel)
   sits under an `#if` that says why. The Keychain and App State Reset tests also run in the iOS simulator under

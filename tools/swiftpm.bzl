@@ -46,7 +46,9 @@ _module_dependencies_aspect = aspect(
 # and `.testTarget(name:` entry, writing a product dependency as `identity/Product`, as the aspect does.
 # A product linked on Apple platforms only (`condition: .when(platforms: applePlatforms)`,
 # APPLE_ONLY_PACKAGES in scripts/modules.py) is in Bazel's graph on macOS alone, so it is left out
-# of both sides.
+# of both sides. A module linked on some platforms only (`.target(name:condition:)`,
+# PLATFORM_CONDITIONAL_DEPENDENCIES) is in Bazel's macOS graph, which builds it, so it counts as
+# a plain dependency.
 _SCRIPT = """#!/bin/sh
 set -eu
 manifest="$1"
@@ -69,6 +71,7 @@ grep -E '^ *\\.(target|executableTarget|testTarget)\\(name: "' "$manifest" | whi
     esac
     deps=$(printf '%s\\n' "$deps" \\
         | sed -E 's/\\.product\\(name: "[^"]*", package: "[^"]*", condition: [^)]*\\)\\)//g' \\
+        | sed -E 's/\\.target\\(name: "([^"]*)", condition: [^)]*\\)\\)/"\\1"/g' \\
         | sed -E 's/\\.product\\(name: "([^"]*)", package: "([^"]*)"\\)/"\\2\\/\\1"/g' \\
         | tr ',' '\\n' \\
         | sed -nE 's/^ *"([^"]*)" *$/\\1/p' \\

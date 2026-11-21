@@ -47,7 +47,8 @@
     }
 
     /// An app connected to: its channel and session along the top, a picker of the plugins it
-    /// serves, the plugin picked, and the report.
+    /// serves, the plugin picked, and the report. On watchOS, a list of the same: the channel and
+    /// session, a row per plugin that pushes it, and the report.
     struct SidecarConnectedScreen: View {
         @ObservedObject var connection: DebugDrawerSidecarConnection
         /// The plugins the app serves, in the sidecar's order.
@@ -57,49 +58,90 @@
         @State private var selected: DebugDrawerSidecarPlugin.ID?
 
         var body: some View {
-            VStack(alignment: .leading, spacing: 0) {
-                SidecarStatusBar(app: connection.app, channel: connection.channel)
-                if connection.app.requiresSession {
-                    SidecarSessionControl(
-                        sessions: connection.sessions,
-                        open: openSession,
-                        end: connection.endSession
-                    )
+            content
+                // The app state goes in every report, so it is hosted as the app is reached, before
+                // anyone picks it; cancelled with the screen.
+                .task {
+                    await connection.hostOnConnect(plugins)
                 }
-                Divider()
-                if plugins.isEmpty {
-                    DebugDrawerEmptyState("No Plugins", systemImage: "puzzlepiece.extension") {
-                        Text("\(connection.app.displayName) serves none of the plugins this sidecar shows.")
+        }
+
+        #if os(watchOS)
+            // A watch has no room for a picker over the plugin's view, so each plugin is a row that
+            // pushes it, as the drawer's watch list does.
+            private var content: some View {
+                List {
+                    Section {
+                        SidecarStatusBar(app: connection.app, channel: connection.channel)
+                        if connection.app.requiresSession {
+                            SidecarSessionControl(
+                                sessions: connection.sessions,
+                                open: openSession,
+                                end: connection.endSession
+                            )
+                        }
                     }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else {
-                    if plugins.count > 1 {
-                        Picker("Plugin", selection: $selected) {
-                            ForEach(plugins) { plugin in
-                                Label(plugin.title, systemImage: plugin.icon).tag(Optional(plugin.id))
+                    Section("Plugins") {
+                        if plugins.isEmpty {
+                            DebugDrawerEmptyState("No Plugins", systemImage: "puzzlepiece.extension") {
+                                Text("\(connection.app.displayName) serves none of the plugins this sidecar shows.")
                             }
                         }
-                        .pickerStyle(.segmented)
-                        .labelsHidden()
-                        .accessibilityElement(children: .contain)
-                        .accessibilityLabel("Plugin")
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 8)
+                        ForEach(plugins) { plugin in
+                            NavigationLink {
+                                SidecarPluginHost(connection: connection, plugin: plugin)
+                                    .navigationTitle(plugin.title)
+                            } label: {
+                                Label(plugin.title, systemImage: plugin.icon)
+                            }
+                        }
                     }
-                    if let plugin = plugins.first(where: { $0.id == selected }) ?? plugins.first {
-                        SidecarPluginHost(connection: connection, plugin: plugin)
-                            .id(plugin.id)
+                    Section {
+                        SidecarReportBar(connection: connection)
                     }
                 }
-                Divider()
-                SidecarReportBar(connection: connection)
             }
-            // The app state goes in every report, so it is hosted as the app is reached, before
-            // anyone picks it; cancelled with the screen.
-            .task {
-                await connection.hostOnConnect(plugins)
+        #else
+            private var content: some View {
+                VStack(alignment: .leading, spacing: 0) {
+                    SidecarStatusBar(app: connection.app, channel: connection.channel)
+                    if connection.app.requiresSession {
+                        SidecarSessionControl(
+                            sessions: connection.sessions,
+                            open: openSession,
+                            end: connection.endSession
+                        )
+                    }
+                    Divider()
+                    if plugins.isEmpty {
+                        DebugDrawerEmptyState("No Plugins", systemImage: "puzzlepiece.extension") {
+                            Text("\(connection.app.displayName) serves none of the plugins this sidecar shows.")
+                        }
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    } else {
+                        if plugins.count > 1 {
+                            Picker("Plugin", selection: $selected) {
+                                ForEach(plugins) { plugin in
+                                    Label(plugin.title, systemImage: plugin.icon).tag(Optional(plugin.id))
+                                }
+                            }
+                            .pickerStyle(.segmented)
+                            .labelsHidden()
+                            .accessibilityElement(children: .contain)
+                            .accessibilityLabel("Plugin")
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 8)
+                        }
+                        if let plugin = plugins.first(where: { $0.id == selected }) ?? plugins.first {
+                            SidecarPluginHost(connection: connection, plugin: plugin)
+                                .id(plugin.id)
+                        }
+                    }
+                    Divider()
+                    SidecarReportBar(connection: connection)
+                }
             }
-        }
+        #endif
 
         /// Opens a session, with a grant first when the sidecar fetches them: the error that
         /// stopped it, if one did.
@@ -130,8 +172,7 @@
                     .foregroundStyle(.secondary)
                     .accessibilityLabel("Connected over \(channel.title)")
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 6)
+            .sidecarBarPadding()
         }
     }
 

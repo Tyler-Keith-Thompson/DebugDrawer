@@ -1,4 +1,4 @@
-#if DEBUG
+#if DEBUG && canImport(DebugDrawerNetworkPlugin)
     import Combine
     @testable import DebugDrawerNetworkPlugin
     import Foundation

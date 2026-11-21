@@ -1,6 +1,10 @@
 import DebugDrawer
-import DebugDrawerConsolePlugin
-import DebugDrawerNetworkPlugin
+#if canImport(DebugDrawerConsolePlugin)
+    import DebugDrawerConsolePlugin
+#endif
+#if canImport(DebugDrawerNetworkPlugin)
+    import DebugDrawerNetworkPlugin
+#endif
 import SwiftUI
 
 // A plugin the sidecar can show: the ID its model is served under in the app, and how to make the
@@ -14,6 +18,11 @@ import SwiftUI
 // from an instance, and core would grow a second plugin contract for one caller); the kit depending
 // on every plugin with a model (a sidecar would link them all, the N5 shape); and the host writing
 // a view per plugin (the plugins' own views over a transport already exist).
+//
+// Console and Network are linked only where they build (PLATFORM_CONDITIONAL_DEPENDENCIES in
+// scripts/modules.py): not on watchOS, where the kit hosts the receiver's plugins alone, so a watch
+// sidecar names the plugins it shows. Checked with canImport rather than os(watchOS), so the kit
+// gains them on a platform as soon as they are ported there.
 
 /// A plugin a sidecar shows for an app, drawn from the app's model of it over the sidecar's
 /// transport.
@@ -22,9 +31,9 @@ import SwiftUI
 /// DebugDrawerSidecarView(groupIdentifier: "TEAMID.com.example.debug", plugins: [.console, .network])
 /// ```
 ///
-/// ``console`` and ``network`` show the Console and Network plugins. Any plugin whose model the app
-/// serves comes in through ``init(id:title:icon:snapshot:command:plugin:)``, with the plugin made
-/// over the transport.
+/// ``console`` and ``network`` show the Console and Network plugins, on macOS and iOS: watchOS
+/// doesn't build them. Any plugin whose model the app serves comes in through
+/// ``init(id:title:icon:snapshot:command:plugin:)``, with the plugin made over the transport.
 public struct DebugDrawerSidecarPlugin: Identifiable {
     /// The ID the app serves the plugin's model under.
     public let id: String
@@ -75,24 +84,38 @@ public struct DebugDrawerSidecarPlugin: Identifiable {
         }
     }
 
-    /// The Console plugin: the app's captured log lines, filtered and searched in the app.
-    @MainActor public static var console: DebugDrawerSidecarPlugin {
-        let console = ConsolePlugin()
-        return DebugDrawerSidecarPlugin(
-            id: console.id, title: console.title, icon: console.icon, snapshot: ConsoleSnapshot.self, command: ConsoleCommand.self
-        ) { transport in
-            ConsolePlugin(transport: transport)
-        }
+    /// The plugins a sidecar shows unless it names its own: Console and Network where they build,
+    /// none on watchOS.
+    @MainActor @usableFromInline static var defaults: [DebugDrawerSidecarPlugin] {
+        #if canImport(DebugDrawerConsolePlugin) && canImport(DebugDrawerNetworkPlugin)
+            [.console, .network]
+        #else
+            []
+        #endif
     }
 
-    /// The Network plugin: the app's captured requests, with its mocks, conditions and ignored
-    /// hosts.
-    @MainActor public static var network: DebugDrawerSidecarPlugin {
-        let network = NetworkPlugin()
-        return DebugDrawerSidecarPlugin(
-            id: network.id, title: network.title, icon: network.icon, snapshot: NetworkSnapshot.self, command: NetworkCommand.self
-        ) { transport in
-            NetworkPlugin(transport: transport)
+    #if canImport(DebugDrawerConsolePlugin)
+        /// The Console plugin: the app's captured log lines, filtered and searched in the app.
+        @MainActor public static var console: DebugDrawerSidecarPlugin {
+            let console = ConsolePlugin()
+            return DebugDrawerSidecarPlugin(
+                id: console.id, title: console.title, icon: console.icon, snapshot: ConsoleSnapshot.self, command: ConsoleCommand.self
+            ) { transport in
+                ConsolePlugin(transport: transport)
+            }
         }
-    }
+    #endif
+
+    #if canImport(DebugDrawerNetworkPlugin)
+        /// The Network plugin: the app's captured requests, with its mocks, conditions and ignored
+        /// hosts.
+        @MainActor public static var network: DebugDrawerSidecarPlugin {
+            let network = NetworkPlugin()
+            return DebugDrawerSidecarPlugin(
+                id: network.id, title: network.title, icon: network.icon, snapshot: NetworkSnapshot.self, command: NetworkCommand.self
+            ) { transport in
+                NetworkPlugin(transport: transport)
+            }
+        }
+    #endif
 }

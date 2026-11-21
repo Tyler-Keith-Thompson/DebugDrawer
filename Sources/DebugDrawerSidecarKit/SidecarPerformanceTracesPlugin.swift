@@ -1,5 +1,7 @@
 import DebugDrawer
-import DebugDrawerHangDetectorPlugin
+#if canImport(DebugDrawerHangDetectorPlugin)
+    import DebugDrawerHangDetectorPlugin
+#endif
 import Foundation
 import SwiftUI
 
@@ -11,9 +13,12 @@ import SwiftUI
 // loop and a thread beside it. A frame the app's stripped build can't name shows as its image and
 // offset, which the report's binary images (load address and UUID) symbolicate with the build's
 // dSYM. It is a `DebugDrawerReportContributor`, so Create Report adds `performance.txt` and tells
-// the app it was exported.
+// the app it was exported. The capability's types and the stack demangler come from the Hang
+// Detector plugin, which doesn't build for watchOS (its monitor samples the main thread with
+// thread_suspend and thread_get_state, which watchOS doesn't offer), so the kit has no
+// `performanceTraces` there (PLATFORM_CONDITIONAL_DEPENDENCIES in scripts/modules.py).
 
-#if DEBUG
+#if DEBUG && canImport(DebugDrawerHangDetectorPlugin)
     extension DebugDrawerSidecarPlugin {
         /// The app's hitches, hangs and signpost intervals
         /// (`DebugDrawerReceiverCapability.performanceTraces(_:)`), recorded once Start Recording is
@@ -197,7 +202,7 @@ import SwiftUI
             return "0x\(String(address, radix: 16))"
         }
     }
-#else
+#elseif canImport(DebugDrawerHangDetectorPlugin)
     // The release stand-in: the same member, over a plugin that draws nothing; a release build's
     // transports connect to nothing anyway.
 

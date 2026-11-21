@@ -12,6 +12,11 @@ let bazelFiles = ["BUILD.bazel"]
 // Where the Apple-only packages' products are linked (APPLE_ONLY_PACKAGES in scripts/modules.py).
 let applePlatforms: [Platform] = [.macOS, .macCatalyst, .iOS, .tvOS, .watchOS, .visionOS]
 
+// The platforms that build each module linked under a condition (PLATFORM_CONDITIONAL_DEPENDENCIES in scripts/modules.py).
+let consolePluginPlatforms: [Platform] = [.macOS, .macCatalyst, .iOS]
+let hangDetectorPluginPlatforms: [Platform] = [.macOS, .macCatalyst, .iOS]
+let networkPluginPlatforms: [Platform] = [.macOS, .macCatalyst, .iOS]
+
 // Typed arrays of their own: as one `Package(...)` expression, a large manifest is too big for
 // the type checker.
 let products: [Product] = [
@@ -91,13 +96,13 @@ let targets: [Target] = [
     .target(name: "DebugDrawerAppInfo", dependencies: ["DebugDrawerReceiver"], exclude: bazelFiles),
     .target(name: "DebugDrawerLocation", dependencies: ["DebugDrawerReceiver"], exclude: bazelFiles),
     // Plugins
-    .target(name: "DebugDrawerConsolePlugin", dependencies: ["DebugDrawer", .product(name: "OSLogClient", package: "oslogclient")], exclude: bazelFiles),
+    .target(name: "DebugDrawerConsolePlugin", dependencies: ["DebugDrawer", .product(name: "OSLogClient", package: "oslogclient", condition: .when(platforms: consolePluginPlatforms))], exclude: bazelFiles),
     .target(name: "DebugDrawerViewInspectorPlugin", dependencies: ["DebugDrawer"], exclude: bazelFiles),
     .target(name: "DebugDrawerAccessibilityPlugin", dependencies: ["DebugDrawer", "DebugDrawerAccessibility"], exclude: bazelFiles),
     .target(name: "DebugDrawerAppInfoPlugin", dependencies: ["DebugDrawer", "DebugDrawerAppInfo"], exclude: bazelFiles),
     .target(name: "DebugDrawerUserDefaultsPlugin", dependencies: ["DebugDrawer"], exclude: bazelFiles),
     .target(name: "DebugDrawerPerformancePlugin", dependencies: ["DebugDrawer"], exclude: bazelFiles),
-    .target(name: "DebugDrawerNetworkPlugin", dependencies: ["DebugDrawer", "DebugDrawerNetwork"], exclude: bazelFiles),
+    .target(name: "DebugDrawerNetworkPlugin", dependencies: ["DebugDrawer", .target(name: "DebugDrawerNetwork", condition: .when(platforms: networkPluginPlatforms))], exclude: bazelFiles),
     .target(name: "DebugDrawerKeychainPlugin", dependencies: ["DebugDrawer"], exclude: bazelFiles),
     .target(name: "DebugDrawerScreenshotPlugin", dependencies: ["DebugDrawer"], exclude: bazelFiles),
     .target(name: "DebugDrawerFileBrowserPlugin", dependencies: ["DebugDrawer"], exclude: bazelFiles),
@@ -111,7 +116,7 @@ let targets: [Target] = [
     .target(name: "DebugDrawerTweaksPlugin", dependencies: ["DebugDrawer", "DebugDrawerTweaks"], exclude: bazelFiles),
     .target(name: "DebugDrawerFeatureFlagsPlugin", dependencies: ["DebugDrawer"], exclude: bazelFiles),
     .target(name: "DebugDrawerCrashReportsPlugin", dependencies: ["DebugDrawer"], exclude: bazelFiles),
-    .target(name: "DebugDrawerHangDetectorPlugin", dependencies: ["DebugDrawer", "DebugDrawerHangDetector"], exclude: bazelFiles),
+    .target(name: "DebugDrawerHangDetectorPlugin", dependencies: ["DebugDrawer", .target(name: "DebugDrawerHangDetector", condition: .when(platforms: hangDetectorPluginPlatforms))], exclude: bazelFiles),
     .target(name: "DebugDrawerLeakDetectorPlugin", dependencies: ["DebugDrawer"], exclude: bazelFiles),
     .target(name: "DebugDrawerMetricKitPlugin", dependencies: ["DebugDrawer", "DebugDrawerMetricKit"], exclude: bazelFiles),
     .target(name: "DebugDrawerPermissionsPlugin", dependencies: ["DebugDrawer"], exclude: bazelFiles),
@@ -127,7 +132,7 @@ let targets: [Target] = [
     // Transports
     .target(name: "DebugDrawerRemote", dependencies: ["DebugDrawer"], exclude: bazelFiles),
     // Sidecar
-    .target(name: "DebugDrawerSidecarKit", dependencies: ["DebugDrawer", "DebugDrawerConsolePlugin", "DebugDrawerNetworkPlugin", "DebugDrawerAppStateResetPlugin", "DebugDrawerHangDetectorPlugin", "DebugDrawerAppInfo", "DebugDrawerLocation"], exclude: bazelFiles),
+    .target(name: "DebugDrawerSidecarKit", dependencies: ["DebugDrawer", .target(name: "DebugDrawerConsolePlugin", condition: .when(platforms: consolePluginPlatforms)), .target(name: "DebugDrawerNetworkPlugin", condition: .when(platforms: networkPluginPlatforms)), "DebugDrawerAppStateReset", .target(name: "DebugDrawerHangDetectorPlugin", condition: .when(platforms: hangDetectorPluginPlatforms)), "DebugDrawerAppInfo", "DebugDrawerLocation"], exclude: bazelFiles),
 
     // Dynamic libraries: C, each a `.dynamic` product of its own (DYNAMIC_LIBRARIES in scripts/modules.py).
     .target(name: "DebugDrawerDiskIOInterposer", exclude: bazelFiles),
@@ -185,7 +190,7 @@ let targets: [Target] = [
     .testTarget(name: "DebugDrawerAppStateResetTests", dependencies: ["DebugDrawerAppStateReset", "DebugDrawerReceiver", "DebugDrawer"], exclude: ["BUILD.bazel", "Performance"]),
     .testTarget(name: "DebugDrawerAppStateResetPluginTests", dependencies: ["DebugDrawerAppStateResetPlugin", "DebugDrawerAppStateReset", "DebugDrawer", .product(name: "ViewInspector", package: "viewinspector", condition: .when(platforms: [.macOS, .macCatalyst, .iOS, .tvOS, .watchOS])), .product(name: "SnapshotTesting", package: "swift-snapshot-testing", condition: .when(platforms: [.macOS, .iOS, .tvOS, .watchOS])), .product(name: "IssueReportingTestSupport", package: "xctest-dynamic-overlay", condition: .when(platforms: applePlatforms))], exclude: ["BUILD.bazel", "Performance", "__Snapshots__"]),
     .testTarget(name: "DebugDrawerRemoteTests", dependencies: ["DebugDrawerRemote", "DebugDrawer", "DebugDrawerReceiver", "DebugDrawerNetworkPlugin", "DebugDrawerNetwork", "DebugDrawerConsolePlugin", .product(name: "ViewInspector", package: "viewinspector", condition: .when(platforms: [.macOS, .macCatalyst, .iOS, .tvOS, .watchOS]))], exclude: bazelFiles),
-    .testTarget(name: "DebugDrawerSidecarKitTests", dependencies: ["DebugDrawerSidecarKit", "DebugDrawer", "DebugDrawerReceiver", "DebugDrawerAppInfo", "DebugDrawerLocation", "DebugDrawerAppStateReset", "DebugDrawerHangDetectorPlugin", "DebugDrawerNetworkPlugin", "DebugDrawerConsolePlugin", .product(name: "ViewInspector", package: "viewinspector", condition: .when(platforms: [.macOS, .macCatalyst, .iOS, .tvOS, .watchOS]))], exclude: bazelFiles),
+    .testTarget(name: "DebugDrawerSidecarKitTests", dependencies: ["DebugDrawerSidecarKit", "DebugDrawer", "DebugDrawerReceiver", "DebugDrawerAppInfo", "DebugDrawerLocation", "DebugDrawerAppStateReset", .target(name: "DebugDrawerHangDetectorPlugin", condition: .when(platforms: hangDetectorPluginPlatforms)), .target(name: "DebugDrawerNetworkPlugin", condition: .when(platforms: networkPluginPlatforms)), .target(name: "DebugDrawerConsolePlugin", condition: .when(platforms: consolePluginPlatforms)), .product(name: "ViewInspector", package: "viewinspector", condition: .when(platforms: [.macOS, .macCatalyst, .iOS, .tvOS, .watchOS]))], exclude: bazelFiles),
 
     // Speed-reliant tests, split from the target of the same module (PERFORMANCE_TESTS in scripts/modules.py).
     .testTarget(name: "DebugDrawerAnalyticsPerformanceTests", dependencies: ["DebugDrawerAnalytics", "DebugDrawerReceiver", "DebugDrawer"], path: "Tests/DebugDrawerAnalyticsTests/Performance"),

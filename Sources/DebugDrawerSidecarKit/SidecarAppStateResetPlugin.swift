@@ -1,5 +1,5 @@
 import DebugDrawer
-import DebugDrawerAppStateResetPlugin
+import DebugDrawerAppStateReset
 import Foundation
 import SwiftUI
 
@@ -9,8 +9,8 @@ import SwiftUI
 // categories at the revisions shown for the app and then brings the app forward, where the reset
 // runs. It ships in the kit, beside Scenarios and Auth, for the same reasons: the capability
 // describes itself, so every sidecar would draw the same list, and opening the app is the kit's
-// own. The kit reaches the model's types through the Reset App State plugin, which re-exports
-// them, as it hosts the plugins it depends on.
+// own. The kit takes the model's types from the capability itself, not from the Reset App State
+// plugin, which builds on fewer platforms (watchOS among them) and whose views it doesn't use.
 
 #if DEBUG
     extension DebugDrawerSidecarPlugin {

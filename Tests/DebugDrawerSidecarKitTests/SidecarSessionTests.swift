@@ -67,6 +67,49 @@
             receiver.stop()
         }
 
+        // A watch sidecar's whole job, on the watch too (TESTED_PLATFORMS in scripts/modules.py):
+        // the group is named, its container resolved as the system would, and the app found there.
+        @Test("The kit lists the app whose receiver serves the group's container, then opens and ends its session")
+        func opensAndEndsASessionInAGroupContainer() async throws {
+            let container = FileManager.default.temporaryDirectory.appending(path: "SidecarSessionTests-\(UUID().uuidString)")
+            let group = "group.com.example.shop"
+            let sessions = DebugDrawerSessions(maximumDuration: 60)
+            let receiver = try DebugDrawerReceiver(
+                directory: DebugDrawerAppGroupContainer(groupIdentifier: group) { _ in container }.storeDirectory, sessions: sessions
+            )
+            receiver.identity = AppPresence.Identity(bundleIdentifier: "com.example.shop", displayName: "Shop", version: "2.4", build: "881")
+            receiver.enable(.model(LevelModel(), id: "Shop.LogLevel", scope: .persistent))
+            try receiver.start()
+            let list = DebugDrawerSidecarAppList(groupIdentifier: group) { $0 == group ? container : nil }
+            let listed = list.apps.map(\.bundleIdentifier)
+            let app = try #require(list.apps.first)
+
+            let sut = try DebugDrawerSidecarConnection(app: app)
+            var read: DebugDrawerPluginTransport<DebugDrawerSessionState, DebugDrawerSessionCommand>?
+            for await transport in sut.$sessions.values where transport != nil {
+                read = transport
+                break
+            }
+            let transport = try #require(read)
+            sut.openSession(duration: 60)
+            for await state in transport.snapshots() where state.isActive {
+                break
+            }
+            let opened = sessions.snapshot.isActive
+            sut.endSession()
+            for await state in transport.snapshots() where !state.isActive {
+                break
+            }
+
+            #expect(listed == ["com.example.shop"])
+            #expect(list.error == nil)
+            #expect(app.storeDirectory == receiver.appDirectory)
+            #expect(opened)
+            #expect(sessions.snapshot == .inactive)
+            sut.close()
+            receiver.stop()
+        }
+
         @Test("An app whose commands act at once has no sessions to read")
         func noSessionsForAnUngatedApp() throws {
             let app = DebugDrawerSidecarApp(

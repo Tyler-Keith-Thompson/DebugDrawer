@@ -3941,10 +3941,10 @@ and share a folder in Caches instead, without a group container's protection.
 The transports, the receiver and `DebugDrawerAppGroupContainer` build and run on every platform
 the drawer does: the store is files in the app group's container and a dispatch source on its
 directory, which each platform has. Their tests run in the tvOS, visionOS and watchOS simulators
-and for Mac Catalyst. The kit itself (`DebugDrawerSidecarKit`) builds for iOS, iPadOS and macOS
-only, since the Console and Network views it hosts do; on the other platforms a sidecar is built
-on `DebugDrawerSidecarTransport` or `DebugDrawerAppGroupStoreTransport` directly, with views of
-its own.
+and for Mac Catalyst. The kit itself (`DebugDrawerSidecarKit`) builds for iOS, iPadOS, macOS and
+watchOS, hosting on each platform the plugins that build there; on tvOS and visionOS a sidecar is
+built on `DebugDrawerSidecarTransport` or `DebugDrawerAppGroupStoreTransport` directly, with views
+of its own.
 
 - **Mac Catalyst** follows iOS: a Catalyst sidecar and a Catalyst app share their group as iOS
   apps do. Catalyst apps aren't suspended, as on the Mac.
@@ -3966,6 +3966,33 @@ its own.
   what the sidecar left as it comes to the foreground. The socket's tests pass in the watchOS
   simulator, but the simulator runs on the Mac's kernel, so on a watch rely on the store:
   `DebugDrawerSidecarTransport` uses it whenever the socket doesn't answer.
+
+  **A watch sidecar is built on `DebugDrawerSidecarKit`**, like the iPhone's: the same
+  `DebugDrawerSidecarView` in the watch app's `WindowGroup`, laid out as the watch navigates. The
+  apps are a list, each row opening the app's screen: its version and channel, its session with
+  Open Session or End Session below it, a row per plugin it serves that opens the plugin, and
+  Create Report. The kit hosts the receiver's plugins there, `.bugReports`, `.scenarios`,
+  `.authActions`, `.appStateReset`, `.environments`, `.userDefaults`, `.locationSpoofing` and
+  `.appState`, and any `DebugDrawerSidecarPlugin` of the company's own. Console, Network and
+  Performance (`.console`, `.network`, `.performanceTraces`) don't exist on watchOS, as those
+  plugins don't build there, so a watch sidecar names the plugins it shows (`plugins` defaults to
+  none). watchOS lets one app bring another forward only through the system's own URLs, so
+  `DebugDrawerSidecarApp.open(url:)` returns `false` there, and Scenarios and Reset App State say
+  to open the app instead:
+
+  ```swift
+  @main
+  struct CompanyWatchSidecar: App {
+      var body: some Scene {
+          WindowGroup {
+              DebugDrawerSidecarView(
+                  groupIdentifier: "group.com.example.debug",
+                  plugins: [.appState, .bugReports, .environments, .userDefaults]
+              )
+          }
+      }
+  }
+  ```
 
 ### What the plugins need from the app
 
@@ -4142,7 +4169,7 @@ ContentView()
 | `DebugDrawerAppStateReset` | The receiver capability (`.appStateReset(_:)`) that lets a sidecar reset the categories a production app allows (never the keychain unless it opts in), listed and confirmed by revision, applied on the next foreground; no drawer, so a release build links it beside the receiver |
 | `DebugDrawerAppStateResetPlugin` | The app's state cleared as a fresh install leaves it, by category: UserDefaults, keychain items, the container's files, caches, cookies, the URL cache and the app's own cleanup, each listed before a confirmation, then relaunched on macOS or quit elsewhere; re-exports `DebugDrawerAppStateReset` |
 | `DebugDrawerRemote` | Plugin models served to a viewer on another device over the local network: an opt-in Network.framework server advertised over Bonjour, each viewer paired with a six-digit code the device shows (and its Remote Viewing plugin, which shows the codes), and the viewer's transport and browser |
-| `DebugDrawerSidecarKit` | A sidecar app, as a library: `DebugDrawerSidecarView` lists the apps in the group that serve a sidecar, opens their sessions (with a grant the company's server gives, when they require one), shows their Console, Network, Bug Reports, Scenarios, Auth, Reset App State, Environment, UserDefaults, Performance, App State and other model-backed plugins over the socket or the store, and makes and uploads a report of them, the app state attached to each; iOS, iPadOS and macOS, debug builds |
+| `DebugDrawerSidecarKit` | A sidecar app, as a library: `DebugDrawerSidecarView` lists the apps in the group that serve a sidecar, opens their sessions (with a grant the company's server gives, when they require one), shows their Console, Network, Bug Reports, Scenarios, Auth, Reset App State, Environment, UserDefaults, Performance, App State and other model-backed plugins over the socket or the store, and makes and uploads a report of them, the app state attached to each; iOS, iPadOS and macOS, and watchOS without Console, Network and Performance; debug builds |
 
 ## Development
 

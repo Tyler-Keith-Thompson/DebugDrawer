@@ -23,8 +23,7 @@
                         .debugDrawerFont(.secondary)
                         .foregroundStyle(.secondary)
                 }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 6)
+                .sidecarBarPadding()
             }
         }
     }
@@ -39,33 +38,57 @@
 
         var body: some View {
             VStack(alignment: .leading, spacing: 4) {
-                HStack(spacing: 8) {
+                #if os(watchOS)
+                    // The status and its button don't fit one watch row: the button goes below,
+                    // the row's width.
                     SidecarSessionStatus(state: sessions.snapshot)
-                    Spacer()
-                    if sessions.snapshot.isActive {
-                        Button("End Session", action: end)
-                            .debugDrawerButtonStyle(.destructive)
-                    } else {
-                        Button("Open Session") {
-                            isOpening = true
-                            failure = nil
-                            Task {
-                                failure = await open()
-                                isOpening = false
-                            }
-                        }
-                        .debugDrawerButtonStyle(.primary)
-                        .disabled(isOpening)
+                    button
+                #else
+                    HStack(spacing: 8) {
+                        SidecarSessionStatus(state: sessions.snapshot)
+                        Spacer()
+                        button
                     }
-                }
+                #endif
                 if let failure {
                     DebugDrawerIssueRow("Session not opened", severity: .error) {
                         Text(failure)
                     }
                 }
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 6)
+            .sidecarBarPadding()
+        }
+
+        /// End Session while one is open, else Open Session.
+        @ViewBuilder private var button: some View {
+            if sessions.snapshot.isActive {
+                Button("End Session", action: end)
+                    .debugDrawerButtonStyle(.destructive)
+            } else {
+                Button("Open Session") {
+                    isOpening = true
+                    failure = nil
+                    Task {
+                        failure = await open()
+                        isOpening = false
+                    }
+                }
+                .debugDrawerButtonStyle(.primary)
+                .disabled(isOpening)
+            }
+        }
+    }
+
+    extension View {
+        /// The margins of a row along the top or bottom of an app's screen, at the plugin header's
+        /// inset; none on watchOS, whose list rows inset themselves.
+        func sidecarBarPadding() -> some View {
+            #if os(watchOS)
+                self
+            #else
+                padding(.horizontal, 14)
+                    .padding(.vertical, 6)
+            #endif
         }
     }
 

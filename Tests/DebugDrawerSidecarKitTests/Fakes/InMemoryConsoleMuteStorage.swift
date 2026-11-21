@@ -1,4 +1,4 @@
-#if DEBUG
+#if DEBUG && canImport(DebugDrawerConsolePlugin)
     @testable import DebugDrawerConsolePlugin
     import Foundation
     import os

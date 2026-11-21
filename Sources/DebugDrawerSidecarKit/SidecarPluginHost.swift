@@ -46,11 +46,31 @@
     }
 
     /// A plugin shown in the sidecar: its title and header accessory, as the drawer's header row
-    /// draws them, over its body.
+    /// draws them, over its body. On watchOS the title is the screen's navigation title, and the
+    /// header accessory scrolls with the body, as the drawer's watch list shows a plugin.
     struct SidecarHostedPlugin: View {
         let plugin: AnyDebugDrawerPlugin
 
         var body: some View {
+            #if os(watchOS)
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 8) {
+                        plugin.headerAccessory
+                            .debugDrawerFont(.label)
+                            .foregroundStyle(.secondary)
+                        plugin.body
+                    }
+                    .debugDrawerFont(.body)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    // The system's margins keep the rows off the screen's rounded corners.
+                    .scenePadding(.horizontal)
+                }
+            #else
+                panel
+            #endif
+        }
+
+        private var panel: some View {
             VStack(alignment: .leading, spacing: 0) {
                 HStack(spacing: 8) {
                     Label(plugin.title, systemImage: plugin.icon)

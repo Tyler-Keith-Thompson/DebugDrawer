@@ -1,7 +1,7 @@
 import Foundation
 #if os(macOS)
     import AppKit
-#else
+#elseif !os(watchOS)
     import UIKit
 #endif
 
@@ -12,6 +12,8 @@ import Foundation
 // host declares one (a scenario launcher's `launchURL`). Rejected: opening by bundle identifier on
 // iOS (only private API does it, which App Review rejects) and a URL the kit makes up from the
 // bundle identifier (no app claims it unless its host adds it, which is the same declaration).
+// watchOS opens only the system's own URLs (WKApplication's openSystemURL), so a watch sidecar
+// opens nothing, and the plugins that open the app say to open it instead.
 
 #if DEBUG
     extension DebugDrawerSidecarApp {
@@ -20,12 +22,13 @@ import Foundation
         /// On the Mac it opens the app by its bundle identifier, launching it if it isn't running,
         /// and opens `url` only when Launch Services finds no app with that identifier. On iOS and
         /// iPadOS it opens `url`, a URL of the app's own scheme, the only way one app can bring
-        /// another forward there.
+        /// another forward there. On watchOS it opens nothing: the system offers one app no way to
+        /// bring another forward.
         ///
         /// - Parameter url: A URL the app claims (its `CFBundleURLTypes`), such as a scenario
         ///   launcher's `DebugDrawerScenarios.Snapshot.launchURL`, or `nil`.
-        /// - Returns: Whether the system opened the app: `false` on iOS without `url`, or when no
-        ///   app claims it.
+        /// - Returns: Whether the system opened the app: `false` on iOS without `url`, when no app
+        ///   claims it, and on watchOS.
         @MainActor
         @discardableResult
         public func open(url: URL?) async -> Bool {
@@ -42,6 +45,8 @@ import Foundation
                 }
                 guard let url else { return false }
                 return NSWorkspace.shared.open(url)
+            #elseif os(watchOS)
+                return false
             #else
                 guard let url else { return false }
                 return await UIApplication.shared.open(url)

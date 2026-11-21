@@ -17,13 +17,14 @@
                 }
             } else {
                 HStack {
-                    Spacer()
+                    #if !os(watchOS)
+                        Spacer()
+                    #endif
                     Button("Create Report", systemImage: "doc.zipper", action: createReport)
                         .debugDrawerButtonStyle(.secondary)
                         .disabled(connection.hosted.isEmpty)
                 }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 6)
+                .sidecarBarPadding()
             }
         }
 

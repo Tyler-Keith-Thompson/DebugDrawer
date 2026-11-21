@@ -19,10 +19,19 @@
                     Text("No app in the group serves a sidecar. Start an app that runs a receiver.")
                 }
             } else {
-                List(apps, selection: $selection) { app in
-                    SidecarAppRow(app: app)
-                        .tag(app.id)
-                }
+                #if os(watchOS)
+                    // The watch's list has no selection: a row pushes its app, which sets it.
+                    List(apps) { app in
+                        NavigationLink(value: app.id) {
+                            SidecarAppRow(app: app)
+                        }
+                    }
+                #else
+                    List(apps, selection: $selection) { app in
+                        SidecarAppRow(app: app)
+                            .tag(app.id)
+                    }
+                #endif
             }
         }
     }
