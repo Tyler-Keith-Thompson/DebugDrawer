@@ -1,14 +1,15 @@
 #if DEBUG
     // MARK: - Objects held weakly
 
-    // Swift's own weak references rather than NSHashTable.weakObjects(): the table reads its
-    // entries through Objective-C weak loads, which retain and autorelease, so adding a drawer
-    // (now and then, as the table rehashes) or listing them (allObjects) left drawers in the
-    // caller's autorelease pool, alive after their last owner let go until the run loop drained
-    // it (DD-279). A Swift weak load hands back a strong reference ARC releases at once, so a
-    // drawer goes the moment its last owner lets go. Rejected: an autoreleasepool around each
-    // table call, which relies on what the table happens to autorelease today. Linear in the
-    // number of objects; a set holds a handful of drawers.
+    // Swift's own weak references rather than Foundation's weak hash table (weakObjects()):
+    // the table reads its entries through Objective-C weak loads, which retain and autorelease,
+    // so adding a drawer (now and then, as the table rehashes) or listing them (allObjects) left
+    // drawers in the caller's autorelease pool, alive after their last owner let go until the run
+    // loop drained it (DD-279). A Swift weak load hands back a strong reference ARC releases at
+    // once, so a drawer goes the moment its last owner lets go. Rejected: an autoreleasepool
+    // around each table call, which relies on what the table happens to autorelease today. Linear
+    // in the number of objects; a set holds a handful of drawers. The View Inspector plugin keeps
+    // a copy of its own for the grid's probes.
     /// Objects held weakly, each once, in the order they were added; one that is freed leaves.
     struct WeakSet<Element: AnyObject> {
         /// One object, held weakly.

@@ -106,7 +106,7 @@
         let overlays = InspectorOverlays()
         private let appWindows: @MainActor () -> [Window]
         private let slowdown = AnimationSlowdown()
-        private let gridProbes = NSHashTable<GridProbeView>.weakObjects()
+        private var gridProbes = WeakSet<GridProbeView>()
         private var windowObservers: [any NSObjectProtocol] = []
         private lazy var passObserver = RunLoopPassObserver { [weak self] in self?.refreshOverlays() }
         #if os(macOS)
