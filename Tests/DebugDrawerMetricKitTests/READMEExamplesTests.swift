@@ -24,7 +24,7 @@
     @Suite("README examples")
     struct READMEExamplesTests {
         @Test(
-            "Production builds: crash reports and MetricKit payloads: the capability is served, and empty until a session opens",
+            "Production builds: crash reports and MetricKit payloads: enabled, and nothing of it is in the store until a session opens",
             .timeLimit(.minutes(1))
         )
         func productionMetricKit() async throws {
@@ -33,15 +33,10 @@
             defer { diagnostics.receiver.stop() }
 
             let appDirectory = AppGroupStoreLayout.appDirectory(inStore: container.appending(path: "DebugDrawer"))
+            let snapshotFile = AppGroupStoreLayout(directory: appDirectory).snapshotFile(for: MetricKitPayloadsMirror.pluginID)
 
-            let sidecar = try DebugDrawerAppGroupStoreTransport(directory: appDirectory)
-            let payloads = try await sidecar.connect(
-                toPlugin: MetricKitPayloadsMirror.pluginID,
-                snapshot: MetricKitPayloadsMirror.Snapshot.self,
-                command: MetricKitPayloadsMirror.Command.self
-            )
             #expect(diagnostics.receiver.enabledCapabilities == [MetricKitPayloadsMirror.pluginID])
-            #expect(payloads.snapshot == MetricKitPayloadsMirror.Snapshot(sessionID: nil, payloads: []))
+            #expect(!FileManager.default.fileExists(atPath: snapshotFile.path))
         }
     }
 #endif

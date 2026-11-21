@@ -60,7 +60,7 @@ struct ScenariosReceiverTests {
     private let flagsID = DebugDrawerFeatureFlagOverrides.pluginID
     private let sessionsID = DebugDrawerSessions.pluginID
 
-    @Test("A sidecar reads, from the store, each scenario the host registered with its declared parameters and the launch URL")
+    @Test("In a session, a sidecar reads, from the store, each scenario the host registered with its declared parameters and the launch URL")
     func listsScenariosWithParameters() async throws {
         let directory = FileManager.default.temporaryDirectory.appending(path: "ScenariosReceiverTests-\(UUID().uuidString)")
         let layout = AppGroupStoreLayout(directory: AppGroupStoreLayout.appDirectory(inStore: directory))
@@ -90,6 +90,7 @@ struct ScenariosReceiverTests {
         let watcher = try #require(DirectoryWatcher(directory: layout.snapshots))
         defer { watcher.cancel() }
 
+        sessions.perform(.open(duration: 60))
         try sut.start()
         defer { sut.stop() }
         if !FileManager.default.fileExists(atPath: snapshotFile.path) {

@@ -31,7 +31,7 @@
     @Suite("README examples")
     struct READMEExamplesTests {
         @Test(
-            "Production builds: push token and environment: the capability is served, and empty until a session opens",
+            "Production builds: push token and environment: enabled, and nothing of it is in the store until a session opens",
             .timeLimit(.minutes(1))
         )
         func productionPush() async throws {
@@ -41,15 +41,10 @@
             push.didRegisterForRemoteNotifications(withDeviceToken: Data([0x01, 0x02]))
 
             let appDirectory = AppGroupStoreLayout.appDirectory(inStore: container.appending(path: "DebugDrawer"))
-            let sidecar = try DebugDrawerAppGroupStoreTransport(directory: appDirectory)
-            let registration = try await sidecar.connect(
-                toPlugin: PushRegistrationMirror.pluginID,
-                snapshot: PushRegistrationMirror.Snapshot.self,
-                command: PushRegistrationMirror.Command.self
-            )
+            let snapshotFile = AppGroupStoreLayout(directory: appDirectory).snapshotFile(for: PushRegistrationMirror.pluginID)
 
             #expect(push.receiver.enabledCapabilities == [PushRegistrationMirror.pluginID])
-            #expect(registration.snapshot == PushRegistrationMirror.Snapshot(sessionID: nil, registration: nil, environment: nil, settings: nil))
+            #expect(!FileManager.default.fileExists(atPath: snapshotFile.path))
         }
     }
 #endif

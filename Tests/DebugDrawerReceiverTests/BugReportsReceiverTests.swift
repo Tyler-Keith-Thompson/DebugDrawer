@@ -347,7 +347,7 @@ struct BugReportsReceiverTests {
         #expect(sessions.auditLog.contains { $0.capability == reportsID && $0.event == .changeReverted })
     }
 
-    @Test("As the session ends the reports are deleted, audited changeReverted, and the store's snapshot lists none")
+    @Test("As the session ends the reports are deleted, audited changeReverted, and their snapshot leaves the store")
     func deletedAtSessionEnd() async throws {
         let directory = FileManager.default.temporaryDirectory.appending(path: "BugReportsReceiverTests-\(UUID().uuidString)")
         let layout = AppGroupStoreLayout(directory: AppGroupStoreLayout.appDirectory(inStore: directory))
@@ -378,14 +378,9 @@ struct BugReportsReceiverTests {
 
         sessions.end()
 
-        if storedReports() != [] {
-            for await _ in watcher.changes where storedReports() == [] {
-                break
-            }
-        }
         #expect(reports.snapshot.reports.isEmpty)
         #expect(reports.snapshot.sessionID == nil)
-        #expect(storedReports() == [])
+        #expect(!FileManager.default.fileExists(atPath: snapshotFile.path))
         #expect(sessions.auditLog.contains { $0.capability == reportsID && $0.event == .changeReverted })
     }
 

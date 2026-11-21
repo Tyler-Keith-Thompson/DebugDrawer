@@ -99,11 +99,6 @@ struct DebugDrawerTestGrantSigner {
             let sessionControl = try await sidecar.connect(
                 toPlugin: DebugDrawerSessions.pluginID, snapshot: DebugDrawerSessionState.self, command: DebugDrawerSessionCommand.self
             )
-            let flagControl = try await sidecar.connect(
-                toPlugin: DebugDrawerFeatureFlagOverrides.pluginID,
-                snapshot: DebugDrawerFeatureFlagOverrides.Snapshot.self,
-                command: DebugDrawerFeatureFlagOverrides.Command.self
-            )
             let (arrivals, arrival) = AsyncStream<DebugDrawerAuditEntry>.makeStream()
             let subscription = app.sessions.auditEntries.sink { arrival.yield($0) }
             defer { subscription.cancel() }
@@ -113,6 +108,12 @@ struct DebugDrawerTestGrantSigner {
             // In the sidecar, once the employee signed in and the company's server issued a grant:
             sessionControl.send(.open(duration: 15 * 60, grant: grantFromServer))
             let opened = await recorded.next()
+            // The flags are served once the session, whose grant lists them, is open.
+            let flagControl = try await sidecar.connect(
+                toPlugin: DebugDrawerFeatureFlagOverrides.pluginID,
+                snapshot: DebugDrawerFeatureFlagOverrides.Snapshot.self,
+                command: DebugDrawerFeatureFlagOverrides.Command.self
+            )
             flagControl.send(.setOverride(key: "new-checkout", value: .bool(true)))
             let applied = await recorded.next()
 

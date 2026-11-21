@@ -64,10 +64,6 @@
             let sessionControl = try await sidecar.connect(
                 toPlugin: DebugDrawerSessions.pluginID, snapshot: DebugDrawerSessionState.self, command: DebugDrawerSessionCommand.self
             )
-            let modes = try await sidecar.connect(
-                toPlugin: LocalizationReview.pluginID, snapshot: LocalizationReview.Snapshot.self, command: LocalizationReview.Command.self
-            )
-            var published = modes.snapshots().makeAsyncIterator()
             var sessionStates = sessionControl.snapshots().makeAsyncIterator()
             func lookUp() -> String {
                 review.localizedString(forKey: "greeting", bundle: bundle)
@@ -78,6 +74,11 @@
 
             let before = lookUp()
             sessionControl.send(.open(duration: 60))
+            // Served once the session is open.
+            let modes = try await sidecar.connect(
+                toPlugin: LocalizationReview.pluginID, snapshot: LocalizationReview.Snapshot.self, command: LocalizationReview.Command.self
+            )
+            var published = modes.snapshots().makeAsyncIterator()
             while let state = await sessionStates.next(), !state.isActive {}
             modes.send(.setMode(.showingKeys))
             var showingKeys: LocalizationReview.Snapshot?
@@ -98,13 +99,10 @@
             }
             let pseudo = lookUp()
             sessionControl.send(.end)
-            var reverted: LocalizationReview.Snapshot?
-            while let snapshot = await published.next() {
-                if snapshot.mode == .standard {
-                    reverted = snapshot
-                    break
-                }
-            }
+            while let state = await sessionStates.next(), state.isActive {}
+            let reverted = review.snapshot
+            let snapshotFile = AppGroupStoreLayout(directory: receiver.appDirectory).snapshotFile(for: LocalizationReview.pluginID)
+            let servedAfterSession = FileManager.default.fileExists(atPath: snapshotFile.path)
             let after = lookUp()
 
             #expect(before == expectedTranslation)
@@ -113,6 +111,7 @@
             #expect(pseudoLocalized == LocalizationReview.Snapshot(mode: .pseudoLocalized))
             #expect(pseudo == expectedPseudo)
             #expect(reverted == LocalizationReview.Snapshot(mode: .standard))
+            #expect(!servedAfterSession)
             #expect(review.mode == .standard)
             #expect(after == expectedTranslation)
             #expect(sessions.auditLog.filter { $0.capability == LocalizationReview.pluginID }.map(\.event) == [
@@ -130,16 +129,19 @@
             receiver.enable(.localizationReview(review))
             try receiver.start()
             defer { receiver.stop() }
-            let sidecar = try DebugDrawerAppGroupStoreTransport(directory: AppGroupStoreLayout.appDirectory(inStore: directory))
-            let modes = try await sidecar.connect(
-                toPlugin: LocalizationReview.pluginID, snapshot: LocalizationReview.Snapshot.self, command: LocalizationReview.Command.self
-            )
+            // Outside a session the capability isn't served, so a sidecar can't connect to it: the
+            // command is left in the store as its transport would leave it.
+            let layout = AppGroupStoreLayout(directory: receiver.appDirectory)
+            let command = try StoreDocument(TransportMessage(
+                kind: .command, pluginID: LocalizationReview.pluginID,
+                payload: TransportMessage.payload(LocalizationReview.Command.setMode(.showingKeys))
+            )).encoded()
             let (arrivals, arrival) = AsyncStream<DebugDrawerAuditEntry>.makeStream()
             let subscription = sessions.auditEntries.sink { arrival.yield($0) }
             defer { subscription.cancel() }
             let expected = DebugDrawerAuditEntry.Event.commandRefused(.noActiveSession)
 
-            modes.send(.setMode(.showingKeys))
+            try layout.write(command, to: layout.commands.appending(path: "0.json"))
             var refusal: DebugDrawerAuditEntry?
             for await entry in arrivals where entry.capability == LocalizationReview.pluginID {
                 refusal = entry

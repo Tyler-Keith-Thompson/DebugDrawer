@@ -67,7 +67,7 @@
     @MainActor
     @Suite(.timeLimit(.minutes(1)), .serialized)
     struct SidecarAppStateResetTests {
-        @Test("The kit lists an app serving the reset and hosts its plugin over the store, which asks for a session first")
+        @Test("The kit lists an app serving the reset and, once a session is open, hosts its plugin over the store, which reads that session")
         func hostedOverStore() async throws {
             let root = FileManager.default.temporaryDirectory
                 .appending(path: "SidecarAppStateResetTests-\(UUID().uuidString)", directoryHint: .isDirectory)
@@ -91,11 +91,14 @@
             let listed = try #require(DebugDrawerSidecarAppList(storeDirectory: store).apps.first)
             let sut = try DebugDrawerSidecarConnection(app: listed)
             defer { sut.close() }
+            // The receiver serves the capability only within a session.
+            sessions.perform(.open(duration: 60))
 
             let hosted = try await sut.host(.appStateReset)
 
             #expect(listed.serves(AppStateResetRequests.pluginID))
-            #expect(throws: Never.self) { try hosted.body.inspect().find(text: "Open a session to list what a reset would clear.") }
+            #expect(listed.servesInSessionsOnly)
+            #expect(throws: (any Error).self) { try hosted.body.inspect().find(text: "Open a session to list what a reset would clear.") }
         }
 
         @Test("Reset in the confirmation sends the ticked categories at the revisions shown, and the app clears them as it comes to the foreground")

@@ -295,7 +295,7 @@ struct ReceiverTests {
         #expect(adapter.overrides.isEmpty)
     }
 
-    @Test("Starting writes the sessions' and each enabled capability's snapshot, and removes any other snapshot file")
+    @Test("Starting with a session open writes the sessions' and each enabled capability's snapshot, and removes any other snapshot file")
     func writesOnlyServedSnapshots() async throws {
         let directory = FileManager.default.temporaryDirectory.appending(path: "ReceiverTests-\(UUID().uuidString)")
         let layout = AppGroupStoreLayout(directory: AppGroupStoreLayout.appDirectory(inStore: directory))
@@ -315,6 +315,7 @@ struct ReceiverTests {
         )
         let watcher = try #require(DirectoryWatcher(directory: layout.snapshots))
         defer { watcher.cancel() }
+        sessions.perform(.open(duration: 60))
 
         try sut.start()
         defer { sut.stop() }

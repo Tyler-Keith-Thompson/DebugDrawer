@@ -2344,6 +2344,16 @@ What the receiver does:
   `DebugDrawerPluginModel` of the app's. A command decodes into the model's own `Command` type or
   is refused as malformed; nothing received is run or evaluated, and a sidecar reads only the
   model's snapshot, so list nothing secret in it.
+- **Served only within a session.** Every app of the group can read the store, so a
+  capability's snapshot is in it only while a session is open: outside one, the app's directory
+  holds its presence file and the sessions' snapshot, and nothing a capability holds. As a session
+  opens, each capability's snapshot is written before the sessions' snapshot says it is open, so
+  a sidecar connects to a capability once it sees its session (before then its transport's
+  `connect` waits); each leaves the store as the session ends or expires, a gate turns off, the
+  capability is disabled or the receiver stops, and `start()` first removes what a launch killed
+  during a session left. Under a grant policy, and for a capability made `requiringGrant()`, a
+  session reads only the capabilities its grant lists. While a session is open the group's other
+  apps can read what it reads, so list nothing secret.
 - **Scopes.** Each capability takes a `DebugDrawerChangeScope`: `.session(revertWith:)` reverts it
   as the session ends or expires (feature flag overrides default to `.session(revertWith:
   .clearAllOverrides)`), `.persistent` keeps it.
@@ -3922,6 +3932,11 @@ DebugDrawerSidecarView(
 )
 ```
 
+A production app's receiver serves its capabilities only within a session, so until one opens,
+and once it ends, each of its plugins shows "No Session" ("Open a session to see Flags.") in place
+of data, and one the session's grant doesn't list shows "Not Granted". A debug build's store
+server serves at once, and its plugins show as soon as the app is picked.
+
 The view shows only those the app picked serves, so listing every one costs nothing for an app
 that enables a few.
 
@@ -4002,8 +4017,9 @@ without asking. Signed ad hoc (no identity, or `DEBUGDRAWER_SIGN_IDENTITY=-`) th
 and share a folder in Caches instead, without a group container's protection.
 Launched with `-ScriptSession <bundle ID>` (`open -g /tmp/debugdrawer-example-sidecar/DebugDrawerSidecarExample.app
 --args -ScriptSession com.debugdrawer.example.receiver`), the sidecar drives a session with that app
-without anyone at the screen: it opens one with a grant, overrides `new-checkout` to true, waits
-for the host to report it, ends the session and waits for the flag to come back, logging each step
+without anyone at the screen: it opens one with a grant, connects to the flags once it is open,
+overrides `new-checkout` to true, waits for the host to report it and ends the session, then opens
+a second one to read the flags back, waits for the flag to come back and ends it, logging each step
 and the channel that carried it (`log show --predicate 'subsystem == "com.debugdrawer.example.sidecar"'`),
 while the host logs its audit entries (`subsystem == "com.debugdrawer.example.receiver"`). The
 receiver serves the store only, so on the Mac too the channel is the store, each command performed

@@ -40,7 +40,7 @@
         private let paris = LocationCoordinate(latitude: 48.8566, longitude: 2.3522)
         private let real = CLLocation(latitude: 37.3349, longitude: -122.009)
 
-        @Test("A sidecar reads, from the store, that nothing is spoofed until a spoof lands")
+        @Test("In a session, a sidecar reads from the store that nothing is spoofed until a spoof lands; before it, the store holds nothing of it")
         func servesSnapshot() async throws {
             let suite = "LocationSpoofingReceiverTests-\(UUID().uuidString)"
             let defaults = try #require(UserDefaults(suiteName: suite))
@@ -58,6 +58,9 @@
 
             try sut.start()
             defer { sut.stop() }
+            let servedBeforeSession = FileManager.default.fileExists(atPath: snapshotFile.path)
+            sessions.perform(.open(duration: 60))
+            defer { sessions.end() }
             if !FileManager.default.fileExists(atPath: snapshotFile.path) {
                 for await _ in watcher.changes where FileManager.default.fileExists(atPath: snapshotFile.path) {
                     break
@@ -66,6 +69,7 @@
 
             let document = try #require(StoreDocument.decoded(from: Data(contentsOf: snapshotFile)))
             let actual = try JSONDecoder().decode(LocationSpoofing.Snapshot.self, from: document.message.payload)
+            #expect(!servedBeforeSession)
             #expect(actual == LocationSpoofing.Snapshot(coordinate: nil))
             #expect(sut.enabledCapabilities == [spoofingID])
         }

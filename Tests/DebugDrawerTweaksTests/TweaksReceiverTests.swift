@@ -19,7 +19,7 @@
         private let verbose = Tweak.toggle("Verbose logging", key: "verbose", default: false)
         private let apiToken = Tweak.text("API token", key: "apiToken", default: "")
 
-        @Test("A sidecar's snapshot lists only the production-safe tweaks, with their controls, defaults and the values the app reads")
+        @Test("In a session, a sidecar's snapshot lists only the production-safe tweaks, with their controls, defaults and the values the app reads")
         func snapshotListsOnlyProductionSafe() async throws {
             let directory = FileManager.default.temporaryDirectory.appending(path: "TweaksReceiverTests-\(UUID().uuidString)")
             let storage = FakeTweakStorage(["timeout": .int(60), "verbose": .bool(true), "apiToken": .string("t0k3n")])
@@ -47,10 +47,10 @@
                 )
             ])
 
+            sessions.perform(.open(duration: 60))
+            defer { sessions.end() }
             let sut = try await sidecar.connect(
-
                 toPlugin: TweaksModel.pluginID, snapshot: TweaksModel.Snapshot.self, command: TweaksModel.Command.self
-
             )
 
             #expect(sut.snapshot == expected)
@@ -74,9 +74,6 @@
             let session = try await sidecar.connect(
                 toPlugin: DebugDrawerSessions.pluginID, snapshot: DebugDrawerSessionState.self, command: DebugDrawerSessionCommand.self
             )
-            let sut = try await sidecar.connect(
-                toPlugin: TweaksModel.pluginID, snapshot: TweaksModel.Snapshot.self, command: TweaksModel.Command.self
-            )
             let expectedEvents: [DebugDrawerAuditEntry.Event] = [
                 .commandRefused(.notExposed),
                 .commandRefused(.notExposed),
@@ -86,6 +83,10 @@
             let expectedStored: [String: TweakStoredValue] = ["backend": .string("staging")]
 
             session.send(.open(duration: 60))
+            // Served once the session is open.
+            let sut = try await sidecar.connect(
+                toPlugin: TweaksModel.pluginID, snapshot: TweaksModel.Snapshot.self, command: TweaksModel.Command.self
+            )
             sut.send(.setValue(key: "verbose", value: .bool(true)))
             sut.send(.setValue(key: "apiToken", value: .string("stolen")))
             sut.send(.reset(key: "apiToken"))
@@ -159,10 +160,11 @@
             let session = try await sidecar.connect(
                 toPlugin: DebugDrawerSessions.pluginID, snapshot: DebugDrawerSessionState.self, command: DebugDrawerSessionCommand.self
             )
+            session.send(.open(duration: 60))
+            // Served once the session is open.
             let tweaks = try await sidecar.connect(
                 toPlugin: TweaksModel.pluginID, snapshot: TweaksModel.Snapshot.self, command: TweaksModel.Command.self
             )
-            session.send(.open(duration: 60))
             tweaks.send(.setValue(key: "backend", value: .string("staging")))
             tweaks.send(.setValue(key: "timeout", value: .int(90)))
             for await snapshot in tweaks.snapshots() where snapshot.tweaks.map(\.value) == [.string("staging"), .int(90)] {

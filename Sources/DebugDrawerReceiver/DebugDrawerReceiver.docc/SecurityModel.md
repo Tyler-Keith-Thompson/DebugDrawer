@@ -100,9 +100,10 @@ through location spoofing. That is what keeps a
 leaked sidecar from doing more than the app chose to offer, and why a capability added to the
 library reaches no app until that app enables it.
 
-Snapshots are what the capability's model puts in them. The receiver removes, as it starts, every
-snapshot file that isn't the sessions' or an enabled capability's, so a capability enabled in an
-earlier launch shows nothing once it isn't.
+Snapshots are what the capability's model puts in them, and they are in the store only while a
+session may read them ("What a sidecar can read, and when"). The receiver removes, as it starts,
+every snapshot file but the sessions', so nothing an earlier launch wrote, a launch killed during a
+session included, stays readable.
 
 ## Sessions
 
@@ -174,8 +175,10 @@ one. What a grant can't do:
 - **Survive a relaunch as single-use.** Grant IDs already used are remembered in memory until the
   grant expires, so after a relaunch a grant copied from the store (it travels in the command
   file that opens the session) could open one more session. Issue grants that last minutes.
-- **Hide snapshots.** The sessions check grants against commands. Most snapshots are served
-  whether or not a grant lists the capability (see "What a sidecar can read without a session").
+- **Hide what a session reads from another app of the group.** Under a policy a session reads
+  only the snapshots of the capabilities its grant lists, but while it is open those files sit in
+  the shared container, where any app of the group can read them too (see "What a sidecar can
+  read, and when").
 
 ## The remote kill switch
 
@@ -189,33 +192,45 @@ goes on. The library calls no configuration service and doesn't poll; the receiv
 gates at each command, as it starts, as the app comes to the foreground and before each snapshot
 it writes. This is how you shut out a leaked sidecar without a release.
 
-## What a sidecar can read without a session
+## What a sidecar can read, and when
 
-Sessions gate commands. The receiver writes each enabled capability's snapshot to the store for
-as long as it runs and its gates are on, so a capability whose snapshot holds the app's state
-shows it to any app of the group, in a session or not, and under a grant policy whether or not a
-grant lists it:
+The store sits in a container every app of the group can read, and a read of a file there can't be
+observed or audited, so the receiver keeps a capability's data out of it except while a sidecar
+could act on it:
 
-- Feature flags (the listed flags and their values), experiments (the listed experiments and the
-  variant the device is assigned), log levels (the listed subsystems and their levels), tweaks
-  (production-safe ones and their values), environments (the list and the active one),
-  allowlisted UserDefaults (each key and its value), scenarios and auth actions (what is
-  registered and the last run), localization and accessibility review (the mode and overrides),
-  network mocking (the allowed hosts), location spoofing (the coordinate a session spoofed, never
-  the device's) and app state reset (the allowed categories).
-- Served only during a session: diagnostics capture, bug reports, analytics events, MetricKit
-  payloads, performance traces, the app state reset listing, the push registration and the app
-  state snapshot. Of these, analytics events, MetricKit payloads, the push registration and the
-  app state snapshot also check that the session's grant lists them.
+- **No session open: nothing.** The app's directory holds its presence file (who the app is, the
+  IDs it serves, the protocol it speaks), the sessions' snapshot (no session, or the open one's ID,
+  two dates and its grant's claims, never the token) and `unreverted-changes.json` while a killed
+  session's change waits for its revert (capability and session IDs, no value). No capability's
+  snapshot is written: not the flags and their values, the experiments and their assignments, log
+  levels, tweaks, environments, allowlisted UserDefaults, scenarios, auth actions, review modes,
+  network mocking's allowed hosts, a spoofed coordinate, or any other.
+- **A session open: what it may read.** As a session opens, the receiver writes each enabled
+  capability's snapshot before the sessions' own snapshot says the session is open. Under a grant
+  policy, and for a capability made ``DebugDrawerReceiverCapability/requiringGrant()``, only the
+  capabilities the session's grant lists are written; without a policy every one that doesn't
+  require a grant is.
+- **Removed as the session ends.** Each snapshot leaves the store as the session ends, expires
+  (when its timer fires: an app suspended past the expiry removes them as it resumes), the
+  receiver's gate or the capability's turns off, the capability is disabled, the receiver stops,
+  and, for what a launch killed during a session left, as the next launch starts the receiver,
+  before it serves anything.
+- **Collected only for a session.** Diagnostics capture, bug reports, performance traces and the
+  app state reset listing also hold nothing until a sidecar asks within a session; analytics
+  events, MetricKit payloads, the push registration and the app state snapshot hold nothing for a
+  session whose grant doesn't list them.
 
-So list in an adapter or allowlist only what you're content for any app of the group to read.
+While a session is open, any app of the group can read what it reads. So list in an adapter or
+allowlist only what you're content for the group's apps to read during a session, keep sessions
+short, and give an app that shares a group with apps you don't trust a group of its own.
 
 ## Threat model
 
 Each capability below says what someone holding the sidecar, a leaked copy included, can do to
 the app on the device the sidecar is installed on, what they can't, and how the host limits it.
 Every one is off until the app enables it. In the Grant column, "Under a policy" means its
-commands need a grant that lists it when the sessions have a ``DebugDrawerGrantPolicy``; any
+commands, and its snapshot, need a grant that lists it when the sessions have a
+``DebugDrawerGrantPolicy``; any
 capability also takes ``DebugDrawerReceiverCapability/requiringGrant()`` to need one in every
 receiver, as network mocking always does.
 
@@ -231,16 +246,16 @@ receiver, as network mocking always does.
 | Environments | High | Session, always | Under a policy |
 | Allowlisted UserDefaults | Medium | Session by default, or persistent | Under a policy |
 | Tweaks | The tweaks' | Persistent by default, or session | Under a policy |
-| Analytics events | Low | Nothing to revert | Under a policy, to be served too |
+| Analytics events | Low | Nothing to revert | Under a policy |
 | Localization review | Low | Session, always | Under a policy |
 | Accessibility overrides | Low | Session, always | Under a policy |
-| Crash reports and MetricKit payloads | Low | Persistent (deletions) | Under a policy, to be served too |
+| Crash reports and MetricKit payloads | Low | Persistent (deletions) | Under a policy |
 | Network mocking | High | Session, always | Always |
 | Location spoofing | High | Session, always | Under a policy |
-| Push token | Low to medium | Nothing to revert | Under a policy, to be served too |
+| Push token | Low to medium | Nothing to revert | Under a policy |
 | App state reset | Medium (data loss) | Persistent (can't be undone) | Under a policy |
 | Performance traces | Low | Session, always | Under a policy |
-| App state snapshot | Low | Nothing to revert | Under a policy, to be served too |
+| App state snapshot | Low | Nothing to revert | Under a policy |
 | A model of the app's own | The model's | The host's choice | Under a policy |
 
 ### Feature flag overrides
@@ -415,13 +430,14 @@ and under a policy only to a grant that lists it. Never register a secret.
 ### A model of the app's own
 
 `.model(_:id:scope:)` serves any `DebugDrawerPluginModel`. Its risk is whatever its commands do;
-its snapshot is readable as above. With a session scope its revert runs as the session ends,
+its snapshot is readable during a session, as above. With a session scope its revert runs as the session ends,
 and after a kill as the next launch enables it (the receiver's record, under "Sessions"), so its
 revert command should do nothing when nothing is left to put back.
 
 ## Known limitations
 
-- **Snapshots aren't gated.** See "What a sidecar can read without a session".
+- **What a session reads is readable by the group while it lasts.** See "What a sidecar can
+  read, and when".
 - **A grant can open one more session after a relaunch.** See "Signed grants".
 - **The audit log is in memory.** Forward it, or it goes with the process.
 

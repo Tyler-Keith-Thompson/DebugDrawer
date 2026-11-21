@@ -14,7 +14,7 @@
     @MainActor
     @Suite(.serialized, .timeLimit(.minutes(1)))
     struct AppStateSidecarTests {
-        @Test("The sidecar sees the state during its session, the registered fields with it, and nothing before or after")
+        @Test("The sidecar sees the state during its session, the registered fields with it, and nothing of it is in the store before or after")
         func servedDuringSession() async throws {
             let suite = "AppStateSidecarTests-\(UUID().uuidString)"
             let defaults = try #require(UserDefaults(suiteName: suite))
@@ -39,14 +39,16 @@
             let sessionControl = try await sidecar.connect(
                 toPlugin: DebugDrawerSessions.pluginID, snapshot: DebugDrawerSessionState.self, command: DebugDrawerSessionCommand.self
             )
+            let snapshotFile = AppGroupStoreLayout(directory: receiver.appDirectory).snapshotFile(for: DebugDrawerAppState.pluginID)
+            let expectedValues: [String: DebugDrawerAppStateValue] = ["plan": "pro"]
+
+            let servedBeforeSession = FileManager.default.fileExists(atPath: snapshotFile.path)
+            sessionControl.send(.open(duration: 60))
+            // Served once the session is open.
             let state = try await sidecar.connect(
                 toPlugin: DebugDrawerAppState.pluginID, snapshot: DebugDrawerAppState.Snapshot.self, command: DebugDrawerAppState.Command.self
             )
             var arrivals = state.snapshots().makeAsyncIterator()
-            let expectedValues: [String: DebugDrawerAppStateValue] = ["plan": "pro"]
-
-            let beforeSession = await arrivals.next()
-            sessionControl.send(.open(duration: 60))
             var during: DebugDrawerAppState.Snapshot?
             while let snapshot = await arrivals.next() {
                 if snapshot.state != nil {
@@ -55,21 +57,17 @@
                 }
             }
             sessionControl.send(.end)
-            var after: DebugDrawerAppState.Snapshot?
-            while let snapshot = await arrivals.next() {
-                if snapshot.sessionID == nil {
-                    after = snapshot
-                    break
-                }
+            for await state in sessionControl.snapshots() where !state.isActive {
+                break
             }
+            let servedAfterSession = FileManager.default.fileExists(atPath: snapshotFile.path)
 
-            let empty = DebugDrawerAppState.Snapshot(sessionID: nil, state: nil)
-            #expect(beforeSession == empty)
+            #expect(!servedBeforeSession)
             #expect(during?.state?.buildMetadata.gitCommit == "4f9c2e1")
             #expect(during?.state?.environment?.id == "production")
             #expect(during?.state?.values == expectedValues)
             #expect(during?.state?.featureFlagOverrides == nil)
-            #expect(after == empty)
+            #expect(!servedAfterSession)
         }
 
         @Test("The raw user ID is never written: not to the store's files, the snapshots received, the audit log, the defaults or the log")
@@ -91,12 +89,13 @@
             let sessionControl = try await sidecar.connect(
                 toPlugin: DebugDrawerSessions.pluginID, snapshot: DebugDrawerSessionState.self, command: DebugDrawerSessionCommand.self
             )
+            var received: [DebugDrawerAppState.Snapshot] = []
+            sessionControl.send(.open(duration: 60))
+            // Served once the session is open.
             let state = try await sidecar.connect(
                 toPlugin: DebugDrawerAppState.pluginID, snapshot: DebugDrawerAppState.Snapshot.self, command: DebugDrawerAppState.Command.self
             )
             var arrivals = state.snapshots().makeAsyncIterator()
-            var received: [DebugDrawerAppState.Snapshot] = []
-            sessionControl.send(.open(duration: 60))
             while let snapshot = await arrivals.next() {
                 received.append(snapshot)
                 if snapshot.state != nil {

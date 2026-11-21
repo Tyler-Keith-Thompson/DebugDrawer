@@ -30,14 +30,16 @@
             let sessionControl = try await sidecar.connect(
                 toPlugin: DebugDrawerSessions.pluginID, snapshot: DebugDrawerSessionState.self, command: DebugDrawerSessionCommand.self
             )
+            let snapshotFile = AppGroupStoreLayout(directory: receiver.appDirectory).snapshotFile(for: PerformanceTraces.pluginID)
+
+            let servedBeforeSession = FileManager.default.fileExists(atPath: snapshotFile.path)
+            sessionControl.send(.open(duration: 60))
+            // Served once the session is open.
             let recording = try await sidecar.connect(
                 toPlugin: PerformanceTraces.pluginID, snapshot: PerformanceTraces.Snapshot.self, command: PerformanceTraces.Command.self
             )
             var arrivals = recording.snapshots().makeAsyncIterator()
-            let snapshotFile = AppGroupStoreLayout(directory: receiver.appDirectory).snapshotFile(for: PerformanceTraces.pluginID)
-
-            let beforeSession = await arrivals.next()
-            sessionControl.send(.open(duration: 60))
+            let beforeRecording = await arrivals.next()
             recording.send(.start)
             while let snapshot = await arrivals.next(), !snapshot.isRecording {}
             thread.stall()
@@ -50,29 +52,24 @@
             }
             let fileDuring = (try? Data(contentsOf: snapshotFile)).flatMap(StoreDocument.decoded(from:))?.message.payload
             sessionControl.send(.end)
-            var after: PerformanceTraces.Snapshot?
-            while let snapshot = await arrivals.next() {
-                if !snapshot.isRecording {
-                    after = snapshot
-                    break
-                }
+            for await state in sessionControl.snapshots() where !state.isActive {
+                break
             }
-            let fileAfter = (try? Data(contentsOf: snapshotFile)).flatMap(StoreDocument.decoded(from:))?.message.payload
+            let servedAfterSession = FileManager.default.fileExists(atPath: snapshotFile.path)
 
             let stall = try #require(during?.stalls.first)
             let lines = stall.frames.enumerated().map { $1.line(index: $0) }
             let decodedDuring = try fileDuring.map { try JSONDecoder().decode(PerformanceTraces.Snapshot.self, from: $0) }
-            let decodedAfter = try fileAfter.map { try JSONDecoder().decode(PerformanceTraces.Snapshot.self, from: $0) }
             #expect(thread.finished())
-            #expect(beforeSession?.isRecording == false)
+            #expect(!servedBeforeSession)
+            #expect(beforeRecording?.isRecording == false)
             #expect(stall.kind == .hang)
             #expect(stall.duration >= .milliseconds(50))
             #expect(lines.contains { $0.contains("semaphore") || $0.contains("ulock") })
             #expect(lines.contains { $0.contains("CFRunLoop") })
             #expect(stall.frames.contains { $0.image != nil && $0.imageUUID != nil && $0.imageOffset != nil })
             #expect(decodedDuring?.stalls == during?.stalls)
-            #expect(after?.stalls.isEmpty == true)
-            #expect(decodedAfter.map { $0.stalls.isEmpty && !$0.isRecording } ?? true)
+            #expect(!servedAfterSession)
             #expect(traces.monitor == nil)
         }
 

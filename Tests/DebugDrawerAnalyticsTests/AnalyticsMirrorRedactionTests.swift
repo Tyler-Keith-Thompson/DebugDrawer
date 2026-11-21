@@ -27,10 +27,6 @@
             let sessionControl = try await sidecar.connect(
                 toPlugin: DebugDrawerSessions.pluginID, snapshot: DebugDrawerSessionState.self, command: DebugDrawerSessionCommand.self
             )
-            let events = try await sidecar.connect(
-                toPlugin: AnalyticsEventsMirror.pluginID, snapshot: AnalyticsEventsMirror.Snapshot.self, command: AnalyticsEventsMirror.Command.self
-            )
-            var arrivals = events.snapshots().makeAsyncIterator()
             let emailUnderKey = "dd124.key.owner@example.com"
             let emailInText = "dd124.text.owner@example.org"
             let jwt = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJkZDEyNCJ9.c2VjcmV0LXNpZ25hdHVyZS1kZDEyNA"
@@ -53,6 +49,11 @@
             ]
 
             sessionControl.send(.open(duration: 60))
+            // Served once the session is open.
+            let events = try await sidecar.connect(
+                toPlugin: AnalyticsEventsMirror.pluginID, snapshot: AnalyticsEventsMirror.Snapshot.self, command: AnalyticsEventsMirror.Command.self
+            )
+            var arrivals = events.snapshots().makeAsyncIterator()
             while let snapshot = await arrivals.next(), snapshot.sessionID == nil {}
             AnalyticsEvents.record("\(prefix)signed_up", properties: [
                 "plan": "pro",

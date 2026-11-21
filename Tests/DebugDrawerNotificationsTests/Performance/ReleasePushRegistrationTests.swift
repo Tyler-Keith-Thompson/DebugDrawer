@@ -45,18 +45,14 @@
                 }
             }
             sessions.end()
-            var after = read()
-            if after?.sessionID != nil {
-                for await _ in watcher.changes {
-                    after = read()
-                    if after?.sessionID == nil { break }
-                }
-            }
+            // The receiver removes the snapshot as the session ends.
+            let after = read()
 
             #expect(during?.registration == .registered(deviceToken: "0badf00d"))
             #expect(during?.environment == environment)
             #expect(during?.settings?.authorization == .authorized)
-            #expect(after == PushRegistrationMirror.Snapshot(sessionID: nil, registration: nil, environment: nil, settings: nil))
+            #expect(after == nil)
+            #expect(!FileManager.default.fileExists(atPath: file.path))
         }
     }
 #endif

@@ -76,10 +76,10 @@
                 exit(isKept ? EXIT_SUCCESS : EXIT_FAILURE)
             }
 
-            // The relaunch: a fresh receiver over the same container, and the sidecar, which reads
-            // the snapshot before opening a session, then in it.
+            // The relaunch: a fresh receiver over the same container, and the sidecar, which finds
+            // nothing of the capability in the store before opening a session, then reads it in one.
             @MainActor
-            func relaunch() async throws -> (beforeSession: MetricKitPayloadsMirror.Snapshot?, during: MetricKitPayloadsMirror.Snapshot?) {
+            func relaunch() async throws -> (servedBeforeSession: Bool, during: MetricKitPayloadsMirror.Snapshot?) {
                 let sessions = DebugDrawerSessions(maximumDuration: 300)
                 let receiver = DebugDrawerReceiver(directory: URL(filePath: store, directoryHint: .isDirectory), sessions: sessions)
                 receiver.enable(.metricKitPayloads(sessions: sessions, directory: URL(filePath: archive, directoryHint: .isDirectory)))
@@ -89,24 +89,26 @@
                 let sessionControl = try await sidecar.connect(
                     toPlugin: DebugDrawerSessions.pluginID, snapshot: DebugDrawerSessionState.self, command: DebugDrawerSessionCommand.self
                 )
+                let snapshotFile = AppGroupStoreLayout(directory: receiver.appDirectory).snapshotFile(for: MetricKitPayloadsMirror.pluginID)
+                let servedBeforeSession = FileManager.default.fileExists(atPath: snapshotFile.path)
+                sessionControl.send(.open(duration: 60))
+                // Served once the session is open.
                 let payloads = try await sidecar.connect(
                     toPlugin: MetricKitPayloadsMirror.pluginID,
                     snapshot: MetricKitPayloadsMirror.Snapshot.self,
                     command: MetricKitPayloadsMirror.Command.self
                 )
                 var arrivals = payloads.snapshots().makeAsyncIterator()
-                let beforeSession = await arrivals.next()
-                sessionControl.send(.open(duration: 60))
                 while let snapshot = await arrivals.next() {
                     if snapshot.sessionID != nil {
-                        return (beforeSession, snapshot)
+                        return (servedBeforeSession, snapshot)
                     }
                 }
-                return (beforeSession, nil)
+                return (servedBeforeSession, nil)
             }
-            let (beforeSession, during) = try await relaunch()
+            let (servedBeforeSession, during) = try await relaunch()
 
-            #expect(beforeSession?.payloads.isEmpty == true)
+            #expect(!servedBeforeSession)
             // The real subscriber may add payloads MetricKit holds for the test runner; the crash
             // is found by what it holds.
             let crashes = (during?.payloads ?? []).filter { $0.kind == .diagnostics }.compactMap { payload in

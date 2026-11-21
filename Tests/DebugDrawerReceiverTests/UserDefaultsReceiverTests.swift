@@ -82,7 +82,7 @@ struct UserDefaultsReceiverTests {
         .string("greeting", maximumLength: 12)
     ]
 
-    @Test("A sidecar reads, from the store, the allowlisted keys with their values as their kinds, and no other key of the domain")
+    @Test("In a session, a sidecar reads, from the store, the allowlisted keys with their values as their kinds, and no other key of the domain")
     func listsOnlyAllowlistedKeys() async throws {
         let suite = "UserDefaultsReceiverTests-\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: suite))
@@ -112,6 +112,7 @@ struct UserDefaultsReceiverTests {
         let watcher = try #require(DirectoryWatcher(directory: layout.snapshots))
         defer { watcher.cancel() }
 
+        sessions.perform(.open(duration: 60))
         try sut.start()
         defer { sut.stop() }
         if !FileManager.default.fileExists(atPath: snapshotFile.path) {

@@ -6,7 +6,8 @@ import Foundation
 // serves, and the sidecar kit watches the `apps/` directory and each app's directory in it
 // (`DirectoryWatcher`) and lists one app per file. The file says who the app is and what it serves,
 // nothing secret: its bundle ID, name, version and build, the IDs it serves, the protocol it speaks
-// (its hello: major version, oldest version, capabilities) and when it last said so. It is written
+// (its hello: major version, oldest version, capabilities), whether it serves its capabilities'
+// snapshots only within a session (a receiver's, DD-271) and when it last said so. It is written
 // atomically (`AppGroupStoreLayout`), as the store's other files are, so a reader sees the old file
 // or the new one.
 //
@@ -44,12 +45,24 @@ package struct AppPresence: Codable, Equatable, Sendable {
     /// The protocol the app's store speaks: its major version, the oldest it still speaks, and
     /// its capabilities, as each of its store files' writer says.
     package var hello: TransportHello
+    /// `true` when the app serves its capabilities' snapshots only within a session, as a
+    /// receiver does, so a sidecar shows none before one opens; absent (`nil`) from a debug
+    /// build's store server, which serves them at once, and from a receiver of a build before
+    /// this field, so either decodes.
+    package var servesInSessionsOnly: Bool?
 
-    package init(identity: Identity, capabilities: [String], lastSeen: Date, hello: TransportHello = .current) {
+    package init(
+        identity: Identity,
+        capabilities: [String],
+        lastSeen: Date,
+        hello: TransportHello = .current,
+        servesInSessionsOnly: Bool? = nil
+    ) {
         self.identity = identity
         self.capabilities = capabilities.sorted()
         self.lastSeen = lastSeen
         self.hello = hello
+        self.servesInSessionsOnly = servesInSessionsOnly
     }
 
     /// Who an app is, as its bundle says.
@@ -121,6 +134,8 @@ package final class PresenceAnnouncement {
     ///   - directory: The app's directory of the store.
     ///   - identity: Who the app is.
     ///   - capabilities: The IDs the app serves.
+    ///   - servesInSessionsOnly: Whether the app serves its capabilities' snapshots only within
+    ///     a session, as a receiver does.
     ///   - foreground: What the system posts as the app comes to the foreground.
     ///   - center: Where `foreground` is posted: the default center, unless a test posts on its own.
     ///   - now: The time now; the system's by default.
@@ -128,6 +143,7 @@ package final class PresenceAnnouncement {
         directory: URL,
         identity: AppPresence.Identity,
         capabilities: [String],
+        servesInSessionsOnly: Bool = false,
         foreground: Notification.Name,
         center: NotificationCenter = .default,
         now: @escaping () -> Date = Date.init
@@ -136,7 +152,9 @@ package final class PresenceAnnouncement {
         layout = AppGroupStoreLayout(directory: directory)
         self.center = center
         self.now = now
-        presence = AppPresence(identity: identity, capabilities: capabilities, lastSeen: now())
+        presence = AppPresence(
+            identity: identity, capabilities: capabilities, lastSeen: now(), servesInSessionsOnly: servesInSessionsOnly ? true : nil
+        )
         write()
         // No queue: the system posts it on the main thread.
         foregroundObservation = center.addObserver(forName: foreground, object: nil, queue: nil) { [weak self] _ in

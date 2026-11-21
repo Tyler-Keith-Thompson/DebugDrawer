@@ -31,7 +31,7 @@
     @Suite("README examples")
     struct PerformanceTracesREADMETests {
         @Test(
-            "Production builds: hangs and signposts: the capability is served, not recording, and nothing runs until a sidecar starts it",
+            "Production builds: hangs and signposts: served once a session opens, not recording, and nothing runs until a sidecar starts it",
             .timeLimit(.minutes(1))
         )
         func productionPerformanceTraces() async throws {
@@ -39,6 +39,10 @@
             let performance = try ProductionPerformance(container: container)
             defer { performance.receiver.stop() }
             let appDirectory = AppGroupStoreLayout.appDirectory(inStore: container.appending(path: "DebugDrawer"))
+            let snapshotFile = AppGroupStoreLayout(directory: appDirectory).snapshotFile(for: PerformanceTraces.pluginID)
+            let servedBeforeSession = FileManager.default.fileExists(atPath: snapshotFile.path)
+            performance.sessions.perform(.open(duration: 60))
+            defer { performance.sessions.end() }
 
             let sidecar = try DebugDrawerAppGroupStoreTransport(directory: appDirectory)
             let traces = try await sidecar.connect(
@@ -46,6 +50,7 @@
             )
 
             #expect(performance.receiver.enabledCapabilities == [PerformanceTraces.pluginID])
+            #expect(!servedBeforeSession)
             #expect(!traces.snapshot.isRecording)
             #expect(traces.snapshot.hitchThreshold == PerformanceTraces.defaultHitchThreshold)
             #expect(traces.snapshot.hangThreshold == PerformanceTraces.defaultHangThreshold)

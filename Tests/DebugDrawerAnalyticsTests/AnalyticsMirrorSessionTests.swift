@@ -65,10 +65,6 @@
             let sessionControl = try await sidecar.connect(
                 toPlugin: DebugDrawerSessions.pluginID, snapshot: DebugDrawerSessionState.self, command: DebugDrawerSessionCommand.self
             )
-            let events = try await sidecar.connect(
-                toPlugin: AnalyticsEventsMirror.pluginID, snapshot: AnalyticsEventsMirror.Snapshot.self, command: AnalyticsEventsMirror.Command.self
-            )
-            var arrivals = events.snapshots().makeAsyncIterator()
             func ours(_ snapshot: AnalyticsEventsMirror.Snapshot) -> [String] {
                 snapshot.events.map(\.name).filter { $0.hasPrefix(prefix) }
             }
@@ -78,6 +74,11 @@
             AnalyticsEvents.record("\(prefix)before-1", properties: ["step": 1])
             AnalyticsEvents.record("\(prefix)before-2")
             sessionControl.send(.open(duration: 60))
+            // Served once the session is open.
+            let events = try await sidecar.connect(
+                toPlugin: AnalyticsEventsMirror.pluginID, snapshot: AnalyticsEventsMirror.Snapshot.self, command: AnalyticsEventsMirror.Command.self
+            )
+            var arrivals = events.snapshots().makeAsyncIterator()
             var opened: [AnalyticsEventsMirror.Snapshot] = []
             while let snapshot = await arrivals.next() {
                 opened.append(snapshot)
@@ -93,11 +94,11 @@
             }
             let firstSession = try #require(opened.last?.sessionID)
             sessionControl.send(.end)
-            var ended: [AnalyticsEventsMirror.Snapshot] = []
-            while let snapshot = await arrivals.next() {
-                ended.append(snapshot)
-                if snapshot.sessionID == nil { break }
+            for await state in sessionControl.snapshots() where !state.isActive {
+                break
             }
+            let snapshotFile = AppGroupStoreLayout(directory: receiver.appDirectory).snapshotFile(for: AnalyticsEventsMirror.pluginID)
+            let servedAfterEnd = FileManager.default.fileExists(atPath: snapshotFile.path)
             AnalyticsEvents.record("\(prefix)after-1")
             AnalyticsEvents.record("\(prefix)after-2")
             sessionControl.send(.open(duration: 60))
@@ -115,7 +116,7 @@
             #expect(Set(seenInFirst).isSubset(of: Set(expectedFirst)))
             #expect(during.last.map(ours) == expectedFirst)
             #expect(during.last?.events.filter { $0.name.hasPrefix(prefix) }.map(\.properties) == [["step": 1], ["step": 2], ["step": 3]])
-            #expect(ended.last?.events.isEmpty == true)
+            #expect(!servedAfterEnd)
             #expect(second.last.map(ours) == expectedSecond)
             #expect(second.flatMap(ours).allSatisfy { $0 == expectedSecond[0] })
         }
@@ -136,10 +137,6 @@
             let sessionControl = try await sidecar.connect(
                 toPlugin: DebugDrawerSessions.pluginID, snapshot: DebugDrawerSessionState.self, command: DebugDrawerSessionCommand.self
             )
-            let events = try await sidecar.connect(
-                toPlugin: AnalyticsEventsMirror.pluginID, snapshot: AnalyticsEventsMirror.Snapshot.self, command: AnalyticsEventsMirror.Command.self
-            )
-            var arrivals = events.snapshots().makeAsyncIterator()
             func ours(_ snapshot: AnalyticsEventsMirror.Snapshot) -> [String] {
                 snapshot.events.map(\.name).filter { $0.hasPrefix(prefix) }
             }
@@ -148,6 +145,11 @@
 
             AnalyticsEvents.record("\(prefix)before")
             sessionControl.send(.open(duration: 60))
+            // Served once the session is open.
+            let events = try await sidecar.connect(
+                toPlugin: AnalyticsEventsMirror.pluginID, snapshot: AnalyticsEventsMirror.Snapshot.self, command: AnalyticsEventsMirror.Command.self
+            )
+            var arrivals = events.snapshots().makeAsyncIterator()
             var opened: [AnalyticsEventsMirror.Snapshot] = []
             while let snapshot = await arrivals.next() {
                 opened.append(snapshot)
@@ -165,11 +167,11 @@
             // Past the expiry, before its timer fires, as in an app back from suspension.
             AnalyticsEvents.record("\(prefix)past-expiry")
             timer.fire()
-            var expired: [AnalyticsEventsMirror.Snapshot] = []
-            while let snapshot = await arrivals.next() {
-                expired.append(snapshot)
-                if snapshot.sessionID == nil { break }
+            for await state in sessionControl.snapshots() where !state.isActive {
+                break
             }
+            let snapshotFile = AppGroupStoreLayout(directory: receiver.appDirectory).snapshotFile(for: AnalyticsEventsMirror.pluginID)
+            let servedAfterExpiry = FileManager.default.fileExists(atPath: snapshotFile.path)
             AnalyticsEvents.record("\(prefix)after-expiry")
             sessionControl.send(.open(duration: 60))
             while let snapshot = await arrivals.next() {
@@ -183,8 +185,8 @@
             }
 
             #expect(during.last.map(ours) == expectedFirst)
-            #expect((opened + during + expired).flatMap(ours).allSatisfy(expectedFirst.contains))
-            #expect(expired.last?.events.isEmpty == true)
+            #expect((opened + during).flatMap(ours).allSatisfy(expectedFirst.contains))
+            #expect(!servedAfterExpiry)
             #expect(second.last.map(ours) == expectedSecond)
             #expect(sessions.auditLog.contains { $0.event == .sessionEnded(.expired) })
         }

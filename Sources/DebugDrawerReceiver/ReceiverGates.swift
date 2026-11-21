@@ -19,7 +19,8 @@ import Foundation
 // way, and its session-scoped change in the open session is reverted at once, while the session
 // and every other capability carry on: a capability turned off is meant to stop affecting the app
 // now, not at the end of a session that may last a while. A gate turned back on serves the
-// snapshot again, and a new session can open.
+// snapshot again while a session is open that may read it (DebugDrawerReceiver+SessionServing.swift),
+// and a new session can open.
 //
 // A closure can't say when it changes, so the receiver asks at the events it already has: each
 // command, its start, the app coming to the foreground and each snapshot it is about to write;
@@ -79,16 +80,23 @@ extension DebugDrawerReceiver {
         paused.remove(capability.id)
         defer { presence?.update(capabilities: servedIDs) }
         guard isRunning else { return }
-        if servesSnapshot(of: capability.id) {
-            serve(capability.id, capability.snapshots())
-        } else {
-            pause(capability.id)
+        // The capability enabled before under this ID served its own model: serve the new one's,
+        // writing over its file, or remove the file if the new one isn't served.
+        let previous = writing.removeValue(forKey: capability.id)
+        previous?.cancel()
+        if !isAllowed() || gate?() == false {
+            paused.insert(capability.id)
+        }
+        updateServing()
+        if previous != nil, writing[capability.id] == nil {
+            try? FileManager.default.removeItem(at: layout.snapshotFile(for: capability.id))
         }
     }
 
-    /// Whether the gates let `id`'s snapshot be written: the sessions' always.
+    /// Whether `id`'s snapshot may be written: the sessions' always, a capability's while the
+    /// gates are on and the open session may read it (DebugDrawerReceiver+SessionServing.swift).
     func servesSnapshot(of id: String) -> Bool {
-        id == DebugDrawerSessions.pluginID || (isAllowed() && capabilityGates[id]?() != false)
+        id == DebugDrawerSessions.pluginID || (isAllowed() && capabilityGates[id]?() != false && sessionReads(id))
     }
 
     /// Refuses and audits a command to `id` while a gate is off, then applies the gates; why the
@@ -117,23 +125,17 @@ extension DebugDrawerReceiver {
         }
         for id in capabilities.keys.sorted() {
             if receiverAllowed, capabilityGates[id]?() != false {
-                if paused.remove(id) != nil, isRunning, let capability = capabilities[id] {
-                    serve(id, capability.snapshots())
-                }
+                paused.remove(id)
             } else {
                 // With the receiver's gate off the session's end reverted everything already.
                 sessions.revertChanges(of: id)
-                pause(id)
+                paused.insert(id)
             }
         }
+        // Stops writing, and removes the file of, each capability a gate turned off, and serves
+        // each turned back on while the open session may read it.
+        updateServing()
         // The app's presence lists only what is served now: nothing while the receiver is off.
         presence?.update(capabilities: servedIDs)
-    }
-
-    /// Stops writing `id`'s snapshot and removes its file from the store.
-    private func pause(_ id: String) {
-        guard paused.insert(id).inserted else { return }
-        writing.removeValue(forKey: id)?.cancel()
-        try? FileManager.default.removeItem(at: layout.snapshotFile(for: id))
     }
 }

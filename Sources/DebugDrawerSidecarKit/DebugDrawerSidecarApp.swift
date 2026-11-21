@@ -30,6 +30,10 @@ public struct DebugDrawerSidecarApp: Identifiable, Equatable, Sendable {
     /// The app's own directory of the group's store, `DebugDrawer/apps/<bundle ID>` in the
     /// container, where the app keeps its presence file and snapshots and takes commands.
     public let storeDirectory: URL
+    /// Whether the app serves its capabilities' snapshots only within a session, as a production
+    /// app's receiver does: before one opens, and once it ends, the sidecar has nothing current
+    /// of them to show.
+    var servesInSessionsOnly = false
 
     /// An app serving its directory of the group's store, `storeDirectory`.
     ///
@@ -106,5 +110,6 @@ public struct DebugDrawerSidecarApp: Identifiable, Equatable, Sendable {
             lastSeen: presence.lastSeen,
             storeDirectory: storeDirectory
         )
+        servesInSessionsOnly = presence.servesInSessionsOnly == true
     }
 }

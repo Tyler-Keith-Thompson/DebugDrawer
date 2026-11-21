@@ -74,7 +74,7 @@ struct DiagnosticsCaptureReceiverTests {
     private let captureID = DebugDrawerDiagnosticsCapture.pluginID
     private let sessionsID = DebugDrawerSessions.pluginID
 
-    @Test("Outside a session nothing is captured or written: log and record evaluate no argument, no URL protocol installed, the snapshot empty")
+    @Test("Outside a session nothing is captured or written: log and record evaluate no argument, no URL protocol installed, nothing in the store")
     func nothingCapturedOutsideSession() async throws {
         let directory = FileManager.default.temporaryDirectory.appending(path: "DiagnosticsCaptureReceiverTests-\(UUID().uuidString)")
         let layout = AppGroupStoreLayout(directory: AppGroupStoreLayout.appDirectory(inStore: directory))
@@ -84,7 +84,7 @@ struct DiagnosticsCaptureReceiverTests {
         let capture = DebugDrawerDiagnosticsCapture(sessions: sessions, redaction: .standard, limits: .standard) { clock.now }
         let sut = DebugDrawerReceiver(directory: directory, sessions: sessions)
         sut.enable(.diagnosticsCapture(capture))
-        let snapshotFile = layout.snapshotFile(for: captureID)
+        let sessionsFile = layout.snapshotFile(for: sessionsID)
         let protocolsBefore = URLSessionConfiguration.default.protocolClasses?.map { ObjectIdentifier($0) }
         let request = URLRequest(url: URL(string: "https://api.example.com/orders")!)
         var evaluated = 0
@@ -104,20 +104,17 @@ struct DiagnosticsCaptureReceiverTests {
         capture.log(level: .error, message: evaluate("checkout failed"), metadata: ["order": evaluate("1042")])
         capture.record(evaluateRequest(), body: Data(evaluate("{}").utf8), started: Self.now)
 
-        if !FileManager.default.fileExists(atPath: snapshotFile.path) {
-            for await _ in watcher.changes where FileManager.default.fileExists(atPath: snapshotFile.path) {
+        if !FileManager.default.fileExists(atPath: sessionsFile.path) {
+            for await _ in watcher.changes where FileManager.default.fileExists(atPath: sessionsFile.path) {
                 break
             }
         }
-        let document = try #require(StoreDocument.decoded(from: Data(contentsOf: snapshotFile)))
-        let actual = try JSONDecoder().decode(DebugDrawerDiagnosticsCapture.Snapshot.self, from: document.message.payload)
         let files = try FileManager.default.subpathsOfDirectory(atPath: layout.snapshots.path).sorted()
-        let expectedFiles = [snapshotFile.lastPathComponent, layout.snapshotFile(for: sessionsID).lastPathComponent].sorted()
+        let expectedFiles = [sessionsFile.lastPathComponent]
         #expect(evaluated == 0)
-        #expect(!actual.isCapturing)
-        #expect(actual.lines.isEmpty)
-        #expect(actual.requests.isEmpty)
-        #expect(capture.snapshot == actual)
+        #expect(!capture.snapshot.isCapturing)
+        #expect(capture.snapshot.lines.isEmpty)
+        #expect(capture.snapshot.requests.isEmpty)
         #expect(files == expectedFiles)
         #expect(URLSessionConfiguration.default.protocolClasses?.map { ObjectIdentifier($0) } == protocolsBefore)
     }
@@ -496,8 +493,11 @@ struct DiagnosticsCaptureReceiverTests {
                 break
             }
         }
-        // The app is killed with the session open: nothing ends it, so its revert never runs.
+        // The app is killed with the session open: nothing ends it, so its revert never runs, and
+        // the file stays as it was, where stop() would remove it.
+        let leftover = try Data(contentsOf: snapshotFile)
         killedLaunch.stop()
+        try layout.write(leftover, to: snapshotFile)
         let leftByKill = storedText()?.contains(marker) == true
         let sessions = DebugDrawerSessions(maximumDuration: 300, auditCapacity: 100, clock: clock, timer: ManualTimer())
         let capture = DebugDrawerDiagnosticsCapture(sessions: sessions, redaction: .standard, limits: .standard) { clock.now }

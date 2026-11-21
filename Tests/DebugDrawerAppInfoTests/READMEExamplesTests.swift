@@ -36,7 +36,7 @@
     @Suite("README examples")
     struct READMEExamplesTests {
         @Test(
-            "Production builds: the app's state: served under its ID, empty until a session opens, then the build, overrides, hashed ID and plan",
+            "Production builds: the app's state: served under its ID once a session opens, with the build, overrides, hashed ID and plan",
             .timeLimit(.minutes(1))
         )
         func productionAppState() async throws {
@@ -51,20 +51,21 @@
             let production = try ProductionAppStateSnapshot(flags: flags, account: account, container: container)
             defer { production.receiver.stop() }
             let appDirectory = AppGroupStoreLayout.appDirectory(inStore: container.appending(path: "DebugDrawer"))
-            let sidecar = try DebugDrawerAppGroupStoreTransport(directory: appDirectory)
-            let state = try await sidecar.connect(
-                toPlugin: DebugDrawerAppState.pluginID, snapshot: DebugDrawerAppState.Snapshot.self, command: DebugDrawerAppState.Command.self
-            )
+            let snapshotFile = AppGroupStoreLayout(directory: appDirectory).snapshotFile(for: DebugDrawerAppState.pluginID)
             let expectedEnabled = [DebugDrawerAppState.pluginID, DebugDrawerFeatureFlagOverrides.pluginID]
             let expectedValues: [String: DebugDrawerAppStateValue] = ["plan": "pro"]
 
-            let beforeSession = state.snapshot
+            let servedBeforeSession = FileManager.default.fileExists(atPath: snapshotFile.path)
             production.sessions.perform(.open(duration: 60))
+            let sidecar = try DebugDrawerAppGroupStoreTransport(directory: appDirectory)
+            _ = try await sidecar.connect(
+                toPlugin: DebugDrawerAppState.pluginID, snapshot: DebugDrawerAppState.Snapshot.self, command: DebugDrawerAppState.Command.self
+            )
             flags.perform(.setOverride(key: "new-checkout", value: .bool(true)))
             let during = production.appState.snapshot.state
 
             #expect(production.receiver.enabledCapabilities.sorted() == expectedEnabled)
-            #expect(beforeSession == DebugDrawerAppState.Snapshot(sessionID: nil, state: nil))
+            #expect(!servedBeforeSession)
             #expect(during?.featureFlagOverrides == ["new-checkout": .bool(true)])
             #expect(during?.values == expectedValues)
             #expect(during?.hashedUserID?.count == 64)

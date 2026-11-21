@@ -165,8 +165,8 @@
             let receiverGate = RemoteSwitch(true)
             let sut = try await Fixture(receiverGate: receiverGate, themeGate: RemoteSwitch(true))
             defer { sut.receiver.stop() }
-            let logLevels = try await sut.control(logLevelsID)
             let session = try await sut.openSession()
+            let logLevels = try await sut.control(logLevelsID)
             logLevels.send(.set("debug"))
             _ = await sut.entries { $0.event == .commandApplied }
             #expect(sut.logLevels.snapshot.value == "debug")
@@ -201,8 +201,8 @@
             let receiverGate = RemoteSwitch(true)
             let sut = try await Fixture(receiverGate: receiverGate, themeGate: RemoteSwitch(true))
             defer { sut.receiver.stop() }
-            let logLevels = try await sut.control(logLevelsID)
             let session = try await sut.openSession()
+            let logLevels = try await sut.control(logLevelsID)
             logLevels.send(.set("debug"))
             _ = await sut.entries { $0.event == .commandApplied }
             // Once the sidecar reads the change, the receiver has no snapshot write of its own left.
@@ -253,8 +253,8 @@
             let receiverGate = RemoteSwitch(true)
             let sut = try await Fixture(receiverGate: receiverGate, themeGate: RemoteSwitch(true))
             defer { sut.receiver.stop() }
-            let theme = try await sut.control(themeID)
             let first = try await sut.openSession()
+            let theme = try await sut.control(themeID)
             theme.send(.set("dark"))
             _ = await sut.entries { $0.event == .commandApplied }
             let expectedEvents: [DebugDrawerAuditEntry.Event] = [.changeReverted, .sessionEnded(.disabledByHost)]
@@ -283,9 +283,9 @@
             let themeGate = RemoteSwitch(true)
             let sut = try await Fixture(receiverGate: RemoteSwitch(true), themeGate: themeGate)
             defer { sut.receiver.stop() }
-            let theme = try await sut.control(themeID)
-            let logLevels = try await sut.control(logLevelsID)
             let session = try await sut.openSession()
+            let logLevels = try await sut.control(logLevelsID)
+            let theme = try await sut.control(themeID)
             themeGate.isOn = false
 
             theme.send(.set("dark"))
@@ -310,9 +310,9 @@
             let themeGate = RemoteSwitch(true)
             let sut = try await Fixture(receiverGate: RemoteSwitch(true), themeGate: themeGate)
             defer { sut.receiver.stop() }
-            let theme = try await sut.control(themeID)
-            let logLevels = try await sut.control(logLevelsID)
             let session = try await sut.openSession()
+            let logLevels = try await sut.control(logLevelsID)
+            let theme = try await sut.control(themeID)
             theme.send(.set("dark"))
             _ = await sut.entries { $0.event == .commandApplied }
             logLevels.send(.set("debug"))

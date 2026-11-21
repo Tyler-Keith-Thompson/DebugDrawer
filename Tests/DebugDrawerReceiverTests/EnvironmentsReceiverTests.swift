@@ -99,7 +99,7 @@ struct EnvironmentsReceiverTests {
     private let staging = DebugDrawerEnvironment("staging", title: "Staging", summary: "Yesterday's server build")
     private let canary = DebugDrawerEnvironment("canary", title: "Canary")
 
-    @Test("A sidecar reads, from the store, the default and allowed environments by ID, title and summary, with the active one")
+    @Test("In a session, a sidecar reads, from the store, the default and allowed environments by ID, title and summary, with the active one")
     func listsEnvironments() async throws {
         let suite = "EnvironmentsReceiverTests-\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: suite))
@@ -117,6 +117,7 @@ struct EnvironmentsReceiverTests {
         let watcher = try #require(DirectoryWatcher(directory: layout.snapshots))
         defer { watcher.cancel() }
 
+        sessions.perform(.open(duration: 60))
         try sut.start()
         defer { sut.stop() }
         if !FileManager.default.fileExists(atPath: snapshotFile.path) {

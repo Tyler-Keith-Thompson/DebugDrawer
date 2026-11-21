@@ -33,6 +33,17 @@
         private static let start = Date(timeIntervalSince1970: 1_778_307_200)
         private static let audience = "com.example.MyApp"
 
+        /// Leaves `command` in `receiver`'s store as a sidecar's transport would. The capability
+        /// is served only to a session whose grant lists it, so outside one a sidecar can't
+        /// connect to it, and the tests send what it would send this way.
+        private static func leave(_ command: NetworkMocking.Command, for receiver: DebugDrawerReceiver) throws {
+            let layout = AppGroupStoreLayout(directory: receiver.appDirectory)
+            let document = try StoreDocument(TransportMessage(
+                kind: .command, pluginID: NetworkMocking.pluginID, payload: TransportMessage.payload(command)
+            ))
+            try layout.write(document.encoded(), to: layout.commands.appending(path: "\(UUID().uuidString).json"))
+        }
+
         @Test("A rule for an allowed host answers only while the session is open: before it opens and after it ends, the server answers")
         func mocksOnlyDuringSession() async throws {
             let root = FileManager.default.temporaryDirectory.appending(path: "NetworkMockingSidecarTests-\(UUID().uuidString)")
@@ -73,18 +84,19 @@
             let sessionControl = try await sidecar.connect(
                 toPlugin: DebugDrawerSessions.pluginID, snapshot: DebugDrawerSessionState.self, command: DebugDrawerSessionCommand.self
             )
-            let mocks = try await sidecar.connect(
-                toPlugin: NetworkMocking.pluginID, snapshot: NetworkMocking.Snapshot.self, command: NetworkMocking.Command.self
-            )
             let (auditEntries, auditEntry) = AsyncStream<DebugDrawerAuditEntry>.makeStream()
             let subscription = sessions.auditEntries.sink { auditEntry.yield($0) }
             defer { subscription.cancel() }
             var audit = auditEntries.makeAsyncIterator()
 
             let (before, _) = try await urlSession.data(from: url)
-            mocks.send(.setRules([rule]))
+            try Self.leave(.setRules([rule]), for: receiver)
             let refusedBeforeSession = await audit.next()
             sessionControl.send(.open(duration: 60, grant: grant))
+            // Served once the session is open.
+            let mocks = try await sidecar.connect(
+                toPlugin: NetworkMocking.pluginID, snapshot: NetworkMocking.Snapshot.self, command: NetworkMocking.Command.self
+            )
             let opened = await audit.next()
             mocks.send(.setRules([rule]))
             let applied = await audit.next()
@@ -157,15 +169,16 @@
             let sessionControl = try await sidecar.connect(
                 toPlugin: DebugDrawerSessions.pluginID, snapshot: DebugDrawerSessionState.self, command: DebugDrawerSessionCommand.self
             )
-            let mocks = try await sidecar.connect(
-                toPlugin: NetworkMocking.pluginID, snapshot: NetworkMocking.Snapshot.self, command: NetworkMocking.Command.self
-            )
             let (auditEntries, auditEntry) = AsyncStream<DebugDrawerAuditEntry>.makeStream()
             let subscription = sessions.auditEntries.sink { auditEntry.yield($0) }
             defer { subscription.cancel() }
             var audit = auditEntries.makeAsyncIterator()
 
             sessionControl.send(.open(duration: 60, grant: grant))
+            // Served once the session is open.
+            let mocks = try await sidecar.connect(
+                toPlugin: NetworkMocking.pluginID, snapshot: NetworkMocking.Snapshot.self, command: NetworkMocking.Command.self
+            )
             _ = await audit.next()
             mocks.send(.setRules([rule]))
             let applied = await audit.next()
@@ -227,15 +240,16 @@
             let sessionControl = try await sidecar.connect(
                 toPlugin: DebugDrawerSessions.pluginID, snapshot: DebugDrawerSessionState.self, command: DebugDrawerSessionCommand.self
             )
-            let mocks = try await sidecar.connect(
-                toPlugin: NetworkMocking.pluginID, snapshot: NetworkMocking.Snapshot.self, command: NetworkMocking.Command.self
-            )
             let (auditEntries, auditEntry) = AsyncStream<DebugDrawerAuditEntry>.makeStream()
             let subscription = sessions.auditEntries.sink { auditEntry.yield($0) }
             defer { subscription.cancel() }
             var audit = auditEntries.makeAsyncIterator()
 
             sessionControl.send(.open(duration: 60, grant: grant))
+            // Served once the session is open.
+            let mocks = try await sidecar.connect(
+                toPlugin: NetworkMocking.pluginID, snapshot: NetworkMocking.Snapshot.self, command: NetworkMocking.Command.self
+            )
             _ = await audit.next()
             mocks.send(.setRules(rules))
             let applied = await audit.next()
@@ -284,15 +298,16 @@
             let sessionControl = try await sidecar.connect(
                 toPlugin: DebugDrawerSessions.pluginID, snapshot: DebugDrawerSessionState.self, command: DebugDrawerSessionCommand.self
             )
-            let mocks = try await sidecar.connect(
-                toPlugin: NetworkMocking.pluginID, snapshot: NetworkMocking.Snapshot.self, command: NetworkMocking.Command.self
-            )
             let (auditEntries, auditEntry) = AsyncStream<DebugDrawerAuditEntry>.makeStream()
             let subscription = sessions.auditEntries.sink { auditEntry.yield($0) }
             defer { subscription.cancel() }
             var audit = auditEntries.makeAsyncIterator()
 
             sessionControl.send(.open(duration: 60, grant: grant))
+            // Served once the session is open.
+            let mocks = try await sidecar.connect(
+                toPlugin: NetworkMocking.pluginID, snapshot: NetworkMocking.Snapshot.self, command: NetworkMocking.Command.self
+            )
             _ = await audit.next()
             mocks.send(.setRules([rule]))
             let applied = await audit.next()
@@ -341,9 +356,6 @@
             let sessionControl = try await sidecar.connect(
                 toPlugin: DebugDrawerSessions.pluginID, snapshot: DebugDrawerSessionState.self, command: DebugDrawerSessionCommand.self
             )
-            let mocks = try await sidecar.connect(
-                toPlugin: NetworkMocking.pluginID, snapshot: NetworkMocking.Snapshot.self, command: NetworkMocking.Command.self
-            )
             let (auditEntries, auditEntry) = AsyncStream<DebugDrawerAuditEntry>.makeStream()
             let subscription = sessions.auditEntries.sink { auditEntry.yield($0) }
             defer { subscription.cancel() }
@@ -351,12 +363,15 @@
 
             sessionControl.send(.open(duration: 60))
             let openWithout = await audit.next()
-            mocks.send(.setRules([rule]))
+            try Self.leave(.setRules([rule]), for: receiver)
             let withoutGrant = await audit.next()
             let (afterWithout, _) = try await urlSession.data(from: url)
             sessionControl.send(.open(duration: 60, grant: otherCapability))
             let openWithOther = await audit.next()
-            mocks.send(.setRules([rule]))
+            let servedToOtherGrant = FileManager.default.fileExists(
+                atPath: AppGroupStoreLayout(directory: receiver.appDirectory).snapshotFile(for: NetworkMocking.pluginID).path
+            )
+            try Self.leave(.setRules([rule]), for: receiver)
             let withOtherGrant = await audit.next()
             let (afterOther, _) = try await urlSession.data(from: url)
 
@@ -368,6 +383,7 @@
             ))
             #expect(withOtherGrant?.capability == NetworkMocking.pluginID)
             #expect(withOtherGrant?.event == .commandRefused(.capabilityNotGranted))
+            #expect(!servedToOtherGrant)
             #expect(mocking.snapshot.rules.isEmpty)
             #expect(String(bytes: afterOther, encoding: .utf8) == "server")
             #expect(server.requests.count == 2)
@@ -401,9 +417,6 @@
             let sessionControl = try await sidecar.connect(
                 toPlugin: DebugDrawerSessions.pluginID, snapshot: DebugDrawerSessionState.self, command: DebugDrawerSessionCommand.self
             )
-            let mocks = try await sidecar.connect(
-                toPlugin: NetworkMocking.pluginID, snapshot: NetworkMocking.Snapshot.self, command: NetworkMocking.Command.self
-            )
             let (auditEntries, auditEntry) = AsyncStream<DebugDrawerAuditEntry>.makeStream()
             let subscription = sessions.auditEntries.sink { auditEntry.yield($0) }
             defer { subscription.cancel() }
@@ -411,13 +424,17 @@
 
             sessionControl.send(.open(duration: 60))
             let opened = await audit.next()
-            mocks.send(.setRules([rule]))
+            let servedWithoutGrant = FileManager.default.fileExists(
+                atPath: AppGroupStoreLayout(directory: receiver.appDirectory).snapshotFile(for: NetworkMocking.pluginID).path
+            )
+            try Self.leave(.setRules([rule]), for: receiver)
             let refused = await audit.next()
             let (data, _) = try await urlSession.data(from: url)
 
             #expect(opened?.event == .sessionOpened(expires: Self.start.addingTimeInterval(60), grant: nil))
             #expect(refused?.capability == NetworkMocking.pluginID)
             #expect(refused?.event == .commandRefused(.grantMissing))
+            #expect(!servedWithoutGrant)
             #expect(mocking.snapshot.rules.isEmpty)
             #expect(String(bytes: data, encoding: .utf8) == "server")
             #expect(server.requests.count == 1)
@@ -458,15 +475,16 @@
             let sessionControl = try await sidecar.connect(
                 toPlugin: DebugDrawerSessions.pluginID, snapshot: DebugDrawerSessionState.self, command: DebugDrawerSessionCommand.self
             )
-            let mocks = try await sidecar.connect(
-                toPlugin: NetworkMocking.pluginID, snapshot: NetworkMocking.Snapshot.self, command: NetworkMocking.Command.self
-            )
             let (auditEntries, auditEntry) = AsyncStream<DebugDrawerAuditEntry>.makeStream()
             let subscription = sessions.auditEntries.sink { auditEntry.yield($0) }
             defer { subscription.cancel() }
             var audit = auditEntries.makeAsyncIterator()
 
             sessionControl.send(.open(duration: 60, grant: grant))
+            // Served once the session is open.
+            let mocks = try await sidecar.connect(
+                toPlugin: NetworkMocking.pluginID, snapshot: NetworkMocking.Snapshot.self, command: NetworkMocking.Command.self
+            )
             _ = await audit.next()
             var refusals: [DebugDrawerAuditEntry.Event] = []
             for command in commands {
@@ -519,15 +537,16 @@
             let sessionControl = try await sidecar.connect(
                 toPlugin: DebugDrawerSessions.pluginID, snapshot: DebugDrawerSessionState.self, command: DebugDrawerSessionCommand.self
             )
-            let mocks = try await sidecar.connect(
-                toPlugin: NetworkMocking.pluginID, snapshot: NetworkMocking.Snapshot.self, command: NetworkMocking.Command.self
-            )
             let (auditEntries, auditEntry) = AsyncStream<DebugDrawerAuditEntry>.makeStream()
             let subscription = sessions.auditEntries.sink { auditEntry.yield($0) }
             defer { subscription.cancel() }
             var audit = auditEntries.makeAsyncIterator()
 
             sessionControl.send(.open(duration: 60, grant: grant))
+            // Served once the session is open.
+            let mocks = try await sidecar.connect(
+                toPlugin: NetworkMocking.pluginID, snapshot: NetworkMocking.Snapshot.self, command: NetworkMocking.Command.self
+            )
             _ = await audit.next()
             mocks.send(.setRules([rule]))
             _ = await audit.next()

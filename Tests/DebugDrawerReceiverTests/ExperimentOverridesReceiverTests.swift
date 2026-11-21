@@ -71,7 +71,7 @@ struct ExperimentOverridesReceiverTests {
     private let flagsID = DebugDrawerFeatureFlagOverrides.pluginID
     private let sessionsID = DebugDrawerSessions.pluginID
 
-    @Test("A sidecar reads, from the store, each experiment the adapter lists with its variants and the app's assignment")
+    @Test("In a session, a sidecar reads, from the store, each experiment the adapter lists with its variants and the app's assignment")
     func listsExperimentsWithVariantsAndAssignment() async throws {
         let suite = "ExperimentOverridesReceiverTests-\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: suite))
@@ -97,6 +97,7 @@ struct ExperimentOverridesReceiverTests {
         let watcher = try #require(DirectoryWatcher(directory: layout.snapshots))
         defer { watcher.cancel() }
 
+        sessions.perform(.open(duration: 60))
         try sut.start()
         defer { sut.stop() }
         if !FileManager.default.fileExists(atPath: snapshotFile.path) {

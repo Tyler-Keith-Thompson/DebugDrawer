@@ -87,7 +87,8 @@ extension DebugDrawerReceiverCapability {
                 }
                 return .applied(changes: model.apply(command))
             },
-            snapshots: { encodedSnapshots(of: model) }
+            snapshots: { encodedSnapshots(of: model) },
+            currentSnapshot: { try? TransportMessage.payload(model.snapshot) }
         )
         .recordingNoUnrevertedChanges()
     }

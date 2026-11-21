@@ -18,7 +18,7 @@
     @MainActor
     @Suite("README examples")
     struct READMEExamplesTests {
-        @Test("Production builds: tweaks: a sidecar sees the production-safe tweak and not the other", .timeLimit(.minutes(1)))
+        @Test("Production builds: tweaks: in a session, a sidecar sees the production-safe tweak and not the other", .timeLimit(.minutes(1)))
         func productionTweaks() async throws {
             let container = FileManager.default.temporaryDirectory.appending(path: "READMETweaks-\(UUID().uuidString)")
             let sessions = DebugDrawerSessions(maximumDuration: 15 * 60)
@@ -29,6 +29,8 @@
             try receiver.start()
             defer { receiver.stop() }
             let appDirectory = AppGroupStoreLayout.appDirectory(inStore: container.appending(path: "DebugDrawer"))
+            sessions.perform(.open(duration: 60))
+            defer { sessions.end() }
             let sidecar = try DebugDrawerAppGroupStoreTransport(directory: appDirectory)
             let tweaks = try await sidecar.connect(
                 toPlugin: TweaksModel.pluginID, snapshot: TweaksModel.Snapshot.self, command: TweaksModel.Command.self

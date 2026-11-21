@@ -24,7 +24,10 @@
     @MainActor
     @Suite("README examples")
     struct READMEExamplesTests {
-        @Test("Production builds: analytics events: the mirror is served, and empty until a session opens", .timeLimit(.minutes(1)))
+        @Test(
+            "Production builds: analytics events: the mirror is served once a session opens, without the events recorded before it",
+            .timeLimit(.minutes(1))
+        )
         func productionAnalytics() async throws {
             let container = FileManager.default.temporaryDirectory.appending(path: "READMEAnalytics-\(UUID().uuidString)")
             let mirror = try ProductionAnalyticsMirror(container: container)
@@ -34,13 +37,18 @@
             AnalyticsEvents.record("checkout_completed", properties: ["plan": "pro", "seats": 3], source: "Segment")
 
             let appDirectory = AppGroupStoreLayout.appDirectory(inStore: container.appending(path: "DebugDrawer"))
+            let snapshotFile = AppGroupStoreLayout(directory: appDirectory).snapshotFile(for: AnalyticsEventsMirror.pluginID)
+            let servedBeforeSession = FileManager.default.fileExists(atPath: snapshotFile.path)
+            mirror.sessions.perform(.open(duration: 60))
+            defer { mirror.sessions.end() }
 
             let sidecar = try DebugDrawerAppGroupStoreTransport(directory: appDirectory)
             let events = try await sidecar.connect(
                 toPlugin: AnalyticsEventsMirror.pluginID, snapshot: AnalyticsEventsMirror.Snapshot.self, command: AnalyticsEventsMirror.Command.self
             )
             #expect(mirror.receiver.enabledCapabilities == [AnalyticsEventsMirror.pluginID])
-            #expect(events.snapshot == AnalyticsEventsMirror.Snapshot(sessionID: nil, events: []))
+            #expect(!servedBeforeSession)
+            #expect(events.snapshot.events.isEmpty)
         }
     }
 #endif

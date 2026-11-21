@@ -34,7 +34,10 @@
     @MainActor
     @Suite("README examples")
     struct READMEExamplesTests {
-        @Test("Production builds: localization review: served, showing translations until a session sets a mode", .timeLimit(.minutes(1)))
+        @Test(
+            "Production builds: localization review: served once a session opens, showing translations until the session sets a mode",
+            .timeLimit(.minutes(1))
+        )
         func productionLocalizationReview() async throws {
             let container = FileManager.default.temporaryDirectory.appending(path: "READMELocalization-\(UUID().uuidString)")
             let review = try ProductionLocalizationReview(container: container)
@@ -42,12 +45,17 @@
             _ = SettingsHeader(itemCount: 3).localizationReview()
 
             let appDirectory = AppGroupStoreLayout.appDirectory(inStore: container.appending(path: "DebugDrawer"))
+            let snapshotFile = AppGroupStoreLayout(directory: appDirectory).snapshotFile(for: LocalizationReview.pluginID)
+            let servedBeforeSession = FileManager.default.fileExists(atPath: snapshotFile.path)
+            review.sessions.perform(.open(duration: 60))
+            defer { review.sessions.end() }
 
             let sidecar = try DebugDrawerAppGroupStoreTransport(directory: appDirectory)
             let modes = try await sidecar.connect(
                 toPlugin: LocalizationReview.pluginID, snapshot: LocalizationReview.Snapshot.self, command: LocalizationReview.Command.self
             )
             #expect(review.receiver.enabledCapabilities == [LocalizationReview.pluginID])
+            #expect(!servedBeforeSession)
             #expect(modes.snapshot == LocalizationReview.Snapshot(mode: .standard))
             #expect(LocalizationReview.shared.localizedString("\(3) items") == "3 items")
         }

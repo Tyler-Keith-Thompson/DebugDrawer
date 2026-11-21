@@ -16,7 +16,7 @@
     @MainActor
     @Suite(.serialized, .timeLimit(.minutes(1)))
     struct PushRegistrationSidecarTests {
-        @Test("The sidecar sees the token, the environment and the authorization status during its session, and none before or after")
+        @Test("The sidecar sees the token, the environment and the authorization status in its session, and none of it is in the store outside it")
         func servedDuringSession() async throws {
             let root = FileManager.default.temporaryDirectory.appending(path: "PushRegistrationSidecarTests-\(UUID().uuidString)")
             let store = root.appending(path: "Group/DebugDrawer")
@@ -33,15 +33,17 @@
             let sessionControl = try await sidecar.connect(
                 toPlugin: DebugDrawerSessions.pluginID, snapshot: DebugDrawerSessionState.self, command: DebugDrawerSessionCommand.self
             )
+            let snapshotFile = AppGroupStoreLayout(directory: receiver.appDirectory).snapshotFile(for: PushRegistrationMirror.pluginID)
+            let servedBeforeSession = FileManager.default.fileExists(atPath: snapshotFile.path)
+
+            sessionControl.send(.open(duration: 60))
+            // Served once the session is open.
             let push = try await sidecar.connect(
                 toPlugin: PushRegistrationMirror.pluginID,
                 snapshot: PushRegistrationMirror.Snapshot.self,
                 command: PushRegistrationMirror.Command.self
             )
             var arrivals = push.snapshots().makeAsyncIterator()
-
-            let beforeSession = await arrivals.next()
-            sessionControl.send(.open(duration: 60))
             var during: PushRegistrationMirror.Snapshot?
             while let snapshot = await arrivals.next() {
                 if snapshot.settings != nil {
@@ -50,22 +52,18 @@
                 }
             }
             sessionControl.send(.end)
-            var after: PushRegistrationMirror.Snapshot?
-            while let snapshot = await arrivals.next() {
-                if snapshot.sessionID == nil {
-                    after = snapshot
-                    break
-                }
+            for await state in sessionControl.snapshots() where !state.isActive {
+                break
             }
+            let servedAfterSession = FileManager.default.fileExists(atPath: snapshotFile.path)
 
-            let empty = PushRegistrationMirror.Snapshot(sessionID: nil, registration: nil, environment: nil, settings: nil)
-            #expect(beforeSession == empty)
+            #expect(!servedBeforeSession)
             #expect(during?.sessionID != nil)
             #expect(during?.registration == .registered(deviceToken: "7a00c319"))
             #expect(during?.environment == environment)
             #expect(during?.settings?.authorization == .authorized)
             #expect(during?.settings?.items == [.init(name: "Alerts", value: "On")])
-            #expect(after == empty)
+            #expect(!servedAfterSession)
         }
 
         @Test("The token is written only to the store's snapshot file, never to the audit log, defaults or logs, and leaves it as the session ends")
@@ -89,13 +87,14 @@
             let sessionControl = try await sidecar.connect(
                 toPlugin: DebugDrawerSessions.pluginID, snapshot: DebugDrawerSessionState.self, command: DebugDrawerSessionCommand.self
             )
+            sessionControl.send(.open(duration: 60))
+            // Served once the session is open.
             let push = try await sidecar.connect(
                 toPlugin: PushRegistrationMirror.pluginID,
                 snapshot: PushRegistrationMirror.Snapshot.self,
                 command: PushRegistrationMirror.Command.self
             )
             var arrivals = push.snapshots().makeAsyncIterator()
-            sessionControl.send(.open(duration: 60))
             while let snapshot = await arrivals.next() {
                 if snapshot.settings != nil {
                     break
@@ -148,10 +147,8 @@
                 #expect(!logLines.contains { $0.localizedCaseInsensitiveContains(hexadecimal) })
             #endif
             sessionControl.send(.end)
-            while let snapshot = await arrivals.next() {
-                if snapshot.sessionID == nil {
-                    break
-                }
+            for await state in sessionControl.snapshots() where !state.isActive {
+                break
             }
             let afterSession = payload(of: snapshotFile)
 
@@ -160,8 +157,7 @@
             #expect(!holdsToken(defaults))
             #expect(!audit.isEmpty)
             #expect(!holdsToken(audit))
-            #expect(afterSession != nil)
-            #expect(afterSession.map(holdsToken) == false)
+            #expect(afterSession == nil)
         }
 
         @Test("Turning the receiver's gate off removes the capability's snapshot file, token and all")
@@ -181,13 +177,13 @@
             let sessionControl = try await sidecar.connect(
                 toPlugin: DebugDrawerSessions.pluginID, snapshot: DebugDrawerSessionState.self, command: DebugDrawerSessionCommand.self
             )
+            sessionControl.send(.open(duration: 60))
             let push = try await sidecar.connect(
                 toPlugin: PushRegistrationMirror.pluginID,
                 snapshot: PushRegistrationMirror.Snapshot.self,
                 command: PushRegistrationMirror.Command.self
             )
             var arrivals = push.snapshots().makeAsyncIterator()
-            sessionControl.send(.open(duration: 60))
             while let snapshot = await arrivals.next() {
                 if snapshot.registration != nil {
                     break
@@ -202,7 +198,7 @@
             #expect(!FileManager.default.fileExists(atPath: snapshotFile.path))
         }
 
-        @Test("A snapshot file a launch killed during a session left is rewritten without the token as the next launch's receiver starts")
+        @Test("A snapshot file a launch killed during a session left, token and all, is removed as the next launch's receiver starts")
         func killedLaunchRewritten() async throws {
             let root = FileManager.default.temporaryDirectory.appending(path: "PushRegistrationSidecarTests-\(UUID().uuidString)")
             let store = root.appending(path: "Group/DebugDrawer")
@@ -218,22 +214,24 @@
             let sessionControl = try await sidecar.connect(
                 toPlugin: DebugDrawerSessions.pluginID, snapshot: DebugDrawerSessionState.self, command: DebugDrawerSessionCommand.self
             )
+            sessionControl.send(.open(duration: 60))
             let push = try await sidecar.connect(
                 toPlugin: PushRegistrationMirror.pluginID,
                 snapshot: PushRegistrationMirror.Snapshot.self,
                 command: PushRegistrationMirror.Command.self
             )
             var arrivals = push.snapshots().makeAsyncIterator()
-            sessionControl.send(.open(duration: 60))
             while let snapshot = await arrivals.next() {
                 if snapshot.registration != nil {
                     break
                 }
             }
-            // Stopping leaves the snapshots where they are, as a kill would.
-            firstLaunch.stop()
             let snapshotFile = AppGroupStoreLayout(directory: firstLaunch.appDirectory).snapshotFile(for: PushRegistrationMirror.pluginID)
-            let left = try StoreDocument.decoded(from: Data(contentsOf: snapshotFile))?.message.payload
+            // A kill leaves the snapshot file as it was, where stopping would remove it.
+            let leftData = try Data(contentsOf: snapshotFile)
+            firstLaunch.stop()
+            try AppGroupStoreLayout(directory: firstLaunch.appDirectory).write(leftData, to: snapshotFile)
+            let left = StoreDocument.decoded(from: leftData)?.message.payload
 
             let secondSessions = DebugDrawerSessions(maximumDuration: 300)
             let secondLaunch = DebugDrawerReceiver(directory: store, sessions: secondSessions)
@@ -243,20 +241,10 @@
             secondLaunch.enable(.pushRegistration(secondMirror))
             try secondLaunch.start()
             defer { secondLaunch.stop() }
-            let rewritten = PushRegistrationMirror.Snapshot(sessionID: nil, registration: nil, environment: nil, settings: nil)
-            var served: PushRegistrationMirror.Snapshot?
-            while let snapshot = await arrivals.next() {
-                if snapshot == rewritten {
-                    served = snapshot
-                    break
-                }
-            }
-            let onDisk = try StoreDocument.decoded(from: Data(contentsOf: snapshotFile))?.message.payload
 
             let leftSnapshot = left.flatMap { try? JSONDecoder().decode(PushRegistrationMirror.Snapshot.self, from: $0) }
             #expect(leftSnapshot?.registration == .registered(deviceToken: "feed"))
-            #expect(served == rewritten)
-            #expect(onDisk.flatMap { try? JSONDecoder().decode(PushRegistrationMirror.Snapshot.self, from: $0) } == rewritten)
+            #expect(!FileManager.default.fileExists(atPath: snapshotFile.path))
         }
 
         @Test("Refresh from the sidecar is refused outside a session and reads the settings again inside one")
@@ -274,20 +262,26 @@
             let sessionControl = try await sidecar.connect(
                 toPlugin: DebugDrawerSessions.pluginID, snapshot: DebugDrawerSessionState.self, command: DebugDrawerSessionCommand.self
             )
+            // Outside a session the capability isn't served, so a sidecar can't connect to it: the
+            // refresh is left in the store as its transport would leave it.
+            let layout = AppGroupStoreLayout(directory: receiver.appDirectory)
+            let refresh = try StoreDocument(TransportMessage(
+                kind: .command, pluginID: PushRegistrationMirror.pluginID, payload: TransportMessage.payload(PushRegistrationMirror.Command.refresh)
+            )).encoded()
+            let (auditEntries, auditEntry) = AsyncStream<DebugDrawerAuditEntry>.makeStream()
+            let subscription = sessions.auditEntries.sink { auditEntry.yield($0) }
+            defer { subscription.cancel() }
+            var audit = auditEntries.makeAsyncIterator()
+
+            try layout.write(refresh, to: layout.commands.appending(path: "refresh.json"))
+            let refusal = await audit.next()
+            sessionControl.send(.open(duration: 60))
             let push = try await sidecar.connect(
                 toPlugin: PushRegistrationMirror.pluginID,
                 snapshot: PushRegistrationMirror.Snapshot.self,
                 command: PushRegistrationMirror.Command.self
             )
-            let (auditEntries, auditEntry) = AsyncStream<DebugDrawerAuditEntry>.makeStream()
-            let subscription = sessions.auditEntries.sink { auditEntry.yield($0) }
-            defer { subscription.cancel() }
-            var audit = auditEntries.makeAsyncIterator()
             var arrivals = push.snapshots().makeAsyncIterator()
-
-            push.send(.refresh)
-            let refusal = await audit.next()
-            sessionControl.send(.open(duration: 60))
             while let snapshot = await arrivals.next() {
                 if snapshot.settings?.authorization == .notDetermined {
                     break

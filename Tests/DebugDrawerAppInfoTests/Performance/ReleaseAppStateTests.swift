@@ -49,13 +49,8 @@
             let fileDuring = try Data(contentsOf: file)
             let payloadDuring = try #require(StoreDocument.decoded(from: fileDuring)?.message.payload)
             sessions.end()
-            var after = read()
-            if after?.sessionID != nil {
-                for await _ in watcher.changes {
-                    after = read()
-                    if after?.sessionID == nil { break }
-                }
-            }
+            // The receiver removes the snapshot as the session ends.
+            let after = read()
 
             #expect(during?.state?.buildMetadata.gitCommit == "4f9c2e1")
             #expect(during?.state?.values == expectedValues)
@@ -63,7 +58,8 @@
             #expect(fileDuring.range(of: Data(rawID.utf8)) == nil)
             #expect(fileDuring.range(of: Data(Data(rawID.utf8).base64EncodedString().utf8)) == nil)
             #expect(payloadDuring.range(of: Data(rawID.utf8)) == nil)
-            #expect(after == DebugDrawerAppState.Snapshot(sessionID: nil, state: nil))
+            #expect(after == nil)
+            #expect(!FileManager.default.fileExists(atPath: file.path))
         }
     }
 #endif

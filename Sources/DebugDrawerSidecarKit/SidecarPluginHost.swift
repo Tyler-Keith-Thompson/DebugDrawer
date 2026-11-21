@@ -3,7 +3,10 @@
     import SwiftUI
 
     /// One plugin of the app's: waiting for its model's first snapshot, then the plugin as the
-    /// drawer shows it, or why it couldn't be reached.
+    /// drawer shows it, or why it couldn't be reached. For an app that serves its capabilities
+    /// only within a session (a production app's receiver), it says so in place of the plugin
+    /// while no session is open, or while the open one's grant doesn't list it, rather than
+    /// waiting on a snapshot that won't come or showing the last one the session served.
     struct SidecarPluginHost: View {
         /// Where the plugin is.
         enum Hosting {
@@ -12,11 +15,34 @@
             case failed(DebugDrawerTransportError)
         }
 
-        let connection: DebugDrawerSidecarConnection
+        @ObservedObject var connection: DebugDrawerSidecarConnection
         let plugin: DebugDrawerSidecarPlugin
         @State private var hosting = Hosting.waiting
 
         var body: some View {
+            Group {
+                if connection.app.servesInSessionsOnly {
+                    SidecarSessionReadingObserver(sessions: connection.sessions, plugin: plugin) {
+                        hosted
+                    }
+                } else {
+                    hosted
+                }
+            }
+            // Cancelled as the plugin is no longer shown, which ends the wait. It goes on while the
+            // session gate shows in its place, so the plugin appears as the session opens.
+            .task {
+                do throws(DebugDrawerTransportError) {
+                    hosting = try await .shown(connection.host(plugin))
+                } catch {
+                    if error != .cancelled {
+                        hosting = .failed(error)
+                    }
+                }
+            }
+        }
+
+        @ViewBuilder private var hosted: some View {
             Group {
                 switch hosting {
                 case .waiting:
@@ -32,15 +58,76 @@
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
             }
-            // Cancelled as the plugin is no longer shown, which ends the wait.
-            .task {
-                do throws(DebugDrawerTransportError) {
-                    hosting = try await .shown(connection.host(plugin))
-                } catch {
-                    if error != .cancelled {
-                        hosting = .failed(error)
-                    }
+        }
+    }
+
+    /// What the open session lets a sidecar see of a plugin, for an app that serves its
+    /// capabilities only within a session.
+    enum SidecarSessionReading: Equatable {
+        /// No session is open, or the app's sessions haven't been read yet.
+        case noSession
+        /// A session is open, but its grant doesn't list the plugin's model.
+        case notGranted
+        /// The session may read the plugin's model.
+        case reading
+
+        /// What `state`, the app's sessions as last read (`nil` before), lets a sidecar see of the
+        /// model served under `pluginID`.
+        init(state: DebugDrawerSessionState?, pluginID: String) {
+            guard let session = state?.session else {
+                self = .noSession
+                return
+            }
+            self = session.grant.map { $0.capabilities.contains(pluginID) } ?? true ? .reading : .notGranted
+        }
+    }
+
+    /// Follows the app's sessions, once read, and shows `content` only while they let the sidecar
+    /// see `plugin`.
+    private struct SidecarSessionReadingObserver<Content: View>: View {
+        let sessions: DebugDrawerPluginTransport<DebugDrawerSessionState, DebugDrawerSessionCommand>?
+        let plugin: DebugDrawerSidecarPlugin
+        @ViewBuilder let content: () -> Content
+
+        var body: some View {
+            if let sessions {
+                SidecarSessionTransportReading(sessions: sessions, plugin: plugin, content: content)
+            } else {
+                SidecarSessionGate(reading: .noSession, title: plugin.title, content: content)
+            }
+        }
+    }
+
+    private struct SidecarSessionTransportReading<Content: View>: View {
+        @ObservedObject var sessions: DebugDrawerPluginTransport<DebugDrawerSessionState, DebugDrawerSessionCommand>
+        let plugin: DebugDrawerSidecarPlugin
+        @ViewBuilder let content: () -> Content
+
+        var body: some View {
+            SidecarSessionGate(reading: SidecarSessionReading(state: sessions.snapshot, pluginID: plugin.id), title: plugin.title, content: content)
+        }
+    }
+
+    /// `content` while `reading` lets the sidecar see the plugin titled `title`, else why not.
+    struct SidecarSessionGate<Content: View>: View {
+        let reading: SidecarSessionReading
+        let title: String
+        @ViewBuilder let content: () -> Content
+
+        var body: some View {
+            switch reading {
+            case .noSession:
+                DebugDrawerEmptyState("No Session", systemImage: "lock") {
+                    Text("Open a session to see \(title).")
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            case .notGranted:
+                DebugDrawerEmptyState("Not Granted", systemImage: "lock.slash") {
+                    Text("This session's grant doesn't list \(title).")
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            case .reading:
+                content()
             }
         }
     }

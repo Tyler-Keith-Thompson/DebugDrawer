@@ -51,15 +51,17 @@
             let sessionControl = try await sidecar.connect(
                 toPlugin: DebugDrawerSessions.pluginID, snapshot: DebugDrawerSessionState.self, command: DebugDrawerSessionCommand.self
             )
+            let snapshotFile = AppGroupStoreLayout(directory: receiver.appDirectory).snapshotFile(for: MetricKitPayloadsMirror.pluginID)
+
+            let servedBeforeSession = FileManager.default.fileExists(atPath: snapshotFile.path)
+            sessionControl.send(.open(duration: 60))
+            // Served once the session is open.
             let payloads = try await sidecar.connect(
                 toPlugin: MetricKitPayloadsMirror.pluginID,
                 snapshot: MetricKitPayloadsMirror.Snapshot.self,
                 command: MetricKitPayloadsMirror.Command.self
             )
             var arrivals = payloads.snapshots().makeAsyncIterator()
-
-            let beforeSession = await arrivals.next()
-            sessionControl.send(.open(duration: 60))
             var during: MetricKitPayloadsMirror.Snapshot?
             while let snapshot = await arrivals.next() {
                 if snapshot.sessionID != nil {
@@ -68,8 +70,7 @@
                 }
             }
 
-            #expect(beforeSession?.sessionID == nil)
-            #expect(beforeSession?.payloads.isEmpty == true)
+            #expect(!servedBeforeSession)
             let served = try #require(during?.payloads)
             #expect(served.map(\.kind) == [.diagnostics, .metrics])
             let metrics = try #require(served.last)
@@ -102,14 +103,15 @@
             let sessionControl = try await sidecar.connect(
                 toPlugin: DebugDrawerSessions.pluginID, snapshot: DebugDrawerSessionState.self, command: DebugDrawerSessionCommand.self
             )
+
+            sessionControl.send(.open(duration: 60))
+            // Served once the session is open.
             let payloads = try await sidecar.connect(
                 toPlugin: MetricKitPayloadsMirror.pluginID,
                 snapshot: MetricKitPayloadsMirror.Snapshot.self,
                 command: MetricKitPayloadsMirror.Command.self
             )
             var arrivals = payloads.snapshots().makeAsyncIterator()
-
-            sessionControl.send(.open(duration: 60))
             var during: MetricKitPayloadsMirror.Snapshot?
             while let snapshot = await arrivals.next() {
                 if snapshot.sessionID != nil {
@@ -139,20 +141,28 @@
             let sessionControl = try await sidecar.connect(
                 toPlugin: DebugDrawerSessions.pluginID, snapshot: DebugDrawerSessionState.self, command: DebugDrawerSessionCommand.self
             )
+            let (auditEntries, auditEntry) = AsyncStream<DebugDrawerAuditEntry>.makeStream()
+            let subscription = sessions.auditEntries.sink { auditEntry.yield($0) }
+            defer { subscription.cancel() }
+            var audit = auditEntries.makeAsyncIterator()
+            // Outside a session the capability isn't served, so a sidecar can't connect to it: the
+            // command is left in the store as its transport would leave it.
+            let layout = AppGroupStoreLayout(directory: receiver.appDirectory)
+            let deleteAll = try StoreDocument(TransportMessage(
+                kind: .command, pluginID: MetricKitPayloadsMirror.pluginID,
+                payload: TransportMessage.payload(MetricKitPayloadsMirror.Command.deleteAll)
+            )).encoded()
+
+            try layout.write(deleteAll, to: layout.commands.appending(path: "delete-all.json"))
+            let refusal = await audit.next()
+            sessionControl.send(.open(duration: 60))
+            // Served once the session is open.
             let payloads = try await sidecar.connect(
                 toPlugin: MetricKitPayloadsMirror.pluginID,
                 snapshot: MetricKitPayloadsMirror.Snapshot.self,
                 command: MetricKitPayloadsMirror.Command.self
             )
-            let (auditEntries, auditEntry) = AsyncStream<DebugDrawerAuditEntry>.makeStream()
-            let subscription = sessions.auditEntries.sink { auditEntry.yield($0) }
-            defer { subscription.cancel() }
-            var audit = auditEntries.makeAsyncIterator()
             var arrivals = payloads.snapshots().makeAsyncIterator()
-
-            payloads.send(.deleteAll)
-            let refusal = await audit.next()
-            sessionControl.send(.open(duration: 60))
             var opened: MetricKitPayloadsMirror.Snapshot?
             while let snapshot = await arrivals.next() {
                 if snapshot.sessionID != nil {

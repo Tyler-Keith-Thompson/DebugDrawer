@@ -105,7 +105,7 @@ struct LogLevelsReceiverTests {
     private let flagsID = DebugDrawerFeatureFlagOverrides.pluginID
     private let sessionsID = DebugDrawerSessions.pluginID
 
-    @Test("A sidecar reads, from the store, each subsystem the adapter lists with the levels it may set and its level now")
+    @Test("In a session, a sidecar reads, from the store, each subsystem the adapter lists with the levels it may set and its level now")
     func listsSubsystemsWithLevels() async throws {
         let suite = "LogLevelsReceiverTests-\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: suite))
@@ -131,6 +131,7 @@ struct LogLevelsReceiverTests {
         let watcher = try #require(DirectoryWatcher(directory: layout.snapshots))
         defer { watcher.cancel() }
 
+        sessions.perform(.open(duration: 60))
         try sut.start()
         defer { sut.stop() }
         if !FileManager.default.fileExists(atPath: snapshotFile.path) {

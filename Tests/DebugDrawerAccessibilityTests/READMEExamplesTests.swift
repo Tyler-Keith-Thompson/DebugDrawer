@@ -30,7 +30,7 @@
     @MainActor
     @Suite("README examples")
     struct READMEExamplesTests {
-        @Test("Production builds: accessibility overrides: the overrides are served, none set until a session sets one", .timeLimit(.minutes(1)))
+        @Test("Production builds: accessibility overrides: served once a session opens, none set until the session sets one", .timeLimit(.minutes(1)))
         func productionAccessibilityOverrides() async throws {
             let container = FileManager.default.temporaryDirectory.appending(path: "READMEAccessibility-\(UUID().uuidString)")
             let review = try ProductionAccessibilityReview(container: container)
@@ -38,6 +38,10 @@
             _ = ReviewedRoot().body
 
             let appDirectory = AppGroupStoreLayout.appDirectory(inStore: container.appending(path: "DebugDrawer"))
+            let snapshotFile = AppGroupStoreLayout(directory: appDirectory).snapshotFile(for: AccessibilityEnvironmentOverrides.pluginID)
+            let servedBeforeSession = FileManager.default.fileExists(atPath: snapshotFile.path)
+            review.sessions.perform(.open(duration: 60))
+            defer { review.sessions.end() }
 
             let sidecar = try DebugDrawerAppGroupStoreTransport(directory: appDirectory)
             let environment = try await sidecar.connect(
@@ -46,6 +50,7 @@
                 command: AccessibilityEnvironmentOverrides.Command.self
             )
             #expect(review.receiver.enabledCapabilities == [AccessibilityEnvironmentOverrides.pluginID])
+            #expect(!servedBeforeSession)
             #expect(environment.snapshot == AccessibilityEnvironmentOverrides.Snapshot())
         }
     }

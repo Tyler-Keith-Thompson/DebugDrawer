@@ -92,12 +92,6 @@
                 let sessionControl = try await sidecar.connect(
                     toPlugin: DebugDrawerSessions.pluginID, snapshot: DebugDrawerSessionState.self, command: DebugDrawerSessionCommand.self
                 )
-                let environment = try await sidecar.connect(
-                    toPlugin: AccessibilityEnvironmentOverrides.pluginID,
-                    snapshot: AccessibilityEnvironmentOverrides.Snapshot.self,
-                    command: AccessibilityEnvironmentOverrides.Command.self
-                )
-                var published = environment.snapshots().makeAsyncIterator()
                 var sessionStates = sessionControl.snapshots().makeAsyncIterator()
                 let expectedOverridden = AccessibilityEnvironmentOverrides.Snapshot(
                     dynamicTypeSize: .accessibility3, increaseContrast: true, reduceMotion: true
@@ -106,6 +100,13 @@
 
                 let before = try await read(under: overrides)
                 sessionControl.send(.open(duration: 60))
+                // Served once the session is open.
+                let environment = try await sidecar.connect(
+                    toPlugin: AccessibilityEnvironmentOverrides.pluginID,
+                    snapshot: AccessibilityEnvironmentOverrides.Snapshot.self,
+                    command: AccessibilityEnvironmentOverrides.Command.self
+                )
+                var published = environment.snapshots().makeAsyncIterator()
                 while let state = await sessionStates.next(), !state.isActive {}
                 environment.send(.setDynamicTypeSize(.accessibility3))
                 environment.send(.setIncreaseContrast(true))
@@ -119,19 +120,17 @@
                 }
                 let during = try await read(under: overrides)
                 sessionControl.send(.end)
-                var reverted: AccessibilityEnvironmentOverrides.Snapshot?
-                while let snapshot = await published.next() {
-                    if snapshot == AccessibilityEnvironmentOverrides.Snapshot() {
-                        reverted = snapshot
-                        break
-                    }
-                }
+                while let state = await sessionStates.next(), state.isActive {}
+                let reverted = overrides.snapshot
+                let snapshotFile = AppGroupStoreLayout(directory: receiver.appDirectory).snapshotFile(for: AccessibilityEnvironmentOverrides.pluginID)
+                let servedAfterSession = FileManager.default.fileExists(atPath: snapshotFile.path)
                 let after = try await read(under: overrides)
 
                 #expect(before == system)
                 #expect(overridden == expectedOverridden)
                 #expect(during == expectedDuring)
                 #expect(reverted == AccessibilityEnvironmentOverrides.Snapshot())
+                #expect(!servedAfterSession)
                 #expect(after == system)
                 #expect(sessions.auditLog.filter { $0.capability == AccessibilityEnvironmentOverrides.pluginID }.map(\.event) == [
                     .commandApplied, .commandApplied, .commandApplied, .changeReverted
@@ -174,18 +173,19 @@
             receiver.enable(.accessibilityEnvironmentOverrides(overrides))
             try receiver.start()
             defer { receiver.stop() }
-            let sidecar = try DebugDrawerAppGroupStoreTransport(directory: AppGroupStoreLayout.appDirectory(inStore: directory))
-            let environment = try await sidecar.connect(
-                toPlugin: AccessibilityEnvironmentOverrides.pluginID,
-                snapshot: AccessibilityEnvironmentOverrides.Snapshot.self,
-                command: AccessibilityEnvironmentOverrides.Command.self
-            )
+            // Outside a session the capability isn't served, so a sidecar can't connect to it: the
+            // command is left in the store as its transport would leave it.
+            let layout = AppGroupStoreLayout(directory: receiver.appDirectory)
+            let command = try StoreDocument(TransportMessage(
+                kind: .command, pluginID: AccessibilityEnvironmentOverrides.pluginID,
+                payload: TransportMessage.payload(AccessibilityEnvironmentOverrides.Command.setDynamicTypeSize(.accessibility5))
+            )).encoded()
             let (arrivals, arrival) = AsyncStream<DebugDrawerAuditEntry>.makeStream()
             let subscription = sessions.auditEntries.sink { arrival.yield($0) }
             defer { subscription.cancel() }
             let expected = DebugDrawerAuditEntry.Event.commandRefused(.noActiveSession)
 
-            environment.send(.setDynamicTypeSize(.accessibility5))
+            try layout.write(command, to: layout.commands.appending(path: "0.json"))
             var refusal: DebugDrawerAuditEntry?
             for await entry in arrivals where entry.capability == AccessibilityEnvironmentOverrides.pluginID {
                 refusal = entry

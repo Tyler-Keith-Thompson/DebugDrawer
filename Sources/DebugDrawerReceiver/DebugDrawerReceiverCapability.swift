@@ -42,6 +42,9 @@ public struct DebugDrawerReceiverCapability {
     let perform: @MainActor (_ payload: Data) -> DebugDrawerSessions.CommandOutcome
     /// The model's snapshots as JSON.
     let snapshots: @MainActor () -> AsyncStream<Data>
+    /// The model's snapshot now, as JSON, for the receiver to write at once as a session opens;
+    /// `nil` when it doesn't encode.
+    let currentSnapshot: @MainActor () -> Data?
     /// Told, as the receiver enables the capability, the file the receiver writes the snapshot to,
     /// for a model that must delete it itself, and how to apply a change the host asks for itself,
     /// through the receiver's gates and the sessions as a sidecar's command goes (it returns why the
@@ -98,7 +101,8 @@ public struct DebugDrawerReceiverCapability {
                 model.perform(command)
                 return .applied(changes: nil)
             },
-            snapshots: { encodedSnapshots(of: model) }
+            snapshots: { encodedSnapshots(of: model) },
+            currentSnapshot: { try? TransportMessage.payload(model.snapshot) }
         )
     }
 

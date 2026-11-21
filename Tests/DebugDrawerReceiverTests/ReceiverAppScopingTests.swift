@@ -106,6 +106,9 @@ struct ReceiverAppScopingTests {
         #expect(shopLayout.create())
         let shopSnapshot = shopLayout.snapshotFile(for: "LogLevel")
         let watcher = try #require(DirectoryWatcher(directory: shopLayout.snapshots))
+        // The shop's own session, so its capability is served: the wallet's command, had it reached
+        // the shop, would be refused as one more session and audited.
+        shopSessions.perform(.open(duration: 60))
 
         try sut.start()
         if !FileManager.default.fileExists(atPath: shopSnapshot.path) {
@@ -122,8 +125,7 @@ struct ReceiverAppScopingTests {
         let appDirectories = try FileManager.default.contentsOfDirectory(atPath: AppGroupStoreLayout.appsDirectory(inStore: store).path).sorted()
 
         #expect(walletFilesAfter == walletFilesBefore)
-        #expect(shopSessions.auditLog.isEmpty)
-        #expect(!shopSessions.snapshot.isActive)
+        #expect(shopSessions.auditLog.count == 1)
         #expect(servedSnapshot == LogLevelModel.Snapshot(level: "info"))
         #expect(appsInStore == ["apps"])
         #expect(appDirectories == ["com.example.shop", "com.example.wallet"])

@@ -23,9 +23,10 @@ import os
 // session while none is enabled, each logged and audited; a command to an enabled one goes
 // through the sessions, which apply it only within an open session. A command decodes into its
 // capability's own `Command` type or is refused as malformed: nothing received is run or
-// evaluated. A snapshot is what the capability's model put in it, nothing more, and the receiver
-// removes, as it starts, every snapshot file that isn't the sessions' or an enabled capability's,
-// so a capability enabled in an earlier launch shows nothing once it isn't.
+// evaluated. A snapshot is what the capability's model put in it, nothing more, and it is in the
+// store only while a session is open whose grant, if it needs one, lists the capability
+// (DebugDrawerReceiver+SessionServing.swift); the receiver removes, as it starts and stops, every
+// snapshot file but the sessions', so nothing an earlier launch wrote stays readable.
 //
 // Commands left while the app was not running are performed as it starts, those left while it was
 // suspended as it comes back to the foreground, then each as its file lands (DirectoryWatcher).
@@ -58,6 +59,13 @@ import os
 /// and any command outside a session is refused, logged and written to the sessions' audit log.
 /// Sessions made with a ``DebugDrawerGrantPolicy`` also need a signed grant for each session, and
 /// one that lists each capability a command is for.
+///
+/// A capability's snapshot is served only while a session is open: outside one, the store holds
+/// the app's presence file and the sessions' snapshot, and nothing a capability holds. Under a
+/// grant policy, or for a capability marked `requiringGrant()`, a session reads only the
+/// snapshots of the capabilities its grant lists. Each snapshot leaves the store as the session
+/// ends or expires, as a gate turns off, as the receiver stops, and, for what a killed launch
+/// left, as the next launch starts it.
 /// Show your own indicator while ``DebugDrawerSessions/snapshot`` is active.
 ///
 /// To turn it off for everyone without a release, give it a gate, ``isAllowed``, backed by your
@@ -88,7 +96,8 @@ public final class DebugDrawerReceiver {
     }
 
     var capabilities: [String: DebugDrawerReceiverCapability] = [:]
-    /// Writes each served model's snapshots, by ID, while the receiver runs.
+    /// Writes each served model's snapshots, by ID, while the receiver runs: the sessions' always,
+    /// a capability's while the gates and the open session let a sidecar read it.
     var writing: [String: Task<Void, Never>] = [:]
     private var watcher: DirectoryWatcher?
     private var performing: Task<Void, Never>?
@@ -141,7 +150,10 @@ public final class DebugDrawerReceiver {
         // The sessions record each entry on the main actor, as it happens, so the record follows
         // each revert before the next command.
         reverted = sessions.auditEntries.sink { [weak self] entry in
-            MainActor.assumeIsolated { self?.noteReverted(entry) }
+            MainActor.assumeIsolated {
+                self?.noteReverted(entry)
+                self?.noteSessionChange(entry)
+            }
         }
     }
 
@@ -170,7 +182,7 @@ public final class DebugDrawerReceiver {
         watcher != nil
     }
 
-    /// Lets a sidecar read `capability` and, within a session, drive it, in place of any capability
+    /// Lets a sidecar, within a session, read `capability` and drive it, in place of any capability
     /// enabled under its ID before.
     ///
     /// - Parameter capability: What to allow.
@@ -192,9 +204,11 @@ public final class DebugDrawerReceiver {
         presence?.update(capabilities: servedIDs)
     }
 
-    /// Writes the sessions' and each enabled capability's snapshot, performs the commands waiting in
-    /// the store, and goes on doing both as they change, and as the app comes back to the
-    /// foreground, all in the app's own directory of the store, ``appDirectory``. It also keeps a
+    /// Writes the sessions' snapshot, and each enabled capability's while a session is open that may
+    /// read it, performs the commands waiting in the store, and goes on doing both as they change,
+    /// and as the app comes back to the foreground, all in the app's own directory of the store,
+    /// ``appDirectory``. It first removes every capability snapshot a launch before this one left
+    /// there, one killed during a session included. It also keeps a
     /// presence file there, the app's bundle ID, name, version and build, the IDs it serves and
     /// the protocol version it speaks, so a sidecar built on `DebugDrawerSidecarKit` lists the
     /// app. Does nothing while the receiver runs.
@@ -205,16 +219,14 @@ public final class DebugDrawerReceiver {
         guard watcher == nil else { return }
         let layout = layout
         guard layout.create(), let watcher = DirectoryWatcher(directory: layout.commands) else { throw .cannotServe }
+        // Before anything is served: what a killed launch's session left must not be read in this one.
         layout.removeCutOffSnapshots()
-        removeSnapshotsNotServed()
+        removeCapabilitySnapshots()
         self.watcher = watcher
         serve(DebugDrawerSessions.pluginID, encodedSnapshots(of: sessions))
         paused = []
-        for (id, capability) in capabilities {
-            serve(id, capability.snapshots())
-        }
-        // Before any of those writes runs: they wait for the main actor. It performs the commands
-        // left while the receiver was stopped first, each in the session it was sent in.
+        // Performs the commands left while the receiver was stopped first, each in the session it
+        // was sent in, then serves each capability the gates and the open session allow.
         reevaluateGates()
         performing = Task { [weak self] in
             for await _ in watcher.changes {
@@ -230,13 +242,14 @@ public final class DebugDrawerReceiver {
             }
         }
         presence = PresenceAnnouncement(
-            directory: appDirectory, identity: identity, capabilities: servedIDs, foreground: Self.foreground, center: notificationCenter
+            directory: appDirectory, identity: identity, capabilities: servedIDs, servesInSessionsOnly: true,
+            foreground: Self.foreground, center: notificationCenter
         )
     }
 
-    /// Stops writing snapshots and performing commands. The snapshots written stay in the store, and
-    /// commands left meanwhile wait for the next start; the app's presence file goes, so a
-    /// sidecar no longer lists it.
+    /// Stops writing snapshots and performing commands. The capabilities' snapshots leave the store
+    /// (the sessions' stays), and commands left meanwhile wait for the next start; the app's
+    /// presence file goes, so a sidecar no longer lists it.
     public func stop() {
         presence?.withdraw()
         presence = nil
@@ -248,6 +261,7 @@ public final class DebugDrawerReceiver {
             task.cancel()
         }
         writing = [:]
+        removeCapabilitySnapshots()
         watcher?.cancel()
         watcher = nil
         performing?.cancel()
@@ -336,27 +350,13 @@ public final class DebugDrawerReceiver {
         }
     }
 
-    /// Writes the snapshots `snapshots` delivers to `id`'s file, in place of any written for it
-    /// before.
-    func serve(_ id: String, _ snapshots: AsyncStream<Data>) {
-        writing[id]?.cancel()
-        let layout = layout
-        let file = layout.snapshotFile(for: id)
-        writing[id] = Task { [weak self] in
-            for await payload in snapshots {
-                // A gate turned off since the receiver last asked: stop now rather than write, once
-                // the commands waiting are performed in their session (reevaluateGates()).
-                guard let self, servesSnapshot(of: id) else {
-                    self?.reevaluateGates()
-                    return
-                }
-                let document = StoreDocument(TransportMessage(kind: .snapshot, pluginID: id, payload: payload))
-                do {
-                    try layout.write(document.encoded(), to: file)
-                } catch {
-                    Self.logger.error("Couldn't write \(id, privacy: .public)'s snapshot: \(error.localizedDescription, privacy: .public)")
-                }
-            }
+    /// Writes `payload` as `id`'s snapshot to `file`, logging a failure.
+    func write(_ payload: Data, of id: String, to file: URL, in layout: AppGroupStoreLayout) {
+        let document = StoreDocument(TransportMessage(kind: .snapshot, pluginID: id, payload: payload))
+        do {
+            try layout.write(document.encoded(), to: file)
+        } catch {
+            Self.logger.error("Couldn't write \(id, privacy: .public)'s snapshot: \(error.localizedDescription, privacy: .public)")
         }
     }
 
@@ -365,14 +365,6 @@ public final class DebugDrawerReceiver {
     var servedIDs: [String] {
         guard isAllowed() else { return [] }
         return [DebugDrawerSessions.pluginID] + capabilities.keys.filter { !paused.contains($0) }
-    }
-
-    /// Removes every snapshot file that is neither the sessions' nor an enabled capability's.
-    private func removeSnapshotsNotServed() {
-        let served = Set(([DebugDrawerSessions.pluginID] + capabilities.keys).map { layout.snapshotFile(for: $0).lastPathComponent })
-        for file in layout.messageFiles(in: layout.snapshots) where !served.contains(file.lastPathComponent) {
-            try? FileManager.default.removeItem(at: file)
-        }
     }
 
     /// What the system posts as the app comes to the foreground: on the Mac, where apps aren't

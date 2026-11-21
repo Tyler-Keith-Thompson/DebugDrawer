@@ -73,6 +73,12 @@
             let sessionControl = try await sidecar.connect(
                 toPlugin: DebugDrawerSessions.pluginID, snapshot: DebugDrawerSessionState.self, command: DebugDrawerSessionCommand.self
             )
+            let sessionStates = sessionControl.snapshots()
+            sessionControl.send(.open(duration: 60))
+            for await state in sessionStates where state.isActive {
+                break
+            }
+            // Served only within the session.
             let actions = try await sidecar.connect(
                 toPlugin: DebugDrawerAuthActions.pluginID,
                 snapshot: DebugDrawerAuthActions.Snapshot.self,
@@ -81,11 +87,6 @@
             var arrivals = actions.snapshots().makeAsyncIterator()
             var received: [DebugDrawerAuthActions.Snapshot] = []
             var sent: [DebugDrawerAuthActions.Command] = []
-            let sessionStates = sessionControl.snapshots()
-            sessionControl.send(.open(duration: 60))
-            for await state in sessionStates where state.isActive {
-                break
-            }
             // Each request, then the snapshot holding its outcome: expire, refresh, log out, and a
             // refresh once signed out, which fails.
             let requests = ["expire-access-token", "force-refresh", "log-out", "force-refresh"]

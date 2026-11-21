@@ -61,9 +61,6 @@
             let sessionControl = try await sidecar.connect(
                 toPlugin: DebugDrawerSessions.pluginID, snapshot: DebugDrawerSessionState.self, command: DebugDrawerSessionCommand.self
             )
-            let mocks = try await sidecar.connect(
-                toPlugin: NetworkMocking.pluginID, snapshot: NetworkMocking.Snapshot.self, command: NetworkMocking.Command.self
-            )
             let (arrivals, arrival) = AsyncStream<DebugDrawerAuditEntry>.makeStream()
             let subscription = app.sessions.auditEntries.sink { arrival.yield($0) }
             defer { subscription.cancel() }
@@ -71,6 +68,10 @@
             let url = try #require(URL(string: "https://api.example.com/v1/orders/42"))
 
             sessionControl.send(.open(duration: 15 * 60, grant: grantFromServer))
+            // Served once the session is open.
+            let mocks = try await sidecar.connect(
+                toPlugin: NetworkMocking.pluginID, snapshot: NetworkMocking.Snapshot.self, command: NetworkMocking.Command.self
+            )
             _ = await recorded.next()
             // In the sidecar, once its session is open:
             mocks.send(.setRules([NetworkMockRule(

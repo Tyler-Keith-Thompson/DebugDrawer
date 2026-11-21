@@ -69,12 +69,13 @@
             let sessionControl = try await sidecar.connect(
                 toPlugin: DebugDrawerSessions.pluginID, snapshot: DebugDrawerSessionState.self, command: DebugDrawerSessionCommand.self
             )
+
+            sessionControl.send(.open(duration: 60))
+            // Served once the session is open.
             let reset = try await sidecar.connect(
                 toPlugin: AppStateResetRequests.pluginID, snapshot: AppStateResetRequests.Snapshot.self, command: AppStateResetRequests.Command.self
             )
             var arrivals = reset.snapshots().makeAsyncIterator()
-
-            sessionControl.send(.open(duration: 60))
             while let snapshot = await arrivals.next(), snapshot.sessionID == nil {}
             reset.send(.refresh)
             var listed: AppStateResetRequests.Snapshot?
@@ -243,12 +244,13 @@
                 let sessionControl = try await sidecar.connect(
                     toPlugin: DebugDrawerSessions.pluginID, snapshot: DebugDrawerSessionState.self, command: DebugDrawerSessionCommand.self
                 )
+                sessionControl.send(.open(duration: 60))
+                // Served once the session is open.
                 let reset = try await sidecar.connect(
                     toPlugin: AppStateResetRequests.pluginID,
                     snapshot: AppStateResetRequests.Snapshot.self,
                     command: AppStateResetRequests.Command.self
                 )
-                sessionControl.send(.open(duration: 60))
                 reset.send(.refresh)
                 for await snapshot in model.$snapshot.values where snapshot.listing != nil {
                     break

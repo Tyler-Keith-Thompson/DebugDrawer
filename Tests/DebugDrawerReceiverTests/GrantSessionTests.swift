@@ -165,9 +165,13 @@
             let sessionControl = try await sidecar.connect(
                 toPlugin: sessionsID, snapshot: DebugDrawerSessionState.self, command: DebugDrawerSessionCommand.self
             )
-            let flagControl = try await sidecar.connect(
-                toPlugin: flagsID, snapshot: DebugDrawerFeatureFlagOverrides.Snapshot.self, command: DebugDrawerFeatureFlagOverrides.Command.self
-            )
+            // No session opens, so the flags aren't served and a sidecar can't connect to them:
+            // the command is left in the store as its transport would leave it.
+            let layout = AppGroupStoreLayout(directory: receiver.appDirectory)
+            let flagCommand = try StoreDocument(TransportMessage(
+                kind: .command, pluginID: flagsID,
+                payload: TransportMessage.payload(DebugDrawerFeatureFlagOverrides.Command.setOverride(key: "new-checkout", value: .bool(true)))
+            )).encoded()
             let (arrivals, arrival) = AsyncStream<DebugDrawerAuditEntry>.makeStream()
             let subscription = sessions.auditEntries.sink { arrival.yield($0) }
             defer { subscription.cancel() }
@@ -179,7 +183,7 @@
 
             sessionControl.send(.open(duration: 300, grant: token))
             let first = await recorded.next()
-            flagControl.send(.setOverride(key: "new-checkout", value: .bool(true)))
+            try layout.write(flagCommand, to: layout.commands.appending(path: "flag.json"))
             let second = await recorded.next()
 
             #expect([first, second] == expected)
@@ -220,9 +224,6 @@
             let sessionControl = try await sidecar.connect(
                 toPlugin: sessionsID, snapshot: DebugDrawerSessionState.self, command: DebugDrawerSessionCommand.self
             )
-            let flagControl = try await sidecar.connect(
-                toPlugin: flagsID, snapshot: DebugDrawerFeatureFlagOverrides.Snapshot.self, command: DebugDrawerFeatureFlagOverrides.Command.self
-            )
             let (arrivals, arrival) = AsyncStream<DebugDrawerAuditEntry>.makeStream()
             let subscription = sessions.auditEntries.sink { arrival.yield($0) }
             defer { subscription.cancel() }
@@ -237,6 +238,10 @@
 
             sessionControl.send(.open(duration: 900, grant: token))
             let opened = await recorded.next()
+            // Served once the session is open.
+            let flagControl = try await sidecar.connect(
+                toPlugin: flagsID, snapshot: DebugDrawerFeatureFlagOverrides.Snapshot.self, command: DebugDrawerFeatureFlagOverrides.Command.self
+            )
             flagControl.send(.setOverride(key: "new-checkout", value: .bool(true)))
             let applied = await recorded.next()
             var seen: DebugDrawerSessionState?
@@ -335,12 +340,12 @@
             let sessionControl = try await sidecar.connect(
                 toPlugin: sessionsID, snapshot: DebugDrawerSessionState.self, command: DebugDrawerSessionCommand.self
             )
-            let flagControl = try await sidecar.connect(
-                toPlugin: flagsID, snapshot: DebugDrawerFeatureFlagOverrides.Snapshot.self, command: DebugDrawerFeatureFlagOverrides.Command.self
-            )
-            let logControl = try await sidecar.connect(
-                toPlugin: "MyApp.LogLevels", snapshot: LogLevelModel.Snapshot.self, command: LogLevelModel.Command.self
-            )
+            // The grant doesn't list the log levels, so they aren't served and a sidecar can't
+            // connect to them: the command is left in the store as its transport would leave it.
+            let layout = AppGroupStoreLayout(directory: receiver.appDirectory)
+            let logCommand = try StoreDocument(TransportMessage(
+                kind: .command, pluginID: "MyApp.LogLevels", payload: TransportMessage.payload(LogLevelModel.Command.set("debug"))
+            )).encoded()
             let (arrivals, arrival) = AsyncStream<DebugDrawerAuditEntry>.makeStream()
             let subscription = sessions.auditEntries.sink { arrival.yield($0) }
             defer { subscription.cancel() }
@@ -349,8 +354,12 @@
 
             sessionControl.send(.open(duration: 300, grant: token))
             _ = await recorded.next()
-            logControl.send(.set("debug"))
+            try layout.write(logCommand, to: layout.commands.appending(path: "log.json"))
             let refused = await recorded.next()
+            // Served once the session, whose grant lists them, is open.
+            let flagControl = try await sidecar.connect(
+                toPlugin: flagsID, snapshot: DebugDrawerFeatureFlagOverrides.Snapshot.self, command: DebugDrawerFeatureFlagOverrides.Command.self
+            )
             flagControl.send(.setOverride(key: "new-checkout", value: .bool(true)))
             let applied = await recorded.next()
 
@@ -389,9 +398,6 @@
             let sessionControl = try await sidecar.connect(
                 toPlugin: sessionsID, snapshot: DebugDrawerSessionState.self, command: DebugDrawerSessionCommand.self
             )
-            let flagControl = try await sidecar.connect(
-                toPlugin: flagsID, snapshot: DebugDrawerFeatureFlagOverrides.Snapshot.self, command: DebugDrawerFeatureFlagOverrides.Command.self
-            )
             let (arrivals, arrival) = AsyncStream<DebugDrawerAuditEntry>.makeStream()
             let subscription = sessions.auditEntries.sink { arrival.yield($0) }
             defer { subscription.cancel() }
@@ -400,6 +406,10 @@
 
             sessionControl.send(.open(duration: 600, grant: token))
             let opened = await recorded.next()
+            // Served once the session is open.
+            let flagControl = try await sidecar.connect(
+                toPlugin: flagsID, snapshot: DebugDrawerFeatureFlagOverrides.Snapshot.self, command: DebugDrawerFeatureFlagOverrides.Command.self
+            )
             clock.set(expiry)
             flagControl.send(.setOverride(key: "new-checkout", value: .bool(true)))
             let ended = await recorded.next()
@@ -482,9 +492,6 @@
             let sessionControl = try await sidecar.connect(
                 toPlugin: sessionsID, snapshot: DebugDrawerSessionState.self, command: DebugDrawerSessionCommand.self
             )
-            let flagControl = try await sidecar.connect(
-                toPlugin: flagsID, snapshot: DebugDrawerFeatureFlagOverrides.Snapshot.self, command: DebugDrawerFeatureFlagOverrides.Command.self
-            )
             let (arrivals, arrival) = AsyncStream<DebugDrawerAuditEntry>.makeStream()
             let subscription = sessions.auditEntries.sink { arrival.yield($0) }
             defer { subscription.cancel() }
@@ -492,6 +499,10 @@
 
             sessionControl.send(.open(duration: 60))
             let opened = await recorded.next()
+            // Served once the session is open.
+            let flagControl = try await sidecar.connect(
+                toPlugin: flagsID, snapshot: DebugDrawerFeatureFlagOverrides.Snapshot.self, command: DebugDrawerFeatureFlagOverrides.Command.self
+            )
             flagControl.send(.setOverride(key: "new-checkout", value: .bool(true)))
             let applied = await recorded.next()
             sessionControl.send(.end)
@@ -547,23 +558,26 @@
             let plainControl = try await plainSidecar.connect(
                 toPlugin: sessionsID, snapshot: DebugDrawerSessionState.self, command: DebugDrawerSessionCommand.self
             )
-            let plainLog = try await plainSidecar.connect(
-                toPlugin: "MyApp.LogLevels", snapshot: LogLevelModel.Snapshot.self, command: LogLevelModel.Command.self
-            )
+            // Without a grant the log levels aren't served, so a sidecar can't connect to them: the
+            // command is left in the store as its transport would leave it.
+            let plainLayout = AppGroupStoreLayout(directory: plainReceiver.appDirectory)
+            let plainCommand = try StoreDocument(TransportMessage(
+                kind: .command, pluginID: "MyApp.LogLevels", payload: TransportMessage.payload(LogLevelModel.Command.set("debug"))
+            )).encoded()
             let grantedSidecar = try DebugDrawerAppGroupStoreTransport(directory: AppGroupStoreLayout.appDirectory(inStore: withDirectory))
             let grantedControl = try await grantedSidecar.connect(
                 toPlugin: sessionsID, snapshot: DebugDrawerSessionState.self, command: DebugDrawerSessionCommand.self
             )
-            let grantedLog = try await grantedSidecar.connect(
-                toPlugin: "MyApp.LogLevels", snapshot: LogLevelModel.Snapshot.self, command: LogLevelModel.Command.self
-            )
 
             plainControl.send(.open(duration: 60))
             _ = await recorded.next()
-            plainLog.send(.set("debug"))
+            try plainLayout.write(plainCommand, to: plainLayout.commands.appending(path: "log.json"))
             let refused = await recorded.next()
             grantedControl.send(.open(duration: 60, grant: token))
             _ = await recorded.next()
+            let grantedLog = try await grantedSidecar.connect(
+                toPlugin: "MyApp.LogLevels", snapshot: LogLevelModel.Snapshot.self, command: LogLevelModel.Command.self
+            )
             grantedLog.send(.set("debug"))
             let applied = await recorded.next()
 

@@ -340,14 +340,15 @@
             let session = try await sidecar.connect(
                 toPlugin: DebugDrawerSessions.pluginID, snapshot: DebugDrawerSessionState.self, command: DebugDrawerSessionCommand.self
             )
+            let expectedEvents: [DebugDrawerAuditEntry.Event] = [.commandApplied, .changeReverted, .sessionEnded(.disabledByHost)]
+
+            session.send(.open(duration: 60))
+            // Served once the session is open.
             let overrides = try await sidecar.connect(
                 toPlugin: DebugDrawerFeatureFlagOverrides.pluginID,
                 snapshot: DebugDrawerFeatureFlagOverrides.Snapshot.self,
                 command: DebugDrawerFeatureFlagOverrides.Command.self
             )
-            let expectedEvents: [DebugDrawerAuditEntry.Event] = [.commandApplied, .changeReverted, .sessionEnded(.disabledByHost)]
-
-            session.send(.open(duration: 60))
             for await state in session.snapshots() where state.isActive {
                 break
             }
@@ -378,14 +379,15 @@
             let session = try await sidecar.connect(
                 toPlugin: DebugDrawerSessions.pluginID, snapshot: DebugDrawerSessionState.self, command: DebugDrawerSessionCommand.self
             )
+            let expectedEvents: [DebugDrawerAuditEntry.Event] = [.commandApplied, .changeReverted, .sessionEnded(.ended)]
+
+            session.send(.open(duration: 60))
+            // Served once the session is open.
             let overrides = try await sidecar.connect(
                 toPlugin: DebugDrawerFeatureFlagOverrides.pluginID,
                 snapshot: DebugDrawerFeatureFlagOverrides.Snapshot.self,
                 command: DebugDrawerFeatureFlagOverrides.Command.self
             )
-            let expectedEvents: [DebugDrawerAuditEntry.Event] = [.commandApplied, .changeReverted, .sessionEnded(.ended)]
-
-            session.send(.open(duration: 60))
             for await state in session.snapshots() where state.isActive {
                 break
             }

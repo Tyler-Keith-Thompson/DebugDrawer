@@ -60,10 +60,13 @@ public struct DebugDrawerSession: Codable, Equatable, Sendable {
     }
 }
 
-// The sessions check a grant only against commands; a capability whose point is what it serves
-// (push registration, app state, analytics events, MetricKit payloads) asks this before serving a
-// session anything, so a grant meant for one capability doesn't expose another's data. Without a
-// grant (no policy) every session is served, as every command in one is applied.
+// The sessions check a grant only against commands. The receiver asks this before it writes any
+// capability's snapshot to the store (DebugDrawerReceiver+SessionServing.swift), so a grant meant
+// for one capability doesn't expose another's data; a capability whose point is what it collects
+// for a session (push registration, app state, analytics events, MetricKit payloads) also asks it
+// before collecting anything, as it may be served by something other than a receiver. Without a
+// grant (no policy) every session is served, as every command in one is applied, unless the
+// capability requires a grant.
 extension DebugDrawerSession {
     /// Whether `capability` may serve this session what it holds: always for a session without a
     /// grant, and otherwise only when its grant lists `capability`.
@@ -71,7 +74,19 @@ extension DebugDrawerSession {
     /// - Parameter capability: The ID the capability's model is served under.
     /// - Returns: Whether to serve the session.
     package func allows(_ capability: String) -> Bool {
-        grant.map { $0.capabilities.contains(capability) } ?? true
+        allows(capability, requiringGrant: false)
+    }
+
+    /// Whether `capability` may serve this session what it holds, for a capability that may need
+    /// a grant even without a policy (`requiringGrant()`): only when the session's grant lists
+    /// `capability`, and for a session without a grant only when `requiresGrant` is `false`.
+    ///
+    /// - Parameters:
+    ///   - capability: The ID the capability's model is served under.
+    ///   - requiresGrant: Whether the capability needs a grant listing it in every session.
+    /// - Returns: Whether to serve the session.
+    package func allows(_ capability: String, requiringGrant requiresGrant: Bool) -> Bool {
+        grant.map { $0.capabilities.contains(capability) } ?? !requiresGrant
     }
 }
 
