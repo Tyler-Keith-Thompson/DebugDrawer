@@ -165,6 +165,7 @@
             // Here rather than at the property: `self` can't be passed until every property is set.
             detachedPresentation.drawer = self
             toastExpiry = expireToasts(on: toastScheduler)
+            Self.track(self)
         }
 
         // MARK: - Global

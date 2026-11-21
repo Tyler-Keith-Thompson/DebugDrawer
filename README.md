@@ -259,7 +259,9 @@ is closed; tapping it opens the drawer with that plugin expanded and scrolled in
 close button dismisses it. Posts from one plugin coalesce into one toast that shows the latest
 message and how many posts it stands for; a post while the drawer is open is dropped. The toast goes
 away by itself `DebugDrawer.toastLifetime` (6) seconds after its last post, and stays while the
-pointer is over it or VoiceOver's focus is on it. To quiet a
+pointer is over it or VoiceOver's focus is on it. A plugin's badges and toasts go to each drawer
+that holds it (`DebugDrawer.shared`, or a `DebugDrawer()` of your own), and to `shared` while none
+does. To quiet a
 plugin that posts too often, choose Silence Notices from its section header's context menu: its
 badge and toast go away, what it posts afterwards is dropped, and a crossed-out bell marks its
 header until Allow Notices. The choice is remembered across launches;

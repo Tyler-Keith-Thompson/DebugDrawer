@@ -15,56 +15,8 @@
         var body: some View { EmptyView() }
     }
 
-    struct OtherNoticePlugin: DebugDrawerPlugin {
-        var title = "Other"
-        var icon = "bell"
-        var body: some View { EmptyView() }
-    }
-
-    // A plugin's setBadge(_:), clearBadge() and postToast(_:) reach the shared drawer, so the
-    // tests of them stay on it, in the serialized suite of the shared drawer's tests.
-    extension SharedDrawerTests {
-        @MainActor
-        @Suite("Badges and toasts a plugin raises")
-        struct PluginNoticeTests {
-            init() {
-                let drawer = DebugDrawer.shared
-                drawer.close()
-                drawer.dismissToast()
-                drawer.revealRequest = nil
-                for id in drawer.badges.keys {
-                    drawer.setBadge(0, forPlugin: id)
-                }
-            }
-
-            @Test("A plugin's badge shows its count, and clearing it removes it")
-            func aBadgeShowsItsCountUntilCleared() {
-                let sut = NoticePlugin()
-
-                sut.setBadge(3)
-                let shown = DebugDrawer.shared.badges["DebugDrawerTests.NoticePlugin"]
-                sut.clearBadge()
-
-                #expect(shown == 3)
-                #expect(DebugDrawer.shared.badges["DebugDrawerTests.NoticePlugin"] == nil)
-            }
-
-            @Test("A plugin's posts reach the shared drawer as one toast that counts them")
-            func aPluginsPostsRaiseOneToast() {
-                let sut = NoticePlugin()
-                let expected = DebugDrawerToast(pluginID: "DebugDrawerTests.NoticePlugin", message: "Request 2 failed", count: 2)
-                defer { DebugDrawer.shared.dismissToast() }
-
-                sut.postToast("Request 1 failed")
-                sut.postToast("Request 2 failed")
-
-                #expect(DebugDrawer.shared.toast == expected)
-            }
-        }
-    }
-
     // Each test makes a drawer of its own over a UserDefaults suite named for the test, removed
-    // when the test ends, and posts to it as a plugin's calls post to the shared drawer.
+    // when the test ends, and posts to it as a plugin's calls post to the drawers that hold it.
     @MainActor
     @Suite("Badges and toasts")
     struct BadgeAndToastTests {

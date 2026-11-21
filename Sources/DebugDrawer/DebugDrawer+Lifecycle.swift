@@ -57,7 +57,7 @@
         }
 
         /// The plugin the drawer holds under `id`: the global one, or else the first local one.
-        private func registeredPlugin(id: String) -> AnyDebugDrawerPlugin? {
+        func registeredPlugin(id: String) -> AnyDebugDrawerPlugin? {
             globalPlugins.first { $0.id == id } ?? localRegistrations.first { $0.plugin.id == id }?.plugin
         }
     }

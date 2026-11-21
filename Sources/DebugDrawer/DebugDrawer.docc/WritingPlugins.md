@@ -110,7 +110,10 @@ a count on its header until ``DebugDrawerPlugin/clearBadge()``, and
 ``DebugDrawerPlugin/postToast(_:)`` shows a toast in the window's corner that opens the drawer at
 the plugin when tapped. Posts from one plugin coalesce into one toast that counts them, and the
 toast goes away by itself ``DebugDrawer/DebugDrawer/toastLifetime`` seconds after the last post,
-staying while the pointer is over it or accessibility focus is on it. These are methods on the
+staying while the pointer is over it or accessibility focus is on it. They reach every drawer
+that holds the plugin, globally or locally: ``DebugDrawer/DebugDrawer/shared`` for a plugin
+installed there, a `DebugDrawer()` of your own for one installed in it, and both for one in both.
+A plugin no drawer holds yet posts to ``DebugDrawer/DebugDrawer/shared``. These are methods on the
 plugin, so they compile in release, where they do nothing.
 
 ```swift
