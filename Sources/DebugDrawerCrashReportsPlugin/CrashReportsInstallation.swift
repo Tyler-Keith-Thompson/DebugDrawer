@@ -18,9 +18,7 @@
         private static var diagnostics: (any CrashDiagnosticSource)?
 
         static func install(directory: URL) {
-            let store = CrashReportStore(directory: directory) { count in
-                DebugDrawer.shared.setBadge(count, forPlugin: CrashReportsPlugin.pluginID)
-            }
+            let store = CrashReportStore(directory: directory)
             // The last run's crash is read before the handlers are installed, so this run's
             // crash can't overwrite it.
             let collected = store.collectCrashFile()
@@ -29,25 +27,28 @@
             // stops the handlers, then this one's install starts them over its own file.
             DebugDrawer.shared.unregisterGlobal(id: plugin.id)
             DebugDrawer.shared.registerGlobal(plugin)
-            plugin.setBadge(store.unseenCount)
             if let collected {
                 plugin.postToast("The app crashed last time: \(collected.title)")
             }
         }
 
-        /// Captures crashes into `store`'s directory while `drawer` holds the plugin; the first
-        /// drawer installs the handlers and subscribes to MetricKit.
+        /// Captures crashes into `store`'s directory while `drawer` holds the plugin, and badges
+        /// `drawer` with its unseen reports; the first drawer installs the handlers and subscribes
+        /// to MetricKit.
         static func start(_ store: CrashReportStore, in drawer: DebugDrawer) {
             stores[ObjectIdentifier(drawer)] = store
             store.load()
+            store.badge.show(store.unseenCount, in: drawer)
             capture(into: store)
         }
 
-        /// Stops what ``start(_:in:)`` began for `drawer`, and drops `store`'s reports from
-        /// memory unless another drawer shows them; the last drawer puts the handlers back and
-        /// unsubscribes from MetricKit. A drawer that isn't capturing changes nothing.
+        /// Stops what ``start(_:in:)`` began for `drawer`, clearing its badge there, and drops
+        /// `store`'s reports from memory unless another drawer shows them; the last drawer puts
+        /// the handlers back and unsubscribes from MetricKit. A drawer that isn't capturing
+        /// changes nothing.
         static func stop(_ store: CrashReportStore, from drawer: DebugDrawer) {
             guard stores.removeValue(forKey: ObjectIdentifier(drawer)) != nil else { return }
+            store.badge.remove(from: drawer)
             if !stores.values.contains(where: { $0 === store }) {
                 store.unload()
             }

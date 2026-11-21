@@ -30,6 +30,40 @@
             #expect(counts == [1, 0])
         }
 
+        // No test in this process installs Analytics on the shared drawer (the install tests run
+        // in child processes), so reading its badge here sees only what this test's plugin did.
+        @Test("Installed only in a drawer of its own, the plugin badges that drawer as its unseen count changes, and never the shared one")
+        func badgesItsOwnDrawer() throws {
+            let suite = "AnalyticsLifecycleTests.badgesItsOwnDrawer.\(UUID().uuidString)"
+            let defaults = try #require(UserDefaults(suiteName: suite))
+            defer { defaults.removePersistentDomain(forName: suite) }
+            let drawer = DebugDrawer(defaults: defaults)
+            let log = AnalyticsEventLog(capacity: 10)
+            log.record(name: "launched", properties: [:], source: nil)
+            let model = AnalyticsEventsModel(log: log)
+            let sut = AnalyticsPlugin(model: model)
+            let beforeInstall = drawer.badges[sut.id]
+
+            drawer.registerGlobal(sut)
+            let installed = drawer.badges[sut.id]
+            log.record(name: "purchase", properties: [:], source: nil)
+            // What the log's observer does on the main actor after the event; called here so the
+            // test needn't wait for it.
+            model.reload()
+            let changed = drawer.badges[sut.id]
+            let sharedWhileInstalled = DebugDrawer.shared.badges[sut.id]
+            drawer.unregisterGlobal(id: sut.id)
+            log.record(name: "after", properties: [:], source: nil)
+            model.reload()
+
+            #expect(beforeInstall == nil)
+            #expect(installed == 1)
+            #expect(changed == 2)
+            #expect(sharedWhileInstalled == nil)
+            #expect(drawer.badges[sut.id] == nil)
+            #expect(DebugDrawer.shared.badges[sut.id] == nil)
+        }
+
         @Test("Registering the plugin again reads the log again, events recorded meanwhile included")
         func reinstallReadsAgain() throws {
             let suite = "AnalyticsLifecycleTests.\(UUID().uuidString)"

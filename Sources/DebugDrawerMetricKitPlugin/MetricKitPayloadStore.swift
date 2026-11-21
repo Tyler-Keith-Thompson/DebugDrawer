@@ -24,13 +24,16 @@
         private(set) var isLoaded = true
         /// Called with the number of unseen payloads whenever the payloads change.
         private let onUnseenCountChange: @MainActor (Int) -> Void
+        /// The plugin's badge, counting the unseen payloads in each drawer that installed the
+        /// plugin over this store.
+        let badge = DebugDrawerPluginBadge(pluginID: MetricKitPlugin.pluginID)
 
         /// The payloads kept in `directory`, which is created if missing.
         ///
         /// - Parameters:
         ///   - directory: Where the payloads live.
         ///   - onUnseenCountChange: Called with the number of unseen payloads whenever the
-        ///     payloads change: the plugin's badge.
+        ///     payloads change, after ``badge`` shows it.
         init(directory: URL, onUnseenCountChange: @escaping @MainActor (Int) -> Void = { _ in }) {
             self.directory = directory
             self.onUnseenCountChange = onUnseenCountChange
@@ -122,6 +125,7 @@
 
         private func update(_ newPayloads: [MetricKitPayload]) {
             payloads = newPayloads
+            badge.update(unseenCount)
             onUnseenCountChange(unseenCount)
         }
 

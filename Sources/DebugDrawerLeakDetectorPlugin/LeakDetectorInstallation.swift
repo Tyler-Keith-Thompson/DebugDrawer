@@ -10,18 +10,14 @@
     @MainActor
     enum LeakDetectorInstallation {
         /// The suspects the drawer shows, made with the monitor.
-        static let store = LeakStore { count in
-            if isInstalled {
-                DebugDrawer.shared.setBadge(count, forPlugin: LeakDetectorPlugin.pluginID)
-            }
-        }
+        static let store = LeakStore()
 
         /// Made at the first object tracked or the install, whichever comes first, and dropped by
         /// the last uninstall.
         private(set) static var monitor: LeakMonitor?
 
-        /// The drawers the plugin is installed in, by identity; suspects raise its badge and post
-        /// toasts while there is one.
+        /// The drawers the plugin is installed in, by identity; suspects post toasts while there is
+        /// one.
         private static var drawers: Set<ObjectIdentifier> = []
 
         private static var isInstalled: Bool {
@@ -39,11 +35,13 @@
             DebugDrawer.shared.registerGlobal(LeakDetectorPlugin(store: store))
         }
 
-        /// Watches the app's view controllers while `drawer` holds the plugin; the first drawer
-        /// exchanges `viewDidDisappear` and shows what the monitor found so far.
+        /// Watches the app's view controllers while `drawer` holds the plugin, and badges `drawer`
+        /// with the suspects not ignored; the first drawer exchanges `viewDidDisappear` and shows
+        /// what the monitor found so far.
         static func start(in drawer: DebugDrawer) {
             let isFirst = drawers.isEmpty
             drawers.insert(ObjectIdentifier(drawer))
+            store.badge.show(store.visibleSuspects.count, in: drawer)
             guard isFirst else { return }
             isUninstalled.withLock { $0 = false }
             let monitor = trackingMonitor()
@@ -53,17 +51,18 @@
             }
         }
 
-        /// Stops what ``start(in:)`` began for `drawer`; the last drawer puts `viewDidDisappear`
-        /// back, stops the monitor and forgets its suspects and the objects it counted. A drawer
-        /// that isn't watching changes nothing.
+        /// Stops what ``start(in:)`` began for `drawer`, clearing its badge there; the last drawer
+        /// puts `viewDidDisappear` back, stops the monitor and forgets its suspects and the objects
+        /// it counted. A drawer that isn't watching changes nothing.
         static func stop(from drawer: DebugDrawer) {
-            guard drawers.remove(ObjectIdentifier(drawer)) != nil, drawers.isEmpty else { return }
+            guard drawers.remove(ObjectIdentifier(drawer)) != nil else { return }
+            store.badge.remove(from: drawer)
+            guard drawers.isEmpty else { return }
             isUninstalled.withLock { $0 = true }
             ViewControllerLifecycle.uninstall()
             monitor?.stop()
             monitor = nil
             store.update([])
-            DebugDrawer.shared.setBadge(0, forPlugin: LeakDetectorPlugin.pluginID)
         }
 
         /// Counts `object` in the monitor, made on the main actor if it isn't yet; does nothing

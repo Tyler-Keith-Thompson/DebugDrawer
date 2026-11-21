@@ -1,5 +1,6 @@
 #if DEBUG
     import Combine
+    import DebugDrawer
     import Foundation
 
     /// The suspects the drawer shows, and the classes the developer chose to ignore.
@@ -14,9 +15,12 @@
         @Published private(set) var ignored: Set<String> = []
 
         private let onVisibleCountChange: @MainActor (Int) -> Void
+        /// The plugin's badge, counting the suspects not ignored in each drawer that installed the
+        /// plugin over this store.
+        let badge = DebugDrawerPluginBadge(pluginID: LeakDetectorPlugin.pluginID)
 
         /// - Parameter onVisibleCountChange: Called with the number of suspects not ignored
-        ///   whenever it may have changed: the plugin's badge.
+        ///   whenever it may have changed, after ``badge`` shows it.
         init(onVisibleCountChange: @escaping @MainActor (Int) -> Void = { _ in }) {
             self.onVisibleCountChange = onVisibleCountChange
         }
@@ -39,19 +43,25 @@
         /// Shows `newSuspects` in place of the ones before.
         func update(_ newSuspects: [LeakSuspect]) {
             suspects = newSuspects
-            onVisibleCountChange(visibleSuspects.count)
+            visibleCountDidChange()
         }
 
         /// Stops showing, counting and toasting `suspect`'s class, for this run.
         func ignore(_ suspect: LeakSuspect) {
             ignored.insert(suspect.type.qualifiedName)
-            onVisibleCountChange(visibleSuspects.count)
+            visibleCountDidChange()
         }
 
         /// Shows every ignored class's suspects again.
         func stopIgnoring() {
             ignored = []
-            onVisibleCountChange(visibleSuspects.count)
+            visibleCountDidChange()
+        }
+
+        private func visibleCountDidChange() {
+            let count = visibleSuspects.count
+            badge.update(count)
+            onVisibleCountChange(count)
         }
     }
 #endif

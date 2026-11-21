@@ -1,5 +1,6 @@
 #if DEBUG
     import Combine
+    import DebugDrawer
     import Foundation
 
     /// The log's events on the main actor, for the drawer: read again after each change the log
@@ -15,8 +16,11 @@
         private var seenThrough: Int
         /// Whether the plugin's list is on screen, which sees each event as it arrives.
         private var isShowing = false
-        /// Called with the number of unseen events whenever it changes: the plugin's badge.
+        /// Called with the number of unseen events whenever it changes.
         private let onUnseenCountChange: @MainActor (Int) -> Void
+        /// The plugin's badge, counting the unseen events in each drawer that installed the plugin
+        /// over this model.
+        let badge = DebugDrawerPluginBadge(pluginID: AnalyticsPlugin.pluginID)
         /// The number last handed to `onUnseenCountChange`.
         private var reportedUnseenCount = 0
         /// The log's identity for this model's observer, while the model reads the log.
@@ -29,8 +33,8 @@
         ///
         /// - Parameters:
         ///   - log: Where the events are kept.
-        ///   - onUnseenCountChange: Called with the number of unseen events whenever it changes.
-        ///     Events already kept count as unseen.
+        ///   - onUnseenCountChange: Called with the number of unseen events whenever it changes,
+        ///     after ``badge`` shows it. Events already kept count as unseen.
         init(log: AnalyticsEventLog, onUnseenCountChange: @escaping @MainActor (Int) -> Void = { _ in }) {
             self.log = log
             self.onUnseenCountChange = onUnseenCountChange
@@ -43,18 +47,21 @@
             observation != nil
         }
 
-        /// Counts `drawer` as one the plugin is installed in, and reads the log again from now on
-        /// if an uninstall stopped it.
-        func install(in drawer: ObjectIdentifier) {
-            installedDrawers.insert(drawer)
+        /// Counts `drawer` as one the plugin is installed in, badging it with the unseen events,
+        /// and reads the log again from now on if an uninstall stopped it.
+        func install(in drawer: DebugDrawer) {
+            installedDrawers.insert(ObjectIdentifier(drawer))
             startReading()
+            badge.show(unseenCount, in: drawer)
         }
 
-        /// Uncounts `drawer`. Once no drawer has the plugin, stops reading the log and drops the
-        /// events read, which clears the badge. The log keeps what `AnalyticsEvents.record` sends
-        /// it, as it does before install, so installing again shows them.
-        func uninstall(from drawer: ObjectIdentifier) {
-            installedDrawers.remove(drawer)
+        /// Uncounts `drawer` and clears the badge there. Once no drawer has the plugin, stops
+        /// reading the log and drops the events read. The log keeps what `AnalyticsEvents.record`
+        /// sends it, as it does before install, so installing again shows them.
+        func uninstall(from drawer: DebugDrawer) {
+            if installedDrawers.remove(ObjectIdentifier(drawer)) != nil {
+                badge.remove(from: drawer)
+            }
             guard installedDrawers.isEmpty, let observation else { return }
             log.stopObserving(observation)
             self.observation = nil
@@ -112,6 +119,7 @@
             let count = unseenCount
             guard count != reportedUnseenCount else { return }
             reportedUnseenCount = count
+            badge.update(count)
             onUnseenCountChange(count)
         }
     }

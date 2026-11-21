@@ -11,7 +11,7 @@
     @MainActor
     enum HangDetectorInstallation {
         /// The store `install(threshold:)` made first, kept so a later call changes its threshold.
-        private static var installedStore: HangStore?
+        private(set) static var installedStore: HangStore?
         /// The store of each drawer the plugin is installed in, by the drawer's identity. The
         /// monitor runs while there is one.
         private static var stores: [ObjectIdentifier: HangStore] = [:]
@@ -24,20 +24,19 @@
 
         static func install(threshold: Duration) {
             precondition(threshold > .zero, "The hang threshold must be positive")
-            let store = installedStore ?? HangStore(threshold: threshold) { monitor?.threshold = $0 } onUnseenCountChange: { count in
-                DebugDrawer.shared.setBadge(count, forPlugin: HangDetectorPlugin.pluginID)
-            }
+            let store = installedStore ?? HangStore(threshold: threshold) { monitor?.threshold = $0 }
             installedStore = store
             store.threshold = threshold
             // Registered already, this adds nothing; after the plugin was removed, it adds it again.
             DebugDrawer.shared.registerGlobal(HangDetectorPlugin(store: store))
         }
 
-        /// Records hangs into `store` while `drawer` holds the plugin; the first drawer starts the
-        /// monitor and subscribes to MetricKit.
+        /// Records hangs into `store` while `drawer` holds the plugin, and badges `drawer` with its
+        /// unseen hangs; the first drawer starts the monitor and subscribes to MetricKit.
         static func start(_ store: HangStore, in drawer: DebugDrawer) {
             stores[ObjectIdentifier(drawer)] = store
             current = store
+            store.badge.show(store.unseenCount, in: drawer)
             if let monitor {
                 monitor.threshold = store.threshold
                 return
@@ -60,12 +59,13 @@
             #endif
         }
 
-        /// Stops what ``start(_:in:)`` began for `drawer`, and forgets `store`'s hangs unless
-        /// another drawer shows them; the last drawer stops the monitor (its observers removed,
-        /// its watcher thread ended) and unsubscribes from MetricKit. A drawer that isn't
-        /// recording changes nothing.
+        /// Stops what ``start(_:in:)`` began for `drawer`, clearing its badge there, and forgets
+        /// `store`'s hangs unless another drawer shows them; the last drawer stops the monitor (its
+        /// observers removed, its watcher thread ended) and unsubscribes from MetricKit. A drawer
+        /// that isn't recording changes nothing.
         static func stop(_ store: HangStore, from drawer: DebugDrawer) {
             guard stores.removeValue(forKey: ObjectIdentifier(drawer)) != nil else { return }
+            store.badge.remove(from: drawer)
             if !stores.values.contains(where: { $0 === store }) {
                 store.clear()
             }

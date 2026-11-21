@@ -261,8 +261,9 @@ message and how many posts it stands for; a post while the drawer is open is dro
 away by itself `DebugDrawer.toastLifetime` (6) seconds after its last post, and stays while the
 pointer is over it or VoiceOver's focus is on it. A plugin's badges and toasts go to each drawer
 that holds it (`DebugDrawer.shared`, or a `DebugDrawer()` of your own), and to `shared` while none
-does. To quiet a
-plugin that posts too often, choose Silence Notices from its section header's context menu: its
+does. The counts of Analytics, Crash Reports, Hangs, Leaks and MetricKit badge only the drawers that
+installed the plugin: each shows the count as it installs the plugin and clears it as it removes it.
+To quiet a plugin that posts too often, choose Silence Notices from its section header's context menu: its
 badge and toast go away, what it posts afterwards is dropped, and a crossed-out bell marks its
 header until Allow Notices. The choice is remembered across launches;
 `DebugDrawer.shared.setNoticesMuted(_:forPlugin:)` and `isNoticesMuted(forPlugin:)` do the same

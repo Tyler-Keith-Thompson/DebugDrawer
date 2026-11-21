@@ -22,16 +22,13 @@
         /// - Parameter newSource: Where payloads come from; `nil` is MetricKit's subscriber where
         ///   it exists. Kept from the first install; a later one's is ignored.
         static func install(directory: URL, source newSource: (any MetricKitPayloadSource)? = nil) {
-            let store = MetricKitPayloadStore(directory: directory) { count in
-                DebugDrawer.shared.setBadge(count, forPlugin: MetricKitPlugin.pluginID)
-            }
+            let store = MetricKitPayloadStore(directory: directory)
             source = source ?? newSource ?? defaultSource()
             let plugin = MetricKitPlugin(store: store)
             // The plugin installed before is removed before this one is added: its uninstall
             // unsubscribes, then this one's install subscribes over its own store.
             DebugDrawer.shared.unregisterGlobal(id: plugin.id)
             DebugDrawer.shared.registerGlobal(plugin)
-            plugin.setBadge(store.unseenCount)
         }
 
         static func add(json: Data, kind: MetricKitPayloadKind) {
@@ -39,12 +36,13 @@
             receive([ReceivedMetricKitPayload(kind: kind, json: json)], in: current)
         }
 
-        /// Keeps what the source delivers in `store` while `drawer` holds the plugin; the first
-        /// drawer subscribes.
+        /// Keeps what the source delivers in `store` while `drawer` holds the plugin, and badges
+        /// `drawer` with its unseen payloads; the first drawer subscribes.
         static func start(_ store: MetricKitPayloadStore, in drawer: DebugDrawer) {
             stores[ObjectIdentifier(drawer)] = store
             current = store
             store.load()
+            store.badge.show(store.unseenCount, in: drawer)
             source = source ?? defaultSource()
             source?.subscribe { received in
                 guard let current else { return }
@@ -52,11 +50,12 @@
             }
         }
 
-        /// Stops what ``start(_:in:)`` began for `drawer`, and drops `store`'s payloads from
-        /// memory unless another drawer shows them; the last drawer unsubscribes. A drawer that
-        /// isn't subscribed changes nothing.
+        /// Stops what ``start(_:in:)`` began for `drawer`, clearing its badge there, and drops
+        /// `store`'s payloads from memory unless another drawer shows them; the last drawer
+        /// unsubscribes. A drawer that isn't subscribed changes nothing.
         static func stop(_ store: MetricKitPayloadStore, from drawer: DebugDrawer) {
             guard stores.removeValue(forKey: ObjectIdentifier(drawer)) != nil else { return }
+            store.badge.remove(from: drawer)
             if !stores.values.contains(where: { $0 === store }) {
                 store.unload()
             }

@@ -1,5 +1,6 @@
 #if DEBUG
     import Combine
+    import DebugDrawer
     import Foundation
 
     /// The hangs of this run, newest first, the newest ``limit`` kept, and the threshold the
@@ -21,12 +22,15 @@
 
         private let onThresholdChange: @MainActor (Duration) -> Void
         private let onUnseenCountChange: @MainActor (Int) -> Void
+        /// The plugin's badge, counting the unseen hangs in each drawer that installed the plugin
+        /// over this store.
+        let badge = DebugDrawerPluginBadge(pluginID: HangDetectorPlugin.pluginID)
 
         /// - Parameters:
         ///   - threshold: The threshold the monitor starts with.
         ///   - onThresholdChange: Called with the new threshold when the drawer changes it.
         ///   - onUnseenCountChange: Called with the number of unseen hangs whenever the hangs
-        ///     change: the plugin's badge.
+        ///     change, after ``badge`` shows it.
         init(
             threshold: Duration,
             onThresholdChange: @escaping @MainActor (Duration) -> Void = { _ in },
@@ -84,6 +88,7 @@
 
         private func update(_ newEvents: [HangEvent]) {
             events = newEvents
+            badge.update(unseenCount)
             onUnseenCountChange(unseenCount)
         }
     }

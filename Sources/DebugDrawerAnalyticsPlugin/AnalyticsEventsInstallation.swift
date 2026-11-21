@@ -14,9 +14,7 @@
             // stops its own model's reading.
             DebugDrawer.shared.unregisterGlobal(id: AnalyticsPlugin.pluginID)
             log.resize(to: capacity)
-            let model = AnalyticsEventsModel(log: log) { count in
-                DebugDrawer.shared.setBadge(count, forPlugin: AnalyticsPlugin.pluginID)
-            }
+            let model = AnalyticsEventsModel(log: log)
             let plugin = AnalyticsPlugin(model: model)
             DebugDrawer.shared.registerGlobal(plugin)
             return model
