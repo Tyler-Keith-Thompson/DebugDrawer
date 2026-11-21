@@ -54,13 +54,6 @@
             fatalError("The drawer's HUD window is made in code.")
         }
 
-        /// Whether a readout's context menu shows: UIKit then adds views of its own to this window
-        /// beside the hosted content (the menu, past the card's frame, and what closes it on a tap
-        /// anywhere else in the window), and removes them once the menu has closed.
-        private var isShowingContextMenu: Bool {
-            subviews.contains { $0 !== hosting.view }
-        }
-
         /// Never key, so a tap on the HUD or the toast leaves the app's window key, with its
         /// keyboard shortcuts and its text fields' focus.
         override var canBecomeKey: Bool {
@@ -71,7 +64,7 @@
         /// menu shows, so its items can be chosen and a tap beside it closes it; otherwise `nil`,
         /// so UIKit offers the touch to the app's windows below.
         override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
-            guard frames.contains(point) || isShowingContextMenu else { return nil }
+            guard frames.contains(point) || hasSubviews(besides: hosting.view) else { return nil }
             return super.hitTest(point, with: event)
         }
     }

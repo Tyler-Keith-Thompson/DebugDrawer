@@ -7,8 +7,9 @@
     // A window of the drawer's own, above the app's windows, rather than an overlay in the app's
     // root view: a sheet, a full-screen cover or an alert is presented above that root view, so
     // an overlay in it is covered by what it needs to inspect. Beside a regular panel the window
-    // lets every touch fall through to the app's windows below it; around a compact one, which
-    // leaves the app no room to use, a tap closes the drawer.
+    // lets every touch fall through to the app's windows below it, except while a context menu or
+    // sheet from the panel shows (UIKit draws it in this window and closes it on a tap this window
+    // gets); around a compact one, which leaves the app no room to use, a tap closes the drawer.
 
     /// The drawer's window in one scene: at a level above alerts, hosting the panel, and hidden
     /// while the drawer is closed.
@@ -42,15 +43,17 @@
             fatalError("The drawer's window is made in code.")
         }
 
-        /// Takes a touch on the open panel, and anywhere on the backdrop behind a compact one, which
-        /// closes the drawer; everywhere else `nil`, so UIKit offers it to the app's windows below.
+        /// Takes a touch on the open panel, anywhere on the backdrop behind a compact one, which
+        /// closes the drawer, and every touch while a context menu, sheet or popover from the panel
+        /// shows, so a tap beside it closes it and its items past the panel's edge can be chosen;
+        /// everywhere else `nil`, so UIKit offers it to the app's windows below.
         override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
             guard Self.takesTouch(
                 at: point,
                 panelFrame: presentation.panelFrame,
                 layout: presentation.layout,
                 isOpen: presentation.isOpen
-            ) else { return nil }
+            ) || hasSubviews(besides: rootViewController?.view) else { return nil }
             return super.hitTest(point, with: event)
         }
 

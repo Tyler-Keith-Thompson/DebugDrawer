@@ -100,6 +100,43 @@
                 #expect(on != nil)
             }
 
+            // UIKit shows a context menu from the panel (a section header's) in views it adds to the
+            // drawer's window beside its root view, and closes it on a tap the window gets; a plain
+            // view added the same way stands in for them, as opening a real menu takes a touch.
+            @Test("An added view, such as a context menu's, makes the drawer's window take touches beside the panel; once it's gone, the app does")
+            func addedViewTakesTouchesOutsidePanel() throws {
+                let suite = "DrawerHitTestingTests.\(#function).\(UUID().uuidString)"
+                let defaults = try #require(UserDefaults(suiteName: suite))
+                defer { defaults.removePersistentDomain(forName: suite) }
+                let drawer = DebugDrawer(defaults: defaults)
+                let presentation = DrawerPresentation()
+                presentation.isOpen = true
+                let panelFrame = CGRect(x: 700, y: 20, width: 316, height: 728)
+                presentation.panelFrame = panelFrame
+                let sut = DrawerSceneWindow(scene: nil, drawer: drawer, presentation: presentation)
+                sut.frame = CGRect(x: 0, y: 0, width: 1024, height: 768)
+                sut.isHidden = false
+                defer { sut.isHidden = true }
+                sut.layoutIfNeeded()
+                // A menu item past the panel's leading edge, and a point beside the panel well away from it.
+                let menu = UIView(frame: CGRect(x: 600, y: 80, width: 224, height: 40))
+                let onMenuPoint = CGPoint(x: 620, y: 100)
+                let besidePanel = CGPoint(x: 100, y: 384)
+                let beforeMenu = sut.hitTest(besidePanel, with: nil)
+                sut.addSubview(menu)
+
+                let onMenu = sut.hitTest(onMenuPoint, with: nil)
+                let besidePanelWithMenu = sut.hitTest(besidePanel, with: nil)
+                menu.removeFromSuperview()
+                let afterMenu = [onMenuPoint, besidePanel].map { sut.hitTest($0, with: nil) }
+
+                #expect(!panelFrame.contains(onMenuPoint))
+                #expect(beforeMenu == nil)
+                #expect(onMenu === menu)
+                #expect(besidePanelWithMenu != nil)
+                #expect(afterMenu.allSatisfy { $0 == nil })
+            }
+
             @Test("While the drawer is closed, its window takes no touch, even where the panel was")
             func touchWhileClosedFallsThrough() throws {
                 let suite = "DrawerHitTestingTests.\(#function).\(UUID().uuidString)"
