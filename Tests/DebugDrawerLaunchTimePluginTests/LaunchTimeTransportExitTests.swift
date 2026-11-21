@@ -57,6 +57,11 @@
     struct LaunchTimeTransportExitTests {
         @Test("Over a Unix domain socket, a viewer in another process gets both snapshots, its commands land, and the app's change reaches it")
         func overSocket() async throws {
+            // The children get a home folder of their own, so the files they keep in Application Support and
+            // Caches stay out of the Mac's, whatever runs the test; each checks the move took.
+            let home = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString).path(percentEncoded: false)
+            defer { try? FileManager.default.removeItem(atPath: home) }
+
             let clock = FakeClock(100.4)
             let launchTime = LaunchTimeModel(clock: clock, processStart: FakeProcessStart(uptime: 100), firstFrameObserver: FakeFirstFrameObserver())
             let counter = CounterModel()
@@ -74,7 +79,9 @@
                 }
             }
 
-            await #expect(processExitsWith: .success) { [socketPath = server.socketPath as String] in
+            await #expect(processExitsWith: .success) { [home = home as String, socketPath = server.socketPath as String] in
+                setenv("CFFIXED_USER_HOME", home, 1)
+                guard URL.applicationSupportDirectory.path(percentEncoded: false).hasPrefix(home) else { exit(EXIT_FAILURE) }
                 @MainActor
                 func viewerSeesEveryStep() async throws -> Bool {
                     let connection = try DebugDrawerSocketTransport(socketPath: socketPath)
@@ -112,6 +119,11 @@
 
         @Test("Through the app-group store, a viewer in another process gets both snapshots, its commands land, and the app's change reaches it")
         func throughAppGroupStore() async throws {
+            // The children get a home folder of their own, so the files they keep in Application Support and
+            // Caches stay out of the Mac's, whatever runs the test; each checks the move took.
+            let home = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString).path(percentEncoded: false)
+            defer { try? FileManager.default.removeItem(atPath: home) }
+
             let clock = FakeClock(100.4)
             let launchTime = LaunchTimeModel(clock: clock, processStart: FakeProcessStart(uptime: 100), firstFrameObserver: FakeFirstFrameObserver())
             let counter = CounterModel()
@@ -130,7 +142,9 @@
                 }
             }
 
-            await #expect(processExitsWith: .success) { [path = directory.path as String] in
+            await #expect(processExitsWith: .success) { [home = home as String, path = directory.path as String] in
+                setenv("CFFIXED_USER_HOME", home, 1)
+                guard URL.applicationSupportDirectory.path(percentEncoded: false).hasPrefix(home) else { exit(EXIT_FAILURE) }
                 @MainActor
                 func viewerSeesEveryStep() async throws -> Bool {
                     let store = URL(filePath: path, directoryHint: .isDirectory)

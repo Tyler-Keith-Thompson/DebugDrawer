@@ -11,7 +11,14 @@
     struct FileBrowserInstallExitTests {
         @Test("Install registers the plugin over the app's folders, the bundle and the given app groups")
         func install() async {
-            await #expect(processExitsWith: .success) {
+            // The children get a home folder of their own, so the files they keep in Application Support and
+            // Caches stay out of the Mac's, whatever runs the test; each checks the move took.
+            let home = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString).path(percentEncoded: false)
+            defer { try? FileManager.default.removeItem(atPath: home) }
+
+            await #expect(processExitsWith: .success) { [home = home as String] in
+                setenv("CFFIXED_USER_HOME", home, 1)
+                guard URL.applicationSupportDirectory.path(percentEncoded: false).hasPrefix(home) else { exit(EXIT_FAILURE) }
                 let folder = URL(filePath: "/app/Documents", directoryHint: .isDirectory)
                 let locations = FakeFileLocations(
                     appFolders: [FileRoot(kind: .documents, url: folder)],
@@ -29,7 +36,14 @@
 
         @Test("Installing again registers the plugin once")
         func installAgain() async {
-            await #expect(processExitsWith: .success) {
+            // The children get a home folder of their own, so the files they keep in Application Support and
+            // Caches stay out of the Mac's, whatever runs the test; each checks the move took.
+            let home = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString).path(percentEncoded: false)
+            defer { try? FileManager.default.removeItem(atPath: home) }
+
+            await #expect(processExitsWith: .success) { [home = home as String] in
+                setenv("CFFIXED_USER_HOME", home, 1)
+                guard URL.applicationSupportDirectory.path(percentEncoded: false).hasPrefix(home) else { exit(EXIT_FAILURE) }
                 let isExpected = await MainActor.run {
                     let model = FileBrowserModel(locations: FakeFileLocations(), fileSystem: FakeFileSystem())
                     FileBrowserInstallation.install(appGroups: [], model: model)
@@ -42,7 +56,14 @@
 
         @Test("README: File Browser")
         func readme() async {
-            await #expect(processExitsWith: .success) {
+            // The children get a home folder of their own, so the files they keep in Application Support and
+            // Caches stay out of the Mac's, whatever runs the test; each checks the move took.
+            let home = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString).path(percentEncoded: false)
+            defer { try? FileManager.default.removeItem(atPath: home) }
+
+            await #expect(processExitsWith: .success) { [home = home as String] in
+                setenv("CFFIXED_USER_HOME", home, 1)
+                guard URL.applicationSupportDirectory.path(percentEncoded: false).hasPrefix(home) else { exit(EXIT_FAILURE) }
                 await MainActor.run {
                     // At startup:
                     FileBrowser.install()

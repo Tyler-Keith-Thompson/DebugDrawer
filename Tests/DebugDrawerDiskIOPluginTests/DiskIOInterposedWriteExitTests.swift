@@ -13,7 +13,14 @@
     struct DiskIOInterposedWriteExitTests {
         @Test("With interposing installed, Data.write(to:) on the main thread is recorded as a main-thread write of its bytes")
         func dataWrite() async {
-            await #expect(processExitsWith: .success) {
+            // The children get a home folder of their own, so the files they keep in Application Support and
+            // Caches stay out of the Mac's, whatever runs the test; each checks the move took.
+            let home = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString).path(percentEncoded: false)
+            defer { try? FileManager.default.removeItem(atPath: home) }
+
+            await #expect(processExitsWith: .success) { [home = home as String] in
+                setenv("CFFIXED_USER_HOME", home, 1)
+                guard URL.applicationSupportDirectory.path(percentEncoded: false).hasPrefix(home) else { exit(EXIT_FAILURE) }
                 @MainActor
                 func writeThenWait() async throws {
                     let sut = DiskIOStore.shared
@@ -43,7 +50,14 @@
 
         @Test("With interposing installed, Swift's FileHandle.write(contentsOf:) on the main thread is recorded as a main-thread write of its bytes")
         func fileHandleWrite() async {
-            await #expect(processExitsWith: .success) {
+            // The children get a home folder of their own, so the files they keep in Application Support and
+            // Caches stay out of the Mac's, whatever runs the test; each checks the move took.
+            let home = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString).path(percentEncoded: false)
+            defer { try? FileManager.default.removeItem(atPath: home) }
+
+            await #expect(processExitsWith: .success) { [home = home as String] in
+                setenv("CFFIXED_USER_HOME", home, 1)
+                guard URL.applicationSupportDirectory.path(percentEncoded: false).hasPrefix(home) else { exit(EXIT_FAILURE) }
                 @MainActor
                 func writeThenWait() async throws {
                     let sut = DiskIOStore.shared
@@ -77,7 +91,14 @@
 
         @Test("With interposing installed, a write a swizzled method records is recorded once, not again by the interposer")
         func swizzledWriteOnce() async {
-            await #expect(processExitsWith: .success) {
+            // The children get a home folder of their own, so the files they keep in Application Support and
+            // Caches stay out of the Mac's, whatever runs the test; each checks the move took.
+            let home = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString).path(percentEncoded: false)
+            defer { try? FileManager.default.removeItem(atPath: home) }
+
+            await #expect(processExitsWith: .success) { [home = home as String] in
+                setenv("CFFIXED_USER_HOME", home, 1)
+                guard URL.applicationSupportDirectory.path(percentEncoded: false).hasPrefix(home) else { exit(EXIT_FAILURE) }
                 // Both records, were there two, happen before the main queue turns, so the first
                 // batch that lists the file holds them both.
                 @MainActor

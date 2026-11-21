@@ -11,7 +11,14 @@
     struct DiskIOCreateExitTests {
         @Test("Creating a folder and a file records a create for each, once, with the file's bytes")
         func createsRecorded() async {
-            await #expect(processExitsWith: .success) {
+            // The children get a home folder of their own, so the files they keep in Application Support and
+            // Caches stay out of the Mac's, whatever runs the test; each checks the move took.
+            let home = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString).path(percentEncoded: false)
+            defer { try? FileManager.default.removeItem(atPath: home) }
+
+            await #expect(processExitsWith: .success) { [home = home as String] in
+                setenv("CFFIXED_USER_HOME", home, 1)
+                guard URL.applicationSupportDirectory.path(percentEncoded: false).hasPrefix(home) else { exit(EXIT_FAILURE) }
                 // `createDirectory(at:)` creates through `createDirectory(atPath:)`; the folder is
                 // still recorded once. The file is created after it, on the same thread, so once
                 // the file is listed the folder has been delivered too.

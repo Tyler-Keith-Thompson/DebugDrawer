@@ -12,6 +12,11 @@
     struct ConsoleCrashCompletionExitTests {
         @Test("An os_log line logged just before the app crashes is under Previous in the next launch's store")
         @MainActor func lineBeforeCrash() async throws {
+            // The children get a home folder of their own, so the files they keep in Application Support and
+            // Caches stay out of the Mac's, whatever runs the test; each checks the move took.
+            let home = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString).path(percentEncoded: false)
+            defer { try? FileManager.default.removeItem(atPath: home) }
+
             let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
             defer { try? FileManager.default.removeItem(at: directory) }
             let expected = "Crashing now \(UUID().uuidString)"
@@ -19,7 +24,9 @@
             // The child crashes as soon as it has logged the line, long before the console's
             // two-second read of its own log could take the line in.
             let path = directory.path(percentEncoded: false)
-            await #expect(processExitsWith: .signal(SIGABRT)) { [path = path as String, expected = expected as String] in
+            await #expect(processExitsWith: .signal(SIGABRT)) { [home = home as String, path = path as String, expected = expected as String] in
+                setenv("CFFIXED_USER_HOME", home, 1)
+                guard URL.applicationSupportDirectory.path(percentEncoded: false).hasPrefix(home) else { exit(EXIT_SUCCESS) }
                 await MainActor.run {
                     let storage = _ConsoleSessionStorage(directory: URL(filePath: path, directoryHint: .isDirectory))
                     DebugDrawer.shared.installConsole(sessions: ConsoleSessionPersistence(storage: storage))

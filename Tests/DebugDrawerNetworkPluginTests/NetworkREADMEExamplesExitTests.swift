@@ -12,9 +12,16 @@
     struct NetworkREADMEExamplesExitTests {
         @Test("Network mocks: the installed rule answers a matching request through URLSession.shared")
         func networkMocks() async {
-            await #expect(processExitsWith: .success) {
-                // The rules are saved in Application Support, under the home folder the test
-                // runners point at a temporary one (CFFIXED_USER_HOME).
+            // The children get a home folder of their own, so the files they keep in Application Support and
+            // Caches stay out of the Mac's, whatever runs the test; each checks the move took.
+            let home = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString).path(percentEncoded: false)
+            defer { try? FileManager.default.removeItem(atPath: home) }
+
+            await #expect(processExitsWith: .success) { [home = home as String] in
+                setenv("CFFIXED_USER_HOME", home, 1)
+                guard URL.applicationSupportDirectory.path(percentEncoded: false).hasPrefix(home) else { exit(EXIT_FAILURE) }
+                // The rules are saved in Application Support, in the child's temporary home
+                // folder (CFFIXED_USER_HOME above).
                 await MainActor.run {
                     let outage = NetworkMockRule(
                         id: UUID(uuidString: "3F2B8E1C-0D4A-4B7E-9C61-5A2D7E8F9B10")!,
@@ -34,7 +41,14 @@
 
         @Test("Network, apps that pin certificates: the bypassed host and its subdomains never reach the URL protocol; other hosts do")
         func networkBypassing() async {
-            await #expect(processExitsWith: .success) {
+            // The children get a home folder of their own, so the files they keep in Application Support and
+            // Caches stay out of the Mac's, whatever runs the test; each checks the move took.
+            let home = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString).path(percentEncoded: false)
+            defer { try? FileManager.default.removeItem(atPath: home) }
+
+            await #expect(processExitsWith: .success) { [home = home as String] in
+                setenv("CFFIXED_USER_HOME", home, 1)
+                guard URL.applicationSupportDirectory.path(percentEncoded: false).hasPrefix(home) else { exit(EXIT_FAILURE) }
                 await MainActor.run {
                     DebugDrawer.shared.installNetwork(bypassing: ["api.example.com"])
                 }

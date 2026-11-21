@@ -20,7 +20,14 @@
     struct PerformanceTracesExitTests {
         @Test("With the capability off, a sidecar's start in its session is refused and starts no watcher thread")
         func offStartsNothing() async {
-            await #expect(processExitsWith: .success) {
+            // The children get a home folder of their own, so what they keep there (Application Support,
+            // Caches, preferences) stays out of the Mac's, whatever runs the test; each checks it took.
+            let home = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString).path(percentEncoded: false)
+            defer { try? FileManager.default.removeItem(atPath: home) }
+
+            await #expect(processExitsWith: .success) { [home = home as String] in
+                setenv("CFFIXED_USER_HOME", home, 1)
+                guard URL.applicationSupportDirectory.path(percentEncoded: false).hasPrefix(home) else { exit(EXIT_FAILURE) }
                 func watcherCount() -> Int {
                     var threads: thread_act_array_t?
                     var count: mach_msg_type_number_t = 0
@@ -68,7 +75,14 @@
 
         @Test("Enabled: nothing runs outside a session; a start in one runs a watcher and the observers; the session's end removes both")
         func sessionStartsAndEnds() async {
-            await #expect(processExitsWith: .success) {
+            // The children get a home folder of their own, so what they keep there (Application Support,
+            // Caches, preferences) stays out of the Mac's, whatever runs the test; each checks it took.
+            let home = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString).path(percentEncoded: false)
+            defer { try? FileManager.default.removeItem(atPath: home) }
+
+            await #expect(processExitsWith: .success) { [home = home as String] in
+                setenv("CFFIXED_USER_HOME", home, 1)
+                guard URL.applicationSupportDirectory.path(percentEncoded: false).hasPrefix(home) else { exit(EXIT_FAILURE) }
                 func watcherCount() -> Int {
                     var threads: thread_act_array_t?
                     var count: mach_msg_type_number_t = 0
@@ -122,7 +136,14 @@
 
         @Test("The session's expiry ends the watcher thread and removes the observers")
         func expiryEnds() async {
-            await #expect(processExitsWith: .success) {
+            // The children get a home folder of their own, so what they keep there (Application Support,
+            // Caches, preferences) stays out of the Mac's, whatever runs the test; each checks it took.
+            let home = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString).path(percentEncoded: false)
+            defer { try? FileManager.default.removeItem(atPath: home) }
+
+            await #expect(processExitsWith: .success) { [home = home as String] in
+                setenv("CFFIXED_USER_HOME", home, 1)
+                guard URL.applicationSupportDirectory.path(percentEncoded: false).hasPrefix(home) else { exit(EXIT_FAILURE) }
                 func watcherCount() -> Int {
                     var threads: thread_act_array_t?
                     var count: mach_msg_type_number_t = 0
@@ -172,7 +193,14 @@
 
         @Test("The receiver's gate turning off ends the session, the watcher thread and the observers")
         func receiverGateEnds() async {
-            await #expect(processExitsWith: .success) {
+            // The children get a home folder of their own, so what they keep there (Application Support,
+            // Caches, preferences) stays out of the Mac's, whatever runs the test; each checks it took.
+            let home = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString).path(percentEncoded: false)
+            defer { try? FileManager.default.removeItem(atPath: home) }
+
+            await #expect(processExitsWith: .success) { [home = home as String] in
+                setenv("CFFIXED_USER_HOME", home, 1)
+                guard URL.applicationSupportDirectory.path(percentEncoded: false).hasPrefix(home) else { exit(EXIT_FAILURE) }
                 func watcherCount() -> Int {
                     var threads: thread_act_array_t?
                     var count: mach_msg_type_number_t = 0
@@ -219,7 +247,14 @@
 
         @Test("The capability's gate turning off ends the watcher thread and the observers while the session goes on")
         func capabilityGateEnds() async {
-            await #expect(processExitsWith: .success) {
+            // The children get a home folder of their own, so what they keep there (Application Support,
+            // Caches, preferences) stays out of the Mac's, whatever runs the test; each checks it took.
+            let home = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString).path(percentEncoded: false)
+            defer { try? FileManager.default.removeItem(atPath: home) }
+
+            await #expect(processExitsWith: .success) { [home = home as String] in
+                setenv("CFFIXED_USER_HOME", home, 1)
+                guard URL.applicationSupportDirectory.path(percentEncoded: false).hasPrefix(home) else { exit(EXIT_FAILURE) }
                 func watcherCount() -> Int {
                     var threads: thread_act_array_t?
                     var count: mach_msg_type_number_t = 0
@@ -268,7 +303,14 @@
 
         @Test("A hang of the main thread itself, with the shipped watcher, is recorded with the main thread's stack")
         func mainThreadHang() async {
-            await #expect(processExitsWith: .success) {
+            // The children get a home folder of their own, so what they keep there (Application Support,
+            // Caches, preferences) stays out of the Mac's, whatever runs the test; each checks it took.
+            let home = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString).path(percentEncoded: false)
+            defer { try? FileManager.default.removeItem(atPath: home) }
+
+            await #expect(processExitsWith: .success) { [home = home as String] in
+                setenv("CFFIXED_USER_HOME", home, 1)
+                guard URL.applicationSupportDirectory.path(percentEncoded: false).hasPrefix(home) else { exit(EXIT_FAILURE) }
                 // The main run loop, turned here as an app's is: it waits once, then a timer keeps the
                 // main thread busy past the hang threshold and stops the loop.
                 @MainActor func turnMainRunLoopThroughAHang() {

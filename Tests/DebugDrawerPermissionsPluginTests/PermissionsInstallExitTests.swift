@@ -11,7 +11,14 @@
     struct PermissionsInstallExitTests {
         @Test("Install registers the plugin over the declared permissions, reads them, and reads them again on a change")
         func install() async {
-            await #expect(processExitsWith: .success) {
+            // The children get a home folder of their own, so the files they keep in Application Support and
+            // Caches stay out of the Mac's, whatever runs the test; each checks the move took.
+            let home = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString).path(percentEncoded: false)
+            defer { try? FileManager.default.removeItem(atPath: home) }
+
+            await #expect(processExitsWith: .success) { [home = home as String] in
+                setenv("CFFIXED_USER_HOME", home, 1)
+                guard URL.applicationSupportDirectory.path(percentEncoded: false).hasPrefix(home) else { exit(EXIT_FAILURE) }
                 let isExpected = await MainActor.run {
                     let authority = FakePermissionAuthority(statuses: [.camera: .denied, .notifications: .authorized])
                     let changes = FakePermissionChangeSource()
@@ -36,7 +43,14 @@
 
         @Test("Installing again registers the plugin once, over the Info.plist read again")
         func installAgain() async {
-            await #expect(processExitsWith: .success) {
+            // The children get a home folder of their own, so the files they keep in Application Support and
+            // Caches stay out of the Mac's, whatever runs the test; each checks the move took.
+            let home = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString).path(percentEncoded: false)
+            defer { try? FileManager.default.removeItem(atPath: home) }
+
+            await #expect(processExitsWith: .success) { [home = home as String] in
+                setenv("CFFIXED_USER_HOME", home, 1)
+                guard URL.applicationSupportDirectory.path(percentEncoded: false).hasPrefix(home) else { exit(EXIT_FAILURE) }
                 let isExpected = await MainActor.run {
                     PrivacyPermissionsInstallation.install(
                         infoDictionary: [:], authority: FakePermissionAuthority(statuses: [:]), changes: FakePermissionChangeSource()
@@ -54,7 +68,14 @@
 
         @Test("README: Permissions")
         func readme() async {
-            await #expect(processExitsWith: .success) {
+            // The children get a home folder of their own, so the files they keep in Application Support and
+            // Caches stay out of the Mac's, whatever runs the test; each checks the move took.
+            let home = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString).path(percentEncoded: false)
+            defer { try? FileManager.default.removeItem(atPath: home) }
+
+            await #expect(processExitsWith: .success) { [home = home as String] in
+                setenv("CFFIXED_USER_HOME", home, 1)
+                guard URL.applicationSupportDirectory.path(percentEncoded: false).hasPrefix(home) else { exit(EXIT_FAILURE) }
                 await MainActor.run {
                     // At startup:
                     PrivacyPermissions.install()

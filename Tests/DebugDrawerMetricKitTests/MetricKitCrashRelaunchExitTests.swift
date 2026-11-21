@@ -20,12 +20,19 @@
     struct MetricKitCrashRelaunchExitTests {
         @Test("A crash in the production build appears in the sidecar after relaunch")
         func crashReachesSidecarAfterRelaunch() async throws {
+            // The children get a home folder of their own, so the files they keep in Application Support and
+            // Caches stay out of the Mac's, whatever runs the test; each checks the move took.
+            let home = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString).path(percentEncoded: false)
+            defer { try? FileManager.default.removeItem(atPath: home) }
+
             let root = FileManager.default.temporaryDirectory.appending(path: "MetricKitCrashRelaunchExitTests-\(UUID().uuidString)")
             let store = root.appending(path: "Group/DebugDrawer").path(percentEncoded: false)
             let archive = root.appending(path: "Application Support/Payloads").path(percentEncoded: false)
 
             // The launch that crashes: the receiver serves the capability, then the app faults.
-            await #expect(processExitsWith: .signal(SIGSEGV)) { [store = store as String, archive = archive as String] in
+            await #expect(processExitsWith: .signal(SIGSEGV)) { [home = home as String, store = store as String, archive = archive as String] in
+                setenv("CFFIXED_USER_HOME", home, 1)
+                guard URL.applicationSupportDirectory.path(percentEncoded: false).hasPrefix(home) else { exit(EXIT_SUCCESS) }
                 await MainActor.run {
                     let sessions = DebugDrawerSessions(maximumDuration: 300)
                     let receiver = DebugDrawerReceiver(directory: URL(filePath: store, directoryHint: .isDirectory), sessions: sessions)
@@ -39,7 +46,9 @@
 
             // The next launch: MetricKit delivers the crash's diagnostic as the app starts, and the
             // app is quit before anyone opens a session.
-            await #expect(processExitsWith: .success) { [store = store as String, archive = archive as String] in
+            await #expect(processExitsWith: .success) { [home = home as String, store = store as String, archive = archive as String] in
+                setenv("CFFIXED_USER_HOME", home, 1)
+                guard URL.applicationSupportDirectory.path(percentEncoded: false).hasPrefix(home) else { exit(EXIT_FAILURE) }
                 /// Hands over the crash's diagnostic payload as it is subscribed.
                 @MainActor
                 final class NextLaunchSource: MetricKitPayloadSource {
@@ -120,10 +129,17 @@
 
         @Test("Enabling the capability installs no crash handler: every fatal signal's action and the uncaught-exception handler stay as they were")
         func installsNoCrashHandler() async {
+            // The children get a home folder of their own, so the files they keep in Application Support and
+            // Caches stay out of the Mac's, whatever runs the test; each checks the move took.
+            let home = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString).path(percentEncoded: false)
+            defer { try? FileManager.default.removeItem(atPath: home) }
+
             let directory = FileManager.default.temporaryDirectory.appending(path: "MetricKitCrashRelaunchExitTests-\(UUID().uuidString)")
                 .path(percentEncoded: false)
 
-            await #expect(processExitsWith: .success) { [directory = directory as String] in
+            await #expect(processExitsWith: .success) { [home = home as String, directory = directory as String] in
+                setenv("CFFIXED_USER_HOME", home, 1)
+                guard URL.applicationSupportDirectory.path(percentEncoded: false).hasPrefix(home) else { exit(EXIT_FAILURE) }
                 let signals: [Int32] = [SIGABRT, SIGSEGV, SIGBUS, SIGILL, SIGFPE, SIGTRAP]
                 func actions() -> [UInt] {
                     signals.map { signal in

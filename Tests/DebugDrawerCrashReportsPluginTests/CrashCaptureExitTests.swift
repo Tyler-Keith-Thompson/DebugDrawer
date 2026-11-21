@@ -45,12 +45,19 @@
     struct CrashCaptureExitTests {
         @Test("A fatal signal is written with its frames, then the handler installed before still runs")
         func signalChains() async throws {
+            // The children get a home folder of their own, so the files they keep in Application Support and
+            // Caches stay out of the Mac's, whatever runs the test; each checks the move took.
+            let home = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString).path(percentEncoded: false)
+            defer { try? FileManager.default.removeItem(atPath: home) }
+
             let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
             defer { try? FileManager.default.removeItem(at: directory) }
             let path = directory.path(percentEncoded: false)
 
-            await #expect(processExitsWith: .signal(SIGSEGV)) { [path = path as String] in
+            await #expect(processExitsWith: .signal(SIGSEGV)) { [home = home as String, path = path as String] in
+                setenv("CFFIXED_USER_HOME", home, 1)
+                guard URL.applicationSupportDirectory.path(percentEncoded: false).hasPrefix(home) else { exit(EXIT_SUCCESS) }
                 markerPath = strdup(path + "/marker")
                 var previous = sigaction()
                 previous.__sigaction_u.__sa_sigaction = previousSignalHandler
@@ -72,12 +79,19 @@
 
         @Test("A Swift runtime failure is written as SIGTRAP with the frame that failed, and still ends the app")
         func swiftTrap() async throws {
+            // The children get a home folder of their own, so the files they keep in Application Support and
+            // Caches stay out of the Mac's, whatever runs the test; each checks the move took.
+            let home = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString).path(percentEncoded: false)
+            defer { try? FileManager.default.removeItem(atPath: home) }
+
             let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
             defer { try? FileManager.default.removeItem(at: directory) }
             let path = directory.path(percentEncoded: false)
 
-            await #expect(processExitsWith: .signal(SIGTRAP)) { [path = path as String] in
+            await #expect(processExitsWith: .signal(SIGTRAP)) { [home = home as String, path = path as String] in
+                setenv("CFFIXED_USER_HOME", home, 1)
+                guard URL.applicationSupportDirectory.path(percentEncoded: false).hasPrefix(home) else { exit(EXIT_SUCCESS) }
                 await CrashReports.install(directory: URL(filePath: path))
                 let missing: Int? = path.isEmpty ? 1 : nil
                 _ = missing!
@@ -91,12 +105,19 @@
 
         @Test("An uncaught exception is written with its reason and stack, then the handler installed before still runs")
         func exceptionChains() async throws {
+            // The children get a home folder of their own, so the files they keep in Application Support and
+            // Caches stay out of the Mac's, whatever runs the test; each checks the move took.
+            let home = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString).path(percentEncoded: false)
+            defer { try? FileManager.default.removeItem(atPath: home) }
+
             let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
             defer { try? FileManager.default.removeItem(at: directory) }
             let path = directory.path(percentEncoded: false)
 
-            await #expect(processExitsWith: .signal(SIGABRT)) { [path = path as String] in
+            await #expect(processExitsWith: .signal(SIGABRT)) { [home = home as String, path = path as String] in
+                setenv("CFFIXED_USER_HOME", home, 1)
+                guard URL.applicationSupportDirectory.path(percentEncoded: false).hasPrefix(home) else { exit(EXIT_SUCCESS) }
                 markerPath = strdup(path + "/marker")
                 NSSetUncaughtExceptionHandler(previousExceptionHandler)
                 await CrashReports.install(directory: URL(filePath: path))
@@ -115,12 +136,19 @@
 
         @Test("A stack overflow on the thread that installed is still written, on the alternate stack")
         func stackOverflow() async throws {
+            // The children get a home folder of their own, so the files they keep in Application Support and
+            // Caches stay out of the Mac's, whatever runs the test; each checks the move took.
+            let home = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString).path(percentEncoded: false)
+            defer { try? FileManager.default.removeItem(atPath: home) }
+
             let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
             defer { try? FileManager.default.removeItem(at: directory) }
             let path = directory.path(percentEncoded: false)
 
-            await #expect(processExitsWith: .failure) { [path = path as String] in
+            await #expect(processExitsWith: .failure) { [home = home as String, path = path as String] in
+                setenv("CFFIXED_USER_HOME", home, 1)
+                guard URL.applicationSupportDirectory.path(percentEncoded: false).hasPrefix(home) else { exit(EXIT_SUCCESS) }
                 await MainActor.run {
                     CrashReports.install(directory: URL(filePath: path))
                     _ = recurse(0)
@@ -135,6 +163,11 @@
 
         @Test("Installing keeps the last run's crash, registers the plugin with a badge and posts a toast")
         func installCollects() async throws {
+            // The children get a home folder of their own, so the files they keep in Application Support and
+            // Caches stay out of the Mac's, whatever runs the test; each checks the move took.
+            let home = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString).path(percentEncoded: false)
+            defer { try? FileManager.default.removeItem(atPath: home) }
+
             let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
             defer { try? FileManager.default.removeItem(at: directory) }
@@ -142,7 +175,9 @@
             try Data(crash.utf8).write(to: directory.appending(path: "crash.txt"))
             let path = directory.path(percentEncoded: false)
 
-            await #expect(processExitsWith: .success) { [path = path as String] in
+            await #expect(processExitsWith: .success) { [home = home as String, path = path as String] in
+                setenv("CFFIXED_USER_HOME", home, 1)
+                guard URL.applicationSupportDirectory.path(percentEncoded: false).hasPrefix(home) else { exit(EXIT_FAILURE) }
                 let isInstalled = await MainActor.run {
                     CrashReports.install(directory: URL(filePath: path))
                     CrashReports.install(directory: URL(filePath: path))

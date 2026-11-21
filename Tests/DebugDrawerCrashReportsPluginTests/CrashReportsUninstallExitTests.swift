@@ -41,12 +41,19 @@
     struct CrashReportsUninstallExitTests {
         @Test("Unregistering puts back the signal actions, exception handler and alternate stack; again changes nothing")
         func restoresHandlers() async throws {
+            // The children get a home folder of their own, so the files they keep in Application Support and
+            // Caches stay out of the Mac's, whatever runs the test; each checks the move took.
+            let home = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString).path(percentEncoded: false)
+            defer { try? FileManager.default.removeItem(atPath: home) }
+
             let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
             defer { try? FileManager.default.removeItem(at: directory) }
             let path = directory.path(percentEncoded: false)
 
-            await #expect(processExitsWith: .success) { [path = path as String] in
+            await #expect(processExitsWith: .success) { [home = home as String, path = path as String] in
+                setenv("CFFIXED_USER_HOME", home, 1)
+                guard URL.applicationSupportDirectory.path(percentEncoded: false).hasPrefix(home) else { exit(EXIT_FAILURE) }
                 @MainActor func isRestored() -> Bool {
                     func signalHandlers() -> [UInt] {
                         CrashCapture.signals.map { signal in
@@ -100,12 +107,19 @@
 
         @Test("In two drawers it captures until the last removes it, which drops its reports but not their files")
         func twoDrawers() async throws {
+            // The children get a home folder of their own, so the files they keep in Application Support and
+            // Caches stay out of the Mac's, whatever runs the test; each checks the move took.
+            let home = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString).path(percentEncoded: false)
+            defer { try? FileManager.default.removeItem(atPath: home) }
+
             let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
             defer { try? FileManager.default.removeItem(at: directory) }
             let path = directory.path(percentEncoded: false)
 
-            await #expect(processExitsWith: .success) { [path = path as String] in
+            await #expect(processExitsWith: .success) { [home = home as String, path = path as String] in
+                setenv("CFFIXED_USER_HOME", home, 1)
+                guard URL.applicationSupportDirectory.path(percentEncoded: false).hasPrefix(home) else { exit(EXIT_FAILURE) }
                 @MainActor func isExpected() -> Bool {
                     func segvHandler() -> UInt {
                         var action = sigaction()
@@ -154,12 +168,19 @@
 
         @Test("Under a crash SDK's handler installed since, the plugin's stays and passes the crash on, writing nothing")
         func keptUnderAnotherHandler() async throws {
+            // The children get a home folder of their own, so the files they keep in Application Support and
+            // Caches stay out of the Mac's, whatever runs the test; each checks the move took.
+            let home = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString).path(percentEncoded: false)
+            defer { try? FileManager.default.removeItem(atPath: home) }
+
             let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
             defer { try? FileManager.default.removeItem(at: directory) }
             let path = directory.path(percentEncoded: false)
 
-            await #expect(processExitsWith: .signal(SIGSEGV)) { [path = path as String] in
+            await #expect(processExitsWith: .signal(SIGSEGV)) { [home = home as String, path = path as String] in
+                setenv("CFFIXED_USER_HOME", home, 1)
+                guard URL.applicationSupportDirectory.path(percentEncoded: false).hasPrefix(home) else { exit(EXIT_SUCCESS) }
                 sdkMarkerPath = strdup(path + "/marker")
                 await MainActor.run {
                     CrashReports.install(directory: URL(filePath: path, directoryHint: .isDirectory))

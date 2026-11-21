@@ -14,7 +14,14 @@
     struct ScreenRecordingInstallExitTests {
         @Test("Install registers the plugin, with a HUD readout, in the Interface category")
         func install() async {
-            await #expect(processExitsWith: .success) {
+            // The children get a home folder of their own, so the files they keep in Application Support and
+            // Caches stay out of the Mac's, whatever runs the test; each checks the move took.
+            let home = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString).path(percentEncoded: false)
+            defer { try? FileManager.default.removeItem(atPath: home) }
+
+            await #expect(processExitsWith: .success) { [home = home as String] in
+                setenv("CFFIXED_USER_HOME", home, 1)
+                guard URL.applicationSupportDirectory.path(percentEncoded: false).hasPrefix(home) else { exit(EXIT_FAILURE) }
                 let isExpected = await MainActor.run {
                     ScreenRecording.install()
                     let plugin = DebugDrawer.shared.globalPlugins.first { $0.title == "Screen Recording" }
@@ -26,7 +33,14 @@
 
         @Test("Installing again registers the plugin once, keeping the model and taking the new capacity")
         func installAgain() async {
-            await #expect(processExitsWith: .success) {
+            // The children get a home folder of their own, so the files they keep in Application Support and
+            // Caches stay out of the Mac's, whatever runs the test; each checks the move took.
+            let home = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString).path(percentEncoded: false)
+            defer { try? FileManager.default.removeItem(atPath: home) }
+
+            await #expect(processExitsWith: .success) { [home = home as String] in
+                setenv("CFFIXED_USER_HOME", home, 1)
+                guard URL.applicationSupportDirectory.path(percentEncoded: false).hasPrefix(home) else { exit(EXIT_FAILURE) }
                 let isExpected = await MainActor.run {
                     let first = ScreenRecordingInstallation.install(capacity: 5, in: .shared)
                     let second = ScreenRecordingInstallation.install(capacity: 2, in: .shared)
@@ -39,7 +53,14 @@
 
         @Test("Installing again keeps the plugin installed rather than uninstalling it; installing after an unregister lists it again")
         func installAgainKeepsItInstalled() async {
-            await #expect(processExitsWith: .success) {
+            // The children get a home folder of their own, so the files they keep in Application Support and
+            // Caches stay out of the Mac's, whatever runs the test; each checks the move took.
+            let home = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString).path(percentEncoded: false)
+            defer { try? FileManager.default.removeItem(atPath: home) }
+
+            await #expect(processExitsWith: .success) { [home = home as String] in
+                setenv("CFFIXED_USER_HOME", home, 1)
+                guard URL.applicationSupportDirectory.path(percentEncoded: false).hasPrefix(home) else { exit(EXIT_FAILURE) }
                 let isExpected = await MainActor.run {
                     let model = ScreenRecordingInstallation.install(capacity: 5, in: .shared)
                     ScreenRecordingInstallation.install(capacity: 5, in: .shared)
@@ -57,7 +78,14 @@
 
         @Test("Installing with a capacity below one traps")
         func zeroCapacityTraps() async {
-            await #expect(processExitsWith: .failure) {
+            // The children get a home folder of their own, so the files they keep in Application Support and
+            // Caches stay out of the Mac's, whatever runs the test; each checks the move took.
+            let home = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString).path(percentEncoded: false)
+            defer { try? FileManager.default.removeItem(atPath: home) }
+
+            await #expect(processExitsWith: .failure) { [home = home as String] in
+                setenv("CFFIXED_USER_HOME", home, 1)
+                guard URL.applicationSupportDirectory.path(percentEncoded: false).hasPrefix(home) else { exit(EXIT_SUCCESS) }
                 await MainActor.run {
                     ScreenRecording.install(capacity: 0)
                 }
@@ -66,7 +94,14 @@
 
         @Test("Installing on a drawer of its own with a capacity below one traps too")
         func zeroCapacityTrapsOnAnyDrawer() async {
-            await #expect(processExitsWith: .failure) {
+            // The children get a home folder of their own, so the files they keep in Application Support and
+            // Caches stay out of the Mac's, whatever runs the test; each checks the move took.
+            let home = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString).path(percentEncoded: false)
+            defer { try? FileManager.default.removeItem(atPath: home) }
+
+            await #expect(processExitsWith: .failure) { [home = home as String] in
+                setenv("CFFIXED_USER_HOME", home, 1)
+                guard URL.applicationSupportDirectory.path(percentEncoded: false).hasPrefix(home) else { exit(EXIT_SUCCESS) }
                 await MainActor.run {
                     ScreenRecording.install(capacity: 0, in: DebugDrawer())
                 }
@@ -75,7 +110,14 @@
 
         @Test("README: Screen Recording")
         func readme() async {
-            await #expect(processExitsWith: .success) {
+            // The children get a home folder of their own, so the files they keep in Application Support and
+            // Caches stay out of the Mac's, whatever runs the test; each checks the move took.
+            let home = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString).path(percentEncoded: false)
+            defer { try? FileManager.default.removeItem(atPath: home) }
+
+            await #expect(processExitsWith: .success) { [home = home as String] in
+                setenv("CFFIXED_USER_HOME", home, 1)
+                guard URL.applicationSupportDirectory.path(percentEncoded: false).hasPrefix(home) else { exit(EXIT_FAILURE) }
                 let isInstalled = await MainActor.run {
                     // At startup:
                     ScreenRecording.install()
@@ -91,7 +133,14 @@
 
         @Test("The bug report bundle carries the newest recording as a .mov in the plugin's folder, and none once it is deleted")
         func reportBundle() async {
-            await #expect(processExitsWith: .success) {
+            // The children get a home folder of their own, so the files they keep in Application Support and
+            // Caches stay out of the Mac's, whatever runs the test; each checks the move took.
+            let home = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString).path(percentEncoded: false)
+            defer { try? FileManager.default.removeItem(atPath: home) }
+
+            await #expect(processExitsWith: .success) { [home = home as String] in
+                setenv("CFFIXED_USER_HOME", home, 1)
+                guard URL.applicationSupportDirectory.path(percentEncoded: false).hasPrefix(home) else { exit(EXIT_FAILURE) }
                 @MainActor
                 func isExpected() async -> Bool {
                     let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)

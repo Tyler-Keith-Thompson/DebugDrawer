@@ -21,14 +21,28 @@
         struct Uninstall {
             @Test("Removing the plugin puts back each original CLLocationManager method, and managers report Core Location's location again")
             func uninstallRestoresOriginals() async {
-                await #expect(processExitsWith: .success) {
+                // The children get a home folder of their own, so the files they keep in Application Support and
+                // Caches stay out of the Mac's, whatever runs the test; each checks the move took.
+                let home = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString).path(percentEncoded: false)
+                defer { try? FileManager.default.removeItem(atPath: home) }
+
+                await #expect(processExitsWith: .success) { [home = home as String] in
+                    setenv("CFFIXED_USER_HOME", home, 1)
+                    guard URL.applicationSupportDirectory.path(percentEncoded: false).hasPrefix(home) else { exit(EXIT_FAILURE) }
                     try await Self.uninstallThenReinstall()
                 }
             }
 
             @Test("A method other code swapped in on top stays, and calls Core Location straight through until a reinstall")
             func swizzleOnTopIsLeftInPlace() async {
-                await #expect(processExitsWith: .success) {
+                // The children get a home folder of their own, so the files they keep in Application Support and
+                // Caches stay out of the Mac's, whatever runs the test; each checks the move took.
+                let home = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString).path(percentEncoded: false)
+                defer { try? FileManager.default.removeItem(atPath: home) }
+
+                await #expect(processExitsWith: .success) { [home = home as String] in
+                    setenv("CFFIXED_USER_HOME", home, 1)
+                    guard URL.applicationSupportDirectory.path(percentEncoded: false).hasPrefix(home) else { exit(EXIT_FAILURE) }
                     try await Self.leaveInPlace()
                 }
             }

@@ -11,7 +11,14 @@
     struct LaunchTimeInstallExitTests {
         @Test("Unregistering removes the first-frame observer from the main run loop, twice harmlessly; installing again adds one")
         func uninstallRemovesTheObserver() async {
-            await #expect(processExitsWith: .success) {
+            // The children get a home folder of their own, so the files they keep in Application Support and
+            // Caches stay out of the Mac's, whatever runs the test; each checks the move took.
+            let home = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString).path(percentEncoded: false)
+            defer { try? FileManager.default.removeItem(atPath: home) }
+
+            await #expect(processExitsWith: .success) { [home = home as String] in
+                setenv("CFFIXED_USER_HOME", home, 1)
+                guard URL.applicationSupportDirectory.path(percentEncoded: false).hasPrefix(home) else { exit(EXIT_FAILURE) }
                 let isExpected = await MainActor.run {
                     guard let firstFrame = LaunchTimeModel.shared.firstFrameObserver as? _FirstFrameObserver else { return false }
                     DebugDrawer.shared.installLaunchTime()
@@ -33,7 +40,14 @@
 
         @Test("Installed again, the plugin records the first frame when the main run loop goes idle")
         func reinstalledRecordsTheFirstFrame() async {
-            await #expect(processExitsWith: .success) {
+            // The children get a home folder of their own, so the files they keep in Application Support and
+            // Caches stay out of the Mac's, whatever runs the test; each checks the move took.
+            let home = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString).path(percentEncoded: false)
+            defer { try? FileManager.default.removeItem(atPath: home) }
+
+            await #expect(processExitsWith: .success) { [home = home as String] in
+                setenv("CFFIXED_USER_HOME", home, 1)
+                guard URL.applicationSupportDirectory.path(percentEncoded: false).hasPrefix(home) else { exit(EXIT_FAILURE) }
                 @MainActor
                 func firstFrame() async -> TimeInterval? {
                     DebugDrawer.shared.installLaunchTime()

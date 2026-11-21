@@ -23,10 +23,17 @@
 
         @Test("Lines written before the app crashes are listed as the previous session by the next launch")
         func survivesCrash() async throws {
+            // The children get a home folder of their own, so what they keep there (Application Support,
+            // Caches, preferences) stays out of the Mac's, whatever runs the test; each checks it took.
+            let home = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString).path(percentEncoded: false)
+            defer { try? FileManager.default.removeItem(atPath: home) }
+
             let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
             defer { try? FileManager.default.removeItem(at: directory) }
 
-            await #expect(processExitsWith: .signal(SIGABRT)) { [path = directory.path(percentEncoded: false) as String] in
+            await #expect(processExitsWith: .signal(SIGABRT)) { [home = home as String, path = directory.path(percentEncoded: false) as String] in
+                setenv("CFFIXED_USER_HOME", home, 1)
+                guard URL.applicationSupportDirectory.path(percentEncoded: false).hasPrefix(home) else { exit(EXIT_SUCCESS) }
                 let storage = _ConsoleSessionStorage(directory: URL(filePath: path, directoryHint: .isDirectory))
                 let recorder = ConsoleSessionRecorder(
                     ConsoleSessionPersistence(storage: storage),

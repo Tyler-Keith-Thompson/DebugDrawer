@@ -11,7 +11,14 @@
     struct ConsolePrintLineExitTests {
         @Test("A line printed after the console captures stdout reaches the console as one line, with no flush")
         func printedLineArrivesAlone() async {
-            await #expect(processExitsWith: .success) {
+            // The children get a home folder of their own, so the files they keep in Application Support and
+            // Caches stay out of the Mac's, whatever runs the test; each checks the move took.
+            let home = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString).path(percentEncoded: false)
+            defer { try? FileManager.default.removeItem(atPath: home) }
+
+            await #expect(processExitsWith: .success) { [home = home as String] in
+                setenv("CFFIXED_USER_HOME", home, 1)
+                guard URL.applicationSupportDirectory.path(percentEncoded: false).hasPrefix(home) else { exit(EXIT_FAILURE) }
                 // The marker goes straight to the descriptor, behind the printed line in the same
                 // pipe, so once the marker is listed the printed line has arrived too, or it is
                 // still held in stdout's buffer.

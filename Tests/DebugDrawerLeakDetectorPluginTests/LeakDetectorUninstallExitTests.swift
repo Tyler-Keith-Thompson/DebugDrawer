@@ -19,7 +19,14 @@
     struct LeakDetectorUninstallExitTests {
         @Test("Unregistering puts viewDidDisappear's implementation back; unregistering again changes nothing; installing again exchanges it again")
         func restoresViewDidDisappear() async {
-            await #expect(processExitsWith: .success) {
+            // The children get a home folder of their own, so the files they keep in Application Support and
+            // Caches stay out of the Mac's, whatever runs the test; each checks the move took.
+            let home = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString).path(percentEncoded: false)
+            defer { try? FileManager.default.removeItem(atPath: home) }
+
+            await #expect(processExitsWith: .success) { [home = home as String] in
+                setenv("CFFIXED_USER_HOME", home, 1)
+                guard URL.applicationSupportDirectory.path(percentEncoded: false).hasPrefix(home) else { exit(EXIT_FAILURE) }
                 @MainActor func isRestored() -> Bool {
                     let selector = #selector(NSViewController.viewDidDisappear)
                     let expected = class_getMethodImplementation(NSViewController.self, selector)
@@ -42,7 +49,14 @@
 
         @Test("Unregistering drops the suspects, badge and monitor; objects tracked then aren't counted")
         func dropsSuspects() async {
-            await #expect(processExitsWith: .success) {
+            // The children get a home folder of their own, so the files they keep in Application Support and
+            // Caches stay out of the Mac's, whatever runs the test; each checks the move took.
+            let home = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString).path(percentEncoded: false)
+            defer { try? FileManager.default.removeItem(atPath: home) }
+
+            await #expect(processExitsWith: .success) { [home = home as String] in
+                setenv("CFFIXED_USER_HOME", home, 1)
+                guard URL.applicationSupportDirectory.path(percentEncoded: false).hasPrefix(home) else { exit(EXIT_FAILURE) }
                 @MainActor func isExpected() -> Bool {
                     LeakDetector.install()
                     let installedModels = [UninstallTrackedModel(), UninstallTrackedModel()]
@@ -73,7 +87,14 @@
 
         @Test("Stopping the main run loop's turn source removes its observer from the run loop")
         func turnSourceStops() async {
-            await #expect(processExitsWith: .success) {
+            // The children get a home folder of their own, so the files they keep in Application Support and
+            // Caches stay out of the Mac's, whatever runs the test; each checks the move took.
+            let home = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString).path(percentEncoded: false)
+            defer { try? FileManager.default.removeItem(atPath: home) }
+
+            await #expect(processExitsWith: .success) { [home = home as String] in
+                setenv("CFFIXED_USER_HOME", home, 1)
+                guard URL.applicationSupportDirectory.path(percentEncoded: false).hasPrefix(home) else { exit(EXIT_FAILURE) }
                 @MainActor func isRemoved() -> Bool {
                     guard let runLoop = CFRunLoopGetMain() else { return false }
                     let sut = MainRunLoopTurnSource()
@@ -93,7 +114,14 @@
 
         @Test("A plugin in two drawers keeps viewDidDisappear exchanged until the last removes it")
         func twoDrawers() async {
-            await #expect(processExitsWith: .success) {
+            // The children get a home folder of their own, so the files they keep in Application Support and
+            // Caches stay out of the Mac's, whatever runs the test; each checks the move took.
+            let home = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString).path(percentEncoded: false)
+            defer { try? FileManager.default.removeItem(atPath: home) }
+
+            await #expect(processExitsWith: .success) { [home = home as String] in
+                setenv("CFFIXED_USER_HOME", home, 1)
+                guard URL.applicationSupportDirectory.path(percentEncoded: false).hasPrefix(home) else { exit(EXIT_FAILURE) }
                 @MainActor func isExpected() -> Bool {
                     let suite = "LeakDetectorUninstallExitTests.\(UUID().uuidString)"
                     guard let first = UserDefaults(suiteName: suite + ".first"), let second = UserDefaults(suiteName: suite + ".second") else {
@@ -123,7 +151,14 @@
 
         @Test("Under a replacement made since, viewDidDisappear keeps it, and the plugin's under it calls straight through")
         func keptUnderAnotherReplacement() async {
-            await #expect(processExitsWith: .success) {
+            // The children get a home folder of their own, so the files they keep in Application Support and
+            // Caches stay out of the Mac's, whatever runs the test; each checks the move took.
+            let home = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString).path(percentEncoded: false)
+            defer { try? FileManager.default.removeItem(atPath: home) }
+
+            await #expect(processExitsWith: .success) { [home = home as String] in
+                setenv("CFFIXED_USER_HOME", home, 1)
+                guard URL.applicationSupportDirectory.path(percentEncoded: false).hasPrefix(home) else { exit(EXIT_FAILURE) }
                 @MainActor func isExpected() -> Bool {
                     final class Screen: NSViewController {
                         override func loadView() {

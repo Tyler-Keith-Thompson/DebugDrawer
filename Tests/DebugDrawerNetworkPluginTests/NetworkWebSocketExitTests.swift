@@ -13,7 +13,14 @@
     struct NetworkWebSocketExitTests {
         @Test("Nothing is recorded until installNetwork() runs; after it, the same traffic is")
         func notInterceptedUntilInstalled() async {
-            await #expect(processExitsWith: .success) {
+            // The children get a home folder of their own, so the files they keep in Application Support and
+            // Caches stay out of the Mac's, whatever runs the test; each checks the move took.
+            let home = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString).path(percentEncoded: false)
+            defer { try? FileManager.default.removeItem(atPath: home) }
+
+            await #expect(processExitsWith: .success) { [home = home as String] in
+                setenv("CFFIXED_USER_HOME", home, 1)
+                guard URL.applicationSupportDirectory.path(percentEncoded: false).hasPrefix(home) else { exit(EXIT_FAILURE) }
                 func talk(to url: URL) async throws -> URLSessionWebSocketTask {
                     let task = URLSession.shared.webSocketTask(with: url)
                     task.resume()
@@ -54,7 +61,14 @@
 
         @Test("The app gets the same messages, errors and close codes with the plugin installed as without it")
         func hostSeesTheSame() async {
-            await #expect(processExitsWith: .success) {
+            // The children get a home folder of their own, so the files they keep in Application Support and
+            // Caches stay out of the Mac's, whatever runs the test; each checks the move took.
+            let home = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString).path(percentEncoded: false)
+            defer { try? FileManager.default.removeItem(atPath: home) }
+
+            await #expect(processExitsWith: .success) { [home = home as String] in
+                setenv("CFFIXED_USER_HOME", home, 1)
+                guard URL.applicationSupportDirectory.path(percentEncoded: false).hasPrefix(home) else { exit(EXIT_FAILURE) }
                 /// What the app sees, as text: each message or error its sends, receives and pings
                 /// get, through the async and the completion-handler APIs, and the close codes and
                 /// reasons the tasks report after the server's close and the app's.

@@ -37,10 +37,17 @@
     struct AppGroupStoreKillExitTests {
         @Test("Snapshots an app wrote while no viewer ran, then quit, are read by a viewer that launches after it")
         func viewerLaunchesAfterTheApp() async throws {
+            // The children get a home folder of their own, so the files they keep in Application Support and
+            // Caches stay out of the Mac's, whatever runs the test; each checks the move took.
+            let home = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString).path(percentEncoded: false)
+            defer { try? FileManager.default.removeItem(atPath: home) }
+
             let directory = FileManager.default.temporaryDirectory.appending(path: "AppGroupStoreKillExitTests-\(UUID().uuidString)")
             let expected = TallyModel.Snapshot(count: 3, note: "written alone")
 
-            await #expect(processExitsWith: .success) { [path = directory.path as String] in
+            await #expect(processExitsWith: .success) { [home = home as String, path = directory.path as String] in
+                setenv("CFFIXED_USER_HOME", home, 1)
+                guard URL.applicationSupportDirectory.path(percentEncoded: false).hasPrefix(home) else { exit(EXIT_FAILURE) }
                 @MainActor
                 func writeAndQuit() async -> Bool {
                     let layout = AppGroupStoreLayout(directory: AppGroupStoreLayout.appDirectory(inStore: URL(filePath: path)))
@@ -73,11 +80,18 @@
 
         @Test("An app killed while writing a snapshot leaves the last complete one for the viewer, and the cut-off file is never read")
         func appKilledMidWrite() async throws {
+            // The children get a home folder of their own, so the files they keep in Application Support and
+            // Caches stay out of the Mac's, whatever runs the test; each checks the move took.
+            let home = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString).path(percentEncoded: false)
+            defer { try? FileManager.default.removeItem(atPath: home) }
+
             let directory = FileManager.default.temporaryDirectory.appending(path: "AppGroupStoreKillExitTests-\(UUID().uuidString)")
             let snapshots = AppGroupStoreLayout.appDirectory(inStore: directory).appending(path: "snapshots")
             let expected = TallyModel.Snapshot(note: "last complete")
 
-            await #expect(processExitsWith: .signal(SIGXFSZ)) { [path = directory.path as String] in
+            await #expect(processExitsWith: .signal(SIGXFSZ)) { [home = home as String, path = directory.path as String] in
+                setenv("CFFIXED_USER_HOME", home, 1)
+                guard URL.applicationSupportDirectory.path(percentEncoded: false).hasPrefix(home) else { exit(EXIT_SUCCESS) }
                 @MainActor
                 func writeUntilKilled() async {
                     let layout = AppGroupStoreLayout(directory: AppGroupStoreLayout.appDirectory(inStore: URL(filePath: path)))
@@ -136,6 +150,11 @@
 
         @Test("A viewer killed while leaving a command leaves the app the commands before it, and the cut-off file is never performed")
         func viewerKilledMidWrite() async throws {
+            // The children get a home folder of their own, so the files they keep in Application Support and
+            // Caches stay out of the Mac's, whatever runs the test; each checks the move took.
+            let home = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString).path(percentEncoded: false)
+            defer { try? FileManager.default.removeItem(atPath: home) }
+
             let model = TallyModel()
             let registry = DebugDrawerModelRegistry()
             registry.register(model, id: "Tally")
@@ -149,7 +168,9 @@
             server.stop()
             let expected = TallyModel.Snapshot(note: "last complete")
 
-            await #expect(processExitsWith: .signal(SIGXFSZ)) { [path = directory.path as String] in
+            await #expect(processExitsWith: .signal(SIGXFSZ)) { [home = home as String, path = directory.path as String] in
+                setenv("CFFIXED_USER_HOME", home, 1)
+                guard URL.applicationSupportDirectory.path(percentEncoded: false).hasPrefix(home) else { exit(EXIT_SUCCESS) }
                 @MainActor
                 func sendUntilKilled() async throws {
                     let connection = try DebugDrawerAppGroupStoreTransport(directory: AppGroupStoreLayout.appDirectory(inStore: URL(filePath: path)))

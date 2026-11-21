@@ -12,7 +12,14 @@
         struct EarlierManager {
             @Test("A manager the app made before any location was simulated gets each simulated point through its own calls, until it stops")
             func managerMadeBeforeSpoofing() async {
-                await #expect(processExitsWith: .success) {
+                // The children get a home folder of their own, so the files they keep in Application Support and
+                // Caches stay out of the Mac's, whatever runs the test; each checks the move took.
+                let home = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString).path(percentEncoded: false)
+                defer { try? FileManager.default.removeItem(atPath: home) }
+
+                await #expect(processExitsWith: .success) { [home = home as String] in
+                    setenv("CFFIXED_USER_HOME", home, 1)
+                    guard URL.applicationSupportDirectory.path(percentEncoded: false).hasPrefix(home) else { exit(EXIT_FAILURE) }
                     try await Self.spoofAnEarlierManager()
                 }
             }

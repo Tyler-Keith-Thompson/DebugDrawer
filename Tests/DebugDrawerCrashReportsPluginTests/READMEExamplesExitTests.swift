@@ -12,9 +12,16 @@
     struct READMEExamplesExitTests {
         @Test("Crash Reports")
         func crashReports() async {
-            await #expect(processExitsWith: .success) {
-                // The default directory is in Application Support, under the home folder the test
-                // runners point at a temporary one (CFFIXED_USER_HOME).
+            // The children get a home folder of their own, so the files they keep in Application Support and
+            // Caches stay out of the Mac's, whatever runs the test; each checks the move took.
+            let home = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString).path(percentEncoded: false)
+            defer { try? FileManager.default.removeItem(atPath: home) }
+
+            await #expect(processExitsWith: .success) { [home = home as String] in
+                setenv("CFFIXED_USER_HOME", home, 1)
+                guard URL.applicationSupportDirectory.path(percentEncoded: false).hasPrefix(home) else { exit(EXIT_FAILURE) }
+                // The default directory is in Application Support, in the child's temporary home
+                // folder (CFFIXED_USER_HOME above).
                 let isInstalled = await MainActor.run {
                     // At startup, after any crash SDK has installed its own handlers:
                     CrashReports.install()

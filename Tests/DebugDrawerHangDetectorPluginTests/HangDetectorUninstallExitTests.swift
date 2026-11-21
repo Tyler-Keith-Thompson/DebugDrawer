@@ -13,7 +13,14 @@
     struct HangDetectorUninstallExitTests {
         @Test("Unregistering ends the watcher thread; unregistering again changes nothing; installing again starts one")
         func endsWatcher() async {
-            await #expect(processExitsWith: .success) {
+            // The children get a home folder of their own, so the files they keep in Application Support and
+            // Caches stay out of the Mac's, whatever runs the test; each checks the move took.
+            let home = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString).path(percentEncoded: false)
+            defer { try? FileManager.default.removeItem(atPath: home) }
+
+            await #expect(processExitsWith: .success) { [home = home as String] in
+                setenv("CFFIXED_USER_HOME", home, 1)
+                guard URL.applicationSupportDirectory.path(percentEncoded: false).hasPrefix(home) else { exit(EXIT_FAILURE) }
                 func watcherCount() -> Int {
                     var threads: thread_act_array_t?
                     var count: mach_msg_type_number_t = 0
@@ -47,7 +54,14 @@
 
         @Test("A plugin in two drawers watches until the last removes it, which forgets its hangs")
         func twoDrawers() async {
-            await #expect(processExitsWith: .success) {
+            // The children get a home folder of their own, so the files they keep in Application Support and
+            // Caches stay out of the Mac's, whatever runs the test; each checks the move took.
+            let home = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString).path(percentEncoded: false)
+            defer { try? FileManager.default.removeItem(atPath: home) }
+
+            await #expect(processExitsWith: .success) { [home = home as String] in
+                setenv("CFFIXED_USER_HOME", home, 1)
+                guard URL.applicationSupportDirectory.path(percentEncoded: false).hasPrefix(home) else { exit(EXIT_FAILURE) }
                 func watcherCount() -> Int {
                     var threads: thread_act_array_t?
                     var count: mach_msg_type_number_t = 0
@@ -93,7 +107,14 @@
 
         @Test("Stopping a monitor removes both its observers from the run loop and ends its watcher thread, at once")
         func stopRemovesObservers() async {
-            await #expect(processExitsWith: .success) {
+            // The children get a home folder of their own, so the files they keep in Application Support and
+            // Caches stay out of the Mac's, whatever runs the test; each checks the move took.
+            let home = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString).path(percentEncoded: false)
+            defer { try? FileManager.default.removeItem(atPath: home) }
+
+            await #expect(processExitsWith: .success) { [home = home as String] in
+                setenv("CFFIXED_USER_HOME", home, 1)
+                guard URL.applicationSupportDirectory.path(percentEncoded: false).hasPrefix(home) else { exit(EXIT_FAILURE) }
                 func watcherCount() -> Int {
                     var threads: thread_act_array_t?
                     var count: mach_msg_type_number_t = 0

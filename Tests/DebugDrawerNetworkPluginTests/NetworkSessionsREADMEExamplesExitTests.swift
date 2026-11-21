@@ -12,7 +12,14 @@
     struct NetworkSessionsREADMEExamplesExitTests {
         @Test("Network sessions: the installed limits apply, and a request is written to the current session as it completes")
         func networkSessions() async {
-            await #expect(processExitsWith: .success) {
+            // The children get a home folder of their own, so the files they keep in Application Support and
+            // Caches stay out of the Mac's, whatever runs the test; each checks the move took.
+            let home = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString).path(percentEncoded: false)
+            defer { try? FileManager.default.removeItem(atPath: home) }
+
+            await #expect(processExitsWith: .success) { [home = home as String] in
+                setenv("CFFIXED_USER_HOME", home, 1)
+                guard URL.applicationSupportDirectory.path(percentEncoded: false).hasPrefix(home) else { exit(EXIT_FAILURE) }
                 await MainActor.run {
                     DebugDrawer.shared.installNetwork(sessions: NetworkSessionPersistence(maxSessions: 3, maxBytes: 5_000_000))
                 }
@@ -28,8 +35,8 @@
                 }.value
                 guard let recorder else { exit(EXIT_FAILURE) }
                 _ = await recorder.previousSessions()
-                // The session is in Application Support, under the home folder the test runners
-                // point at a temporary one (CFFIXED_USER_HOME).
+                // The session is in Application Support, in the child's temporary home folder
+                // (CFFIXED_USER_HOME above).
                 let written = (try? recorder.persistence.storage.contents(ofSessionNamed: recorder.currentName)) ?? Data()
                 let isWritten = (String(bytes: written, encoding: .utf8) ?? "").contains("https://sessions.invalid/v1/ping")
                 let isExpected = recorder.persistence.maxSessions == 3 && recorder.persistence.maxBytes == 5_000_000

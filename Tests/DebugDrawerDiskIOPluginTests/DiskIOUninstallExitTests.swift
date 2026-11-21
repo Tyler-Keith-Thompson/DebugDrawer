@@ -19,7 +19,14 @@
     struct DiskIOUninstallExitTests {
         @Test("Removing the plugin puts back each original method, records nothing more and forgets the calls; a reinstall records again")
         func uninstallRestoresOriginals() async {
-            await #expect(processExitsWith: .success) {
+            // The children get a home folder of their own, so the files they keep in Application Support and
+            // Caches stay out of the Mac's, whatever runs the test; each checks the move took.
+            let home = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString).path(percentEncoded: false)
+            defer { try? FileManager.default.removeItem(atPath: home) }
+
+            await #expect(processExitsWith: .success) { [home = home as String] in
+                setenv("CFFIXED_USER_HOME", home, 1)
+                guard URL.applicationSupportDirectory.path(percentEncoded: false).hasPrefix(home) else { exit(EXIT_FAILURE) }
                 @MainActor
                 func implementations() throws -> [IMP] {
                     let handleClass: AnyClass = try #require(object_getClass(FileHandle(fileDescriptor: STDERR_FILENO, closeOnDealloc: false)))
@@ -88,7 +95,14 @@
 
         @Test("A method other code swapped in on top stays after the uninstall, and its calls aren't recorded until the plugin is installed again")
         func swizzleOnTopIsLeftInPlace() async {
-            await #expect(processExitsWith: .success) {
+            // The children get a home folder of their own, so the files they keep in Application Support and
+            // Caches stay out of the Mac's, whatever runs the test; each checks the move took.
+            let home = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString).path(percentEncoded: false)
+            defer { try? FileManager.default.removeItem(atPath: home) }
+
+            await #expect(processExitsWith: .success) { [home = home as String] in
+                setenv("CFFIXED_USER_HOME", home, 1)
+                guard URL.applicationSupportDirectory.path(percentEncoded: false).hasPrefix(home) else { exit(EXIT_FAILURE) }
                 @MainActor
                 func contentsImplementation() throws -> IMP {
                     try method_getImplementation(#require(class_getInstanceMethod(FileManager.self, #selector(FileManager.contents(atPath:)))))

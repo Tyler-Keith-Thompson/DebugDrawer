@@ -12,7 +12,14 @@
     struct LocalizationInstallExitTests {
         @Test("Pseudo-localized, the app's strings are accented, longer and bracketed; another bundle's are untouched")
         func pseudoLocalized() async {
-            await #expect(processExitsWith: .success) {
+            // The children get a home folder of their own, so the files they keep in Application Support and
+            // Caches stay out of the Mac's, whatever runs the test; each checks the move took.
+            let home = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString).path(percentEncoded: false)
+            defer { try? FileManager.default.removeItem(atPath: home) }
+
+            await #expect(processExitsWith: .success) { [home = home as String] in
+                setenv("CFFIXED_USER_HOME", home, 1)
+                guard URL.applicationSupportDirectory.path(percentEncoded: false).hasPrefix(home) else { exit(EXIT_FAILURE) }
                 let root = FileManager.default.temporaryDirectory.resolvingSymlinksInPath().appending(path: "LocalizationExit-\(UUID().uuidString)")
                 let app = root.appending(path: "App.bundle")
                 let outside = FileManager.default.temporaryDirectory.appending(path: "LocalizationExit-\(UUID().uuidString)/Other.bundle")
@@ -45,7 +52,14 @@
 
         @Test("Pseudo-localized, a plural keeps its rules: each count formats with its own variant")
         func pseudoLocalizedPlural() async {
-            await #expect(processExitsWith: .success) {
+            // The children get a home folder of their own, so the files they keep in Application Support and
+            // Caches stay out of the Mac's, whatever runs the test; each checks the move took.
+            let home = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString).path(percentEncoded: false)
+            defer { try? FileManager.default.removeItem(atPath: home) }
+
+            await #expect(processExitsWith: .success) { [home = home as String] in
+                setenv("CFFIXED_USER_HOME", home, 1)
+                guard URL.applicationSupportDirectory.path(percentEncoded: false).hasPrefix(home) else { exit(EXIT_FAILURE) }
                 let root = FileManager.default.temporaryDirectory.resolvingSymlinksInPath().appending(path: "LocalizationExit-\(UUID().uuidString)")
                 let app = root.appending(path: "App.bundle")
                 try FileManager.default.createDirectory(at: app.appending(path: "en.lproj"), withIntermediateDirectories: true)
@@ -78,7 +92,14 @@
 
         @Test("Showing keys, each of the app's strings is its key, a plural's too; turned off, the translations are back")
         func showingKeys() async {
-            await #expect(processExitsWith: .success) {
+            // The children get a home folder of their own, so the files they keep in Application Support and
+            // Caches stay out of the Mac's, whatever runs the test; each checks the move took.
+            let home = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString).path(percentEncoded: false)
+            defer { try? FileManager.default.removeItem(atPath: home) }
+
+            await #expect(processExitsWith: .success) { [home = home as String] in
+                setenv("CFFIXED_USER_HOME", home, 1)
+                guard URL.applicationSupportDirectory.path(percentEncoded: false).hasPrefix(home) else { exit(EXIT_FAILURE) }
                 let root = FileManager.default.temporaryDirectory.resolvingSymlinksInPath().appending(path: "LocalizationExit-\(UUID().uuidString)")
                 let app = root.appending(path: "App.bundle")
                 try FileManager.default.createDirectory(at: app.appending(path: "en.lproj"), withIntermediateDirectories: true)
@@ -115,7 +136,14 @@
 
         @Test("An untranslated lookup in an app bundle is recorded once and listed as missing; one in another bundle isn't")
         func recordsLookups() async {
-            await #expect(processExitsWith: .success) {
+            // The children get a home folder of their own, so the files they keep in Application Support and
+            // Caches stay out of the Mac's, whatever runs the test; each checks the move took.
+            let home = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString).path(percentEncoded: false)
+            defer { try? FileManager.default.removeItem(atPath: home) }
+
+            await #expect(processExitsWith: .success) { [home = home as String] in
+                setenv("CFFIXED_USER_HOME", home, 1)
+                guard URL.applicationSupportDirectory.path(percentEncoded: false).hasPrefix(home) else { exit(EXIT_FAILURE) }
                 let root = FileManager.default.temporaryDirectory.resolvingSymlinksInPath().appending(path: "LocalizationExit-\(UUID().uuidString)")
                 let app = root.appending(path: "App.bundle")
                 for (localization, strings) in [("en", "\"settings.title\" = \"Settings\";"), ("de", "\"settings.title\" = \"Einstellungen\";")] {
@@ -157,7 +185,14 @@
 
         @Test("Installing again registers the plugin once and sets the mode")
         func installAgain() async {
-            await #expect(processExitsWith: .success) {
+            // The children get a home folder of their own, so the files they keep in Application Support and
+            // Caches stay out of the Mac's, whatever runs the test; each checks the move took.
+            let home = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString).path(percentEncoded: false)
+            defer { try? FileManager.default.removeItem(atPath: home) }
+
+            await #expect(processExitsWith: .success) { [home = home as String] in
+                setenv("CFFIXED_USER_HOME", home, 1)
+                guard URL.applicationSupportDirectory.path(percentEncoded: false).hasPrefix(home) else { exit(EXIT_FAILURE) }
                 let isExpected = await MainActor.run {
                     Localization.install(mode: .pseudoLocalized)
                     Localization.install(mode: .showingKeys)
@@ -170,7 +205,14 @@
 
         @Test("README: Localization")
         func readme() async {
-            await #expect(processExitsWith: .success) {
+            // The children get a home folder of their own, so the files they keep in Application Support and
+            // Caches stay out of the Mac's, whatever runs the test; each checks the move took.
+            let home = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString).path(percentEncoded: false)
+            defer { try? FileManager.default.removeItem(atPath: home) }
+
+            await #expect(processExitsWith: .success) { [home = home as String] in
+                setenv("CFFIXED_USER_HOME", home, 1)
+                guard URL.applicationSupportDirectory.path(percentEncoded: false).hasPrefix(home) else { exit(EXIT_FAILURE) }
                 let isInstalled = await MainActor.run {
                     // At startup, before the first string is looked up:
                     Localization.install()

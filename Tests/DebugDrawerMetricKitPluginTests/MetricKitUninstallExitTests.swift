@@ -12,9 +12,16 @@
     struct MetricKitUninstallExitTests {
         @Test("Unregistering unsubscribes and an added payload is dropped; installing again subscribes again")
         func unsubscribes() async {
+            // The children get a home folder of their own, so the files they keep in Application Support and
+            // Caches stay out of the Mac's, whatever runs the test; each checks the move took.
+            let home = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString).path(percentEncoded: false)
+            defer { try? FileManager.default.removeItem(atPath: home) }
+
             let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString).path(percentEncoded: false)
 
-            await #expect(processExitsWith: .success) { [directory = directory as String] in
+            await #expect(processExitsWith: .success) { [home = home as String, directory = directory as String] in
+                setenv("CFFIXED_USER_HOME", home, 1)
+                guard URL.applicationSupportDirectory.path(percentEncoded: false).hasPrefix(home) else { exit(EXIT_FAILURE) }
                 @MainActor
                 final class RecordingSource: MetricKitPayloadSource {
                     var receive: (@MainActor ([ReceivedMetricKitPayload]) -> Void)?
@@ -58,9 +65,16 @@
 
         @Test("In two drawers it stays subscribed until the last removes it, which drops its payloads but not their files")
         func twoDrawers() async {
+            // The children get a home folder of their own, so the files they keep in Application Support and
+            // Caches stay out of the Mac's, whatever runs the test; each checks the move took.
+            let home = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString).path(percentEncoded: false)
+            defer { try? FileManager.default.removeItem(atPath: home) }
+
             let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString).path(percentEncoded: false)
 
-            await #expect(processExitsWith: .success) { [directory = directory as String] in
+            await #expect(processExitsWith: .success) { [home = home as String, directory = directory as String] in
+                setenv("CFFIXED_USER_HOME", home, 1)
+                guard URL.applicationSupportDirectory.path(percentEncoded: false).hasPrefix(home) else { exit(EXIT_FAILURE) }
                 @MainActor
                 final class RecordingSource: MetricKitPayloadSource {
                     var isSubscribed = false

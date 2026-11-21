@@ -10,7 +10,14 @@
     struct NetworkIgnoreListExitTests {
         @Test("The app's hosts join the ignore list; a request to one is captured but left out of the log's list")
         func seedsHideRequests() async {
-            await #expect(processExitsWith: .success) {
+            // The children get a home folder of their own, so the files they keep in Application Support and
+            // Caches stay out of the Mac's, whatever runs the test; each checks the move took.
+            let home = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString).path(percentEncoded: false)
+            defer { try? FileManager.default.removeItem(atPath: home) }
+
+            await #expect(processExitsWith: .success) { [home = home as String] in
+                setenv("CFFIXED_USER_HOME", home, 1)
+                guard URL.applicationSupportDirectory.path(percentEncoded: false).hasPrefix(home) else { exit(EXIT_FAILURE) }
                 // Sessions go to a folder of the child's own, so nothing is written to the test
                 // runner's Application Support; the seeds aren't written at install.
                 let sessions = FileManager.default.temporaryDirectory.appending(path: "NetworkIgnoreListExitTests-\(UUID().uuidString)")

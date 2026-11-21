@@ -11,7 +11,14 @@
     struct ConsoleSplitLineExitTests {
         @Test("A line written to stdout in pieces, one cut inside an emoji, reaches the console as one whole line")
         func lineWrittenInPiecesArrivesWhole() async {
-            await #expect(processExitsWith: .success) {
+            // The children get a home folder of their own, so the files they keep in Application Support and
+            // Caches stay out of the Mac's, whatever runs the test; each checks the move took.
+            let home = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString).path(percentEncoded: false)
+            defer { try? FileManager.default.removeItem(atPath: home) }
+
+            await #expect(processExitsWith: .success) { [home = home as String] in
+                setenv("CFFIXED_USER_HOME", home, 1)
+                guard URL.applicationSupportDirectory.path(percentEncoded: false).hasPrefix(home) else { exit(EXIT_FAILURE) }
                 // Each piece is its own write to the pipe, so the console may read it alone; the
                 // marker follows them in the same pipe, so once it is listed they have arrived.
                 @MainActor
