@@ -297,6 +297,7 @@
     }
 #elseif os(iOS)
     @testable import DebugDrawer
+    import DebugDrawerTestSupport
     import SwiftUI
     import Testing
     import UIKit

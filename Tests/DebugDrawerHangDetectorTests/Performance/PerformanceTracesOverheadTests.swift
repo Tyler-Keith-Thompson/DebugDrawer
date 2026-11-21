@@ -251,7 +251,7 @@ struct PerformanceTracesOverheadTests {
             guard let thread = pthread_from_mach_thread_np(port) else { return false }
             var name = [CChar](repeating: 0, count: 64)
             pthread_getname_np(thread, &name, name.count)
-            return String(validating: name.prefix { $0 != 0 }.map { UInt8(bitPattern: $0) }, as: UTF8.self) == HangMonitor.watcherName
+            return String(bytes: name.prefix { $0 != 0 }.map { UInt8(bitPattern: $0) }, encoding: .utf8) == HangMonitor.watcherName
         }
         let watcher = watchers.count == 1 ? watchers[0] : nil
         for port in ports where port != watcher {

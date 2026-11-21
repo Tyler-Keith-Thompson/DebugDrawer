@@ -355,6 +355,7 @@
 // NSApplication, so the iOS tests run on the iOS simulator alone.
 #elseif os(iOS) && !targetEnvironment(macCatalyst)
     @testable import DebugDrawer
+    import DebugDrawerTestSupport
     import SwiftUI
     import Testing
     import UIKit
