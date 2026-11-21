@@ -1,4 +1,5 @@
 @testable import DebugDrawerReceiver
+import DebugDrawerTestSupport
 import Foundation
 import Testing
 
@@ -327,7 +328,7 @@ struct UnrevertedChangesReceiverTests {
 
     @Test("Feature flag overrides keep their own record: after a kill the next launch clears them once, with no revert from the receiver")
     func flagsRevertOnce() throws {
-        let suite = "UnrevertedChangesReceiverTests-\(UUID().uuidString)"
+        let suite = temporarySuiteName("UnrevertedChangesReceiverTests")
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         let directory = FileManager.default.temporaryDirectory.appending(path: "UnrevertedChangesReceiverTests-\(UUID().uuidString)")

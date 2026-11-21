@@ -1,6 +1,7 @@
 // The archive is unzipped with ditto, which only the Mac has.
 #if DEBUG && os(macOS)
     @testable import DebugDrawer
+    import DebugDrawerTestSupport
     import Foundation
     import Testing
 
@@ -9,7 +10,7 @@
     struct ReportArchiveTests {
         @Test("Create Report zips a summary and every adopter's files, each text, JSON, HAR or PNG, redacted, and nothing of a non-adopter")
         func createReportWritesTheArchive() throws {
-            let suite = "ReportArchiveTests.\(#function).\(UUID().uuidString)"
+            let suite = temporarySuiteName("ReportArchiveTests.\(#function)")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let drawer = DebugDrawer(defaults: defaults)

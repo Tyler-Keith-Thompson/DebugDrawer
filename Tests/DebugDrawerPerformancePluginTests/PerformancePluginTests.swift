@@ -1,6 +1,7 @@
 #if DEBUG
     @testable import DebugDrawer
     @testable import DebugDrawerPerformancePlugin
+    import DebugDrawerTestSupport
     import Foundation
     import Testing
 
@@ -19,7 +20,7 @@
 
         @Test("Installing the plugin samples nothing until its view or HUD shows")
         func installStartsNothing() throws {
-            let suite = "PerformancePluginTests.\(UUID().uuidString)"
+            let suite = temporarySuiteName("PerformancePluginTests")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let sut = DebugDrawer(defaults: defaults)

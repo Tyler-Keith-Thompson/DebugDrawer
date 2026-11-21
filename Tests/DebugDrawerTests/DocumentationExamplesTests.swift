@@ -4,6 +4,7 @@
 
 #if DEBUG
     import DebugDrawer
+    import DebugDrawerTestSupport
     import Foundation
     import SwiftUI
     import Testing
@@ -269,7 +270,7 @@
 
         @Test("Writing plugins: a stale local registration's token leaves the newer one in place")
         func localPluginTokens() throws {
-            let suite = "DocumentationExamplesTests.\(#function).\(UUID().uuidString)"
+            let suite = temporarySuiteName("DocumentationExamplesTests.\(#function)")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let sut = DebugDrawer(defaults: defaults)

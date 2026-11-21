@@ -2,6 +2,7 @@
 #if os(macOS)
     import AppKit
     @testable import DebugDrawer
+    import DebugDrawerTestSupport
     import SwiftUI
     import Testing
 
@@ -20,7 +21,7 @@
     struct DrawerChromeWindowTests {
         @Test("An AppKit window attached with attach(to:) shows the HUD at its corner and the toast top trailing, each in a panel just its size")
         func attachedWindowShowsHUDAndToast() throws {
-            let suite = "DrawerChromeWindowTests.\(#function).\(UUID().uuidString)"
+            let suite = temporarySuiteName("DrawerChromeWindowTests.\(#function)")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let drawer = DebugDrawer(defaults: defaults)
@@ -63,7 +64,7 @@
 
         @Test("A click beside the HUD and the toast lands in the app's window: neither panel covers it")
         func clickBesideChromeReachesApp() throws {
-            let suite = "DrawerChromeWindowTests.\(#function).\(UUID().uuidString)"
+            let suite = temporarySuiteName("DrawerChromeWindowTests.\(#function)")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let drawer = DebugDrawer(defaults: defaults)
@@ -97,7 +98,7 @@
 
         @Test("With nothing pinned and no toast, the HUD and toast panels are clear and ignore the mouse")
         func emptyPanelsLetClicksThrough() throws {
-            let suite = "DrawerChromeWindowTests.\(#function).\(UUID().uuidString)"
+            let suite = temporarySuiteName("DrawerChromeWindowTests.\(#function)")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let drawer = DebugDrawer(defaults: defaults)
@@ -122,7 +123,7 @@
 
         @Test("Dragging the HUD moves its panel with the mouse, kept inside the window, and saves where it was dropped")
         func draggingMovesThePanel() throws {
-            let suite = "DrawerChromeWindowTests.\(#function).\(UUID().uuidString)"
+            let suite = temporarySuiteName("DrawerChromeWindowTests.\(#function)")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let drawer = DebugDrawer(defaults: defaults)
@@ -185,7 +186,7 @@
 
         @Test("A readout in an attached window's HUD panel makes its plugin visible, once per window")
         func hudPanelReportsVisibility() throws {
-            let suite = "DrawerChromeWindowTests.\(#function).\(UUID().uuidString)"
+            let suite = temporarySuiteName("DrawerChromeWindowTests.\(#function)")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let drawer = DebugDrawer(defaults: defaults)
@@ -316,7 +317,7 @@
         #if !targetEnvironment(macCatalyst)
             @Test("The HUD window draws the HUD and the toast and takes a touch only on them; one beside them reaches the app's windows")
             func touchesOnlyOnHUDAndToast() throws {
-                let suite = "DrawerChromeWindowTests.\(#function).\(UUID().uuidString)"
+                let suite = temporarySuiteName("DrawerChromeWindowTests.\(#function)")
                 let defaults = try #require(UserDefaults(suiteName: suite))
                 defer { defaults.removePersistentDomain(forName: suite) }
                 let drawer = DebugDrawer(defaults: defaults)
@@ -353,7 +354,7 @@
             // way stands in for them, as opening a real menu takes a touch.
             @Test("While an added view, such as an open context menu's, is in the HUD window it takes every touch; once it's gone, the app gets them")
             func addedViewTakesEveryTouch() throws {
-                let suite = "DrawerChromeWindowTests.\(#function).\(UUID().uuidString)"
+                let suite = temporarySuiteName("DrawerChromeWindowTests.\(#function)")
                 let defaults = try #require(UserDefaults(suiteName: suite))
                 defer { defaults.removePersistentDomain(forName: suite) }
                 let drawer = DebugDrawer(defaults: defaults)
@@ -381,7 +382,7 @@
 
             @Test("With nothing pinned and no toast, the drawer's HUD window takes no touch")
             func emptyWindowTakesNoTouch() throws {
-                let suite = "DrawerChromeWindowTests.\(#function).\(UUID().uuidString)"
+                let suite = temporarySuiteName("DrawerChromeWindowTests.\(#function)")
                 let defaults = try #require(UserDefaults(suiteName: suite))
                 defer { defaults.removePersistentDomain(forName: suite) }
                 let sut = DrawerChromeWindow(scene: nil, drawer: DebugDrawer(defaults: defaults))

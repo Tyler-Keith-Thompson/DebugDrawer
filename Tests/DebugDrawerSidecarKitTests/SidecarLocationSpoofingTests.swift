@@ -4,6 +4,7 @@
     import DebugDrawerLocation
     @testable import DebugDrawerReceiver
     @testable import DebugDrawerSidecarKit
+    import DebugDrawerTestSupport
     import Foundation
     import Testing
     import ViewInspector
@@ -19,7 +20,7 @@
 
         @Test("The kit shows the app's spoofing, and a place's Spoof replaces the host's readings with it in the session")
         func placeSpoofs() async throws {
-            let suite = "SidecarLocationSpoofingTests-\(UUID().uuidString)"
+            let suite = temporarySuiteName("SidecarLocationSpoofingTests")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let store = FileManager.default.temporaryDirectory

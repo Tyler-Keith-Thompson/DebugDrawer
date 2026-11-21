@@ -3,6 +3,7 @@
     import DebugDrawer
     import DebugDrawerAppInfo
     import DebugDrawerReceiver
+    import DebugDrawerTestSupport
     import Foundation
     import Testing
 
@@ -40,7 +41,7 @@
             .timeLimit(.minutes(1))
         )
         func productionAppState() async throws {
-            let suite = "READMEAppState-\(UUID().uuidString)"
+            let suite = temporarySuiteName("READMEAppState")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let container = FileManager.default.temporaryDirectory.appending(path: "READMEAppState-\(UUID().uuidString)")

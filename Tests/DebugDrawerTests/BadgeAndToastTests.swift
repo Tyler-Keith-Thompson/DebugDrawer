@@ -1,5 +1,6 @@
 #if DEBUG
     @testable import DebugDrawer
+    import DebugDrawerTestSupport
     import SwiftUI
     import Testing
 
@@ -22,7 +23,7 @@
     struct BadgeAndToastTests {
         @Test("A badge of zero or less clears it")
         func aBadgeOfZeroOrLessClears() throws {
-            let suite = "BadgeAndToastTests.\(#function).\(UUID().uuidString)"
+            let suite = temporarySuiteName("BadgeAndToastTests.\(#function)")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let sut = DebugDrawer(defaults: defaults)
@@ -35,7 +36,7 @@
 
         @Test("A burst of 100 posts from one plugin in one run-loop turn shows a single toast that counts them")
         func aBurstShowsOneToast() throws {
-            let suite = "BadgeAndToastTests.\(#function).\(UUID().uuidString)"
+            let suite = temporarySuiteName("BadgeAndToastTests.\(#function)")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let sut = DebugDrawer(defaults: defaults)
@@ -50,7 +51,7 @@
 
         @Test("A post from another plugin replaces the toast and restarts its count")
         func anotherPluginReplacesTheToast() throws {
-            let suite = "BadgeAndToastTests.\(#function).\(UUID().uuidString)"
+            let suite = temporarySuiteName("BadgeAndToastTests.\(#function)")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let sut = DebugDrawer(defaults: defaults)
@@ -65,7 +66,7 @@
 
         @Test("A post while the drawer is open is dropped")
         func aPostWhileOpenIsDropped() throws {
-            let suite = "BadgeAndToastTests.\(#function).\(UUID().uuidString)"
+            let suite = temporarySuiteName("BadgeAndToastTests.\(#function)")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let sut = DebugDrawer(defaults: defaults)
@@ -78,7 +79,7 @@
 
         @Test("Opening a toast opens the drawer at its plugin and removes the toast")
         func openingAToastRevealsItsPlugin() throws {
-            let suite = "BadgeAndToastTests.\(#function).\(UUID().uuidString)"
+            let suite = temporarySuiteName("BadgeAndToastTests.\(#function)")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let sut = DebugDrawer(defaults: defaults)
@@ -93,7 +94,7 @@
 
         @Test("Dismissing a toast removes it and leaves the drawer closed")
         func dismissingAToastLeavesTheDrawerClosed() throws {
-            let suite = "BadgeAndToastTests.\(#function).\(UUID().uuidString)"
+            let suite = temporarySuiteName("BadgeAndToastTests.\(#function)")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let sut = DebugDrawer(defaults: defaults)

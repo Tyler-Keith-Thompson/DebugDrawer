@@ -4,6 +4,7 @@
     #endif
     @testable import DebugDrawer
     @testable import DebugDrawerEnergyPlugin
+    import DebugDrawerTestSupport
     import Foundation
     import SwiftUI
     import Testing
@@ -31,7 +32,7 @@
     struct EnergyLifecycleTests {
         @Test("Registering the plugin starts nothing; it samples from didBecomeVisible to didBecomeHidden")
         func visibleToHidden() throws {
-            let suite = "EnergyLifecycleTests.\(UUID().uuidString)"
+            let suite = temporarySuiteName("EnergyLifecycleTests")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let drawer = DebugDrawer(defaults: defaults)
@@ -55,7 +56,7 @@
 
         @Test("The app's start() keeps sampling after the drawer hides the plugin")
         func appDemandOutlivesHidden() throws {
-            let suite = "EnergyLifecycleTests.\(UUID().uuidString)"
+            let suite = temporarySuiteName("EnergyLifecycleTests")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let drawer = DebugDrawer(defaults: defaults)
@@ -77,7 +78,7 @@
 
         @Test("Once the plugin is hidden, the production timer is cancelled")
         func productionTimerStops() throws {
-            let suite = "EnergyLifecycleTests.\(UUID().uuidString)"
+            let suite = temporarySuiteName("EnergyLifecycleTests")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let drawer = DebugDrawer(defaults: defaults)

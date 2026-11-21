@@ -5,6 +5,7 @@
     @testable import DebugDrawer
     import DebugDrawerMetricKit
     @testable import DebugDrawerMetricKitPlugin
+    import DebugDrawerTestSupport
     import Foundation
     import Testing
 
@@ -32,7 +33,7 @@
                     func payload(_ version: String) -> [ReceivedMetricKitPayload] {
                         [ReceivedMetricKitPayload(kind: .metrics, json: Data(#"{"appVersion":"\#(version)"}"#.utf8))]
                     }
-                    let suite = "MetricKitBadgeExitTests.badgesItsOwnDrawer.\(UUID().uuidString)"
+                    let suite = temporarySuiteName("MetricKitBadgeExitTests.badgesItsOwnDrawer")
                     guard let defaults = UserDefaults(suiteName: suite) else { return false }
                     defer { defaults.removePersistentDomain(forName: suite) }
                     let drawer = DebugDrawer(defaults: defaults)

@@ -1,6 +1,7 @@
 #if DEBUG
     import DebugDrawer
     @testable import DebugDrawerDeepLinkPlugin
+    import DebugDrawerTestSupport
     import Foundation
     import Testing
 
@@ -17,7 +18,7 @@
             var received: [URL] = []
             let presets = try [DeepLinkPreset("Order 42", url: #require(URL(string: "myapp://orders/42")))]
             let url = try #require(URL(string: "myapp://orders/42"))
-            let suite = "DeepLinkSharedModelTests.\(UUID().uuidString)"
+            let suite = temporarySuiteName("DeepLinkSharedModelTests")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let drawer = DebugDrawer(defaults: defaults)
@@ -42,7 +43,7 @@
         @Test("installDeepLink keeps the history in the drawer's own defaults, not the shared drawer's suite")
         func installKeepsHistoryInTheDrawersDefaults() async throws {
             let url = try #require(URL(string: "myapp://orders/43"))
-            let suite = "DeepLinkSharedModelTests.\(UUID().uuidString)"
+            let suite = temporarySuiteName("DeepLinkSharedModelTests")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let drawer = DebugDrawer(defaults: defaults)

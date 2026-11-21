@@ -5,6 +5,7 @@
     import DebugDrawer
     @testable import DebugDrawerAppInfo
     @testable import DebugDrawerReceiver
+    import DebugDrawerTestSupport
     import Foundation
     #if os(macOS)
         import OSLog
@@ -16,7 +17,7 @@
     struct AppStateSidecarTests {
         @Test("The sidecar sees the state during its session, the registered fields with it, and nothing of it is in the store before or after")
         func servedDuringSession() async throws {
-            let suite = "AppStateSidecarTests-\(UUID().uuidString)"
+            let suite = temporarySuiteName("AppStateSidecarTests")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let root = FileManager.default.temporaryDirectory.appending(path: "AppStateSidecarTests-\(UUID().uuidString)")
@@ -73,7 +74,7 @@
         @Test("The raw user ID is never written: not to the store's files, the snapshots received, the audit log, the defaults or the log")
         func rawUserIDNeverLeaves() async throws {
             let started = Date()
-            let suite = "AppStateSidecarTests-\(UUID().uuidString)"
+            let suite = temporarySuiteName("AppStateSidecarTests")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let root = FileManager.default.temporaryDirectory.appending(path: "AppStateSidecarTests-\(UUID().uuidString)")
@@ -169,7 +170,7 @@
 
         @Test("Until the host enables it, a refresh is refused unknownCapability in an open session, and nothing is served")
         func offUnlessEnabled() throws {
-            let suite = "AppStateSidecarTests-\(UUID().uuidString)"
+            let suite = temporarySuiteName("AppStateSidecarTests")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let directory = FileManager.default.temporaryDirectory.appending(path: "AppStateSidecarTests-\(UUID().uuidString)")

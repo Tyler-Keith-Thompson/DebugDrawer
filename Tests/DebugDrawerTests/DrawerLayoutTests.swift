@@ -1,5 +1,6 @@
 #if DEBUG
     @testable import DebugDrawer
+    import DebugDrawerTestSupport
     import Foundation
     import SwiftUI
     import Testing
@@ -128,7 +129,7 @@
 
         @Test("Pins, order and the last-used plugin survive a relaunch through UserDefaults")
         func theLayoutSurvivesARelaunch() throws {
-            let suite = "DrawerLayoutTests.\(#function).\(UUID().uuidString)"
+            let suite = temporarySuiteName("DrawerLayoutTests.\(#function)")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let plugins = [
@@ -150,7 +151,7 @@
 
         @Test("Nothing stored, or data that can't be read, gives an empty layout")
         func unreadableStorageGivesAnEmptyLayout() throws {
-            let suite = "DrawerLayoutTests.\(#function).\(UUID().uuidString)"
+            let suite = temporarySuiteName("DrawerLayoutTests.\(#function)")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let expected = DrawerLayout()

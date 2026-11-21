@@ -1,6 +1,7 @@
 #if DEBUG
     @testable import DebugDrawer
     @testable import DebugDrawerScreenRecordingPlugin
+    import DebugDrawerTestSupport
     import Foundation
     import Testing
 
@@ -16,13 +17,13 @@
                 folder: RecordingFolder(directory: directory), capacity: 5, frameSource: source,
                 makeWriter: { FakeMovieWriter(url: $0) },
                 now: { Date(timeIntervalSince1970: 1_763_290_000) },
-                defaults: #require(UserDefaults(suiteName: UUID().uuidString))
+                defaults: #require(UserDefaults(suiteName: temporarySuiteName("ScreenRecordingLifecycleTests")))
             )
         }
 
         @Test("Unregistering the plugin while it records removes it, stops the frames, and saves the movie without listing it")
         func uninstallWhileRecording() async throws {
-            let suite = "ScreenRecordingLifecycleTests.\(UUID().uuidString)"
+            let suite = temporarySuiteName("ScreenRecordingLifecycleTests")
             defer { UserDefaults().removePersistentDomain(forName: suite) }
             let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
             defer { try? FileManager.default.removeItem(at: directory) }
@@ -49,7 +50,7 @@
 
         @Test("Unregistering drops the list and the report's choice, keeping the recordings on disk; installing again lists them")
         func uninstallDropsTheList() async throws {
-            let suite = "ScreenRecordingLifecycleTests.\(UUID().uuidString)"
+            let suite = temporarySuiteName("ScreenRecordingLifecycleTests")
             defer { UserDefaults().removePersistentDomain(forName: suite) }
             let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
             defer { try? FileManager.default.removeItem(at: directory) }
@@ -81,7 +82,7 @@
 
         @Test("Uninstalling twice stops the frames once")
         func uninstallTwice() throws {
-            let suite = "ScreenRecordingLifecycleTests.\(UUID().uuidString)"
+            let suite = temporarySuiteName("ScreenRecordingLifecycleTests")
             defer { UserDefaults().removePersistentDomain(forName: suite) }
             let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
             defer { try? FileManager.default.removeItem(at: directory) }
@@ -101,7 +102,7 @@
 
         @Test("In two drawers a recording goes on until the last one uninstalls the plugin")
         func twoDrawers() throws {
-            let suite = "ScreenRecordingLifecycleTests.\(UUID().uuidString)"
+            let suite = temporarySuiteName("ScreenRecordingLifecycleTests")
             defer { UserDefaults().removePersistentDomain(forName: suite) }
             let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
             defer { try? FileManager.default.removeItem(at: directory) }

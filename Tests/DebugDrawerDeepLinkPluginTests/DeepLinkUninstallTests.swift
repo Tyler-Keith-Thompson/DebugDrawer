@@ -1,6 +1,7 @@
 #if DEBUG
     @testable import DebugDrawer
     @testable import DebugDrawerDeepLinkPlugin
+    import DebugDrawerTestSupport
     import Foundation
     import Testing
 
@@ -11,7 +12,7 @@
     struct DeepLinkUninstallTests {
         @Test("Unregistering removes the plugin and forgets the outcome; the history stays in memory and the defaults")
         func disappearsFromTheDrawer() async throws {
-            let name = "DeepLinkUninstallTests.\(UUID().uuidString)"
+            let name = temporarySuiteName("DeepLinkUninstallTests")
             let defaults = try #require(UserDefaults(suiteName: name))
             defer { defaults.removePersistentDomain(forName: name) }
             let drawer = DebugDrawer(defaults: defaults)
@@ -40,7 +41,7 @@
 
         @Test("Uninstalling twice is harmless, and a plugin registered again opens URLs again")
         func uninstallTwiceThenReinstall() async throws {
-            let name = "DeepLinkUninstallTests.\(UUID().uuidString)"
+            let name = temporarySuiteName("DeepLinkUninstallTests")
             let defaults = try #require(UserDefaults(suiteName: name))
             defer { defaults.removePersistentDomain(forName: name) }
             let drawer = DebugDrawer(defaults: defaults)
@@ -66,8 +67,8 @@
 
         @Test("Installed in two drawers, the outcome stays until the second removes the plugin")
         func installCounting() async throws {
-            let firstName = "DeepLinkUninstallTests.\(UUID().uuidString)"
-            let secondName = "DeepLinkUninstallTests.\(UUID().uuidString)"
+            let firstName = temporarySuiteName("DeepLinkUninstallTests")
+            let secondName = temporarySuiteName("DeepLinkUninstallTests")
             let firstDefaults = try #require(UserDefaults(suiteName: firstName))
             let secondDefaults = try #require(UserDefaults(suiteName: secondName))
             defer {
@@ -104,7 +105,7 @@
 
         @Test("Installing hands the model the plugin's presets and the history kept in that drawer's defaults")
         func installConfiguresTheModel() throws {
-            let name = "DeepLinkUninstallTests.\(UUID().uuidString)"
+            let name = temporarySuiteName("DeepLinkUninstallTests")
             let defaults = try #require(UserDefaults(suiteName: name))
             defer { defaults.removePersistentDomain(forName: name) }
             defaults.set(["shop://kept"], forKey: _DeepLinkHistoryStore.historyKey)

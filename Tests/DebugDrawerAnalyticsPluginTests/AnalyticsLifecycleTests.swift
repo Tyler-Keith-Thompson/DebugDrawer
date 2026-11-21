@@ -1,6 +1,7 @@
 #if DEBUG
     @testable import DebugDrawer
     @testable import DebugDrawerAnalyticsPlugin
+    import DebugDrawerTestSupport
     import Foundation
     import Testing
 
@@ -9,7 +10,7 @@
     struct AnalyticsLifecycleTests {
         @Test("Unregistering the plugin removes it, stops reading the log, drops its events and clears the badge")
         func uninstallStopsReading() throws {
-            let suite = "AnalyticsLifecycleTests.\(UUID().uuidString)"
+            let suite = temporarySuiteName("AnalyticsLifecycleTests")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let drawer = DebugDrawer(defaults: defaults)
@@ -34,7 +35,7 @@
         // in child processes), so reading its badge here sees only what this test's plugin did.
         @Test("Installed only in a drawer of its own, the plugin badges that drawer as its unseen count changes, and never the shared one")
         func badgesItsOwnDrawer() throws {
-            let suite = "AnalyticsLifecycleTests.badgesItsOwnDrawer.\(UUID().uuidString)"
+            let suite = temporarySuiteName("AnalyticsLifecycleTests.badgesItsOwnDrawer")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let drawer = DebugDrawer(defaults: defaults)
@@ -66,7 +67,7 @@
 
         @Test("Registering the plugin again reads the log again, events recorded meanwhile included")
         func reinstallReadsAgain() throws {
-            let suite = "AnalyticsLifecycleTests.\(UUID().uuidString)"
+            let suite = temporarySuiteName("AnalyticsLifecycleTests")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let drawer = DebugDrawer(defaults: defaults)
@@ -86,7 +87,7 @@
 
         @Test("Uninstalling twice is harmless")
         func uninstallTwice() throws {
-            let suite = "AnalyticsLifecycleTests.\(UUID().uuidString)"
+            let suite = temporarySuiteName("AnalyticsLifecycleTests")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let drawer = DebugDrawer(defaults: defaults)
@@ -105,7 +106,7 @@
 
         @Test("In two drawers the plugin reads the log until the last one uninstalls it")
         func twoDrawers() throws {
-            let suite = "AnalyticsLifecycleTests.\(UUID().uuidString)"
+            let suite = temporarySuiteName("AnalyticsLifecycleTests")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let first = DebugDrawer(defaults: defaults)
@@ -126,7 +127,7 @@
 
         @Test("An older model's uninstall leaves the observer a newer model set on the log")
         func olderUninstallKeepsNewerObserver() throws {
-            let suite = "AnalyticsLifecycleTests.\(UUID().uuidString)"
+            let suite = temporarySuiteName("AnalyticsLifecycleTests")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let drawer = DebugDrawer(defaults: defaults)

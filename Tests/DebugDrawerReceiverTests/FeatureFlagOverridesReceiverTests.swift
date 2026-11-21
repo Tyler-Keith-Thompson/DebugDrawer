@@ -1,4 +1,5 @@
 @testable import DebugDrawerReceiver
+import DebugDrawerTestSupport
 import Foundation
 import Testing
 
@@ -53,7 +54,7 @@ struct FeatureFlagOverridesReceiverTests {
 
     @Test("Only a listed flag is overridden: an unlisted one is refused notExposed, a value of another kind malformedCommand")
     func onlyListedFlagsChange() throws {
-        let suite = "FeatureFlagOverridesReceiverTests-\(UUID().uuidString)"
+        let suite = temporarySuiteName("FeatureFlagOverridesReceiverTests")
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         let directory = FileManager.default.temporaryDirectory.appending(path: "FeatureFlagOverridesReceiverTests-\(UUID().uuidString)")
@@ -95,7 +96,7 @@ struct FeatureFlagOverridesReceiverTests {
 
     @Test("An override a sidecar leaves while the app is in the background is applied as it comes to the foreground, with only the receiver linked")
     func appliesOnForeground() throws {
-        let suite = "FeatureFlagOverridesReceiverTests-\(UUID().uuidString)"
+        let suite = temporarySuiteName("FeatureFlagOverridesReceiverTests")
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         let directory = FileManager.default.temporaryDirectory.appending(path: "FeatureFlagOverridesReceiverTests-\(UUID().uuidString)")
@@ -129,7 +130,7 @@ struct FeatureFlagOverridesReceiverTests {
 
     @Test("Each override, each clear and the session's revert leaves its own audit entry naming the capability and the session")
     func auditsEachOverride() throws {
-        let suite = "FeatureFlagOverridesReceiverTests-\(UUID().uuidString)"
+        let suite = temporarySuiteName("FeatureFlagOverridesReceiverTests")
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         let directory = FileManager.default.temporaryDirectory.appending(path: "FeatureFlagOverridesReceiverTests-\(UUID().uuidString)")
@@ -169,7 +170,7 @@ struct FeatureFlagOverridesReceiverTests {
 
     @Test("Persistent overrides outlive the session and a relaunch of an adapter that keeps them; the next launch lists and clears them")
     func persistentOverridesSurviveRelaunch() throws {
-        let suite = "FeatureFlagOverridesReceiverTests-\(UUID().uuidString)"
+        let suite = temporarySuiteName("FeatureFlagOverridesReceiverTests")
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         let directory = FileManager.default.temporaryDirectory.appending(path: "FeatureFlagOverridesReceiverTests-\(UUID().uuidString)")
@@ -211,7 +212,7 @@ struct FeatureFlagOverridesReceiverTests {
 
     @Test("With the default scope, overrides a session left when the app quit during it are cleared as the next launch makes the capability")
     func sessionOverridesLeftByQuitAreCleared() throws {
-        let suite = "FeatureFlagOverridesReceiverTests-\(UUID().uuidString)"
+        let suite = temporarySuiteName("FeatureFlagOverridesReceiverTests")
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         let directory = FileManager.default.temporaryDirectory.appending(path: "FeatureFlagOverridesReceiverTests-\(UUID().uuidString)")

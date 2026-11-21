@@ -1,6 +1,7 @@
 // ViewInspector is linked on Apple platforms only, and the views are tested on the Mac.
 #if os(macOS)
     @testable import DebugDrawer
+    import DebugDrawerTestSupport
     import Foundation
     import SwiftUI
     import Testing
@@ -19,7 +20,7 @@
     struct NoticeMutingViewTests {
         @Test("A global plugin's section header menu silences its notices with Silence Notices")
         func contextMenuSilences() throws {
-            let name = "NoticeMutingViewTests.\(#function).\(UUID().uuidString)"
+            let name = temporarySuiteName("NoticeMutingViewTests.\(#function)")
             let suite = try #require(UserDefaults(suiteName: name))
             defer { suite.removePersistentDomain(forName: name) }
             let drawer = DebugDrawer(defaults: suite)
@@ -38,7 +39,7 @@
 
         @Test("A silenced local plugin's section header menu offers Allow Notices, not Silence Notices, which allows them again")
         func contextMenuAllows() throws {
-            let name = "NoticeMutingViewTests.\(#function).\(UUID().uuidString)"
+            let name = temporarySuiteName("NoticeMutingViewTests.\(#function)")
             let suite = try #require(UserDefaults(suiteName: name))
             defer { suite.removePersistentDomain(forName: name) }
             let drawer = DebugDrawer(defaults: suite)

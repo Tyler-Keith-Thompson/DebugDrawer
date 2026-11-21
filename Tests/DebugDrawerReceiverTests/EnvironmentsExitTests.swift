@@ -2,6 +2,7 @@
 // leave this file out.
 #if os(macOS)
     @testable import DebugDrawerReceiver
+    import DebugDrawerTestSupport
     import Foundation
     import Testing
 
@@ -53,7 +54,7 @@
         @Test("A switch made in a session survives the app being killed during it, and the next launch puts the default back")
         @MainActor
         func switchSurvivesKill() async throws {
-            let suite = "EnvironmentsExitTests-\(UUID().uuidString)"
+            let suite = temporarySuiteName("EnvironmentsExitTests")
             let directory = FileManager.default.temporaryDirectory.appending(path: "EnvironmentsExitTests-\(UUID().uuidString)")
             defer { UserDefaults(suiteName: suite)?.removePersistentDomain(forName: suite) }
 

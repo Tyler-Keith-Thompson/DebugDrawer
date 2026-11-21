@@ -2,6 +2,7 @@
 #if os(macOS)
     @testable import DebugDrawer
     @testable import DebugDrawerConsolePlugin
+    import DebugDrawerTestSupport
     import Foundation
     import SwiftUI
     import Testing
@@ -20,7 +21,7 @@
             final class Copied {
                 var texts: [String] = []
             }
-            let suite = "ConsoleCopyRedactionTests.ownDrawerRules.\(UUID().uuidString)"
+            let suite = temporarySuiteName("ConsoleCopyRedactionTests.ownDrawerRules")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let sharedRules = DebugDrawer.shared.redaction

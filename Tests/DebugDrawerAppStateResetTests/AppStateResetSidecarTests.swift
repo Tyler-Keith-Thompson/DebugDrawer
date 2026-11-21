@@ -8,6 +8,7 @@
     import DebugDrawer
     @testable import DebugDrawerAppStateReset
     @testable import DebugDrawerReceiver
+    import DebugDrawerTestSupport
     import Foundation
     import Testing
     #if os(macOS)
@@ -34,7 +35,7 @@
                 try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
                 try Data(contents.utf8).write(to: url)
             }
-            let suite = "AppStateResetSidecarTests-\(UUID().uuidString)"
+            let suite = temporarySuiteName("AppStateResetSidecarTests")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let secretValue = "value-7f3a9c-never-listed"

@@ -1,5 +1,6 @@
 #if DEBUG
     @testable import DebugDrawerScreenRecordingPlugin
+    import DebugDrawerTestSupport
     import Foundation
     import Testing
 
@@ -20,7 +21,7 @@
                     writers.append(writer)
                     return writer
                 },
-                now: { started }, defaults: try #require(UserDefaults(suiteName: UUID().uuidString))
+                now: { started }, defaults: try #require(UserDefaults(suiteName: temporarySuiteName("ScreenRecordingModelTests")))
             )
             let expectedTimes: [TimeInterval] = [10, 10.5]
 
@@ -47,7 +48,7 @@
                     writerCount += 1
                     return FakeMovieWriter(url: url)
                 },
-                defaults: try #require(UserDefaults(suiteName: UUID().uuidString))
+                defaults: try #require(UserDefaults(suiteName: temporarySuiteName("ScreenRecordingModelTests")))
             )
 
             sut.start()
@@ -66,7 +67,7 @@
                 folder: RecordingFolder(directory: directory), capacity: 5, frameSource: source,
                 makeWriter: { FakeMovieWriter(url: $0) },
                 now: { Date(timeIntervalSince1970: 1_763_290_000) },
-                defaults: try #require(UserDefaults(suiteName: UUID().uuidString))
+                defaults: try #require(UserDefaults(suiteName: temporarySuiteName("ScreenRecordingModelTests")))
             )
             sut.start()
             source.send(at: 1)
@@ -97,7 +98,7 @@
                     writers.append(writer)
                     return writer
                 },
-                defaults: try #require(UserDefaults(suiteName: UUID().uuidString))
+                defaults: try #require(UserDefaults(suiteName: temporarySuiteName("ScreenRecordingModelTests")))
             )
             sut.start()
             source.send(at: 1)
@@ -129,7 +130,7 @@
                     writer.failure = .noFrames
                     return writer
                 },
-                defaults: try #require(UserDefaults(suiteName: UUID().uuidString))
+                defaults: try #require(UserDefaults(suiteName: temporarySuiteName("ScreenRecordingModelTests")))
             )
             sut.start()
 
@@ -153,7 +154,7 @@
                     writer.failure = .writeFailed
                     return writer
                 },
-                defaults: try #require(UserDefaults(suiteName: UUID().uuidString))
+                defaults: try #require(UserDefaults(suiteName: temporarySuiteName("ScreenRecordingModelTests")))
             )
             sut.start()
             source.send(at: 1)
@@ -175,7 +176,7 @@
             let sut = ScreenRecordingModel(
                 folder: RecordingFolder(directory: directory), capacity: 5, frameSource: source,
                 makeWriter: { FakeMovieWriter(url: $0) },
-                defaults: try #require(UserDefaults(suiteName: UUID().uuidString))
+                defaults: try #require(UserDefaults(suiteName: temporarySuiteName("ScreenRecordingModelTests")))
             )
 
             sut.start()
@@ -192,7 +193,7 @@
             let sut = ScreenRecordingModel(
                 folder: RecordingFolder(directory: directory), capacity: 5, frameSource: source,
                 makeWriter: { FakeMovieWriter(url: $0) },
-                defaults: try #require(UserDefaults(suiteName: UUID().uuidString))
+                defaults: try #require(UserDefaults(suiteName: temporarySuiteName("ScreenRecordingModelTests")))
             )
 
             await sut.stop()
@@ -211,7 +212,7 @@
                 folder: RecordingFolder(directory: directory), capacity: 2, frameSource: source,
                 makeWriter: { FakeMovieWriter(url: $0) },
                 now: { clock },
-                defaults: try #require(UserDefaults(suiteName: UUID().uuidString))
+                defaults: try #require(UserDefaults(suiteName: temporarySuiteName("ScreenRecordingModelTests")))
             )
             let expected = ["Screen Recording 2025-11-16T10-47-00Z.mov", "Screen Recording 2025-11-16T10-46-50Z.mov"]
 
@@ -236,7 +237,7 @@
             let sut = ScreenRecordingModel(
                 folder: RecordingFolder(directory: directory), capacity: 5, frameSource: source,
                 makeWriter: { FakeMovieWriter(url: $0) },
-                defaults: try #require(UserDefaults(suiteName: UUID().uuidString))
+                defaults: try #require(UserDefaults(suiteName: temporarySuiteName("ScreenRecordingModelTests")))
             )
             sut.start()
             source.send(at: 1)
@@ -262,7 +263,7 @@
                 folder: RecordingFolder(directory: directory), capacity: 5, frameSource: source,
                 makeWriter: { FakeMovieWriter(url: $0) },
                 now: { clock },
-                defaults: try #require(UserDefaults(suiteName: UUID().uuidString))
+                defaults: try #require(UserDefaults(suiteName: temporarySuiteName("ScreenRecordingModelTests")))
             )
             for _ in 0 ..< 2 {
                 sut.start()
@@ -285,7 +286,7 @@
         func showsTouches() throws {
             let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
             defer { try? FileManager.default.removeItem(at: directory) }
-            let defaults = try #require(UserDefaults(suiteName: UUID().uuidString))
+            let defaults = try #require(UserDefaults(suiteName: temporarySuiteName("ScreenRecordingModelTests")))
             let source = FakeFrameSource()
             let sut = ScreenRecordingModel(
                 folder: RecordingFolder(directory: directory), capacity: 5, frameSource: source,
@@ -313,7 +314,7 @@
             let sut = ScreenRecordingModel(
                 folder: RecordingFolder(directory: directory), capacity: 5, frameSource: source,
                 makeWriter: { FakeMovieWriter(url: $0) },
-                defaults: try #require(UserDefaults(suiteName: UUID().uuidString))
+                defaults: try #require(UserDefaults(suiteName: temporarySuiteName("ScreenRecordingModelTests")))
             )
 
             sut.toggle()
@@ -345,7 +346,7 @@
             let sut = ScreenRecordingModel(
                 folder: RecordingFolder(directory: directory), capacity: 2, frameSource: FakeFrameSource(),
                 makeWriter: { FakeMovieWriter(url: $0) },
-                defaults: try #require(UserDefaults(suiteName: UUID().uuidString))
+                defaults: try #require(UserDefaults(suiteName: temporarySuiteName("ScreenRecordingModelTests")))
             )
 
             await sut.load()

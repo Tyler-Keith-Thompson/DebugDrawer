@@ -4,6 +4,7 @@
 #if os(macOS) && DEBUG
     @testable import DebugDrawer
     @testable import DebugDrawerLeakDetectorPlugin
+    import DebugDrawerTestSupport
     import Foundation
     import Testing
 
@@ -27,7 +28,7 @@
                 setenv("CFFIXED_USER_HOME", home, 1)
                 guard URL.applicationSupportDirectory.path(percentEncoded: false).hasPrefix(home) else { exit(EXIT_FAILURE) }
                 @MainActor func isExpected() -> Bool {
-                    let suite = "LeakDetectorBadgeExitTests.badgesItsOwnDrawer.\(UUID().uuidString)"
+                    let suite = temporarySuiteName("LeakDetectorBadgeExitTests.badgesItsOwnDrawer")
                     guard let defaults = UserDefaults(suiteName: suite) else { return false }
                     defer { defaults.removePersistentDomain(forName: suite) }
                     let drawer = DebugDrawer(defaults: defaults)

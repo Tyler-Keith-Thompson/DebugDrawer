@@ -1,6 +1,7 @@
 #if DEBUG
     @testable import DebugDrawer
     @testable import DebugDrawerPerformancePlugin
+    import DebugDrawerTestSupport
     import Foundation
     import Testing
 
@@ -44,7 +45,7 @@
     @Suite("Performance drops its history once removed from every drawer")
     struct PerformanceUninstallTests {
         private static func drawer() throws -> (DebugDrawer, () -> Void) {
-            let suite = "PerformanceUninstallTests.\(UUID().uuidString)"
+            let suite = temporarySuiteName("PerformanceUninstallTests")
             let defaults = try #require(UserDefaults(suiteName: suite))
             return (DebugDrawer(defaults: defaults), { defaults.removePersistentDomain(forName: suite) })
         }

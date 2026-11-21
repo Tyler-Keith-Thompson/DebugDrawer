@@ -2,6 +2,7 @@
     import DebugDrawer
     @testable import DebugDrawerReceiver
     @testable import DebugDrawerSidecarKit
+    import DebugDrawerTestSupport
     import Foundation
     import Testing
     import ViewInspector
@@ -29,7 +30,7 @@
 
         @Test("The kit lists the app's environments, and Switch points the app at the host's own configuration for one in the session")
         func switchButtonSwitches() async throws {
-            let suite = "SidecarEnvironmentsTests-\(UUID().uuidString)"
+            let suite = temporarySuiteName("SidecarEnvironmentsTests")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let store = FileManager.default.temporaryDirectory

@@ -1,4 +1,5 @@
 import DebugDrawer
+import DebugDrawerTestSupport
 import Foundation
 import Testing
 
@@ -89,7 +90,7 @@ extension InterceptionContract {
     /// Runs `body` with two drawers of their own, each keeping what it saves in a `UserDefaults`
     /// suite of its own, which is removed afterwards.
     func withTwoDrawers(_ body: (DebugDrawer, DebugDrawer) async throws -> Void) async throws {
-        let suites = ["InterceptionContract.\(UUID().uuidString)", "InterceptionContract.\(UUID().uuidString)"]
+        let suites = [temporarySuiteName("InterceptionContract"), temporarySuiteName("InterceptionContract")]
         defer {
             for suite in suites {
                 UserDefaults(suiteName: suite)?.removePersistentDomain(forName: suite)

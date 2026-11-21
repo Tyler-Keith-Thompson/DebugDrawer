@@ -4,6 +4,7 @@
     #endif
     @testable import DebugDrawer
     @testable import DebugDrawerPerformancePlugin
+    import DebugDrawerTestSupport
     import Foundation
     import SwiftUI
     import Testing
@@ -40,7 +41,7 @@
     struct PerformanceLifecycleTests {
         @Test("Registering the plugin starts nothing; it samples from didBecomeVisible to didBecomeHidden")
         func visibleToHidden() throws {
-            let suite = "PerformanceLifecycleTests.\(UUID().uuidString)"
+            let suite = temporarySuiteName("PerformanceLifecycleTests")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let drawer = DebugDrawer(defaults: defaults)
@@ -64,8 +65,8 @@
 
         @Test("Two drawers showing the plugin start the sampler once, and it stops only when both hide it")
         func twoDrawers() throws {
-            let firstSuite = "PerformanceLifecycleTests.\(UUID().uuidString)"
-            let secondSuite = "PerformanceLifecycleTests.\(UUID().uuidString)"
+            let firstSuite = temporarySuiteName("PerformanceLifecycleTests")
+            let secondSuite = temporarySuiteName("PerformanceLifecycleTests")
             let firstDefaults = try #require(UserDefaults(suiteName: firstSuite))
             let secondDefaults = try #require(UserDefaults(suiteName: secondSuite))
             defer {
@@ -93,7 +94,7 @@
 
         @Test("Unregistering the plugin while it is shown stops the sampler")
         func removedWhileShown() throws {
-            let suite = "PerformanceLifecycleTests.\(UUID().uuidString)"
+            let suite = temporarySuiteName("PerformanceLifecycleTests")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let drawer = DebugDrawer(defaults: defaults)
@@ -110,7 +111,7 @@
 
         @Test("Once the plugin is hidden, the production sampler's timer is cancelled and its display link invalidated")
         func productionSamplerStops() throws {
-            let suite = "PerformanceLifecycleTests.\(UUID().uuidString)"
+            let suite = temporarySuiteName("PerformanceLifecycleTests")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let drawer = DebugDrawer(defaults: defaults)
@@ -132,7 +133,7 @@
         #if os(macOS)
             @Test("The plugin's section body on screen in a drawer samples, and collapsing the section stops it")
             func hostedSection() throws {
-                let suite = "PerformanceLifecycleTests.\(UUID().uuidString)"
+                let suite = temporarySuiteName("PerformanceLifecycleTests")
                 let defaults = try #require(UserDefaults(suiteName: suite))
                 defer { defaults.removePersistentDomain(forName: suite) }
                 let drawer = DebugDrawer(defaults: defaults)

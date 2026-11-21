@@ -1,6 +1,7 @@
 #if DEBUG
     @testable import DebugDrawer
     @testable import DebugDrawerEnergyPlugin
+    import DebugDrawerTestSupport
     import Foundation
     import Testing
 
@@ -571,8 +572,8 @@
 
         @Test("The plugin over a monitor of fakes, installed in two real drawers, samples while either shows it and drops its readings with the last")
         func pluginInTwoDrawers() throws {
-            let firstSuite = "EnergyModelTests.\(UUID().uuidString)"
-            let secondSuite = "EnergyModelTests.\(UUID().uuidString)"
+            let firstSuite = temporarySuiteName("EnergyModelTests")
+            let secondSuite = temporarySuiteName("EnergyModelTests")
             let firstDefaults = try #require(UserDefaults(suiteName: firstSuite))
             let secondDefaults = try #require(UserDefaults(suiteName: secondSuite))
             defer {

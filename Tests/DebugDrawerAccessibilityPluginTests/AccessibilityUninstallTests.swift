@@ -1,6 +1,7 @@
 #if DEBUG
     @testable import DebugDrawer
     @testable import DebugDrawerAccessibilityPlugin
+    import DebugDrawerTestSupport
     import Foundation
     import Testing
 
@@ -10,7 +11,7 @@
         struct AccessibilityUninstallTests {
             @Test("Removing the plugin takes it out of the drawer and clears every override")
             func uninstallClearsOverrides() throws {
-                let suite = "AccessibilityUninstallTests.\(UUID().uuidString)"
+                let suite = temporarySuiteName("AccessibilityUninstallTests")
                 let defaults = try #require(UserDefaults(suiteName: suite))
                 defer { defaults.removePersistentDomain(forName: suite) }
                 let drawer = DebugDrawer(defaults: defaults)
@@ -49,7 +50,7 @@
 
             @Test("Overrides stay while another drawer still holds the plugin, and clear once the last removes it")
             func lastDrawerClears() throws {
-                let suite = "AccessibilityUninstallTests.\(UUID().uuidString)"
+                let suite = temporarySuiteName("AccessibilityUninstallTests")
                 let defaults = try #require(UserDefaults(suiteName: suite))
                 defer { defaults.removePersistentDomain(forName: suite) }
                 let first = DebugDrawer(defaults: defaults)
@@ -72,7 +73,7 @@
 
             @Test("Removing the plugin twice is harmless, and overrides set after a reinstall apply until the next removal")
             func reinstallAfterUninstall() throws {
-                let suite = "AccessibilityUninstallTests.\(UUID().uuidString)"
+                let suite = temporarySuiteName("AccessibilityUninstallTests")
                 let defaults = try #require(UserDefaults(suiteName: suite))
                 defer { defaults.removePersistentDomain(forName: suite) }
                 let drawer = DebugDrawer(defaults: defaults)

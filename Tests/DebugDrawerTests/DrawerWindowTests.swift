@@ -2,6 +2,7 @@
 #if os(macOS)
     import AppKit
     @testable import DebugDrawer
+    import DebugDrawerTestSupport
     import SwiftUI
     import Testing
 
@@ -12,7 +13,7 @@
     struct DrawerWindowTests {
         @Test("Opening a window's drawer orders its panel in above that window, as a child window at its trailing edge")
         func panelIsAChildAboveTheWindow() throws {
-            let suite = "DrawerWindowTests.\(#function).\(UUID().uuidString)"
+            let suite = temporarySuiteName("DrawerWindowTests.\(#function)")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let drawer = DebugDrawer(defaults: defaults)
@@ -44,7 +45,7 @@
 
         @Test("Attaching a window twice keeps one drawer for it")
         func attachingTwiceKeepsOneDrawer() throws {
-            let suite = "DrawerWindowTests.\(#function).\(UUID().uuidString)"
+            let suite = temporarySuiteName("DrawerWindowTests.\(#function)")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let drawer = DebugDrawer(defaults: defaults)
@@ -64,7 +65,7 @@
 
         @Test("A drawer opened before its window is on screen comes on screen with the window")
         func panelComesInWithItsWindow() throws {
-            let suite = "DrawerWindowTests.\(#function).\(UUID().uuidString)"
+            let suite = temporarySuiteName("DrawerWindowTests.\(#function)")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let drawer = DebugDrawer(defaults: defaults)
@@ -87,7 +88,7 @@
 
         @Test("Opening one window's drawer leaves another window's drawer closed")
         func eachWindowHasItsOwnDrawer() throws {
-            let suite = "DrawerWindowTests.\(#function).\(UUID().uuidString)"
+            let suite = temporarySuiteName("DrawerWindowTests.\(#function)")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let drawer = DebugDrawer(defaults: defaults)
@@ -119,7 +120,7 @@
 
         @Test("A drawer opened before any window is attached opens in the first window attached")
         func theFirstWindowTakesTheDetachedState() throws {
-            let suite = "DrawerWindowTests.\(#function).\(UUID().uuidString)"
+            let suite = temporarySuiteName("DrawerWindowTests.\(#function)")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let drawer = DebugDrawer(defaults: defaults)
@@ -142,7 +143,7 @@
 
         @Test("Closing a window detaches it from the drawer that attached it and takes its panel off screen")
         func closingTheWindowDetaches() throws {
-            let suite = "DrawerWindowTests.\(#function).\(UUID().uuidString)"
+            let suite = temporarySuiteName("DrawerWindowTests.\(#function)")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let drawer = DebugDrawer(defaults: defaults)
@@ -290,7 +291,7 @@
 
             @Test("Closing a window another drawer attached leaves the shared drawer's attachments and that window's local plugins as they were")
             func closingAnotherDrawersWindowLeavesTheSharedDrawer() throws {
-                let suite = "DrawerWindowTests.\(#function).\(UUID().uuidString)"
+                let suite = temporarySuiteName("DrawerWindowTests.\(#function)")
                 let defaults = try #require(UserDefaults(suiteName: suite))
                 defer { defaults.removePersistentDomain(forName: suite) }
                 let drawer = DebugDrawer(defaults: defaults)
@@ -365,7 +366,7 @@
     struct DrawerWindowTests {
         @Test("Opening the drawer shows its window, above the level alerts are presented at; closing hides it")
         func windowIsAboveAlerts() throws {
-            let suite = "DrawerWindowTests.\(#function).\(UUID().uuidString)"
+            let suite = temporarySuiteName("DrawerWindowTests.\(#function)")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let drawer = DebugDrawer(defaults: defaults)
@@ -384,7 +385,7 @@
 
         @Test("Opening the drawer doesn't make its window key, so the app's text field keeps the keyboard")
         func openingLeavesTheKeyWindow() throws {
-            let suite = "DrawerWindowTests.\(#function).\(UUID().uuidString)"
+            let suite = temporarySuiteName("DrawerWindowTests.\(#function)")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let drawer = DebugDrawer(defaults: defaults)
@@ -399,7 +400,7 @@
 
         @Test("The drawer's window is the drawer's own, which plugins that draw the app's windows leave out")
         func drawerWindowIsLeftOut() throws {
-            let suite = "DrawerWindowTests.\(#function).\(UUID().uuidString)"
+            let suite = temporarySuiteName("DrawerWindowTests.\(#function)")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let drawer = DebugDrawer(defaults: defaults)

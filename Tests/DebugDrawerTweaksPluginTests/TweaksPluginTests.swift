@@ -1,5 +1,6 @@
 #if DEBUG
     import DebugDrawer
+    import DebugDrawerTestSupport
     @testable import DebugDrawerTweaksPlugin
     import Foundation
     import Testing
@@ -39,7 +40,7 @@
 
         @Test("Installing registers one Tweaks plugin, and installing again replaces it")
         func install() throws {
-            let suite = "TweaksPluginTests.\(UUID().uuidString)"
+            let suite = temporarySuiteName("TweaksPluginTests")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let drawer = DebugDrawer(defaults: defaults)

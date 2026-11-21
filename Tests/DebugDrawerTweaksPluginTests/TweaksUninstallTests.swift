@@ -1,5 +1,6 @@
 #if DEBUG
     @testable import DebugDrawer
+    import DebugDrawerTestSupport
     @testable import DebugDrawerTweaksPlugin
     import Foundation
     import Testing
@@ -9,7 +10,7 @@
     struct TweaksUninstallTests {
         @Test("Unregistering removes the plugin; the app's tweaks still read the storage installTweaks gave")
         func disappearsFromTheDrawer() throws {
-            let suite = "TweaksUninstallTests.\(UUID().uuidString)"
+            let suite = temporarySuiteName("TweaksUninstallTests")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let drawer = DebugDrawer(defaults: defaults)
@@ -29,7 +30,7 @@
 
         @Test("Uninstalling twice is harmless, and a plugin registered again lists its actions again")
         func uninstallTwiceThenReinstall() throws {
-            let suite = "TweaksUninstallTests.\(UUID().uuidString)"
+            let suite = temporarySuiteName("TweaksUninstallTests")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let drawer = DebugDrawer(defaults: defaults)

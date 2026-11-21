@@ -2,6 +2,7 @@
     @testable import DebugDrawer
     import DebugDrawerAppInfo
     @testable import DebugDrawerAppInfoPlugin
+    import DebugDrawerTestSupport
     import Foundation
     import Testing
 
@@ -45,7 +46,7 @@
     struct AppInfoLifecycleTests {
         @Test("Registering the plugin starts nothing; it refreshes from didBecomeVisible to didBecomeHidden")
         func visibleToHidden() throws {
-            let suite = "AppInfoLifecycleTests.\(UUID().uuidString)"
+            let suite = temporarySuiteName("AppInfoLifecycleTests")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let drawer = DebugDrawer(defaults: defaults)
@@ -84,8 +85,8 @@
 
         @Test("Two drawers showing the plugin start the timer once, and it stops only when both hide it")
         func twoDrawers() throws {
-            let firstSuite = "AppInfoLifecycleTests.\(UUID().uuidString)"
-            let secondSuite = "AppInfoLifecycleTests.\(UUID().uuidString)"
+            let firstSuite = temporarySuiteName("AppInfoLifecycleTests")
+            let secondSuite = temporarySuiteName("AppInfoLifecycleTests")
             let firstDefaults = try #require(UserDefaults(suiteName: firstSuite))
             let secondDefaults = try #require(UserDefaults(suiteName: secondSuite))
             defer {
@@ -122,7 +123,7 @@
 
         @Test("Once the plugin is hidden, the production timer is cancelled")
         func productionTimerStops() throws {
-            let suite = "AppInfoLifecycleTests.\(UUID().uuidString)"
+            let suite = temporarySuiteName("AppInfoLifecycleTests")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let drawer = DebugDrawer(defaults: defaults)

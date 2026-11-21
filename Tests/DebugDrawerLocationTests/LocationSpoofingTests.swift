@@ -2,6 +2,7 @@
     import CoreLocation
     @testable import DebugDrawerLocation
     @testable import DebugDrawerReceiver
+    import DebugDrawerTestSupport
     import Foundation
     import Testing
 
@@ -19,7 +20,7 @@
 
         @Test("A spoof in an open session tells the host its location, and the host's readings become it, dated now")
         func spoofTellsHostAndReplacesReadings() throws {
-            let suite = "LocationSpoofingTests-\(UUID().uuidString)"
+            let suite = temporarySuiteName("LocationSpoofingTests")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let clock = MovableClock(Self.now)
@@ -46,7 +47,7 @@
 
         @Test("Moving the spoof tells the host the new location; the same coordinate again tells it nothing; stop tells it nil")
         func moveRepeatAndStop() throws {
-            let suite = "LocationSpoofingTests-\(UUID().uuidString)"
+            let suite = temporarySuiteName("LocationSpoofingTests")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let sessions = DebugDrawerSessions(maximumDuration: 300, auditCapacity: 100, clock: MovableClock(Self.now), timer: ManualTimer())
@@ -70,7 +71,7 @@
 
         @Test("A spoof outside a session is ignored: the host hears nothing and its readings stay real")
         func spoofOutsideSessionIgnored() throws {
-            let suite = "LocationSpoofingTests-\(UUID().uuidString)"
+            let suite = temporarySuiteName("LocationSpoofingTests")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let sessions = DebugDrawerSessions(maximumDuration: 300, auditCapacity: 100, clock: MovableClock(Self.now), timer: ManualTimer())
@@ -87,7 +88,7 @@
 
         @Test("A coordinate off the Earth is refused malformedCommand and, performed anyway, ignored")
         func coordinateOffTheEarth() throws {
-            let suite = "LocationSpoofingTests-\(UUID().uuidString)"
+            let suite = temporarySuiteName("LocationSpoofingTests")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let sessions = DebugDrawerSessions(maximumDuration: 300, auditCapacity: 100, clock: MovableClock(Self.now), timer: ManualTimer())
@@ -137,7 +138,7 @@
 
         @Test("The host's readings stop being spoofed at the session's expiry date, before the timer fires; the end then tells it nil")
         func readingsStopAtExpiryDate() throws {
-            let suite = "LocationSpoofingTests-\(UUID().uuidString)"
+            let suite = temporarySuiteName("LocationSpoofingTests")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let clock = MovableClock(Self.now)
@@ -164,7 +165,7 @@
 
         @Test("A session that ends with no receiver to revert it still ends the spoof, and the host is told once")
         func sessionEndWithoutReceiver() throws {
-            let suite = "LocationSpoofingTests-\(UUID().uuidString)"
+            let suite = temporarySuiteName("LocationSpoofingTests")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let sessions = DebugDrawerSessions(maximumDuration: 300, auditCapacity: 100, clock: MovableClock(Self.now), timer: ManualTimer())
@@ -182,7 +183,7 @@
 
         @Test("The flag is in the defaults from the spoof's start to its stop, and never the coordinate")
         func flagKeptWhileSpoofing() throws {
-            let suite = "LocationSpoofingTests-\(UUID().uuidString)"
+            let suite = temporarySuiteName("LocationSpoofingTests")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let sessions = DebugDrawerSessions(maximumDuration: 300, auditCapacity: 100, clock: MovableClock(Self.now), timer: ManualTimer())
@@ -200,7 +201,7 @@
 
         @Test("The host's readings are spoofed when read off the main actor")
         func readsFromAnyThread() async throws {
-            let suite = "LocationSpoofingTests-\(UUID().uuidString)"
+            let suite = temporarySuiteName("LocationSpoofingTests")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let sessions = DebugDrawerSessions(maximumDuration: 300, auditCapacity: 100, clock: MovableClock(Self.now), timer: ManualTimer())

@@ -1,5 +1,6 @@
 #if DEBUG
     @testable import DebugDrawerLocalizationPlugin
+    import DebugDrawerTestSupport
     import Foundation
     import Testing
 
@@ -17,7 +18,7 @@
 
         @Test("Pseudo-localizing stores Foundation's accent and double keys as true; turning it off removes them")
         func storesPseudoKeys() throws {
-            let name = "NextLaunchTests.\(UUID().uuidString)"
+            let name = temporarySuiteName("NextLaunchTests")
             let defaults = try #require(UserDefaults(suiteName: name))
             defer { defaults.removePersistentDomain(forName: name) }
             let sut = NextLaunchDefaults(defaults: defaults, domainName: name)
@@ -37,7 +38,7 @@
 
         @Test("Untranslated in Capitals stores NSShowNonLocalizedStrings alone")
         func storesShowNonLocalized() throws {
-            let name = "NextLaunchTests.\(UUID().uuidString)"
+            let name = temporarySuiteName("NextLaunchTests")
             let defaults = try #require(UserDefaults(suiteName: name))
             defer { defaults.removePersistentDomain(forName: name) }
             let sut = NextLaunchDefaults(defaults: defaults, domainName: name)
@@ -51,7 +52,7 @@
 
         @Test("An option counts as stored only when every key is true: one key, or false, isn't")
         func partialKeysArentStored() throws {
-            let name = "NextLaunchTests.\(UUID().uuidString)"
+            let name = temporarySuiteName("NextLaunchTests")
             let defaults = try #require(UserDefaults(suiteName: name))
             defer { defaults.removePersistentDomain(forName: name) }
             defaults.set(true, forKey: "NSAccentuateLocalizedStrings")
@@ -65,7 +66,7 @@
 
         @Test("The model starts with what is stored as launched; a change makes a relaunch pending, and undoing it doesn't")
         func relaunchPending() throws {
-            let name = "NextLaunchTests.\(UUID().uuidString)"
+            let name = temporarySuiteName("NextLaunchTests")
             let defaults = try #require(UserDefaults(suiteName: name))
             defer { defaults.removePersistentDomain(forName: name) }
             NextLaunchDefaults(defaults: defaults, domainName: name).set(.untranslatedInCapitals, isOn: true)

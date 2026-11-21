@@ -1,6 +1,7 @@
 #if DEBUG
     @testable import DebugDrawer
     @testable import DebugDrawerLoadedLibrariesPlugin
+    import DebugDrawerTestSupport
     import Foundation
     import Testing
 
@@ -9,7 +10,7 @@
     struct LoadedLibrariesUninstallTests {
         @Test("Unregistering removes the plugin; uninstalling again is harmless, and registering again lists it once")
         func disappearsFromTheDrawer() throws {
-            let suite = "LoadedLibrariesUninstallTests.\(UUID().uuidString)"
+            let suite = temporarySuiteName("LoadedLibrariesUninstallTests")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let drawer = DebugDrawer(defaults: defaults)

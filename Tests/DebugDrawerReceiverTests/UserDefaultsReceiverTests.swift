@@ -1,5 +1,6 @@
 import CryptoKit
 @testable import DebugDrawerReceiver
+import DebugDrawerTestSupport
 import Foundation
 import os
 import Testing
@@ -84,7 +85,7 @@ struct UserDefaultsReceiverTests {
 
     @Test("In a session, a sidecar reads, from the store, the allowlisted keys with their values as their kinds, and no other key of the domain")
     func listsOnlyAllowlistedKeys() async throws {
-        let suite = "UserDefaultsReceiverTests-\(UUID().uuidString)"
+        let suite = temporarySuiteName("UserDefaultsReceiverTests")
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         defaults.set("pro", forKey: "plan")
@@ -131,7 +132,7 @@ struct UserDefaultsReceiverTests {
 
     @Test("Only allowlisted keys are edited: another key is notExposed, a value the key's kind doesn't take malformed, and neither changes anything")
     func onlyAllowlistedKeysAreEdited() throws {
-        let suite = "UserDefaultsReceiverTests-\(UUID().uuidString)"
+        let suite = temporarySuiteName("UserDefaultsReceiverTests")
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         defaults.set("secret-session-token-4417", forKey: "sessionToken")
@@ -198,7 +199,7 @@ struct UserDefaultsReceiverTests {
 
     @Test("With the capability off, every UserDefaults command is refused, in an open session, and nothing is served or written")
     func offRefusesEverything() throws {
-        let suite = "UserDefaultsReceiverTests-\(UUID().uuidString)"
+        let suite = temporarySuiteName("UserDefaultsReceiverTests")
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         defaults.set("free", forKey: "plan")
@@ -209,7 +210,7 @@ struct UserDefaultsReceiverTests {
         let sessions = DebugDrawerSessions(maximumDuration: 300, auditCapacity: 100, clock: MovableClock(Self.now), timer: ManualTimer())
         let gate = Gate()
         let sut = DebugDrawerReceiver(directory: directory, sessions: sessions)
-        let flagSuite = "UserDefaultsReceiverTests.flags.\(UUID().uuidString)"
+        let flagSuite = temporarySuiteName("UserDefaultsReceiverTests.flags")
         let flagDefaults = try #require(UserDefaults(suiteName: flagSuite))
         defer { flagDefaults.removePersistentDomain(forName: flagSuite) }
         sut.enable(.featureFlagOverrides(DebugDrawerFeatureFlagOverrides(adapter: EmptyFlagAdapter(), defaults: flagDefaults)))
@@ -254,7 +255,7 @@ struct UserDefaultsReceiverTests {
 
     @Test("Each edit's audit entry carries the key with its value before and after, and the revert's what it put back")
     func auditsEachEdit() throws {
-        let suite = "UserDefaultsReceiverTests-\(UUID().uuidString)"
+        let suite = temporarySuiteName("UserDefaultsReceiverTests")
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         defaults.set("free", forKey: "plan")
@@ -351,7 +352,7 @@ struct UserDefaultsReceiverTests {
 
     @Test("As the session expires, the timer firing, each edited key is put back, audited before sessionEnded(.expired)")
     func revertsAsSessionExpires() throws {
-        let suite = "UserDefaultsReceiverTests-\(UUID().uuidString)"
+        let suite = temporarySuiteName("UserDefaultsReceiverTests")
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         defaults.set(20, forKey: "itemsPerPage")
@@ -389,7 +390,7 @@ struct UserDefaultsReceiverTests {
 
     @Test("The capability's gate turning off puts the edits back at once while the session goes on; the receiver's ends the session")
     func revertsAtGateOff() throws {
-        let suite = "UserDefaultsReceiverTests-\(UUID().uuidString)"
+        let suite = temporarySuiteName("UserDefaultsReceiverTests")
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         let directory = FileManager.default.temporaryDirectory.appending(path: "UserDefaultsReceiverTests-\(UUID().uuidString)")
@@ -433,7 +434,7 @@ struct UserDefaultsReceiverTests {
 
     @Test("Edits a session left when the app was killed are put back as the next launch makes the capability, before any session")
     func editsLeftByKillAreRevertedAtLaunch() throws {
-        let suite = "UserDefaultsReceiverTests-\(UUID().uuidString)"
+        let suite = temporarySuiteName("UserDefaultsReceiverTests")
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         defaults.set("free", forKey: "plan")
@@ -472,7 +473,7 @@ struct UserDefaultsReceiverTests {
 
     @Test("With the persistent scope edits outlive the session and the next launch, until a sidecar sends revertAll")
     func persistentEditsStay() throws {
-        let suite = "UserDefaultsReceiverTests-\(UUID().uuidString)"
+        let suite = temporarySuiteName("UserDefaultsReceiverTests")
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         let directory = FileManager.default.temporaryDirectory.appending(path: "UserDefaultsReceiverTests-\(UUID().uuidString)")
@@ -509,7 +510,7 @@ struct UserDefaultsReceiverTests {
 
     @Test("A key that read its registered default is removed by the revert, so the app follows the default again")
     func registeredDefaultIsRemovedByRevert() throws {
-        let suite = "UserDefaultsReceiverTests-\(UUID().uuidString)"
+        let suite = temporarySuiteName("UserDefaultsReceiverTests")
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         defaults.register(defaults: ["itemsPerPage": 30])
@@ -527,7 +528,7 @@ struct UserDefaultsReceiverTests {
 
     @Test("A value the app writes outside the receiver reaches the snapshot through UserDefaults' change notification")
     func followsTheAppsOwnWrites() async throws {
-        let suite = "UserDefaultsReceiverTests-\(UUID().uuidString)"
+        let suite = temporarySuiteName("UserDefaultsReceiverTests")
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         let sut = DebugDrawerUserDefaults(keys: allowlist, defaults: defaults)
@@ -544,7 +545,7 @@ struct UserDefaultsReceiverTests {
 
     @Test("With a grant policy an edit needs a grant listing the capability; another's is capabilityNotGranted")
     func grantRequiredUnderPolicy() throws {
-        let suite = "UserDefaultsReceiverTests-\(UUID().uuidString)"
+        let suite = temporarySuiteName("UserDefaultsReceiverTests")
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         let directory = FileManager.default.temporaryDirectory.appending(path: "UserDefaultsReceiverTests-\(UUID().uuidString)")
@@ -559,7 +560,7 @@ struct UserDefaultsReceiverTests {
         )
         let sut = DebugDrawerReceiver(directory: directory, sessions: sessions)
         sut.enable(.userDefaults(DebugDrawerUserDefaults(keys: allowlist, defaults: defaults)))
-        let flagSuite = "UserDefaultsReceiverTests.flags.\(UUID().uuidString)"
+        let flagSuite = temporarySuiteName("UserDefaultsReceiverTests.flags")
         let flagDefaults = try #require(UserDefaults(suiteName: flagSuite))
         defer { flagDefaults.removePersistentDomain(forName: flagSuite) }
         sut.enable(.featureFlagOverrides(DebugDrawerFeatureFlagOverrides(adapter: EmptyFlagAdapter(), defaults: flagDefaults)))

@@ -3,6 +3,7 @@
 #if os(macOS) && DEBUG
     @testable import DebugDrawer
     @testable import DebugDrawerDiskIOPlugin
+    import DebugDrawerTestSupport
     import Foundation
     import Testing
 
@@ -27,7 +28,7 @@
 
                 @MainActor
                 func pauseThenResume() async throws {
-                    let suite = "DiskIOPauseExitTests.\(UUID().uuidString)"
+                    let suite = temporarySuiteName("DiskIOPauseExitTests")
                     let defaults = try #require(UserDefaults(suiteName: suite))
                     defer { defaults.removePersistentDomain(forName: suite) }
                     let drawer = DebugDrawer(defaults: defaults)

@@ -12,6 +12,7 @@ swift_library(
     module_name = "DebugDrawerInterceptionContract",
     deps = [
         "//Sources/DebugDrawer",
+        "//Tests/DebugDrawerTestSupport",
     ],
     visibility = [
         "//:__pkg__",

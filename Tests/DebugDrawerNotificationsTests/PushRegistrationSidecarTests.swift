@@ -7,6 +7,7 @@
     import DebugDrawer
     @testable import DebugDrawerNotifications
     @testable import DebugDrawerReceiver
+    import DebugDrawerTestSupport
     import Foundation
     #if os(macOS)
         import OSLog
@@ -309,7 +310,7 @@
             let store = root.appending(path: "Group/DebugDrawer")
             let sessions = DebugDrawerSessions(maximumDuration: 300)
             let receiver = DebugDrawerReceiver(directory: store, sessions: sessions)
-            let suite = "PushRegistrationSidecarTests.logLevels.\(UUID().uuidString)"
+            let suite = temporarySuiteName("PushRegistrationSidecarTests.logLevels")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             receiver.enable(.logLevels(DebugDrawerLogLevels(adapter: NoSubsystems(), defaults: defaults)))

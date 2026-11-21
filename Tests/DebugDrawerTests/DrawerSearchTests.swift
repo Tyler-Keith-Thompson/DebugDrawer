@@ -1,5 +1,6 @@
 #if DEBUG
     @testable import DebugDrawer
+    import DebugDrawerTestSupport
     import SwiftUI
     import Testing
 
@@ -141,7 +142,7 @@
         struct DrawerSearchShortcutTests {
             @Test("Cmd-K is not bound while the drawer is closed, so it can't open it")
             func commandKIsUnboundWhileClosed() throws {
-                let suite = "DrawerSearchShortcutTests.\(#function).\(UUID().uuidString)"
+                let suite = temporarySuiteName("DrawerSearchShortcutTests.\(#function)")
                 let defaults = try #require(UserDefaults(suiteName: suite))
                 defer { defaults.removePersistentDomain(forName: suite) }
                 let drawer = DebugDrawer(defaults: defaults)
@@ -158,7 +159,7 @@
 
             @Test("While the drawer is open, Cmd-K is bound and the search field is shown")
             func commandKIsBoundWhileOpen() throws {
-                let suite = "DrawerSearchShortcutTests.\(#function).\(UUID().uuidString)"
+                let suite = temporarySuiteName("DrawerSearchShortcutTests.\(#function)")
                 let defaults = try #require(UserDefaults(suiteName: suite))
                 defer { defaults.removePersistentDomain(forName: suite) }
                 let drawer = DebugDrawer(defaults: defaults)

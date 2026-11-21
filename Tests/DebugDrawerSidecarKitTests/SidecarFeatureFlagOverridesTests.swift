@@ -2,6 +2,7 @@
     import DebugDrawer
     @testable import DebugDrawerReceiver
     @testable import DebugDrawerSidecarKit
+    import DebugDrawerTestSupport
     import Foundation
     import Testing
     import ViewInspector
@@ -40,7 +41,7 @@
 
         @Test("The kit lists the app's flags, and the switch overrides the flag in the host's service in the session")
         func switchOverridesTheFlag() async throws {
-            let suite = "SidecarFeatureFlagOverridesTests-\(UUID().uuidString)"
+            let suite = temporarySuiteName("SidecarFeatureFlagOverridesTests")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let store = FileManager.default.temporaryDirectory

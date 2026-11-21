@@ -1,6 +1,7 @@
 #if DEBUG
     @testable import DebugDrawer
     @testable import DebugDrawerScreenshotPlugin
+    import DebugDrawerTestSupport
     import Foundation
     import Testing
 
@@ -8,7 +9,7 @@
     @Suite("Screenshot drops its last capture once removed from every drawer", .timeLimit(.minutes(1)))
     struct ScreenshotUninstallTests {
         private static func drawer() throws -> (DebugDrawer, () -> Void) {
-            let suite = "ScreenshotUninstallTests.\(UUID().uuidString)"
+            let suite = temporarySuiteName("ScreenshotUninstallTests")
             let defaults = try #require(UserDefaults(suiteName: suite))
             return (DebugDrawer(defaults: defaults), { defaults.removePersistentDomain(forName: suite) })
         }

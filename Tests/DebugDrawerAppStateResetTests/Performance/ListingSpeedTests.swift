@@ -5,6 +5,7 @@
 import Combine
 import DebugDrawerAppStateReset
 import DebugDrawerReceiver
+import DebugDrawerTestSupport
 import Foundation
 import Testing
 
@@ -28,7 +29,7 @@ struct ListingSpeedTests {
         for index in 0 ..< 2000 {
             try Data("x".utf8).write(to: caches.appending(path: "\(index).png"))
         }
-        let suite = "ListingSpeedTests-\(UUID().uuidString)"
+        let suite = temporarySuiteName("ListingSpeedTests")
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         for index in 0 ..< 2000 {

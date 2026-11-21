@@ -6,6 +6,7 @@
     import AppKit
     @testable import DebugDrawer
     @testable import DebugDrawerScreenRecordingPlugin
+    import DebugDrawerTestSupport
     import Foundation
     import SwiftUI
     import Testing
@@ -149,7 +150,7 @@
                         folder: RecordingFolder(directory: directory.appending(path: "Recordings")), capacity: 5, frameSource: source,
                         makeWriter: { FakeMovieWriter(url: $0) },
                         now: { Date(timeIntervalSince1970: 1_763_290_000) },
-                        defaults: UserDefaults(suiteName: UUID().uuidString) ?? .standard
+                        defaults: UserDefaults(suiteName: temporarySuiteName("ScreenRecordingInstallExitTests")) ?? .standard
                     )
                     DebugDrawer.shared.registerGlobal(ScreenRecordingPlugin(model: model))
                     model.start()

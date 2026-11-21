@@ -6,6 +6,7 @@
     import CoreLocation
     @testable import DebugDrawer
     @testable import DebugDrawerLocationPlugin
+    import DebugDrawerTestSupport
     import Foundation
     import Testing
 
@@ -51,7 +52,7 @@
 
             @MainActor
             private static func ownDrawer() async throws {
-                let suite = "LocationRoutingExitTests.\(UUID().uuidString)"
+                let suite = temporarySuiteName("LocationRoutingExitTests")
                 let defaults = try #require(UserDefaults(suiteName: suite))
                 defer { defaults.removePersistentDomain(forName: suite) }
                 DebugDrawer.shared.installLocation()
@@ -86,8 +87,8 @@
 
             @MainActor
             private static func twoDrawers() async throws {
-                let firstSuite = "LocationRoutingExitTests.\(UUID().uuidString)"
-                let secondSuite = "LocationRoutingExitTests.\(UUID().uuidString)"
+                let firstSuite = temporarySuiteName("LocationRoutingExitTests")
+                let secondSuite = temporarySuiteName("LocationRoutingExitTests")
                 let firstDefaults = try #require(UserDefaults(suiteName: firstSuite))
                 let secondDefaults = try #require(UserDefaults(suiteName: secondSuite))
                 defer {

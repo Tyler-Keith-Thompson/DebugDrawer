@@ -1,4 +1,5 @@
 @testable import DebugDrawerReceiver
+import DebugDrawerTestSupport
 import Foundation
 import Testing
 
@@ -73,7 +74,7 @@ struct ExperimentOverridesReceiverTests {
 
     @Test("In a session, a sidecar reads, from the store, each experiment the adapter lists with its variants and the app's assignment")
     func listsExperimentsWithVariantsAndAssignment() async throws {
-        let suite = "ExperimentOverridesReceiverTests-\(UUID().uuidString)"
+        let suite = temporarySuiteName("ExperimentOverridesReceiverTests")
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         let directory = FileManager.default.temporaryDirectory.appending(path: "ExperimentOverridesReceiverTests-\(UUID().uuidString)")
@@ -114,7 +115,7 @@ struct ExperimentOverridesReceiverTests {
 
     @Test("Only a listed experiment is forced, into one of its variants: an unlisted one is refused notExposed, an unknown variant malformedCommand")
     func onlyListedExperimentsAndVariantsChange() throws {
-        let suite = "ExperimentOverridesReceiverTests-\(UUID().uuidString)"
+        let suite = temporarySuiteName("ExperimentOverridesReceiverTests")
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         let directory = FileManager.default.temporaryDirectory.appending(path: "ExperimentOverridesReceiverTests-\(UUID().uuidString)")
@@ -162,7 +163,7 @@ struct ExperimentOverridesReceiverTests {
 
     @Test("The host hears the overridden experiments as the model is made, at each change and as the session ends, and can read them at any time")
     func overridesAreReportedForAnalyticsExclusion() throws {
-        let suite = "ExperimentOverridesReceiverTests-\(UUID().uuidString)"
+        let suite = temporarySuiteName("ExperimentOverridesReceiverTests")
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         let directory = FileManager.default.temporaryDirectory.appending(path: "ExperimentOverridesReceiverTests-\(UUID().uuidString)")
@@ -211,7 +212,7 @@ struct ExperimentOverridesReceiverTests {
 
     @Test("Persistent overrides keep the device excluded past the session and a relaunch, reported as the next model is made, until cleared")
     func persistentOverridesStayExcludedAcrossRelaunch() throws {
-        let suite = "ExperimentOverridesReceiverTests-\(UUID().uuidString)"
+        let suite = temporarySuiteName("ExperimentOverridesReceiverTests")
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         let directory = FileManager.default.temporaryDirectory.appending(path: "ExperimentOverridesReceiverTests-\(UUID().uuidString)")
@@ -256,7 +257,7 @@ struct ExperimentOverridesReceiverTests {
 
     @Test("Session overrides left by a quit are cleared as the next launch makes the capability, and the host hears none is left")
     func sessionOverridesLeftByQuitAreCleared() throws {
-        let suite = "ExperimentOverridesReceiverTests-\(UUID().uuidString)"
+        let suite = temporarySuiteName("ExperimentOverridesReceiverTests")
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         let directory = FileManager.default.temporaryDirectory.appending(path: "ExperimentOverridesReceiverTests-\(UUID().uuidString)")
@@ -305,7 +306,7 @@ struct ExperimentOverridesReceiverTests {
         }
         let sessions = DebugDrawerSessions(maximumDuration: 300, auditCapacity: 100, clock: FixedClock(now: Self.now), timer: IdleTimer())
         let sut = DebugDrawerReceiver(directory: directory, sessions: sessions)
-        let flagSuite = "ExperimentOverridesReceiverTests.flags.\(UUID().uuidString)"
+        let flagSuite = temporarySuiteName("ExperimentOverridesReceiverTests.flags")
         let flagDefaults = try #require(UserDefaults(suiteName: flagSuite))
         defer { flagDefaults.removePersistentDomain(forName: flagSuite) }
         sut.enable(.featureFlagOverrides(DebugDrawerFeatureFlagOverrides(adapter: EmptyFlagAdapter(), defaults: flagDefaults)))

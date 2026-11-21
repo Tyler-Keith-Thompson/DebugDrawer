@@ -3,6 +3,7 @@
 import CryptoKit
 @testable import DebugDrawerAppInfo
 import DebugDrawerReceiver
+import DebugDrawerTestSupport
 import Foundation
 import Testing
 
@@ -23,7 +24,7 @@ private final class Cart {
 struct AppStateTests {
     @Test("With nothing registered, the state holds only the standard fields: bundle, version, build, build metadata and date")
     func emptyRegistrationHoldsStandardFieldsOnly() throws {
-        let suite = "AppStateTests-\(UUID().uuidString)"
+        let suite = temporarySuiteName("AppStateTests")
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         let sessions = DebugDrawerSessions(maximumDuration: 300)
@@ -45,7 +46,7 @@ struct AppStateTests {
 
     @Test("The standard fields come from the bundle's Info.plist, a passed build metadata value winning over its key")
     func standardFieldsFromBundle() throws {
-        let suite = "AppStateTests-\(UUID().uuidString)"
+        let suite = temporarySuiteName("AppStateTests")
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         let info: [String: Any] = [
@@ -83,7 +84,7 @@ struct AppStateTests {
 
     @Test("Outside a session nothing is served and nothing is read; the state comes as one opens and goes as it ends")
     func servedDuringSessionOnly() throws {
-        let suite = "AppStateTests-\(UUID().uuidString)"
+        let suite = temporarySuiteName("AppStateTests")
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         let sessions = DebugDrawerSessions(maximumDuration: 300)
@@ -116,7 +117,7 @@ struct AppStateTests {
 
     @Test("Registered sources appear: overridden flags only, every experiment's bucket, the active environment, the hashed ID and the values")
     func registeredSourcesAppear() throws {
-        let suite = "AppStateTests-\(UUID().uuidString)"
+        let suite = temporarySuiteName("AppStateTests")
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         let sessions = DebugDrawerSessions(maximumDuration: 300)
@@ -164,7 +165,7 @@ struct AppStateTests {
 
     @Test("A change a sidecar makes to a registered model shows in the state served at once")
     func followsRegisteredModels() throws {
-        let suite = "AppStateTests-\(UUID().uuidString)"
+        let suite = temporarySuiteName("AppStateTests")
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         let sessions = DebugDrawerSessions(maximumDuration: 300)
@@ -189,7 +190,7 @@ struct AppStateTests {
 
     @Test("Refresh reads the host's values and the user ID again; outside a session it serves nothing")
     func refreshRereads() throws {
-        let suite = "AppStateTests-\(UUID().uuidString)"
+        let suite = temporarySuiteName("AppStateTests")
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         let sessions = DebugDrawerSessions(maximumDuration: 300)
@@ -211,8 +212,8 @@ struct AppStateTests {
 
     @Test("The user ID is HMAC-SHA256 under the install's key: stable across models of one install, other on another install")
     func hashIsStablePerInstall() throws {
-        let suite = "AppStateTests-\(UUID().uuidString)"
-        let otherSuite = "AppStateTests-\(UUID().uuidString)"
+        let suite = temporarySuiteName("AppStateTests")
+        let otherSuite = temporarySuiteName("AppStateTests")
         let defaults = try #require(UserDefaults(suiteName: suite))
         let otherInstall = try #require(UserDefaults(suiteName: otherSuite))
         defer {
@@ -238,7 +239,7 @@ struct AppStateTests {
 
     @Test("No one signed in: the user ID reads nil and no hash is served")
     func signedOut() throws {
-        let suite = "AppStateTests-\(UUID().uuidString)"
+        let suite = temporarySuiteName("AppStateTests")
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         let sessions = DebugDrawerSessions(maximumDuration: 300)
@@ -251,7 +252,7 @@ struct AppStateTests {
 
     @Test("Under a grant policy, a session whose grant doesn't list the capability is served nothing")
     func grantWithoutCapability() throws {
-        let suite = "AppStateTests-\(UUID().uuidString)"
+        let suite = temporarySuiteName("AppStateTests")
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         let policy = DebugDrawerGrantPolicy(
@@ -270,7 +271,7 @@ struct AppStateTests {
 
     @Test("Under a grant policy, a session whose grant lists the capability is served the state")
     func grantWithCapability() throws {
-        let suite = "AppStateTests-\(UUID().uuidString)"
+        let suite = temporarySuiteName("AppStateTests")
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         let policy = DebugDrawerGrantPolicy(

@@ -29,6 +29,7 @@ swift_library(
         "//Sources/DebugDrawerAnalytics",
         "//Sources/DebugDrawerLocalization",
         "//Sources/DebugDrawerAccessibility",
+        "//Tests/DebugDrawerTestSupport",
     ] + select({
         # Linked where they build (PLATFORM_CONDITIONAL_DEPENDENCIES in scripts/modules.py).
         "@platforms//os:macos": [

@@ -1,6 +1,7 @@
 // Exit tests start a child process, which only the Mac's test runs can do.
 #if os(macOS) && DEBUG
     @testable import DebugDrawerReceiver
+    import DebugDrawerTestSupport
     @testable import DebugDrawerTweaks
     import Foundation
     import Testing
@@ -13,7 +14,7 @@
         @Test("A session-scoped tweak changed in a session survives the app being killed during it, and the next launch resets it")
         @MainActor
         func sessionTweakSurvivesKill() async throws {
-            let suite = "TweaksExitTests-\(UUID().uuidString)"
+            let suite = temporarySuiteName("TweaksExitTests")
             let directory = FileManager.default.temporaryDirectory.appending(path: "TweaksExitTests-\(UUID().uuidString)")
             defer { UserDefaults(suiteName: suite)?.removePersistentDomain(forName: suite) }
 

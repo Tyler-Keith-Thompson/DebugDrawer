@@ -4,6 +4,7 @@
 #if os(macOS) && DEBUG
     @testable import DebugDrawer
     @testable import DebugDrawerHangDetectorPlugin
+    import DebugDrawerTestSupport
     import Foundation
     import Testing
 
@@ -26,7 +27,7 @@
                             source: .detected, isSeen: false
                         )
                     }
-                    let suite = "HangDetectorBadgeExitTests.badgesItsOwnDrawer.\(UUID().uuidString)"
+                    let suite = temporarySuiteName("HangDetectorBadgeExitTests.badgesItsOwnDrawer")
                     guard let defaults = UserDefaults(suiteName: suite) else { return false }
                     defer { defaults.removePersistentDomain(forName: suite) }
                     let drawer = DebugDrawer(defaults: defaults)

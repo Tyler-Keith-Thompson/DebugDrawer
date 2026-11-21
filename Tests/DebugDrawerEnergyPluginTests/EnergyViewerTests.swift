@@ -1,6 +1,7 @@
 #if DEBUG
     @testable import DebugDrawer
     @testable import DebugDrawerEnergyPlugin
+    import DebugDrawerTestSupport
     import Foundation
     import Testing
 
@@ -77,7 +78,7 @@
 
         @Test("Installing the plugin samples nothing until its view shows")
         func installStartsNothing() throws {
-            let suite = "EnergyViewerTests.\(UUID().uuidString)"
+            let suite = temporarySuiteName("EnergyViewerTests")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let sut = DebugDrawer(defaults: defaults)

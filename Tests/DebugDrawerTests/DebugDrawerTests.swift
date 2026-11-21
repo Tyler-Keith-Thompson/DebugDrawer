@@ -1,6 +1,7 @@
 #if DEBUG
     import Combine
     @testable import DebugDrawer
+    import DebugDrawerTestSupport
     import SwiftUI
     import Testing
 
@@ -20,7 +21,7 @@
     struct DebugDrawerTests {
         @Test("Registering a global plugin lists it")
         func registerGlobalPlugin() throws {
-            let suite = "DebugDrawerTests.\(#function).\(UUID().uuidString)"
+            let suite = temporarySuiteName("DebugDrawerTests.\(#function)")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let sut = DebugDrawer(defaults: defaults)
@@ -34,7 +35,7 @@
 
         @Test("A second global plugin with the same ID is ignored")
         func duplicateGlobalIgnored() throws {
-            let suite = "DebugDrawerTests.\(#function).\(UUID().uuidString)"
+            let suite = temporarySuiteName("DebugDrawerTests.\(#function)")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let sut = DebugDrawer(defaults: defaults)
@@ -47,7 +48,7 @@
 
         @Test("Unregistering a global plugin removes it")
         func unregisterGlobal() throws {
-            let suite = "DebugDrawerTests.\(#function).\(UUID().uuidString)"
+            let suite = temporarySuiteName("DebugDrawerTests.\(#function)")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let sut = DebugDrawer(defaults: defaults)
@@ -60,7 +61,7 @@
 
         @Test("A local plugin is removed by the token its registration returned")
         func localPluginToken() throws {
-            let suite = "DebugDrawerTests.\(#function).\(UUID().uuidString)"
+            let suite = temporarySuiteName("DebugDrawerTests.\(#function)")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let sut = DebugDrawer(defaults: defaults)
@@ -74,7 +75,7 @@
 
         @Test("A stale token does not remove a newer registration of the same plugin")
         func staleTokenNoOp() throws {
-            let suite = "DebugDrawerTests.\(#function).\(UUID().uuidString)"
+            let suite = temporarySuiteName("DebugDrawerTests.\(#function)")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let sut = DebugDrawer(defaults: defaults)
@@ -90,7 +91,7 @@
 
         @Test("The drawer has plugins once one is registered")
         func hasPlugins() throws {
-            let suite = "DebugDrawerTests.\(#function).\(UUID().uuidString)"
+            let suite = temporarySuiteName("DebugDrawerTests.\(#function)")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let sut = DebugDrawer(defaults: defaults)
@@ -103,7 +104,7 @@
 
         @Test("Toggling opens a closed drawer and closes an open one")
         func toggle() throws {
-            let suite = "DebugDrawerTests.\(#function).\(UUID().uuidString)"
+            let suite = temporarySuiteName("DebugDrawerTests.\(#function)")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let sut = DebugDrawer(defaults: defaults)
@@ -118,7 +119,7 @@
 
         @Test("Opening opens the drawer, and opening it again leaves it open")
         func openTwice() throws {
-            let suite = "DebugDrawerTests.\(#function).\(UUID().uuidString)"
+            let suite = temporarySuiteName("DebugDrawerTests.\(#function)")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let sut = DebugDrawer(defaults: defaults)
@@ -133,7 +134,7 @@
 
         @Test("Closing closes the drawer, and closing it again leaves it closed")
         func closeTwice() throws {
-            let suite = "DebugDrawerTests.\(#function).\(UUID().uuidString)"
+            let suite = temporarySuiteName("DebugDrawerTests.\(#function)")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let sut = DebugDrawer(defaults: defaults)
@@ -149,7 +150,7 @@
 
         @Test("Opening and closing publish each change through $isOpen, and repeating either publishes nothing more")
         func openAndClosePublish() throws {
-            let suite = "DebugDrawerTests.\(#function).\(UUID().uuidString)"
+            let suite = temporarySuiteName("DebugDrawerTests.\(#function)")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let sut = DebugDrawer(defaults: defaults)

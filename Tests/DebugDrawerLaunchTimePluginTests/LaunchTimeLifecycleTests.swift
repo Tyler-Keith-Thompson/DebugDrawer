@@ -1,6 +1,7 @@
 #if DEBUG
     @testable import DebugDrawer
     @testable import DebugDrawerLaunchTimePlugin
+    import DebugDrawerTestSupport
     import Foundation
     import Testing
 
@@ -22,7 +23,7 @@
 
         @Test("Unregistering the plugin before the first frame removes it and the run-loop observer waiting for the frame")
         func uninstallStopsWaiting() throws {
-            let suite = "LaunchTimeLifecycleTests.\(UUID().uuidString)"
+            let suite = temporarySuiteName("LaunchTimeLifecycleTests")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let drawer = DebugDrawer(defaults: defaults)
@@ -42,7 +43,7 @@
 
         @Test("Installing again waits for the first frame again; uninstalling twice is harmless")
         func reinstallWaitsAgain() throws {
-            let suite = "LaunchTimeLifecycleTests.\(UUID().uuidString)"
+            let suite = temporarySuiteName("LaunchTimeLifecycleTests")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let drawer = DebugDrawer(defaults: defaults)
@@ -63,7 +64,7 @@
 
         @Test("In two drawers the plugin waits for the first frame until the last one uninstalls it")
         func twoDrawers() throws {
-            let suite = "LaunchTimeLifecycleTests.\(UUID().uuidString)"
+            let suite = temporarySuiteName("LaunchTimeLifecycleTests")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let first = DebugDrawer(defaults: defaults)
@@ -84,7 +85,7 @@
 
         @Test("Uninstalling after the first frame keeps the times measured")
         func uninstallKeepsTimes() throws {
-            let suite = "LaunchTimeLifecycleTests.\(UUID().uuidString)"
+            let suite = temporarySuiteName("LaunchTimeLifecycleTests")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let drawer = DebugDrawer(defaults: defaults)

@@ -1,4 +1,5 @@
 import DebugDrawerReceiver
+import DebugDrawerTestSupport
 import Foundation
 import Testing
 
@@ -30,7 +31,7 @@ private final class FakeFlagAdapter: DebugDrawerFeatureFlagAdapter {
 struct FeatureFlagOverridesTests {
     @Test("An override of a listed flag, of the flag's kind, reaches the adapter and the snapshot")
     func overridesListedFlag() throws {
-        let suite = "FeatureFlagOverridesTests-\(UUID().uuidString)"
+        let suite = temporarySuiteName("FeatureFlagOverridesTests")
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         let adapter = FakeFlagAdapter(["new-checkout": .bool(false), "threshold": .number(50)])
@@ -47,7 +48,7 @@ struct FeatureFlagOverridesTests {
 
     @Test("An override of a flag the adapter doesn't list, or of another kind than the flag's, changes nothing")
     func ignoresUnlistedAndWrongKind() throws {
-        let suite = "FeatureFlagOverridesTests-\(UUID().uuidString)"
+        let suite = temporarySuiteName("FeatureFlagOverridesTests")
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         let adapter = FakeFlagAdapter(["new-checkout": .bool(false)])
@@ -63,7 +64,7 @@ struct FeatureFlagOverridesTests {
 
     @Test("Clearing removes only the overrides the model set, never the host's own")
     func clearsOnlyItsOwn() throws {
-        let suite = "FeatureFlagOverridesTests-\(UUID().uuidString)"
+        let suite = temporarySuiteName("FeatureFlagOverridesTests")
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         let adapter = FakeFlagAdapter(["new-checkout": .bool(false), "promo": .bool(true)])
@@ -81,7 +82,7 @@ struct FeatureFlagOverridesTests {
 
     @Test("The keys it overrode outlive the model, in its defaults, so a model made at the next launch lists and clears them")
     func keepsOverriddenKeys() throws {
-        let suite = "FeatureFlagOverridesTests-\(UUID().uuidString)"
+        let suite = temporarySuiteName("FeatureFlagOverridesTests")
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         let adapter = FakeFlagAdapter(["new-checkout": .bool(false), "promo": .bool(true)])

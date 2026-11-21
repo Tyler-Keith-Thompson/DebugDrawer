@@ -2,6 +2,7 @@ import Combine
 import CoreLocation
 import DebugDrawer
 @testable import DebugDrawerLocationPlugin
+import DebugDrawerTestSupport
 import Foundation
 import Testing
 
@@ -363,8 +364,8 @@ struct LocationModelTests {
             simulator: FakeLocationOverride(), interception: interception, files: FakeGPXFileReading(),
             scheduler: ManualPlaybackScheduler(now: Date(timeIntervalSince1970: 0))
         )
-        let firstSuite = "LocationModelTests.\(UUID().uuidString)"
-        let secondSuite = "LocationModelTests.\(UUID().uuidString)"
+        let firstSuite = temporarySuiteName("LocationModelTests")
+        let secondSuite = temporarySuiteName("LocationModelTests")
         let first = DebugDrawer(defaults: try #require(UserDefaults(suiteName: firstSuite)))
         let second = DebugDrawer(defaults: try #require(UserDefaults(suiteName: secondSuite)))
         defer {

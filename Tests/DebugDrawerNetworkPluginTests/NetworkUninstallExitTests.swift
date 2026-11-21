@@ -56,7 +56,7 @@
 
                 @MainActor
                 func uninstallThenReinstall() async throws {
-                    let suite = "NetworkUninstallExitTests.\(UUID().uuidString)"
+                    let suite = temporarySuiteName("NetworkUninstallExitTests")
                     let defaults = try #require(UserDefaults(suiteName: suite))
                     defer { defaults.removePersistentDomain(forName: suite) }
                     let drawer = DebugDrawer(defaults: defaults)
@@ -136,7 +136,7 @@
 
                 @MainActor
                 func leaveInPlace() async throws {
-                    let suite = "NetworkUninstallExitTests.\(UUID().uuidString)"
+                    let suite = temporarySuiteName("NetworkUninstallExitTests")
                     let defaults = try #require(UserDefaults(suiteName: suite))
                     defer { defaults.removePersistentDomain(forName: suite) }
                     let drawer = DebugDrawer(defaults: defaults)

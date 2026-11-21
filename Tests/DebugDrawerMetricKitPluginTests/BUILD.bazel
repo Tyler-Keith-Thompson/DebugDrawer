@@ -22,6 +22,7 @@ swift_library(
         "//Sources/DebugDrawerMetricKitPlugin",
         "//Sources/DebugDrawerMetricKit",
         "//Sources/DebugDrawer",
+        "//Tests/DebugDrawerTestSupport",
     ] + select({
         # Apple-only packages (APPLE_ONLY_PACKAGES in scripts/modules.py).
         "@platforms//os:macos": [
@@ -72,6 +73,7 @@ swift_library(
         "//Sources/DebugDrawerMetricKitPlugin",
         "//Sources/DebugDrawerMetricKit",
         "//Sources/DebugDrawer",
+        "//Tests/DebugDrawerTestSupport",
     ] + select({
         # Apple-only packages (APPLE_ONLY_PACKAGES in scripts/modules.py).
         "@platforms//os:macos": [

@@ -4,6 +4,7 @@
 #if os(macOS) && DEBUG
     @testable import DebugDrawer
     @testable import DebugDrawerLocalizationPlugin
+    import DebugDrawerTestSupport
     import Foundation
     import ObjectiveC
     import Testing
@@ -159,7 +160,7 @@
                 setenv("CFFIXED_USER_HOME", home, 1)
                 guard URL.applicationSupportDirectory.path(percentEncoded: false).hasPrefix(home) else { exit(EXIT_FAILURE) }
                 @MainActor func isExpected() -> Bool {
-                    let suite = "LocalizationUninstallExitTests.\(UUID().uuidString)"
+                    let suite = temporarySuiteName("LocalizationUninstallExitTests")
                     guard let first = UserDefaults(suiteName: suite + ".first"), let second = UserDefaults(suiteName: suite + ".second") else {
                         return false
                     }

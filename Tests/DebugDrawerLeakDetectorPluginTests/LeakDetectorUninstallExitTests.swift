@@ -5,6 +5,7 @@
     import AppKit
     @testable import DebugDrawer
     @testable import DebugDrawerLeakDetectorPlugin
+    import DebugDrawerTestSupport
     import ObjectiveC
     import Testing
 
@@ -123,7 +124,7 @@
                 setenv("CFFIXED_USER_HOME", home, 1)
                 guard URL.applicationSupportDirectory.path(percentEncoded: false).hasPrefix(home) else { exit(EXIT_FAILURE) }
                 @MainActor func isExpected() -> Bool {
-                    let suite = "LeakDetectorUninstallExitTests.\(UUID().uuidString)"
+                    let suite = temporarySuiteName("LeakDetectorUninstallExitTests")
                     guard let first = UserDefaults(suiteName: suite + ".first"), let second = UserDefaults(suiteName: suite + ".second") else {
                         return false
                     }

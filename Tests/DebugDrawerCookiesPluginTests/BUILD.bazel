@@ -21,6 +21,7 @@ swift_library(
     deps = [
         "//Sources/DebugDrawerCookiesPlugin",
         "//Sources/DebugDrawer",
+        "//Tests/DebugDrawerTestSupport",
     ] + select({
         # Apple-only packages (APPLE_ONLY_PACKAGES in scripts/modules.py).
         "@platforms//os:macos": [

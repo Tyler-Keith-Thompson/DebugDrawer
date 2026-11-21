@@ -3,6 +3,7 @@
     import DebugDrawerAppInfo
     @testable import DebugDrawerReceiver
     @testable import DebugDrawerSidecarKit
+    import DebugDrawerTestSupport
     import Foundation
     import SwiftUI
     import Testing
@@ -16,7 +17,7 @@
     struct SidecarAppStateTests {
         @Test("Hosted as the app connects, the app state is in Create Report as app-state.json, its user ID hashed and masked keys redacted")
         func attachedToEveryReport() async throws {
-            let suite = "SidecarAppStateTests-\(UUID().uuidString)"
+            let suite = temporarySuiteName("SidecarAppStateTests")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let store = FileManager.default.temporaryDirectory
@@ -114,7 +115,7 @@
 
         @Test("Outside a session the view says so, and the report gets no app state")
         func noSession() throws {
-            let suite = "SidecarAppStateTests-\(UUID().uuidString)"
+            let suite = temporarySuiteName("SidecarAppStateTests")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let appState = DebugDrawerAppState(sessions: DebugDrawerSessions(maximumDuration: 300), defaults: defaults)

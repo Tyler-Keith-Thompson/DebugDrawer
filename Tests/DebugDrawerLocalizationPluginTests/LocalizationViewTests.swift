@@ -2,6 +2,7 @@
 #if os(macOS)
     @testable import DebugDrawer
     @testable import DebugDrawerLocalizationPlugin
+    import DebugDrawerTestSupport
     import Foundation
     import SwiftUI
     import Testing
@@ -230,7 +231,7 @@
 
         @Test("A pending relaunch leads the header, and stored settings show as whole app once launched with")
         func headerNextLaunch() throws {
-            let name = "LocalizationViewTests.\(UUID().uuidString)"
+            let name = temporarySuiteName("LocalizationViewTests")
             let defaults = try #require(UserDefaults(suiteName: name))
             defer { defaults.removePersistentDomain(forName: name) }
             struct NoTables: LocalizationTableSource {

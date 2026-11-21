@@ -2,6 +2,7 @@
     import DebugDrawer
     @testable import DebugDrawerReceiver
     @testable import DebugDrawerSidecarKit
+    import DebugDrawerTestSupport
     import Foundation
     import Testing
     import ViewInspector
@@ -20,7 +21,7 @@
 
         @Test("The kit lists the app's allowlisted keys, and the switch edits the key in the app, audited with its old and new value")
         func switchEditsTheKey() async throws {
-            let suite = "SidecarUserDefaultsTests-\(UUID().uuidString)"
+            let suite = temporarySuiteName("SidecarUserDefaultsTests")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let store = FileManager.default.temporaryDirectory

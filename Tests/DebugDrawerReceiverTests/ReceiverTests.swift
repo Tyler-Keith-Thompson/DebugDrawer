@@ -1,5 +1,6 @@
 import Combine
 @testable import DebugDrawerReceiver
+import DebugDrawerTestSupport
 import Foundation
 import os
 import Testing
@@ -142,7 +143,7 @@ struct ReceiverTests {
         }
         let sessions = DebugDrawerSessions(maximumDuration: 300, auditCapacity: 100, clock: FixedClock(now: Self.now), timer: IdleTimer())
         let sut = DebugDrawerReceiver(directory: directory, sessions: sessions)
-        let flagSuite = "ReceiverTests.flags.\(UUID().uuidString)"
+        let flagSuite = temporarySuiteName("ReceiverTests.flags")
         let flagDefaults = try #require(UserDefaults(suiteName: flagSuite))
         defer { flagDefaults.removePersistentDomain(forName: flagSuite) }
         sut.enable(.featureFlagOverrides(DebugDrawerFeatureFlagOverrides(adapter: adapter, defaults: flagDefaults)))
@@ -196,7 +197,7 @@ struct ReceiverTests {
         let sessions = DebugDrawerSessions(maximumDuration: 300, auditCapacity: 100, clock: FixedClock(now: Self.now), timer: IdleTimer())
         let sut = DebugDrawerReceiver(directory: directory, sessions: sessions)
         sut.enable(.model(logLevels, id: "MyApp.LogLevels", scope: .persistent))
-        let flagSuite = "ReceiverTests.flags.\(UUID().uuidString)"
+        let flagSuite = temporarySuiteName("ReceiverTests.flags")
         let flagDefaults = try #require(UserDefaults(suiteName: flagSuite))
         defer { flagDefaults.removePersistentDomain(forName: flagSuite) }
         sut.enable(.featureFlagOverrides(DebugDrawerFeatureFlagOverrides(adapter: FakeFlagAdapter([:]), defaults: flagDefaults)))
@@ -252,7 +253,7 @@ struct ReceiverTests {
         }
         let sessions = DebugDrawerSessions(maximumDuration: 300, auditCapacity: 100, clock: FixedClock(now: Self.now), timer: IdleTimer())
         let sut = DebugDrawerReceiver(directory: directory, sessions: sessions)
-        let flagSuite = "ReceiverTests.flags.\(UUID().uuidString)"
+        let flagSuite = temporarySuiteName("ReceiverTests.flags")
         let flagDefaults = try #require(UserDefaults(suiteName: flagSuite))
         defer { flagDefaults.removePersistentDomain(forName: flagSuite) }
         sut.enable(.featureFlagOverrides(DebugDrawerFeatureFlagOverrides(adapter: adapter, defaults: flagDefaults)))
@@ -280,7 +281,7 @@ struct ReceiverTests {
         try layout.write(document.encoded(), to: layout.commands.appending(path: "0.json"))
         let sessions = DebugDrawerSessions(maximumDuration: 300, auditCapacity: 100, clock: FixedClock(now: Self.now), timer: IdleTimer())
         let sut = DebugDrawerReceiver(directory: directory, sessions: sessions)
-        let flagSuite = "ReceiverTests.flags.\(UUID().uuidString)"
+        let flagSuite = temporarySuiteName("ReceiverTests.flags")
         let flagDefaults = try #require(UserDefaults(suiteName: flagSuite))
         defer { flagDefaults.removePersistentDomain(forName: flagSuite) }
         sut.enable(.featureFlagOverrides(DebugDrawerFeatureFlagOverrides(adapter: adapter, defaults: flagDefaults)))
@@ -305,7 +306,7 @@ struct ReceiverTests {
         let adapter = FakeFlagAdapter(["new-checkout": .bool(false)])
         let sessions = DebugDrawerSessions(maximumDuration: 300, auditCapacity: 100, clock: FixedClock(now: Self.now), timer: IdleTimer())
         let sut = DebugDrawerReceiver(directory: directory, sessions: sessions)
-        let flagSuite = "ReceiverTests.flags.\(UUID().uuidString)"
+        let flagSuite = temporarySuiteName("ReceiverTests.flags")
         let flagDefaults = try #require(UserDefaults(suiteName: flagSuite))
         defer { flagDefaults.removePersistentDomain(forName: flagSuite) }
         sut.enable(.featureFlagOverrides(DebugDrawerFeatureFlagOverrides(adapter: adapter, defaults: flagDefaults)))

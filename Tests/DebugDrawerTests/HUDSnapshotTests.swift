@@ -2,6 +2,7 @@
 #if os(macOS) && canImport(SnapshotTesting)
     @testable import DebugDrawer
     import AppKit
+    import DebugDrawerTestSupport
     import SnapshotTesting
     import SwiftUI
     import Testing
@@ -49,7 +50,7 @@
         // laid over the window where it sits.
         @Test("Over an AppKit window, the HUD's panel draws the pinned readouts at the top leading corner", arguments: [ColorScheme.light, .dark])
         func hudOverTheApp(colorScheme: ColorScheme) throws {
-            let suite = "HUDSnapshotTests.\(#function).\(UUID().uuidString)"
+            let suite = temporarySuiteName("HUDSnapshotTests.\(#function)")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let drawer = DebugDrawer(defaults: defaults)

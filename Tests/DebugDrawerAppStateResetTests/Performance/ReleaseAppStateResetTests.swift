@@ -8,6 +8,7 @@
     import Combine
     import DebugDrawerAppStateReset
     import DebugDrawerReceiver
+    import DebugDrawerTestSupport
     import Foundation
     import Testing
 
@@ -38,7 +39,7 @@
             let thumbnail = root.appending(path: "Caches/thumbs/1.png")
             try FileManager.default.createDirectory(at: thumbnail.deletingLastPathComponent(), withIntermediateDirectories: true)
             try Data("png".utf8).write(to: thumbnail)
-            let suite = "ReleaseAppStateResetTests-\(UUID().uuidString)"
+            let suite = temporarySuiteName("ReleaseAppStateResetTests")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             defaults.set(true, forKey: "onboarded")

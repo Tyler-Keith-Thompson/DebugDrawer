@@ -1,5 +1,6 @@
 #if DEBUG
     @testable import DebugDrawer
+    import DebugDrawerTestSupport
     import Foundation
     import SwiftUI
     import Testing
@@ -219,7 +220,7 @@
 
         @Test("The drawer's contributors are its global, then local, plugins that adopt the protocol, each ID once")
         func contributorsAreDeduplicated() throws {
-            let suite = "ReportTests.\(#function).\(UUID().uuidString)"
+            let suite = temporarySuiteName("ReportTests.\(#function)")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let drawer = DebugDrawer(defaults: defaults)

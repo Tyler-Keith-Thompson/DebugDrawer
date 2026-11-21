@@ -2,6 +2,7 @@
     import Combine
     import DebugDrawer
     @testable import DebugDrawerReceiver
+    import DebugDrawerTestSupport
     import Foundation
     import Testing
 
@@ -32,7 +33,7 @@
         @Test("A sidecar's override through the receiver shows in the drawer's direct transport to the same model")
         func sidecarOverrideShowsInDrawer() async throws {
             let directory = FileManager.default.temporaryDirectory.appending(path: "ReceiverAlongsideDrawerTests-\(UUID().uuidString)")
-            let suite = "ReceiverAlongsideDrawerTests.\(UUID().uuidString)"
+            let suite = temporarySuiteName("ReceiverAlongsideDrawerTests")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let model = DebugDrawerFeatureFlagOverrides(adapter: FakeFlagAdapter(), defaults: defaults)

@@ -4,6 +4,7 @@
     #endif
     import Combine
     @testable import DebugDrawer
+    import DebugDrawerTestSupport
     import Foundation
     import SwiftUI
     import Testing
@@ -27,7 +28,7 @@
     struct LocalPluginRefreshTests {
         @Test("A local plugin listed alike shows its latest value without the drawer listing it again")
         func aNewValueReachesTheListedPlugin() throws {
-            let suite = "LocalPluginRefreshTests.\(#function).\(UUID().uuidString)"
+            let suite = temporarySuiteName("LocalPluginRefreshTests.\(#function)")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let sut = DebugDrawer(defaults: defaults)
@@ -47,7 +48,7 @@
 
         @Test("A local plugin whose title changes is listed again under the new title")
         func aNewTitleIsListedAgain() throws {
-            let suite = "LocalPluginRefreshTests.\(#function).\(UUID().uuidString)"
+            let suite = temporarySuiteName("LocalPluginRefreshTests.\(#function)")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let sut = DebugDrawer(defaults: defaults)
@@ -61,7 +62,7 @@
 
         @Test("A value handed over after the view left registers nothing")
         func anUpdateAfterRemovalIsIgnored() throws {
-            let suite = "LocalPluginRefreshTests.\(#function).\(UUID().uuidString)"
+            let suite = temporarySuiteName("LocalPluginRefreshTests.\(#function)")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let sut = DebugDrawer(defaults: defaults)

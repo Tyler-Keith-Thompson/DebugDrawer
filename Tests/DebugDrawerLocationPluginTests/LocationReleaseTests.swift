@@ -1,5 +1,6 @@
 import CoreLocation
 @testable import DebugDrawerLocationPlugin
+import DebugDrawerTestSupport
 import Foundation
 import Testing
 
@@ -11,7 +12,7 @@ import Testing
 struct LocationReleaseTests {
     @Test("Letting go of the managers starts Core Location again for each one given a simulated location, and keeps the switch and coordinate")
     func releaseHandsManagersBack() throws {
-        let suite = "LocationReleaseTests.\(UUID().uuidString)"
+        let suite = temporarySuiteName("LocationReleaseTests")
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         let service = RecordingLocationService()
@@ -40,7 +41,7 @@ struct LocationReleaseTests {
 
     @Test("Letting go of managers that get real updates starts nothing, and forgets the route's point")
     func releaseWithoutSimulationStartsNothing() throws {
-        let suite = "LocationReleaseTests.\(UUID().uuidString)"
+        let suite = temporarySuiteName("LocationReleaseTests")
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         let service = RecordingLocationService()

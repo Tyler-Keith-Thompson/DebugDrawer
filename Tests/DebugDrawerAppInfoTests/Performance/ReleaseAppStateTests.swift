@@ -5,6 +5,7 @@
 #if !DEBUG
     import DebugDrawerAppInfo
     import DebugDrawerReceiver
+    import DebugDrawerTestSupport
     import Foundation
     import Testing
 
@@ -13,7 +14,7 @@
     struct ReleaseAppStateTests {
         @Test("In release, the store's snapshot holds the state, the user ID hashed, during a session only")
         func servedDuringSession() async throws {
-            let suite = "ReleaseAppStateTests-\(UUID().uuidString)"
+            let suite = temporarySuiteName("ReleaseAppStateTests")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let root = FileManager.default.temporaryDirectory.appending(path: "ReleaseAppStateTests-\(UUID().uuidString)")

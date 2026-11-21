@@ -3,6 +3,7 @@
     import DebugDrawer
     @testable import DebugDrawerLocation
     @testable import DebugDrawerReceiver
+    import DebugDrawerTestSupport
     import Foundation
     import Testing
 
@@ -42,7 +43,7 @@
 
         @Test("In a session, a sidecar reads from the store that nothing is spoofed until a spoof lands; before it, the store holds nothing of it")
         func servesSnapshot() async throws {
-            let suite = "LocationSpoofingReceiverTests-\(UUID().uuidString)"
+            let suite = temporarySuiteName("LocationSpoofingReceiverTests")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let directory = FileManager.default.temporaryDirectory.appending(path: "LocationSpoofingReceiverTests-\(UUID().uuidString)")
@@ -76,7 +77,7 @@
 
         @Test("The host is told the location as a sidecar's spoof lands, and nil as the session ends, audited changeReverted")
         func hostToldOnSpoofAndOnRevert() throws {
-            let suite = "LocationSpoofingReceiverTests-\(UUID().uuidString)"
+            let suite = temporarySuiteName("LocationSpoofingReceiverTests")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let directory = FileManager.default.temporaryDirectory.appending(path: "LocationSpoofingReceiverTests-\(UUID().uuidString)")
@@ -115,7 +116,7 @@
 
         @Test("As the session expires, the timer firing, the host is told nil, audited before sessionEnded(.expired)")
         func revertsAsSessionExpires() throws {
-            let suite = "LocationSpoofingReceiverTests-\(UUID().uuidString)"
+            let suite = temporarySuiteName("LocationSpoofingReceiverTests")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let directory = FileManager.default.temporaryDirectory.appending(path: "LocationSpoofingReceiverTests-\(UUID().uuidString)")
@@ -152,7 +153,7 @@
 
         @Test("The capability's gate turning off ends the spoof at once while the session goes on; the receiver's ends the session")
         func revertsAtGateOff() throws {
-            let suite = "LocationSpoofingReceiverTests-\(UUID().uuidString)"
+            let suite = temporarySuiteName("LocationSpoofingReceiverTests")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let directory = FileManager.default.temporaryDirectory.appending(path: "LocationSpoofingReceiverTests-\(UUID().uuidString)")
@@ -200,7 +201,7 @@
 
         @Test("A coordinate off the Earth, or a spoof without one, is refused malformedCommand and the host hears nothing")
         func malformedSpoofsRefused() throws {
-            let suite = "LocationSpoofingReceiverTests-\(UUID().uuidString)"
+            let suite = temporarySuiteName("LocationSpoofingReceiverTests")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let directory = FileManager.default.temporaryDirectory.appending(path: "LocationSpoofingReceiverTests-\(UUID().uuidString)")
@@ -247,7 +248,7 @@
             }
             let sessions = DebugDrawerSessions(maximumDuration: 300, auditCapacity: 100, clock: MovableClock(Self.now), timer: ManualTimer())
             let sut = DebugDrawerReceiver(directory: directory, sessions: sessions)
-            let flagSuite = "LocationSpoofingReceiverTests.flags.\(UUID().uuidString)"
+            let flagSuite = temporarySuiteName("LocationSpoofingReceiverTests.flags")
             let flagDefaults = try #require(UserDefaults(suiteName: flagSuite))
             defer { flagDefaults.removePersistentDomain(forName: flagSuite) }
             sut.enable(.featureFlagOverrides(DebugDrawerFeatureFlagOverrides(adapter: EmptyFlagAdapter(), defaults: flagDefaults)))
@@ -266,7 +267,7 @@
 
         @Test("With a grant policy a spoof needs a grant listing the capability: none opens no session, another's is capabilityNotGranted")
         func grantRequiredUnderPolicy() throws {
-            let suite = "LocationSpoofingReceiverTests-\(UUID().uuidString)"
+            let suite = temporarySuiteName("LocationSpoofingReceiverTests")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let directory = FileManager.default.temporaryDirectory.appending(path: "LocationSpoofingReceiverTests-\(UUID().uuidString)")
@@ -282,7 +283,7 @@
             let model = LocationSpoofing(sessions: sessions, defaults: defaults, now: { Self.now }, spoofingDidChange: observer.spoofingDidChange)
             let sut = DebugDrawerReceiver(directory: directory, sessions: sessions)
             sut.enable(.locationSpoofing(model))
-            let flagSuite = "LocationSpoofingReceiverTests.flags.\(UUID().uuidString)"
+            let flagSuite = temporarySuiteName("LocationSpoofingReceiverTests.flags")
             let flagDefaults = try #require(UserDefaults(suiteName: flagSuite))
             defer { flagDefaults.removePersistentDomain(forName: flagSuite) }
             sut.enable(.featureFlagOverrides(DebugDrawerFeatureFlagOverrides(adapter: EmptyFlagAdapter(), defaults: flagDefaults)))
@@ -320,7 +321,7 @@
 
         @Test("requiringGrant() refuses a spoof grantMissing in a session without a grant, in a receiver with no policy")
         func requiringGrantWithoutPolicy() throws {
-            let suite = "LocationSpoofingReceiverTests-\(UUID().uuidString)"
+            let suite = temporarySuiteName("LocationSpoofingReceiverTests")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let directory = FileManager.default.temporaryDirectory.appending(path: "LocationSpoofingReceiverTests-\(UUID().uuidString)")
@@ -350,7 +351,7 @@
 
         @Test("A spoof a launch was killed in is told over, once, as the next launch makes the capability, before any session")
         func spoofLeftByKillIsEndedAtLaunch() throws {
-            let suite = "LocationSpoofingReceiverTests-\(UUID().uuidString)"
+            let suite = temporarySuiteName("LocationSpoofingReceiverTests")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let directory = FileManager.default.temporaryDirectory.appending(path: "LocationSpoofingReceiverTests-\(UUID().uuidString)")
@@ -392,7 +393,7 @@
 
         @Test("A launch that follows a clean one tells the host nothing as the capability is made")
         func cleanLaunchTellsNothing() throws {
-            let suite = "LocationSpoofingReceiverTests-\(UUID().uuidString)"
+            let suite = temporarySuiteName("LocationSpoofingReceiverTests")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let sessions = DebugDrawerSessions(maximumDuration: 300, auditCapacity: 100, clock: MovableClock(Self.now), timer: ManualTimer())

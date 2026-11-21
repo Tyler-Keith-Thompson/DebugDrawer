@@ -1,6 +1,7 @@
 #if DEBUG
     @testable import DebugDrawer
     @testable import DebugDrawerBackgroundTasksPlugin
+    import DebugDrawerTestSupport
     import Foundation
     import Testing
 
@@ -17,7 +18,7 @@
 
         @Test("Unregistering the plugin removes it, stops observing the source and drops the requests read")
         func uninstallStopsObserving() async throws {
-            let suite = "BackgroundTasksLifecycleTests.\(UUID().uuidString)"
+            let suite = temporarySuiteName("BackgroundTasksLifecycleTests")
             defer { UserDefaults().removePersistentDomain(forName: suite) }
             let drawer = try makeDrawer(suite)
             let changes = FakeBackgroundTaskChangeSource()
@@ -41,7 +42,7 @@
 
         @Test("Registering the plugin again observes the source again, and a change reads the requests")
         func reinstallObservesAgain() async throws {
-            let suite = "BackgroundTasksLifecycleTests.\(UUID().uuidString)"
+            let suite = temporarySuiteName("BackgroundTasksLifecycleTests")
             defer { UserDefaults().removePersistentDomain(forName: suite) }
             let drawer = try makeDrawer(suite)
             let changes = FakeBackgroundTaskChangeSource()
@@ -62,7 +63,7 @@
 
         @Test("Uninstalling twice stops the source once")
         func uninstallTwice() throws {
-            let suite = "BackgroundTasksLifecycleTests.\(UUID().uuidString)"
+            let suite = temporarySuiteName("BackgroundTasksLifecycleTests")
             defer { UserDefaults().removePersistentDomain(forName: suite) }
             let drawer = try makeDrawer(suite)
             let changes = FakeBackgroundTaskChangeSource()
@@ -77,7 +78,7 @@
 
         @Test("In two drawers the plugin observes until the last one uninstalls it")
         func twoDrawers() throws {
-            let suite = "BackgroundTasksLifecycleTests.\(UUID().uuidString)"
+            let suite = temporarySuiteName("BackgroundTasksLifecycleTests")
             defer { UserDefaults().removePersistentDomain(forName: suite) }
             let first = try makeDrawer(suite)
             let second = try makeDrawer(suite)

@@ -2,6 +2,7 @@
     import CoreGraphics
     import DebugDrawer
     @testable import DebugDrawerScreenRecordingPlugin
+    import DebugDrawerTestSupport
     import Foundation
     import Testing
 
@@ -13,7 +14,7 @@
             let model = ScreenRecordingModel(
                 folder: RecordingFolder(directory: FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)),
                 capacity: 5, frameSource: FakeFrameSource(), makeWriter: { FakeMovieWriter(url: $0) },
-                defaults: try #require(UserDefaults(suiteName: UUID().uuidString))
+                defaults: try #require(UserDefaults(suiteName: temporarySuiteName("ScreenRecordingPluginTests")))
             )
             let sut = ScreenRecordingPlugin(model: model)
 
@@ -34,7 +35,7 @@
             let model = ScreenRecordingModel(
                 folder: RecordingFolder(directory: directory), capacity: 5, frameSource: source,
                 makeWriter: { FakeMovieWriter(url: $0) },
-                defaults: try #require(UserDefaults(suiteName: UUID().uuidString))
+                defaults: try #require(UserDefaults(suiteName: temporarySuiteName("ScreenRecordingPluginTests")))
             )
             let sut = ScreenRecordingPlugin(model: model)
             let action = try #require(sut.actions.first)
@@ -101,7 +102,7 @@
                 folder: RecordingFolder(directory: directory), capacity: 5, frameSource: source,
                 makeWriter: { FakeMovieWriter(url: $0) },
                 now: { Date(timeIntervalSince1970: 1_763_290_000) },
-                defaults: try #require(UserDefaults(suiteName: UUID().uuidString))
+                defaults: try #require(UserDefaults(suiteName: temporarySuiteName("ScreenRecordingPluginTests")))
             )
             let sut = ScreenRecordingPlugin(model: model)
             var before = DebugDrawerReport()

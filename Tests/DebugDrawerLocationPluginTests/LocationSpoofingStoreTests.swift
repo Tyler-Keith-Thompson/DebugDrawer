@@ -1,4 +1,5 @@
 @testable import DebugDrawerLocationPlugin
+import DebugDrawerTestSupport
 import Foundation
 import Testing
 
@@ -7,7 +8,7 @@ import Testing
 struct LocationSpoofingStoreTests {
     @Test("Nothing kept reads as spoofing off with no coordinate")
     func emptyDefaults() throws {
-        let suite = "LocationSpoofingStoreTests.\(UUID().uuidString)"
+        let suite = temporarySuiteName("LocationSpoofingStoreTests")
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
 
@@ -19,7 +20,7 @@ struct LocationSpoofingStoreTests {
 
     @Test("The switch and coordinate are kept under the keys earlier versions used, and read back")
     func keysAndReadBack() throws {
-        let suite = "LocationSpoofingStoreTests.\(UUID().uuidString)"
+        let suite = temporarySuiteName("LocationSpoofingStoreTests")
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         let sut = _LocationSpoofingStore(defaults: defaults)
@@ -37,7 +38,7 @@ struct LocationSpoofingStoreTests {
 
     @Test("No coordinate removes both keys")
     func clearingRemovesKeys() throws {
-        let suite = "LocationSpoofingStoreTests.\(UUID().uuidString)"
+        let suite = temporarySuiteName("LocationSpoofingStoreTests")
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         let sut = _LocationSpoofingStore(defaults: defaults)
@@ -52,7 +53,7 @@ struct LocationSpoofingStoreTests {
 
     @Test("A latitude kept without a longitude is no coordinate")
     func halfACoordinate() throws {
-        let suite = "LocationSpoofingStoreTests.\(UUID().uuidString)"
+        let suite = temporarySuiteName("LocationSpoofingStoreTests")
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         defaults.set(12.5, forKey: "com.debugdrawer.location.latitude")

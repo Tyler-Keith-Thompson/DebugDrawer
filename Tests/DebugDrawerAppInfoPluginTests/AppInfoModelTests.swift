@@ -3,6 +3,7 @@
     @testable import DebugDrawer
     import DebugDrawerAppInfo
     @testable import DebugDrawerAppInfoPlugin
+    import DebugDrawerTestSupport
     import Foundation
     import Testing
 
@@ -82,7 +83,7 @@
         )
 
         private static func drawer() throws -> (DebugDrawer, () -> Void) {
-            let suite = "AppInfoModelTests.\(UUID().uuidString)"
+            let suite = temporarySuiteName("AppInfoModelTests")
             let defaults = try #require(UserDefaults(suiteName: suite))
             return (DebugDrawer(defaults: defaults), { defaults.removePersistentDomain(forName: suite) })
         }

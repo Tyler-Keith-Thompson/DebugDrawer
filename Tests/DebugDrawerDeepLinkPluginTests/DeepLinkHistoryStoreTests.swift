@@ -1,5 +1,6 @@
 #if DEBUG
     @testable import DebugDrawerDeepLinkPlugin
+    import DebugDrawerTestSupport
     import Foundation
     import Testing
 
@@ -10,7 +11,7 @@
     struct DeepLinkHistoryStoreTests {
         @Test("A saved history is read back by another store on the same defaults, the URLs as a string array")
         func savesAndLoads() throws {
-            let name = "DeepLinkHistoryStoreTests.\(UUID().uuidString)"
+            let name = temporarySuiteName("DeepLinkHistoryStoreTests")
             let defaults = try #require(UserDefaults(suiteName: name))
             defer { defaults.removePersistentDomain(forName: name) }
             let sut = _DeepLinkHistoryStore(defaults: defaults)
@@ -30,7 +31,7 @@
 
         @Test("Saving an empty history removes both keys")
         func emptyRemovesKeys() throws {
-            let name = "DeepLinkHistoryStoreTests.\(UUID().uuidString)"
+            let name = temporarySuiteName("DeepLinkHistoryStoreTests")
             let defaults = try #require(UserDefaults(suiteName: name))
             defer { defaults.removePersistentDomain(forName: name) }
             let sut = _DeepLinkHistoryStore(defaults: defaults)
@@ -45,7 +46,7 @@
 
         @Test("Activities that no longer decode start empty, and the URLs are still read")
         func undecodableActivities() throws {
-            let name = "DeepLinkHistoryStoreTests.\(UUID().uuidString)"
+            let name = temporarySuiteName("DeepLinkHistoryStoreTests")
             let defaults = try #require(UserDefaults(suiteName: name))
             defer { defaults.removePersistentDomain(forName: name) }
             defaults.set(["myapp://a"], forKey: _DeepLinkHistoryStore.historyKey)

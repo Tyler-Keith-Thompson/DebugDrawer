@@ -1,6 +1,7 @@
 // ViewInspector is linked on Apple platforms only, and the views are tested on the Mac.
 #if os(macOS)
     @testable import DebugDrawer
+    import DebugDrawerTestSupport
     import SwiftUI
     import Testing
     import ViewInspector
@@ -20,7 +21,7 @@
     struct DrawerNavigationTests {
         @Test("A section header's Show Alone button shows that plugin alone")
         func showAloneButtonFocusesThePlugin() throws {
-            let suite = "DrawerNavigationTests.\(#function).\(UUID().uuidString)"
+            let suite = temporarySuiteName("DrawerNavigationTests.\(#function)")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let drawer = DebugDrawer(defaults: defaults)
@@ -40,7 +41,7 @@
 
         @Test("A plugin shown alone fills the panel: its detail view, under a jump bar that ends at it, with no outline")
         func pluginShownAloneHasTheDetailView() throws {
-            let suite = "DrawerNavigationTests.\(#function).\(UUID().uuidString)"
+            let suite = temporarySuiteName("DrawerNavigationTests.\(#function)")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let drawer = DebugDrawer(defaults: defaults)
@@ -67,7 +68,7 @@
 
         @Test("The back button returns from a plugin shown alone to the outline")
         func backReturnsToTheOutline() throws {
-            let suite = "DrawerNavigationTests.\(#function).\(UUID().uuidString)"
+            let suite = temporarySuiteName("DrawerNavigationTests.\(#function)")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let drawer = DebugDrawer(defaults: defaults)
@@ -87,7 +88,7 @@
 
         @Test("In the outline there is no back button")
         func outlineHasNoBackButton() throws {
-            let suite = "DrawerNavigationTests.\(#function).\(UUID().uuidString)"
+            let suite = temporarySuiteName("DrawerNavigationTests.\(#function)")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let drawer = DebugDrawer(defaults: defaults)
@@ -104,7 +105,7 @@
 
         @Test("The jump bar's menu shows a plugin alone, and All Plugins returns to the outline")
         func jumpBarMenuNavigates() throws {
-            let suite = "DrawerNavigationTests.\(#function).\(UUID().uuidString)"
+            let suite = temporarySuiteName("DrawerNavigationTests.\(#function)")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let drawer = DebugDrawer(defaults: defaults)
@@ -125,7 +126,7 @@
 
         @Test("In the compact panel a plugin's header shows it alone instead of expanding it, and no body opens under it")
         func compactHeaderShowsThePluginAlone() throws {
-            let suite = "DrawerNavigationTests.\(#function).\(UUID().uuidString)"
+            let suite = temporarySuiteName("DrawerNavigationTests.\(#function)")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let drawer = DebugDrawer(defaults: defaults)
@@ -151,7 +152,7 @@
 
         @Test("Escape in a plugin shown alone returns to the outline and leaves the drawer open")
         func escapeLeavesThePluginFirst() throws {
-            let suite = "DrawerNavigationTests.\(#function).\(UUID().uuidString)"
+            let suite = temporarySuiteName("DrawerNavigationTests.\(#function)")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let drawer = DebugDrawer(defaults: defaults)
@@ -171,7 +172,7 @@
 
         @Test("A plugin that is no longer registered leaves the panel in the outline")
         func unregisteredPluginShowsTheOutline() throws {
-            let suite = "DrawerNavigationTests.\(#function).\(UUID().uuidString)"
+            let suite = temporarySuiteName("DrawerNavigationTests.\(#function)")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let drawer = DebugDrawer(defaults: defaults)

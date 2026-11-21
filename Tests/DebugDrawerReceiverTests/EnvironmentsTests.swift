@@ -1,4 +1,5 @@
 @testable import DebugDrawerReceiver
+import DebugDrawerTestSupport
 import Foundation
 import Testing
 
@@ -39,7 +40,7 @@ struct EnvironmentsTests {
 
     @Test("The snapshot's JSON has the environments' IDs, titles and summaries and the default and active IDs, and no other key")
     func snapshotSchema() throws {
-        let suite = "EnvironmentsTests-\(UUID().uuidString)"
+        let suite = temporarySuiteName("EnvironmentsTests")
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         let backend = RecordingBackend(defaults: defaults)
@@ -71,7 +72,7 @@ struct EnvironmentsTests {
 
     @Test("An environment the host didn't list is refused notExposed, the default and allowed ones and reset are not")
     func refusals() throws {
-        let suite = "EnvironmentsTests-\(UUID().uuidString)"
+        let suite = temporarySuiteName("EnvironmentsTests")
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         let sut = DebugDrawerEnvironments(default: production, allowing: staging, adapter: RecordingBackend(defaults: defaults), defaults: defaults)
@@ -91,7 +92,7 @@ struct EnvironmentsTests {
 
     @Test("A switch is recorded before the adapter is told, and the record is removed as the default comes back")
     func recordPrecedesSwitch() throws {
-        let suite = "EnvironmentsTests-\(UUID().uuidString)"
+        let suite = temporarySuiteName("EnvironmentsTests")
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         let backend = RecordingBackend(defaults: defaults)
@@ -109,7 +110,7 @@ struct EnvironmentsTests {
 
     @Test("Activating the active environment, or resetting while on the default, tells the adapter nothing")
     func noRepeatedSwitch() throws {
-        let suite = "EnvironmentsTests-\(UUID().uuidString)"
+        let suite = temporarySuiteName("EnvironmentsTests")
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         let backend = RecordingBackend(defaults: defaults)
@@ -127,7 +128,7 @@ struct EnvironmentsTests {
 
     @Test("Performed directly, an environment the host didn't list changes nothing")
     func unlistedIgnored() throws {
-        let suite = "EnvironmentsTests-\(UUID().uuidString)"
+        let suite = temporarySuiteName("EnvironmentsTests")
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         let backend = RecordingBackend(defaults: defaults)
@@ -142,7 +143,7 @@ struct EnvironmentsTests {
 
     @Test("A record naming an environment the app no longer lists is still undone as the capability is made")
     func staleRecordUndone() throws {
-        let suite = "EnvironmentsTests-\(UUID().uuidString)"
+        let suite = temporarySuiteName("EnvironmentsTests")
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         defaults.set("retired-qa", forKey: DebugDrawerEnvironments.activeEnvironmentDefaultsKey)

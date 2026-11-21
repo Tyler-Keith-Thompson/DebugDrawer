@@ -1,5 +1,6 @@
 #if DEBUG
     @testable import DebugDrawer
+    import DebugDrawerTestSupport
     import Foundation
     import Testing
 
@@ -158,7 +159,7 @@
         @MainActor
         @Test("One call on the drawer adds header names, key patterns and JSON paths to its rules")
         func drawerRedact() throws {
-            let suite = "RedactionTests.\(#function).\(UUID().uuidString)"
+            let suite = temporarySuiteName("RedactionTests.\(#function)")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let drawer = DebugDrawer(defaults: defaults)
@@ -173,7 +174,7 @@
         @MainActor
         @Test("The drawer starts with the standard rules")
         func drawerDefault() throws {
-            let suite = "RedactionTests.\(#function).\(UUID().uuidString)"
+            let suite = temporarySuiteName("RedactionTests.\(#function)")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let drawer = DebugDrawer(defaults: defaults)

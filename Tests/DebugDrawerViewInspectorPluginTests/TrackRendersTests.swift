@@ -2,6 +2,7 @@
 #if os(macOS)
     import Combine
     @testable import DebugDrawer
+    import DebugDrawerTestSupport
     @testable import DebugDrawerViewInspectorPlugin
     import Foundation
     import SwiftUI
@@ -66,7 +67,7 @@
         struct TrackRendersTests {
             @Test("A tracked view's count goes up when its input changes, and stays put when only its sibling's does")
             func countsFollowTheViewsOwnInput() async throws {
-                let suite = "TrackRendersTests.\(UUID().uuidString)"
+                let suite = temporarySuiteName("TrackRendersTests")
                 let defaults = try #require(UserDefaults(suiteName: suite))
                 defer { defaults.removePersistentDomain(forName: suite) }
                 let trackedName = "Tracked-\(UUID().uuidString)"
@@ -106,7 +107,7 @@
 
             @Test("Opening the drawer and using the View Inspector plugin records no renders")
             func drawerIsNeverCounted() throws {
-                let suite = "TrackRendersTests.\(UUID().uuidString)"
+                let suite = temporarySuiteName("TrackRendersTests")
                 let defaults = try #require(UserDefaults(suiteName: suite))
                 defer { defaults.removePersistentDomain(forName: suite) }
                 let tracker = RenderTracker()
@@ -139,7 +140,7 @@
             drawer's plugin gets them again
             """)
             func latestInstallGetsTheCounts() throws {
-                let suite = "TrackRendersTests.\(UUID().uuidString)"
+                let suite = temporarySuiteName("TrackRendersTests")
                 let defaults = try #require(UserDefaults(suiteName: suite))
                 defer { defaults.removePersistentDomain(forName: suite) }
                 let name = "Routed-\(UUID().uuidString)"

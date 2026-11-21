@@ -4,6 +4,7 @@
 #if os(macOS) && DEBUG
     @testable import DebugDrawer
     @testable import DebugDrawerConsolePlugin
+    import DebugDrawerTestSupport
     import Foundation
     import OSLogClient
     import Testing
@@ -39,7 +40,7 @@
 
                 @MainActor
                 func route() async throws {
-                    let suite = "ConsoleRoutingExitTests.\(UUID().uuidString)"
+                    let suite = temporarySuiteName("ConsoleRoutingExitTests")
                     let defaults = try #require(UserDefaults(suiteName: suite))
                     defer { defaults.removePersistentDomain(forName: suite) }
                     let shared = ConsoleLogStore.shared
@@ -102,7 +103,7 @@
 
                 @MainActor
                 func route() async throws {
-                    let suite = "ConsoleRoutingExitTests.\(UUID().uuidString)"
+                    let suite = temporarySuiteName("ConsoleRoutingExitTests")
                     let defaults = try #require(UserDefaults(suiteName: suite))
                     defer { defaults.removePersistentDomain(forName: suite) }
                     let firstStore = ConsoleLogStore(muteStorage: FakeConsoleMuteStorage())

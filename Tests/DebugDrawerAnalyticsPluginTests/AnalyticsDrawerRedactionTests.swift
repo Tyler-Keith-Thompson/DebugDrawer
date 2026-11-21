@@ -2,6 +2,7 @@
 #if os(macOS)
     @testable import DebugDrawer
     @testable import DebugDrawerAnalyticsPlugin
+    import DebugDrawerTestSupport
     import Foundation
     import SwiftUI
     import Testing
@@ -17,7 +18,7 @@
         struct AnalyticsDrawerRedactionTests {
             @Test("In a drawer of its own, Analytics masks on screen and in Copy JSON by that drawer's rules as they change, not shared's")
             func ownDrawerRedaction() async throws {
-                let suite = "AnalyticsDrawerRedactionTests.ownDrawerRedaction.\(UUID().uuidString)"
+                let suite = temporarySuiteName("AnalyticsDrawerRedactionTests.ownDrawerRedaction")
                 let defaults = try #require(UserDefaults(suiteName: suite))
                 defer { defaults.removePersistentDomain(forName: suite) }
                 let sharedRules = DebugDrawer.shared.redaction

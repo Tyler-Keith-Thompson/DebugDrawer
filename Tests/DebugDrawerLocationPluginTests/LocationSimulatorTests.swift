@@ -1,5 +1,6 @@
 import CoreLocation
 @testable import DebugDrawerLocationPlugin
+import DebugDrawerTestSupport
 import Foundation
 import Testing
 
@@ -12,7 +13,7 @@ import Testing
 struct LocationSimulatorTests {
     @Test("A manager created before spoofing is turned on gets the spoofed location when it starts updating, and Core Location isn't started")
     func managerCreatedBeforeSpoofing() async throws {
-        let defaults = try #require(UserDefaults(suiteName: "LocationSimulatorTests.\(UUID().uuidString)"))
+        let defaults = try #require(UserDefaults(suiteName: temporarySuiteName("LocationSimulatorTests")))
         let service = RecordingLocationService()
         let sut = LocationSimulator(defaults: defaults, service: service)
         let manager = CLLocationManager()
@@ -32,7 +33,7 @@ struct LocationSimulatorTests {
 
     @Test("A manager already updating when spoofing begins has its real updates stopped and gets the spoofed location")
     func managerUpdatingBeforeSpoofing() throws {
-        let defaults = try #require(UserDefaults(suiteName: "LocationSimulatorTests.\(UUID().uuidString)"))
+        let defaults = try #require(UserDefaults(suiteName: temporarySuiteName("LocationSimulatorTests")))
         let service = RecordingLocationService()
         let sut = LocationSimulator(defaults: defaults, service: service)
         let manager = CLLocationManager()
@@ -54,7 +55,7 @@ struct LocationSimulatorTests {
 
     @Test("Turning spoofing off starts Core Location again for each manager still updating, and not for one that stopped")
     func disablingRestoresRealUpdates() throws {
-        let defaults = try #require(UserDefaults(suiteName: "LocationSimulatorTests.\(UUID().uuidString)"))
+        let defaults = try #require(UserDefaults(suiteName: temporarySuiteName("LocationSimulatorTests")))
         defaults.set(true, forKey: "com.debugdrawer.location.enabled")
         defaults.set(40.7128, forKey: "com.debugdrawer.location.latitude")
         defaults.set(-74.006, forKey: "com.debugdrawer.location.longitude")
@@ -78,7 +79,7 @@ struct LocationSimulatorTests {
 
     @Test("Each new coordinate is delivered to every updating manager, and none to one that stopped")
     func coordinateChangesReachUpdatingManagers() throws {
-        let defaults = try #require(UserDefaults(suiteName: "LocationSimulatorTests.\(UUID().uuidString)"))
+        let defaults = try #require(UserDefaults(suiteName: temporarySuiteName("LocationSimulatorTests")))
         defaults.set(true, forKey: "com.debugdrawer.location.enabled")
         let sut = LocationSimulator(defaults: defaults, service: RecordingLocationService())
         let first = CLLocationManager()
@@ -102,7 +103,7 @@ struct LocationSimulatorTests {
 
     @Test("While spoofing, requestLocation answers once with the spoofed location and location returns it")
     func requestAndLocationWhileSpoofing() async throws {
-        let defaults = try #require(UserDefaults(suiteName: "LocationSimulatorTests.\(UUID().uuidString)"))
+        let defaults = try #require(UserDefaults(suiteName: temporarySuiteName("LocationSimulatorTests")))
         defaults.set(true, forKey: "com.debugdrawer.location.enabled")
         defaults.set(-33.8634, forKey: "com.debugdrawer.location.latitude")
         defaults.set(151.211, forKey: "com.debugdrawer.location.longitude")
@@ -124,7 +125,7 @@ struct LocationSimulatorTests {
 
     @Test("Without a spoofed location, requestLocation goes to Core Location and the manager isn't kept as updating")
     func requestWithoutSpoofing() throws {
-        let defaults = try #require(UserDefaults(suiteName: "LocationSimulatorTests.\(UUID().uuidString)"))
+        let defaults = try #require(UserDefaults(suiteName: temporarySuiteName("LocationSimulatorTests")))
         defaults.set(true, forKey: "com.debugdrawer.location.enabled")
         let service = RecordingLocationService()
         let sut = LocationSimulator(defaults: defaults, service: service)
@@ -139,7 +140,7 @@ struct LocationSimulatorTests {
 
     @Test("Spoofing on with no coordinate set simulates nothing")
     func enabledWithoutCoordinate() throws {
-        let defaults = try #require(UserDefaults(suiteName: "LocationSimulatorTests.\(UUID().uuidString)"))
+        let defaults = try #require(UserDefaults(suiteName: temporarySuiteName("LocationSimulatorTests")))
         let sut = LocationSimulator(defaults: defaults, service: RecordingLocationService())
 
         sut.isEnabled = true
@@ -149,7 +150,7 @@ struct LocationSimulatorTests {
 
     @Test("0, 0 is a coordinate like any other, not the absence of one")
     func nullIsland() throws {
-        let defaults = try #require(UserDefaults(suiteName: "LocationSimulatorTests.\(UUID().uuidString)"))
+        let defaults = try #require(UserDefaults(suiteName: temporarySuiteName("LocationSimulatorTests")))
         let sut = LocationSimulator(defaults: defaults, service: RecordingLocationService())
         let expected: [Double] = [0, 0]
 
@@ -162,7 +163,7 @@ struct LocationSimulatorTests {
 
     @Test("The range's bounds are coordinates that can be spoofed", arguments: [[90.0, 180.0], [-90, -180]])
     func rangeBounds(bounds: [Double]) throws {
-        let defaults = try #require(UserDefaults(suiteName: "LocationSimulatorTests.\(UUID().uuidString)"))
+        let defaults = try #require(UserDefaults(suiteName: temporarySuiteName("LocationSimulatorTests")))
         let sut = LocationSimulator(defaults: defaults, service: RecordingLocationService())
 
         sut.isEnabled = true
@@ -174,7 +175,7 @@ struct LocationSimulatorTests {
 
     @Test("A kept coordinate out of range is no coordinate")
     func keptCoordinateOutOfRange() throws {
-        let defaults = try #require(UserDefaults(suiteName: "LocationSimulatorTests.\(UUID().uuidString)"))
+        let defaults = try #require(UserDefaults(suiteName: temporarySuiteName("LocationSimulatorTests")))
         defaults.set(true, forKey: "com.debugdrawer.location.enabled")
         defaults.set(91.0, forKey: "com.debugdrawer.location.latitude")
         defaults.set(0.0, forKey: "com.debugdrawer.location.longitude")

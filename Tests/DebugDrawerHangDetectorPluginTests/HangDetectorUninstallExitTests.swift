@@ -6,6 +6,7 @@
     @testable import DebugDrawer
     import DebugDrawerHangDetector
     @testable import DebugDrawerHangDetectorPlugin
+    import DebugDrawerTestSupport
     import Foundation
     import Testing
 
@@ -77,7 +78,7 @@
                     }
                 }
                 @MainActor func isExpected() -> Bool {
-                    let suite = "HangDetectorUninstallExitTests.\(UUID().uuidString)"
+                    let suite = temporarySuiteName("HangDetectorUninstallExitTests")
                     guard let first = UserDefaults(suiteName: suite + ".first"), let second = UserDefaults(suiteName: suite + ".second") else {
                         return false
                     }

@@ -1,6 +1,7 @@
 #if DEBUG
     @testable import DebugDrawer
     @testable import DebugDrawerColorVisionPlugin
+    import DebugDrawerTestSupport
     import Foundation
     import Testing
 
@@ -8,7 +9,7 @@
     @Suite("Color Vision turns its simulation off once removed from every drawer")
     struct ColorVisionUninstallTests {
         private static func drawer() throws -> (DebugDrawer, () -> Void) {
-            let suite = "ColorVisionUninstallTests.\(UUID().uuidString)"
+            let suite = temporarySuiteName("ColorVisionUninstallTests")
             let defaults = try #require(UserDefaults(suiteName: suite))
             return (DebugDrawer(defaults: defaults), { defaults.removePersistentDomain(forName: suite) })
         }

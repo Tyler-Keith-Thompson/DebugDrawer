@@ -5,6 +5,7 @@
         import UIKit
     #endif
     @testable import DebugDrawer
+    import DebugDrawerTestSupport
     import SwiftUI
     import Testing
 
@@ -17,7 +18,7 @@
         struct LocalPluginNSWindowTests {
             @Test("registerLocal(_:in:) lists the plugin only in that window's drawer; global plugins in both")
             func listedOnlyInItsWindow() throws {
-                let suite = "LocalPluginNSWindowTests.\(#function).\(UUID().uuidString)"
+                let suite = temporarySuiteName("LocalPluginNSWindowTests.\(#function)")
                 let defaults = try #require(UserDefaults(suiteName: suite))
                 defer { defaults.removePersistentDomain(forName: suite) }
                 let sut = DebugDrawer(defaults: defaults)
@@ -52,7 +53,7 @@
                     [sheet, parent].forEach { $0.close() }
                 }
                 try #require(sheet.sheetParent === parent)
-                let suite = "LocalPluginNSWindowTests.\(#function).\(UUID().uuidString)"
+                let suite = temporarySuiteName("LocalPluginNSWindowTests.\(#function)")
                 let defaults = try #require(UserDefaults(suiteName: suite))
                 defer { defaults.removePersistentDomain(forName: suite) }
                 let sut = DebugDrawer(defaults: defaults)
@@ -72,7 +73,7 @@
                 defer { staying.close() }
                 // A drawer of its own that no window is attached to, so only registerLocal(_:in:)'s
                 // own watch on the window can remove the plugins.
-                let suite = "LocalPluginNSWindowTests.\(#function).\(UUID().uuidString)"
+                let suite = temporarySuiteName("LocalPluginNSWindowTests.\(#function)")
                 let defaults = try #require(UserDefaults(suiteName: suite))
                 defer { defaults.removePersistentDomain(forName: suite) }
                 let sut = DebugDrawer(defaults: defaults)
@@ -93,7 +94,7 @@
             func unregisterBeforeClosing() throws {
                 let window = OffscreenWindow(left: -30000)
                 defer { window.close() }
-                let suite = "LocalPluginNSWindowTests.\(#function).\(UUID().uuidString)"
+                let suite = temporarySuiteName("LocalPluginNSWindowTests.\(#function)")
                 let defaults = try #require(UserDefaults(suiteName: suite))
                 defer { defaults.removePersistentDomain(forName: suite) }
                 let sut = DebugDrawer(defaults: defaults)
@@ -128,7 +129,7 @@
             func listedOnlyInItsScene() throws {
                 let first = NSObject()
                 let second = NSObject()
-                let suite = "LocalPluginWindowSceneTests.\(#function).\(UUID().uuidString)"
+                let suite = temporarySuiteName("LocalPluginWindowSceneTests.\(#function)")
                 let defaults = try #require(UserDefaults(suiteName: suite))
                 defer { defaults.removePersistentDomain(forName: suite) }
                 let sut = DebugDrawer(defaults: defaults)
@@ -155,7 +156,7 @@
             func disconnectingRemovesItsRegistrations() throws {
                 let disconnecting = NSObject()
                 let staying = NSObject()
-                let suite = "LocalPluginWindowSceneTests.\(#function).\(UUID().uuidString)"
+                let suite = temporarySuiteName("LocalPluginWindowSceneTests.\(#function)")
                 let defaults = try #require(UserDefaults(suiteName: suite))
                 defer { defaults.removePersistentDomain(forName: suite) }
                 let sut = DebugDrawer(defaults: defaults)

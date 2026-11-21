@@ -1,6 +1,7 @@
 #if DEBUG
     @testable import DebugDrawerAppStateResetPlugin
     @testable import DebugDrawerAppStateReset
+    import DebugDrawerTestSupport
     import Foundation
     import Security
     import Testing
@@ -60,7 +61,7 @@
 
         @Test("The real defaults list a suite's keys and remove exactly those asked for")
         func preferences() throws {
-            let suite = "com.debugdrawer.tests.appStateReset.\(UUID().uuidString)"
+            let suite = temporarySuiteName("com.debugdrawer.tests.appStateReset")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             defaults.set(true, forKey: "onboarded")

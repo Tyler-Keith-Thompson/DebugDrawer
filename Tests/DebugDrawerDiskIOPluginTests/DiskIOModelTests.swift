@@ -2,6 +2,7 @@
     import Combine
     @testable import DebugDrawer
     @testable import DebugDrawerDiskIOPlugin
+    import DebugDrawerTestSupport
     import Foundation
     import Testing
 
@@ -351,7 +352,7 @@
 
         @Test("DiskIOPlugin(model:) counts the real drawers that register it, and stops recording as the last one unregisters it")
         func pluginInTwoDrawers() throws {
-            let suite = "DiskIOModelTests.\(UUID().uuidString)"
+            let suite = temporarySuiteName("DiskIOModelTests")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let source = FakeDiskIOEventSource()

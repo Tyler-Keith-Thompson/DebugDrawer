@@ -1,4 +1,5 @@
 @testable import DebugDrawerReceiver
+import DebugDrawerTestSupport
 import Foundation
 import os
 import Testing
@@ -196,7 +197,7 @@ struct DiagnosticsCaptureReceiverTests {
         }
         let sessions = DebugDrawerSessions(maximumDuration: 300, auditCapacity: 100, clock: MovableClock(Self.now), timer: ManualTimer())
         let sut = DebugDrawerReceiver(directory: directory, sessions: sessions)
-        let flagSuite = "DiagnosticsCaptureReceiverTests.flags.\(UUID().uuidString)"
+        let flagSuite = temporarySuiteName("DiagnosticsCaptureReceiverTests.flags")
         let flagDefaults = try #require(UserDefaults(suiteName: flagSuite))
         defer { flagDefaults.removePersistentDomain(forName: flagSuite) }
         sut.enable(.featureFlagOverrides(DebugDrawerFeatureFlagOverrides(adapter: EmptyFlagAdapter(), defaults: flagDefaults)))

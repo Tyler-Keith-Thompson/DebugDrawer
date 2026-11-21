@@ -1,4 +1,5 @@
 import DebugDrawerReceiver
+import DebugDrawerTestSupport
 import Foundation
 import Testing
 
@@ -32,7 +33,7 @@ private final class FakeLogLevelAdapter: DebugDrawerLogLevelAdapter {
 struct LogLevelsTests {
     @Test("A raised level reaches the adapter and the snapshot, which lists the subsystem as raised")
     func raisesListedLevel() throws {
-        let suite = "LogLevelsTests-\(UUID().uuidString)"
+        let suite = temporarySuiteName("LogLevelsTests")
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         let adapter = FakeLogLevelAdapter(subsystems: ["com.example.checkout": ["info", "debug"]])
@@ -49,7 +50,7 @@ struct LogLevelsTests {
 
     @Test("Performed directly, an unlisted subsystem or a level the subsystem doesn't list changes nothing")
     func ignoresUnlistedSubsystemAndLevel() throws {
-        let suite = "LogLevelsTests-\(UUID().uuidString)"
+        let suite = temporarySuiteName("LogLevelsTests")
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         let adapter = FakeLogLevelAdapter(subsystems: ["com.example.checkout": ["info", "debug"]])
@@ -65,7 +66,7 @@ struct LogLevelsTests {
 
     @Test("Resetting puts back only the subsystems the model raised, never a level the host set itself")
     func resetsOnlyItsOwn() throws {
-        let suite = "LogLevelsTests-\(UUID().uuidString)"
+        let suite = temporarySuiteName("LogLevelsTests")
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         let adapter = FakeLogLevelAdapter(subsystems: ["com.example.checkout": ["info", "debug"], "com.example.sync": ["info", "debug"]])
@@ -83,7 +84,7 @@ struct LogLevelsTests {
 
     @Test("The raised subsystems are kept in the defaults, without their levels, so a relaunched model still lists them")
     func raisedSubsystemsSurviveRelaunch() throws {
-        let suite = "LogLevelsTests-\(UUID().uuidString)"
+        let suite = temporarySuiteName("LogLevelsTests")
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         let adapter = FakeLogLevelAdapter(subsystems: ["com.example.checkout": ["info", "debug"], "com.example.sync": ["info", "debug"]])

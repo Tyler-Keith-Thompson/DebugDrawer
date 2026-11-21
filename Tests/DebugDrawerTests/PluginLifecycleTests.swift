@@ -3,6 +3,7 @@
         import AppKit
     #endif
     @testable import DebugDrawer
+    import DebugDrawerTestSupport
     import Foundation
     import SwiftUI
     import Testing
@@ -60,7 +61,7 @@
     struct PluginLifecycleTests {
         @Test("A global plugin is installed, shown, hidden and uninstalled, in that order")
         func globalHooksInOrder() throws {
-            let suite = "PluginLifecycleTests.\(#function).\(UUID().uuidString)"
+            let suite = temporarySuiteName("PluginLifecycleTests.\(#function)")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let sut = DebugDrawer(defaults: defaults)
@@ -78,7 +79,7 @@
 
         @Test("A plugin shown in two places becomes visible once and hidden once the last one goes")
         func visibilityIsCountedAcrossViews() throws {
-            let suite = "PluginLifecycleTests.\(#function).\(UUID().uuidString)"
+            let suite = temporarySuiteName("PluginLifecycleTests.\(#function)")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let sut = DebugDrawer(defaults: defaults)
@@ -99,7 +100,7 @@
 
         @Test("Unregistering a global plugin removes it and calls its uninstall hook")
         func unregisteringUninstalls() throws {
-            let suite = "PluginLifecycleTests.\(#function).\(UUID().uuidString)"
+            let suite = temporarySuiteName("PluginLifecycleTests.\(#function)")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let sut = DebugDrawer(defaults: defaults)
@@ -116,7 +117,7 @@
 
         @Test("A plugin removed while on screen is hidden before it is uninstalled, and its views' leaving changes nothing")
         func removedWhileVisible() throws {
-            let suite = "PluginLifecycleTests.\(#function).\(UUID().uuidString)"
+            let suite = temporarySuiteName("PluginLifecycleTests.\(#function)")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let sut = DebugDrawer(defaults: defaults)
@@ -134,7 +135,7 @@
 
         @Test("Unregistering an ID the drawer doesn't hold calls no hook")
         func unregisteringAnUnknownID() throws {
-            let suite = "PluginLifecycleTests.\(#function).\(UUID().uuidString)"
+            let suite = temporarySuiteName("PluginLifecycleTests.\(#function)")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let sut = DebugDrawer(defaults: defaults)
@@ -151,7 +152,7 @@
 
         @Test("Registering a global plugin whose ID is already registered installs nothing again")
         func duplicateIsNotInstalled() throws {
-            let suite = "PluginLifecycleTests.\(#function).\(UUID().uuidString)"
+            let suite = temporarySuiteName("PluginLifecycleTests.\(#function)")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let sut = DebugDrawer(defaults: defaults)
@@ -166,7 +167,7 @@
 
         @Test("A local plugin is installed as it registers and uninstalled as its registration is removed")
         func localHooks() throws {
-            let suite = "PluginLifecycleTests.\(#function).\(UUID().uuidString)"
+            let suite = temporarySuiteName("PluginLifecycleTests.\(#function)")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let sut = DebugDrawer(defaults: defaults)
@@ -183,7 +184,7 @@
 
         @Test("A local plugin's new value, handed over by its view, is not installed again")
         func localUpdateKeepsTheInstall() throws {
-            let suite = "PluginLifecycleTests.\(#function).\(UUID().uuidString)"
+            let suite = temporarySuiteName("PluginLifecycleTests.\(#function)")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let sut = DebugDrawer(defaults: defaults)
@@ -200,7 +201,7 @@
 
         @Test("A local plugin a newer view registers again uninstalls the old registration, installs the new and keeps it visible")
         func localReplacementOnScreen() throws {
-            let suite = "PluginLifecycleTests.\(#function).\(UUID().uuidString)"
+            let suite = temporarySuiteName("PluginLifecycleTests.\(#function)")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let sut = DebugDrawer(defaults: defaults)
@@ -220,8 +221,8 @@
 
         @Test("Two drawers hold their plugins apart: each installs and removes only its own")
         func twoDrawersShareNoPlugins() throws {
-            let firstSuite = "PluginLifecycleTests.\(#function).first.\(UUID().uuidString)"
-            let secondSuite = "PluginLifecycleTests.\(#function).second.\(UUID().uuidString)"
+            let firstSuite = temporarySuiteName("PluginLifecycleTests.\(#function).first")
+            let secondSuite = temporarySuiteName("PluginLifecycleTests.\(#function).second")
             let firstDefaults = try #require(UserDefaults(suiteName: firstSuite))
             let secondDefaults = try #require(UserDefaults(suiteName: secondSuite))
             defer {
@@ -268,7 +269,7 @@
         #if os(macOS)
             @Test("A plugin's section body coming on screen makes it visible, and collapsing the section hides it")
             func aHostedSectionReportsVisibility() throws {
-                let suite = "PluginLifecycleTests.\(#function).\(UUID().uuidString)"
+                let suite = temporarySuiteName("PluginLifecycleTests.\(#function)")
                 let defaults = try #require(UserDefaults(suiteName: suite))
                 defer { defaults.removePersistentDomain(forName: suite) }
                 let drawer = DebugDrawer(defaults: defaults)

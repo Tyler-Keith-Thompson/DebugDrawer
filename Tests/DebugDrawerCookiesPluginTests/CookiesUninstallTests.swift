@@ -1,6 +1,7 @@
 #if DEBUG
     @testable import DebugDrawer
     @testable import DebugDrawerCookiesPlugin
+    import DebugDrawerTestSupport
     import Foundation
     import Testing
 
@@ -8,7 +9,7 @@
     @Suite("HTTP Cookies drops the cookies it read once removed from every drawer", .timeLimit(.minutes(1)))
     struct CookiesUninstallTests {
         private static func drawer() throws -> (DebugDrawer, () -> Void) {
-            let suite = "CookiesUninstallTests.\(UUID().uuidString)"
+            let suite = temporarySuiteName("CookiesUninstallTests")
             let defaults = try #require(UserDefaults(suiteName: suite))
             return (DebugDrawer(defaults: defaults), { defaults.removePersistentDomain(forName: suite) })
         }

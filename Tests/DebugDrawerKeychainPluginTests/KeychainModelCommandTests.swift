@@ -1,6 +1,7 @@
 #if DEBUG
     import DebugDrawer
     @testable import DebugDrawerKeychainPlugin
+    import DebugDrawerTestSupport
     import Foundation
     import Security
     import Testing
@@ -367,8 +368,8 @@
 
         @Test("Installing reads nothing; leaving one of two drawers keeps the items, leaving the last drops them and the password but not the filter")
         func installCounting() throws {
-            let firstSuite = "KeychainModelCommandTests.first.\(UUID().uuidString)"
-            let secondSuite = "KeychainModelCommandTests.second.\(UUID().uuidString)"
+            let firstSuite = temporarySuiteName("KeychainModelCommandTests.first")
+            let secondSuite = temporarySuiteName("KeychainModelCommandTests.second")
             let firstDefaults = try #require(UserDefaults(suiteName: firstSuite))
             let secondDefaults = try #require(UserDefaults(suiteName: secondSuite))
             defer {
@@ -408,7 +409,7 @@
 
         @Test("Uninstalling from a drawer that never installed the plugin drops nothing")
         func uninstallFromAnotherDrawer() throws {
-            let suite = "KeychainModelCommandTests.\(UUID().uuidString)"
+            let suite = temporarySuiteName("KeychainModelCommandTests")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let holder = DebugDrawer(defaults: defaults)

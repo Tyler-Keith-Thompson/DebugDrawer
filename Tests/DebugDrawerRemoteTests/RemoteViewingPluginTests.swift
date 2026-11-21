@@ -3,6 +3,7 @@
     import Combine
     import DebugDrawer
     @testable import DebugDrawerRemote
+    import DebugDrawerTestSupport
     import Foundation
     import Network
     import SwiftUI
@@ -219,7 +220,7 @@
 
         @Test("The badge counts the requests waiting in the drawer that installed the plugin, and in no other")
         func badgeCountsRequests() async throws {
-            let suite = "RemoteViewingPluginTests.badgeCountsRequests.\(UUID().uuidString)"
+            let suite = temporarySuiteName("RemoteViewingPluginTests.badgeCountsRequests")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let drawer = DebugDrawer(defaults: defaults)

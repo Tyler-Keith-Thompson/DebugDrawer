@@ -1,5 +1,6 @@
 @testable import DebugDrawer
 @testable import DebugDrawerDatabaseBrowserPlugin
+import DebugDrawerTestSupport
 import Foundation
 import Testing
 
@@ -7,7 +8,7 @@ import Testing
 @Suite("Databases looks for stores once installed and drops them once removed from every drawer", .timeLimit(.minutes(1)))
 struct DatabaseBrowserUninstallTests {
     private static func drawer() throws -> (DebugDrawer, () -> Void) {
-        let suite = "DatabaseBrowserUninstallTests.\(UUID().uuidString)"
+        let suite = temporarySuiteName("DatabaseBrowserUninstallTests")
         let defaults = try #require(UserDefaults(suiteName: suite))
         return (DebugDrawer(defaults: defaults), { defaults.removePersistentDomain(forName: suite) })
     }

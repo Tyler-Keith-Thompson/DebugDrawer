@@ -3,6 +3,7 @@
 #if os(macOS) && DEBUG
     @testable import DebugDrawerLocation
     @testable import DebugDrawerReceiver
+    import DebugDrawerTestSupport
     import Foundation
     import Testing
 
@@ -14,7 +15,7 @@
         @Test("A spoof made in a session survives the app being killed during it as a flag, and the next launch tells the host it is over")
         @MainActor
         func spoofLeavesFlagThroughKill() async throws {
-            let suite = "LocationSpoofingExitTests-\(UUID().uuidString)"
+            let suite = temporarySuiteName("LocationSpoofingExitTests")
             let directory = FileManager.default.temporaryDirectory.appending(path: "LocationSpoofingExitTests-\(UUID().uuidString)")
             defer { UserDefaults(suiteName: suite)?.removePersistentDomain(forName: suite) }
 

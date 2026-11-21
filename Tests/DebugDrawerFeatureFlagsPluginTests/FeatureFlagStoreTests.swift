@@ -1,5 +1,6 @@
 #if DEBUG
     @testable import DebugDrawerFeatureFlagsPlugin
+    import DebugDrawerTestSupport
     import Foundation
     import Testing
 
@@ -41,7 +42,7 @@
 
         @Test("Overrides persist in UserDefaults: a fresh store over the same defaults applies them once installed")
         func persistsInUserDefaults() throws {
-            let suiteName = "com.debugdrawer.tests.featureFlags.\(UUID().uuidString)"
+            let suiteName = temporarySuiteName("com.debugdrawer.tests.featureFlags")
             let defaults = try #require(UserDefaults(suiteName: suiteName))
             defer { defaults.removePersistentDomain(forName: suiteName) }
             let flags = [FeatureFlag(key: "theme", liveValue: .string("light"))]

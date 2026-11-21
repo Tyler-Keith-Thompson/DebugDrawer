@@ -1,4 +1,5 @@
 import DebugDrawerFeatureFlagsPlugin
+import DebugDrawerTestSupport
 import Foundation
 import Testing
 
@@ -6,7 +7,7 @@ import Testing
 struct UserDefaultsOverrideStorageTests {
     @Test("Overrides persist under the storage's key, and another storage over the same defaults reads them")
     func persists() throws {
-        let suiteName = "com.debugdrawer.tests.featureFlags.\(UUID().uuidString)"
+        let suiteName = temporarySuiteName("com.debugdrawer.tests.featureFlags")
         let defaults = try #require(UserDefaults(suiteName: suiteName))
         defer { defaults.removePersistentDomain(forName: suiteName) }
         let expected: [String: FeatureFlagValue] = ["newCheckout": .bool(true), "discount": .number(0.15), "theme": .string("dark")]
@@ -25,7 +26,7 @@ struct UserDefaultsOverrideStorageTests {
 
     @Test("Removing one override keeps the others, and removing the last removes the defaults key")
     func removes() throws {
-        let suiteName = "com.debugdrawer.tests.featureFlags.\(UUID().uuidString)"
+        let suiteName = temporarySuiteName("com.debugdrawer.tests.featureFlags")
         let defaults = try #require(UserDefaults(suiteName: suiteName))
         defer { defaults.removePersistentDomain(forName: suiteName) }
         let sut = UserDefaultsFeatureFlagOverrideStorage(defaults: defaults, key: "overrides")
@@ -43,7 +44,7 @@ struct UserDefaultsOverrideStorageTests {
 
     @Test("Nothing stored, or data that isn't an object of flag values, reads as no overrides")
     func unreadable() throws {
-        let suiteName = "com.debugdrawer.tests.featureFlags.\(UUID().uuidString)"
+        let suiteName = temporarySuiteName("com.debugdrawer.tests.featureFlags")
         let defaults = try #require(UserDefaults(suiteName: suiteName))
         defer { defaults.removePersistentDomain(forName: suiteName) }
         let sut = UserDefaultsFeatureFlagOverrideStorage(defaults: defaults, key: "overrides")

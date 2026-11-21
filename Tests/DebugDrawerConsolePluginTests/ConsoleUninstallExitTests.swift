@@ -125,7 +125,7 @@
                 setenv("CFFIXED_USER_HOME", home, 1)
                 guard URL.applicationSupportDirectory.path(percentEncoded: false).hasPrefix(home) else { exit(EXIT_FAILURE) }
                 let isExpected = await MainActor.run {
-                    let suite = "ConsoleUninstallExitTests.\(UUID().uuidString)"
+                    let suite = temporarySuiteName("ConsoleUninstallExitTests")
                     guard let defaults = UserDefaults(suiteName: suite) else { return false }
                     let first = DebugDrawer(defaults: defaults)
                     let second = DebugDrawer(defaults: defaults)

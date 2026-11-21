@@ -21,6 +21,7 @@ swift_library(
         "//Sources/DebugDrawerLocation",
         "//Sources/DebugDrawerReceiver",
         "//Sources/DebugDrawer",
+        "//Tests/DebugDrawerTestSupport",
     ],
 )
 
@@ -62,6 +63,7 @@ swift_library(
         "//Sources/DebugDrawerLocation",
         "//Sources/DebugDrawerReceiver",
         "//Sources/DebugDrawer",
+        "//Tests/DebugDrawerTestSupport",
     ],
 )
 

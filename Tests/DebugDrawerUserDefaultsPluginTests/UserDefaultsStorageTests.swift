@@ -1,5 +1,6 @@
 #if DEBUG
     import DebugDrawer
+    import DebugDrawerTestSupport
     @testable import DebugDrawerUserDefaultsPlugin
     import Foundation
     import Testing
@@ -13,7 +14,7 @@
     struct UserDefaultsStorageTests {
         @Test("A suite the host names is offered after Standard, and picking it lists that suite's keys")
         func hostSuiteListed() throws {
-            let name = "DebugDrawerTests.\(UUID().uuidString)"
+            let name = temporarySuiteName("DebugDrawerTests")
             let suite = try #require(UserDefaults(suiteName: name))
             defer { suite.removePersistentDomain(forName: name) }
             suite.set("ada", forKey: "username")
@@ -34,7 +35,7 @@
 
         @Test("Adding a key writes the Foundation type UserDefaults reads it back as", arguments: PropertyListType.allCases)
         func addFoundationType(type: PropertyListType) throws {
-            let name = "DebugDrawerTests.\(UUID().uuidString)"
+            let name = temporarySuiteName("DebugDrawerTests")
             let suite = try #require(UserDefaults(suiteName: name))
             defer { suite.removePersistentDomain(forName: name) }
             let now = Date(timeIntervalSince1970: 1_800_000_000)
@@ -66,7 +67,7 @@
 
         @Test("Editing an element inside an array and a value inside a nested dictionary persists in the suite")
         func nestedEditsPersist() throws {
-            let name = "DebugDrawerTests.\(UUID().uuidString)"
+            let name = temporarySuiteName("DebugDrawerTests")
             let suite = try #require(UserDefaults(suiteName: name))
             defer { suite.removePersistentDomain(forName: name) }
             suite.set(["recent", "favorites"], forKey: "tabs")
@@ -90,7 +91,7 @@
 
         @Test("A key the app writes from outside the plugin appears in the list without anyone reloading")
         func outsideWriteUpdates() async throws {
-            let name = "DebugDrawerTests.\(UUID().uuidString)"
+            let name = temporarySuiteName("DebugDrawerTests")
             let suite = try #require(UserDefaults(suiteName: name))
             defer { suite.removePersistentDomain(forName: name) }
             let storage = _UserDefaultsStorage(standard: suite, standardDomainName: name)
@@ -113,7 +114,7 @@
 
         @Test("Removing a key removes it from the shown suite and the list")
         func removeKey() throws {
-            let name = "DebugDrawerTests.\(UUID().uuidString)"
+            let name = temporarySuiteName("DebugDrawerTests")
             let suite = try #require(UserDefaults(suiteName: name))
             defer { suite.removePersistentDomain(forName: name) }
             suite.set("gone", forKey: "doomed")
@@ -129,7 +130,7 @@
 
         @Test("Keys the app wrote that look like the system's, such as CountryCode and NSFWFilterEnabled, are listed")
         func systemLookingKeysListed() throws {
-            let name = "DebugDrawerTests.\(UUID().uuidString)"
+            let name = temporarySuiteName("DebugDrawerTests")
             let suite = try #require(UserDefaults(suiteName: name))
             defer { suite.removePersistentDomain(forName: name) }
             suite.set("NZ", forKey: "CountryCode")
@@ -150,7 +151,7 @@
 
         @Test("The list is the persistent domain's: a registered default and the global domain's keys stay out unless shown")
         func persistentDomainOnly() throws {
-            let name = "DebugDrawerTests.\(UUID().uuidString)"
+            let name = temporarySuiteName("DebugDrawerTests")
             let suite = try #require(UserDefaults(suiteName: name))
             defer { suite.removePersistentDomain(forName: name) }
             let registered = "DebugDrawerTests.registered.\(UUID().uuidString)"
@@ -174,7 +175,7 @@
 
         @Test("Deleting a key that is also registered removes the app's value; the registered default then shows read-only")
         func deleteOverRegisteredDefault() throws {
-            let name = "DebugDrawerTests.\(UUID().uuidString)"
+            let name = temporarySuiteName("DebugDrawerTests")
             let suite = try #require(UserDefaults(suiteName: name))
             defer { suite.removePersistentDomain(forName: name) }
             let key = "DebugDrawerTests.registered.\(UUID().uuidString)"
@@ -196,7 +197,7 @@
 
         @Test("Editing an integer stores an integer, a real a real, and a Boolean a Boolean, read back from the suite")
         func editsKeepTheStoredType() throws {
-            let name = "DebugDrawerTests.\(UUID().uuidString)"
+            let name = temporarySuiteName("DebugDrawerTests")
             let suite = try #require(UserDefaults(suiteName: name))
             defer { suite.removePersistentDomain(forName: name) }
             suite.set(3, forKey: "launchCount")
@@ -235,7 +236,7 @@
 
         @Test("A number decoded from a snapshot writes back as the same kind of number")
         func decodedNumbersWriteBack() throws {
-            let name = "DebugDrawerTests.\(UUID().uuidString)"
+            let name = temporarySuiteName("DebugDrawerTests")
             let suite = try #require(UserDefaults(suiteName: name))
             defer { suite.removePersistentDomain(forName: name) }
             let storage = _UserDefaultsStorage(standard: suite, standardDomainName: name)

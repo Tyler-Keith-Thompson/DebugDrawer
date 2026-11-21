@@ -1,6 +1,7 @@
 #if DEBUG
     @testable import DebugDrawer
     @testable import DebugDrawerNotificationsPlugin
+    import DebugDrawerTestSupport
     import Foundation
     import Testing
 
@@ -13,7 +14,7 @@
 
         @Test("Unregistering the plugin removes it, stops observing the source and drops the center read; the token stays")
         func uninstallStopsObserving() async throws {
-            let suite = "NotificationsLifecycleTests.\(UUID().uuidString)"
+            let suite = temporarySuiteName("NotificationsLifecycleTests")
             defer { UserDefaults().removePersistentDomain(forName: suite) }
             let drawer = try makeDrawer(suite)
             let changes = FakeNotificationChangeSource()
@@ -36,7 +37,7 @@
 
         @Test("Registering the plugin again observes the source again, and a change reads the center")
         func reinstallObservesAgain() async throws {
-            let suite = "NotificationsLifecycleTests.\(UUID().uuidString)"
+            let suite = temporarySuiteName("NotificationsLifecycleTests")
             defer { UserDefaults().removePersistentDomain(forName: suite) }
             let drawer = try makeDrawer(suite)
             let changes = FakeNotificationChangeSource()
@@ -60,7 +61,7 @@
 
         @Test("Uninstalling twice stops the source once")
         func uninstallTwice() throws {
-            let suite = "NotificationsLifecycleTests.\(UUID().uuidString)"
+            let suite = temporarySuiteName("NotificationsLifecycleTests")
             defer { UserDefaults().removePersistentDomain(forName: suite) }
             let drawer = try makeDrawer(suite)
             let changes = FakeNotificationChangeSource()
@@ -77,7 +78,7 @@
 
         @Test("In two drawers the plugin observes until the last one uninstalls it")
         func twoDrawers() throws {
-            let suite = "NotificationsLifecycleTests.\(UUID().uuidString)"
+            let suite = temporarySuiteName("NotificationsLifecycleTests")
             defer { UserDefaults().removePersistentDomain(forName: suite) }
             let first = try makeDrawer(suite)
             let second = try makeDrawer(suite)

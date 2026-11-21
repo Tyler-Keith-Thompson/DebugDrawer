@@ -3,6 +3,7 @@
 // the same time, so uninstalling, which turns them all off, runs only in a child.
 #if os(macOS) && DEBUG
     @testable import DebugDrawer
+    import DebugDrawerTestSupport
     @testable import DebugDrawerViewInspectorPlugin
     import Foundation
     import SwiftUI
@@ -33,7 +34,7 @@
                 guard URL.applicationSupportDirectory.path(percentEncoded: false).hasPrefix(home) else { exit(EXIT_FAILURE) }
                 @MainActor
                 func uninstallThenReinstall() throws {
-                    let suite = "ViewInspectorUninstallExitTests.\(UUID().uuidString)"
+                    let suite = temporarySuiteName("ViewInspectorUninstallExitTests")
                     let defaults = try #require(UserDefaults(suiteName: suite))
                     defer { defaults.removePersistentDomain(forName: suite) }
                     let drawer = DebugDrawer(defaults: defaults)

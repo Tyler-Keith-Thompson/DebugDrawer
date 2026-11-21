@@ -1,4 +1,5 @@
 @testable import DebugDrawerReceiver
+import DebugDrawerTestSupport
 import Foundation
 import Testing
 
@@ -105,7 +106,7 @@ struct UserDefaultsTests {
     @Test("An empty allowlist lists nothing, and every edit is notExposed")
     @MainActor
     func emptyAllowlistListsNothing() throws {
-        let suite = "UserDefaultsTests-\(UUID().uuidString)"
+        let suite = temporarySuiteName("UserDefaultsTests")
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         defaults.set("pro", forKey: "plan")
@@ -120,7 +121,7 @@ struct UserDefaultsTests {
     @Test("A key edited twice is put back as it was before the first edit")
     @MainActor
     func revertPutsBackTheFirstOriginal() throws {
-        let suite = "UserDefaultsTests-\(UUID().uuidString)"
+        let suite = temporarySuiteName("UserDefaultsTests")
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         defaults.set(Data([9, 9]), forKey: "greeting")

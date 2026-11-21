@@ -1,5 +1,6 @@
 #if DEBUG
     @testable import DebugDrawer
+    import DebugDrawerTestSupport
     import Foundation
     import SwiftUI
     import Testing
@@ -40,7 +41,7 @@
 
         @Test("The pins and the position survive a save and a load")
         func pinsAndPositionPersist() throws {
-            let suite = "HUDLayoutTests.\(#function).\(UUID().uuidString)"
+            let suite = temporarySuiteName("HUDLayoutTests.\(#function)")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             var expected = HUDLayout()
@@ -56,7 +57,7 @@
 
         @Test("Unreadable saved data loads as an empty layout at the default corner")
         func garbageLoadsEmpty() throws {
-            let suite = "HUDLayoutTests.\(#function).\(UUID().uuidString)"
+            let suite = temporarySuiteName("HUDLayoutTests.\(#function)")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             defaults.set(Data("not json".utf8), forKey: HUDLayout.defaultsKey)
@@ -86,7 +87,7 @@
 
         @Test("The HUD lists registered pinned plugins that offer a HUD, in pin order, and nothing else")
         func theHUDListsPinnedReadouts() throws {
-            let suite = "HUDTests.\(#function).\(UUID().uuidString)"
+            let suite = temporarySuiteName("HUDTests.\(#function)")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let sut = DebugDrawer(defaults: defaults)
@@ -103,7 +104,7 @@
 
         @Test("Moving the HUD saves its corner")
         func movingTheHUDSavesItsCorner() throws {
-            let suite = "HUDTests.\(#function).\(UUID().uuidString)"
+            let suite = temporarySuiteName("HUDTests.\(#function)")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let sut = DebugDrawer(defaults: defaults)
@@ -117,7 +118,7 @@
 
         @Test("Running an action while hidden hides the HUD during it, even with the drawer kept")
         func theHUDIsHiddenWhileAnActionRuns() async throws {
-            let suite = "HUDTests.\(#function).\(UUID().uuidString)"
+            let suite = temporarySuiteName("HUDTests.\(#function)")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let sut = DebugDrawer(defaults: defaults)
@@ -136,7 +137,7 @@
         #if !os(visionOS)
             @Test("While the HUD is hidden, its layer draws it fully transparent, so a capture leaves it out")
             func theLayerDrawsNoHUDWhileHidden() throws {
-                let suite = "HUDTests.\(#function).\(UUID().uuidString)"
+                let suite = temporarySuiteName("HUDTests.\(#function)")
                 let defaults = try #require(UserDefaults(suiteName: suite))
                 defer { defaults.removePersistentDomain(forName: suite) }
                 let drawer = DebugDrawer(defaults: defaults)
@@ -168,7 +169,7 @@
 
             @Test("Unpin in a readout's context menu takes that readout off the HUD and leaves the others")
             func unpinTakesTheReadoutOff() throws {
-                let name = "HUDTests.\(#function).\(UUID().uuidString)"
+                let name = temporarySuiteName("HUDTests.\(#function)")
                 let suite = try #require(UserDefaults(suiteName: name))
                 defer { suite.removePersistentDomain(forName: name) }
                 let drawer = DebugDrawer(defaults: suite)

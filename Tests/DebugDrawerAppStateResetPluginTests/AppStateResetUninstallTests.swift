@@ -2,6 +2,7 @@
     @testable import DebugDrawer
     @testable import DebugDrawerAppStateResetPlugin
     @testable import DebugDrawerAppStateReset
+    import DebugDrawerTestSupport
     import Foundation
     import Testing
 
@@ -9,7 +10,7 @@
     @Suite("Reset App State drops the plan it read once removed from every drawer")
     struct AppStateResetUninstallTests {
         private static func drawer() throws -> (DebugDrawer, () -> Void) {
-            let suite = "AppStateResetUninstallTests.\(UUID().uuidString)"
+            let suite = temporarySuiteName("AppStateResetUninstallTests")
             let defaults = try #require(UserDefaults(suiteName: suite))
             return (DebugDrawer(defaults: defaults), { defaults.removePersistentDomain(forName: suite) })
         }

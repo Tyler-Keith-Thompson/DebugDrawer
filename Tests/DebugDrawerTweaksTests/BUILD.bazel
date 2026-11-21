@@ -21,6 +21,7 @@ swift_library(
         "//Sources/DebugDrawerTweaks",
         "//Sources/DebugDrawerReceiver",
         "//Sources/DebugDrawer",
+        "//Tests/DebugDrawerTestSupport",
     ],
 )
 

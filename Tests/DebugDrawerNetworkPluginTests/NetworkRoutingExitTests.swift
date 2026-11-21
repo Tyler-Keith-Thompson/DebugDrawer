@@ -3,6 +3,7 @@
 #if os(macOS) && DEBUG
     @testable import DebugDrawer
     @testable import DebugDrawerNetworkPlugin
+    import DebugDrawerTestSupport
     import Foundation
     import Testing
 
@@ -38,7 +39,7 @@
 
                 @MainActor
                 func route() async throws {
-                    let suite = "NetworkRoutingExitTests.\(UUID().uuidString)"
+                    let suite = temporarySuiteName("NetworkRoutingExitTests")
                     let defaults = try #require(UserDefaults(suiteName: suite))
                     defer { defaults.removePersistentDomain(forName: suite) }
                     let store = NetworkStore(ignoreStorage: FakeNetworkIgnoreListStorage())
@@ -133,7 +134,7 @@
 
                 @MainActor
                 func route() async throws {
-                    let suite = "NetworkRoutingExitTests.\(UUID().uuidString)"
+                    let suite = temporarySuiteName("NetworkRoutingExitTests")
                     let defaults = try #require(UserDefaults(suiteName: suite))
                     defer { defaults.removePersistentDomain(forName: suite) }
                     let firstModel = model()

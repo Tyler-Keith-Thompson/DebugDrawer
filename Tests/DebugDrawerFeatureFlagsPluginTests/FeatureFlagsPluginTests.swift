@@ -1,6 +1,7 @@
 #if DEBUG
     import DebugDrawer
     @testable import DebugDrawerFeatureFlagsPlugin
+    import DebugDrawerTestSupport
     import Foundation
     import Testing
 
@@ -18,7 +19,7 @@
 
         @Test("Installing registers one Feature Flags plugin, with no other plugin installed, and installing again replaces it")
         func install() throws {
-            let suite = "FeatureFlagsPluginTests.\(UUID().uuidString)"
+            let suite = temporarySuiteName("FeatureFlagsPluginTests")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let drawer = DebugDrawer(defaults: defaults)
@@ -35,7 +36,7 @@
 
         @Test("Installing applies every stored override to the provider before returning")
         func installApplies() throws {
-            let suite = "FeatureFlagsPluginTests.\(UUID().uuidString)"
+            let suite = temporarySuiteName("FeatureFlagsPluginTests")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let drawer = DebugDrawer(defaults: defaults)

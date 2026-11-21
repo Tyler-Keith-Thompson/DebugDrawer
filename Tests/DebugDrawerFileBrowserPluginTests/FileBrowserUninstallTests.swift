@@ -1,6 +1,7 @@
 #if DEBUG
     @testable import DebugDrawer
     @testable import DebugDrawerFileBrowserPlugin
+    import DebugDrawerTestSupport
     import Foundation
     import Testing
 
@@ -8,7 +9,7 @@
     @Suite("File Browser drops what it read once removed from every drawer", .timeLimit(.minutes(1)))
     struct FileBrowserUninstallTests {
         private static func drawer() throws -> (DebugDrawer, () -> Void) {
-            let suite = "FileBrowserUninstallTests.\(UUID().uuidString)"
+            let suite = temporarySuiteName("FileBrowserUninstallTests")
             let defaults = try #require(UserDefaults(suiteName: suite))
             return (DebugDrawer(defaults: defaults), { defaults.removePersistentDomain(forName: suite) })
         }

@@ -4,6 +4,7 @@
     import Combine
     @testable import DebugDrawer
     @testable import DebugDrawerDiskIOPlugin
+    import DebugDrawerTestSupport
     import Foundation
     import ObjectiveC
     import Testing
@@ -51,7 +52,7 @@
 
                 @MainActor
                 func uninstallThenReinstall() async throws {
-                    let suite = "DiskIOUninstallExitTests.\(UUID().uuidString)"
+                    let suite = temporarySuiteName("DiskIOUninstallExitTests")
                     let defaults = try #require(UserDefaults(suiteName: suite))
                     defer { defaults.removePersistentDomain(forName: suite) }
                     let drawer = DebugDrawer(defaults: defaults)
@@ -110,7 +111,7 @@
 
                 @MainActor
                 func leaveInPlace() async throws {
-                    let suite = "DiskIOUninstallExitTests.\(UUID().uuidString)"
+                    let suite = temporarySuiteName("DiskIOUninstallExitTests")
                     let defaults = try #require(UserDefaults(suiteName: suite))
                     defer { defaults.removePersistentDomain(forName: suite) }
                     let drawer = DebugDrawer(defaults: defaults)

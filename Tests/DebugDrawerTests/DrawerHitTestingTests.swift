@@ -2,6 +2,7 @@
 #if os(macOS)
     import AppKit
     @testable import DebugDrawer
+    import DebugDrawerTestSupport
     import SwiftUI
     import Testing
 
@@ -12,7 +13,7 @@
     struct DrawerHitTestingTests {
         @Test("While the drawer is open, a click beside the panel lands in the app's window, outside the panel's")
         func clickBesidePanelReachesApp() throws {
-            let suite = "DrawerHitTestingTests.\(#function).\(UUID().uuidString)"
+            let suite = temporarySuiteName("DrawerHitTestingTests.\(#function)")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let drawer = DebugDrawer(defaults: defaults)
@@ -42,7 +43,7 @@
 
         @Test("While the drawer is closed, its panel is off screen, so a click anywhere reaches the app")
         func clickWhileClosedReachesApp() throws {
-            let suite = "DrawerHitTestingTests.\(#function).\(UUID().uuidString)"
+            let suite = temporarySuiteName("DrawerHitTestingTests.\(#function)")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let drawer = DebugDrawer(defaults: defaults)
@@ -78,7 +79,7 @@
         #if !targetEnvironment(macCatalyst)
             @Test("While the drawer is open, its window takes a touch on the panel and lets one beside it fall through to the app's windows")
             func touchBesidePanelFallsThrough() throws {
-                let suite = "DrawerHitTestingTests.\(#function).\(UUID().uuidString)"
+                let suite = temporarySuiteName("DrawerHitTestingTests.\(#function)")
                 let defaults = try #require(UserDefaults(suiteName: suite))
                 defer { defaults.removePersistentDomain(forName: suite) }
                 let drawer = DebugDrawer(defaults: defaults)
@@ -105,7 +106,7 @@
             // view added the same way stands in for them, as opening a real menu takes a touch.
             @Test("An added view, such as a context menu's, makes the drawer's window take touches beside the panel; once it's gone, the app does")
             func addedViewTakesTouchesOutsidePanel() throws {
-                let suite = "DrawerHitTestingTests.\(#function).\(UUID().uuidString)"
+                let suite = temporarySuiteName("DrawerHitTestingTests.\(#function)")
                 let defaults = try #require(UserDefaults(suiteName: suite))
                 defer { defaults.removePersistentDomain(forName: suite) }
                 let drawer = DebugDrawer(defaults: defaults)
@@ -139,7 +140,7 @@
 
             @Test("While the drawer is closed, its window takes no touch, even where the panel was")
             func touchWhileClosedFallsThrough() throws {
-                let suite = "DrawerHitTestingTests.\(#function).\(UUID().uuidString)"
+                let suite = temporarySuiteName("DrawerHitTestingTests.\(#function)")
                 let defaults = try #require(UserDefaults(suiteName: suite))
                 defer { defaults.removePersistentDomain(forName: suite) }
                 let drawer = DebugDrawer(defaults: defaults)
@@ -156,7 +157,7 @@
 
             @Test("While a compact drawer is open, its window takes a touch outside the panel, where its backdrop closes the drawer")
             func touchOutsideCompactPanelIsTaken() throws {
-                let suite = "DrawerHitTestingTests.\(#function).\(UUID().uuidString)"
+                let suite = temporarySuiteName("DrawerHitTestingTests.\(#function)")
                 let defaults = try #require(UserDefaults(suiteName: suite))
                 defer { defaults.removePersistentDomain(forName: suite) }
                 let drawer = DebugDrawer(defaults: defaults)

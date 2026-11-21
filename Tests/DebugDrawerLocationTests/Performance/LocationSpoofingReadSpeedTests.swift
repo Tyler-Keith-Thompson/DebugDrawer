@@ -4,6 +4,7 @@
 import CoreLocation
 import DebugDrawerLocation
 import DebugDrawerReceiver
+import DebugDrawerTestSupport
 import Foundation
 import Testing
 
@@ -15,7 +16,7 @@ import Testing
 struct LocationSpoofingReadSpeedTests {
     @Test("100,000 readings passed through the spoofing take under 3 s, while none is spoofed")
     func manyReadings() throws {
-        let suite = "LocationSpoofingReadSpeedTests-\(UUID().uuidString)"
+        let suite = temporarySuiteName("LocationSpoofingReadSpeedTests")
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         let sut = LocationSpoofing(sessions: DebugDrawerSessions(maximumDuration: 300), defaults: defaults) { _ in }

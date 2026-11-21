@@ -4,6 +4,7 @@
 #if os(macOS) && DEBUG
     @testable import DebugDrawer
     @testable import DebugDrawerCrashReportsPlugin
+    import DebugDrawerTestSupport
     import Foundation
     import Testing
 
@@ -31,7 +32,7 @@
                             frames: [], source: .captured, isSeen: false
                         )
                     }
-                    let suite = "CrashReportsBadgeExitTests.badgesItsOwnDrawer.\(UUID().uuidString)"
+                    let suite = temporarySuiteName("CrashReportsBadgeExitTests.badgesItsOwnDrawer")
                     guard let defaults = UserDefaults(suiteName: suite) else { return false }
                     defer { defaults.removePersistentDomain(forName: suite) }
                     let drawer = DebugDrawer(defaults: defaults)

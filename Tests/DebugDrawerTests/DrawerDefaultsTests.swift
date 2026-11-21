@@ -1,5 +1,6 @@
 #if DEBUG
     @testable import DebugDrawer
+    import DebugDrawerTestSupport
     import Foundation
     import Testing
 
@@ -9,8 +10,8 @@
     struct DrawerDefaultsTests {
         @Test("The drawer's keys move from the app's defaults into the drawer's suite, and the app's own keys stay")
         func drawerKeysMove() throws {
-            let sourceName = "DrawerDefaultsTests.source.\(UUID().uuidString)"
-            let suiteName = "DrawerDefaultsTests.suite.\(UUID().uuidString)"
+            let sourceName = temporarySuiteName("DrawerDefaultsTests.source")
+            let suiteName = temporarySuiteName("DrawerDefaultsTests.suite")
             let source = try #require(UserDefaults(suiteName: sourceName))
             defer { source.removePersistentDomain(forName: sourceName) }
             defer { UserDefaults(suiteName: suiteName)?.removePersistentDomain(forName: suiteName) }
@@ -42,8 +43,8 @@
 
         @Test("A key the drawer's suite already holds keeps its value, and the app's copy is still removed")
         func theSuiteWins() throws {
-            let sourceName = "DrawerDefaultsTests.source.\(UUID().uuidString)"
-            let suiteName = "DrawerDefaultsTests.suite.\(UUID().uuidString)"
+            let sourceName = temporarySuiteName("DrawerDefaultsTests.source")
+            let suiteName = temporarySuiteName("DrawerDefaultsTests.suite")
             let source = try #require(UserDefaults(suiteName: sourceName))
             let suite = try #require(UserDefaults(suiteName: suiteName))
             defer { source.removePersistentDomain(forName: sourceName) }
@@ -60,8 +61,8 @@
 
         @Test("The keys move once: a drawer key written to the app's defaults after the move stays there")
         func theMoveHappensOnce() throws {
-            let sourceName = "DrawerDefaultsTests.source.\(UUID().uuidString)"
-            let suiteName = "DrawerDefaultsTests.suite.\(UUID().uuidString)"
+            let sourceName = temporarySuiteName("DrawerDefaultsTests.source")
+            let suiteName = temporarySuiteName("DrawerDefaultsTests.suite")
             let source = try #require(UserDefaults(suiteName: sourceName))
             defer { source.removePersistentDomain(forName: sourceName) }
             defer { UserDefaults(suiteName: suiteName)?.removePersistentDomain(forName: suiteName) }

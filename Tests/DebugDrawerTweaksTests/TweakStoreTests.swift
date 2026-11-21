@@ -1,5 +1,6 @@
 #if DEBUG
     import Combine
+    import DebugDrawerTestSupport
     @testable import DebugDrawerTweaks
     import Foundation
     import Testing
@@ -25,7 +26,7 @@
 
         @Test("Values persist in UserDefaults under the key prefix, and a fresh store over the same defaults reads them")
         func persistsInUserDefaults() throws {
-            let suiteName = "com.debugdrawer.tests.tweaks.\(UUID().uuidString)"
+            let suiteName = temporarySuiteName("com.debugdrawer.tests.tweaks")
             let defaults = try #require(UserDefaults(suiteName: suiteName))
             defer { defaults.removePersistentDomain(forName: suiteName) }
             let newCheckout = Tweak.toggle("New checkout", key: "newCheckout", default: false)

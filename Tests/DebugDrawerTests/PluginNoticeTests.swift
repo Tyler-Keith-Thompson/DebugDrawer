@@ -1,5 +1,6 @@
 #if DEBUG
     @testable import DebugDrawer
+    import DebugDrawerTestSupport
     import SwiftUI
     import Testing
 
@@ -20,7 +21,7 @@
     struct PluginNoticeTests {
         @Test("A plugin in a drawer of its own badges that drawer until cleared, and not the shared one")
         func aBadgeReachesTheDrawerThatHoldsThePlugin() throws {
-            let suite = "PluginNoticeTests.\(#function).\(UUID().uuidString)"
+            let suite = temporarySuiteName("PluginNoticeTests.\(#function)")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let drawer = DebugDrawer(defaults: defaults)
@@ -39,7 +40,7 @@
 
         @Test("A plugin in a drawer of its own posts to that drawer as one toast that counts the posts, and not to the shared one")
         func aToastReachesTheDrawerThatHoldsThePlugin() throws {
-            let suite = "PluginNoticeTests.\(#function).\(UUID().uuidString)"
+            let suite = temporarySuiteName("PluginNoticeTests.\(#function)")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let drawer = DebugDrawer(defaults: defaults)
@@ -56,8 +57,8 @@
 
         @Test("A plugin in two drawers badges and toasts both, and clearing its badge clears both")
         func aPluginInTwoDrawersReachesBoth() throws {
-            let firstSuite = "PluginNoticeTests.\(#function).first.\(UUID().uuidString)"
-            let secondSuite = "PluginNoticeTests.\(#function).second.\(UUID().uuidString)"
+            let firstSuite = temporarySuiteName("PluginNoticeTests.\(#function).first")
+            let secondSuite = temporarySuiteName("PluginNoticeTests.\(#function).second")
             let firstDefaults = try #require(UserDefaults(suiteName: firstSuite))
             let secondDefaults = try #require(UserDefaults(suiteName: secondSuite))
             defer {
@@ -87,7 +88,7 @@
 
         @Test("A plugin registered as local in a drawer of its own badges and toasts that drawer")
         func aLocalPluginReachesItsDrawer() throws {
-            let suite = "PluginNoticeTests.\(#function).\(UUID().uuidString)"
+            let suite = temporarySuiteName("PluginNoticeTests.\(#function)")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let drawer = DebugDrawer(defaults: defaults)
@@ -105,7 +106,7 @@
 
         @Test("A copy of the plugin made after it was installed reaches the drawer the original was installed in")
         func aCopyOfThePluginReachesItsDrawer() throws {
-            let suite = "PluginNoticeTests.\(#function).\(UUID().uuidString)"
+            let suite = temporarySuiteName("PluginNoticeTests.\(#function)")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let drawer = DebugDrawer(defaults: defaults)
@@ -120,7 +121,7 @@
 
         @Test("Finding a plugin's drawers keeps none of them alive")
         func trackingKeepsNoDrawerAlive() throws {
-            let suite = "PluginNoticeTests.\(#function).\(UUID().uuidString)"
+            let suite = temporarySuiteName("PluginNoticeTests.\(#function)")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let id = "PluginNoticeTests.\(UUID().uuidString)"
@@ -154,7 +155,7 @@
 
             @Test("A plugin in the shared drawer alone badges and toasts the shared drawer, and no other")
             func aPluginInTheSharedDrawerReachesIt() throws {
-                let suite = "SharedPluginNoticeTests.\(#function).\(UUID().uuidString)"
+                let suite = temporarySuiteName("SharedPluginNoticeTests.\(#function)")
                 let defaults = try #require(UserDefaults(suiteName: suite))
                 defer { defaults.removePersistentDomain(forName: suite) }
                 let other = DebugDrawer(defaults: defaults)
@@ -197,7 +198,7 @@
 
             @Test("A plugin removed from the only drawer of its own that held it posts to the shared drawer again")
             func aRemovedPluginFallsBackToTheSharedDrawer() throws {
-                let suite = "SharedPluginNoticeTests.\(#function).\(UUID().uuidString)"
+                let suite = temporarySuiteName("SharedPluginNoticeTests.\(#function)")
                 let defaults = try #require(UserDefaults(suiteName: suite))
                 defer { defaults.removePersistentDomain(forName: suite) }
                 let drawer = DebugDrawer(defaults: defaults)

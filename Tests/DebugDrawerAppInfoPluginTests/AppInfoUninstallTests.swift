@@ -2,6 +2,7 @@
     @testable import DebugDrawer
     import DebugDrawerAppInfo
     @testable import DebugDrawerAppInfoPlugin
+    import DebugDrawerTestSupport
     import Foundation
     import Testing
 
@@ -32,7 +33,7 @@
     @Suite("App Info stops watching the network once removed from every drawer")
     struct AppInfoUninstallTests {
         private static func drawer() throws -> (DebugDrawer, () -> Void) {
-            let suite = "AppInfoUninstallTests.\(UUID().uuidString)"
+            let suite = temporarySuiteName("AppInfoUninstallTests")
             let defaults = try #require(UserDefaults(suiteName: suite))
             return (DebugDrawer(defaults: defaults), { defaults.removePersistentDomain(forName: suite) })
         }

@@ -1,5 +1,6 @@
 import CoreLocation
 @testable import DebugDrawerLocationPlugin
+import DebugDrawerTestSupport
 import Foundation
 import Testing
 
@@ -17,7 +18,7 @@ struct RoutePlayerTests {
             GPXTrackPoint(latitude: 0.001, longitude: 0, elevation: 11, time: start.addingTimeInterval(10)),
             GPXTrackPoint(latitude: 0.001, longitude: 0.001, elevation: 12, time: start.addingTimeInterval(20))
         ])
-        let defaults = try #require(UserDefaults(suiteName: "RoutePlayerTests.\(UUID().uuidString)"))
+        let defaults = try #require(UserDefaults(suiteName: temporarySuiteName("RoutePlayerTests")))
         defaults.set(true, forKey: "com.debugdrawer.location.enabled")
         let simulator = LocationSimulator(defaults: defaults, service: RecordingLocationService())
         let manager = CLLocationManager()
@@ -54,7 +55,7 @@ struct RoutePlayerTests {
             GPXTrackPoint(latitude: 0.001, longitude: 0, elevation: nil, time: start.addingTimeInterval(10)),
             GPXTrackPoint(latitude: 0.002, longitude: 0, elevation: nil, time: start.addingTimeInterval(30))
         ])
-        let defaults = try #require(UserDefaults(suiteName: "RoutePlayerTests.\(UUID().uuidString)"))
+        let defaults = try #require(UserDefaults(suiteName: temporarySuiteName("RoutePlayerTests")))
         defaults.set(true, forKey: "com.debugdrawer.location.enabled")
         let simulator = LocationSimulator(defaults: defaults, service: RecordingLocationService())
         let manager = CLLocationManager()
@@ -85,7 +86,7 @@ struct RoutePlayerTests {
             GPXTrackPoint(latitude: 0.001, longitude: 0, elevation: nil, time: start.addingTimeInterval(10)),
             GPXTrackPoint(latitude: 0.002, longitude: 0, elevation: nil, time: start.addingTimeInterval(20))
         ])
-        let defaults = try #require(UserDefaults(suiteName: "RoutePlayerTests.\(UUID().uuidString)"))
+        let defaults = try #require(UserDefaults(suiteName: temporarySuiteName("RoutePlayerTests")))
         defaults.set(true, forKey: "com.debugdrawer.location.enabled")
         let simulator = LocationSimulator(defaults: defaults, service: RecordingLocationService())
         let manager = CLLocationManager()
@@ -120,7 +121,7 @@ struct RoutePlayerTests {
             GPXTrackPoint(latitude: 1, longitude: 1, elevation: nil, time: start),
             GPXTrackPoint(latitude: 2, longitude: 2, elevation: nil, time: start.addingTimeInterval(10))
         ])
-        let defaults = try #require(UserDefaults(suiteName: "RoutePlayerTests.\(UUID().uuidString)"))
+        let defaults = try #require(UserDefaults(suiteName: temporarySuiteName("RoutePlayerTests")))
         defaults.set(true, forKey: "com.debugdrawer.location.enabled")
         defaults.set(51.5, forKey: "com.debugdrawer.location.latitude")
         defaults.set(-0.12, forKey: "com.debugdrawer.location.longitude")
@@ -152,7 +153,7 @@ struct RoutePlayerTests {
             GPXTrackPoint(latitude: 0, longitude: 0, elevation: nil, time: start),
             GPXTrackPoint(latitude: 0.001, longitude: 0, elevation: nil, time: start.addingTimeInterval(100))
         ])
-        let defaults = try #require(UserDefaults(suiteName: "RoutePlayerTests.\(UUID().uuidString)"))
+        let defaults = try #require(UserDefaults(suiteName: temporarySuiteName("RoutePlayerTests")))
         defaults.set(true, forKey: "com.debugdrawer.location.enabled")
         let simulator = LocationSimulator(defaults: defaults, service: RecordingLocationService())
         let manager = CLLocationManager()
@@ -176,7 +177,7 @@ struct RoutePlayerTests {
             GPXTrackPoint(latitude: 1, longitude: 1, elevation: nil, time: nil),
             GPXTrackPoint(latitude: 2, longitude: 2, elevation: nil, time: nil)
         ])
-        let defaults = try #require(UserDefaults(suiteName: "RoutePlayerTests.\(UUID().uuidString)"))
+        let defaults = try #require(UserDefaults(suiteName: temporarySuiteName("RoutePlayerTests")))
         defaults.set(true, forKey: "com.debugdrawer.location.enabled")
         let simulator = LocationSimulator(defaults: defaults, service: RecordingLocationService())
         let manager = CLLocationManager()
@@ -198,7 +199,7 @@ struct RoutePlayerTests {
     @Test("A one-point route finishes as it starts")
     func onePoint() throws {
         let track = GPXTrack(points: [GPXTrackPoint(latitude: 1, longitude: 1, elevation: nil, time: nil)])
-        let defaults = try #require(UserDefaults(suiteName: "RoutePlayerTests.\(UUID().uuidString)"))
+        let defaults = try #require(UserDefaults(suiteName: temporarySuiteName("RoutePlayerTests")))
         defaults.set(true, forKey: "com.debugdrawer.location.enabled")
         let simulator = LocationSimulator(defaults: defaults, service: RecordingLocationService())
         let scheduler = ManualPlaybackScheduler(now: Date(timeIntervalSince1970: 5_000_000))
@@ -213,7 +214,7 @@ struct RoutePlayerTests {
     @Test("An imported file joins the routes after the samples, replacing the one imported before, and is chosen")
     func importFile() throws {
         let track = GPXTrack(points: [GPXTrackPoint(latitude: 1, longitude: 1, elevation: nil, time: nil)])
-        let defaults = try #require(UserDefaults(suiteName: "RoutePlayerTests.\(UUID().uuidString)"))
+        let defaults = try #require(UserDefaults(suiteName: temporarySuiteName("RoutePlayerTests")))
         defaults.set(true, forKey: "com.debugdrawer.location.enabled")
         let simulator = LocationSimulator(defaults: defaults, service: RecordingLocationService())
         let scheduler = ManualPlaybackScheduler(now: Date(timeIntervalSince1970: 5_000_000))
@@ -232,7 +233,7 @@ struct RoutePlayerTests {
 
     @Test("A file that can't be played shows why and leaves the route and its playback as they were")
     func importFailure() throws {
-        let defaults = try #require(UserDefaults(suiteName: "RoutePlayerTests.\(UUID().uuidString)"))
+        let defaults = try #require(UserDefaults(suiteName: temporarySuiteName("RoutePlayerTests")))
         defaults.set(true, forKey: "com.debugdrawer.location.enabled")
         let simulator = LocationSimulator(defaults: defaults, service: RecordingLocationService())
         let scheduler = ManualPlaybackScheduler(now: Date(timeIntervalSince1970: 5_000_000))
@@ -249,7 +250,7 @@ struct RoutePlayerTests {
 
     @Test("Choosing another route stops playback and clears an import's failure")
     func select() throws {
-        let defaults = try #require(UserDefaults(suiteName: "RoutePlayerTests.\(UUID().uuidString)"))
+        let defaults = try #require(UserDefaults(suiteName: temporarySuiteName("RoutePlayerTests")))
         defaults.set(true, forKey: "com.debugdrawer.location.enabled")
         let simulator = LocationSimulator(defaults: defaults, service: RecordingLocationService())
         let scheduler = ManualPlaybackScheduler(now: Date(timeIntervalSince1970: 5_000_000))

@@ -3,6 +3,7 @@
 // and the user ID hashed each time.
 import DebugDrawerAppInfo
 import DebugDrawerReceiver
+import DebugDrawerTestSupport
 import Foundation
 import Testing
 
@@ -49,7 +50,7 @@ private final class ManyExperiments: DebugDrawerExperimentAdapter {
 struct AppStateSpeedTests {
     @Test("Reading 500 flags, 500 experiments, 200 values and a hashed user ID takes under 50 ms")
     func largeHost() throws {
-        let suite = "AppStateSpeedTests-\(UUID().uuidString)"
+        let suite = temporarySuiteName("AppStateSpeedTests")
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         let fields = (0 ..< 200).map { index in DebugDrawerAppStateField("value-\(index)") { .number(Double(index)) } }

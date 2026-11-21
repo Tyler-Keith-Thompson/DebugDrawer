@@ -1,6 +1,7 @@
 #if DEBUG
     @testable import DebugDrawer
     @testable import DebugDrawerFeatureFlagsPlugin
+    import DebugDrawerTestSupport
     import Foundation
     import Testing
 
@@ -8,7 +9,7 @@
     @Suite("Feature Flags takes its overrides out of the provider once removed from every drawer")
     struct FeatureFlagsUninstallTests {
         private static func drawer() throws -> (DebugDrawer, () -> Void) {
-            let suite = "FeatureFlagsUninstallTests.\(UUID().uuidString)"
+            let suite = temporarySuiteName("FeatureFlagsUninstallTests")
             let defaults = try #require(UserDefaults(suiteName: suite))
             return (DebugDrawer(defaults: defaults), { defaults.removePersistentDomain(forName: suite) })
         }

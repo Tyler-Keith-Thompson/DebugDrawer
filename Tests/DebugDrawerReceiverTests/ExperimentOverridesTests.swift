@@ -1,4 +1,5 @@
 import DebugDrawerReceiver
+import DebugDrawerTestSupport
 import Foundation
 import Testing
 
@@ -37,7 +38,7 @@ private final class FakeExperimentAdapter: DebugDrawerExperimentAdapter {
 struct ExperimentOverridesTests {
     @Test("A forced variant reaches the adapter and the snapshot, which lists the experiment as overridden")
     func forcesListedVariant() throws {
-        let suite = "ExperimentOverridesTests-\(UUID().uuidString)"
+        let suite = temporarySuiteName("ExperimentOverridesTests")
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         let adapter = FakeExperimentAdapter(variants: ["checkout-flow": ["control", "one-page"]])
@@ -54,7 +55,7 @@ struct ExperimentOverridesTests {
 
     @Test("Performed directly, an unlisted experiment or a variant the experiment doesn't have changes nothing and reports nothing")
     func ignoresUnlistedAndUnknownVariant() throws {
-        let suite = "ExperimentOverridesTests-\(UUID().uuidString)"
+        let suite = temporarySuiteName("ExperimentOverridesTests")
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         let adapter = FakeExperimentAdapter(variants: ["checkout-flow": ["control", "one-page"]])
@@ -72,7 +73,7 @@ struct ExperimentOverridesTests {
 
     @Test("Clearing removes only the variants the model forced, never the host's own")
     func clearsOnlyItsOwn() throws {
-        let suite = "ExperimentOverridesTests-\(UUID().uuidString)"
+        let suite = temporarySuiteName("ExperimentOverridesTests")
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         let adapter = FakeExperimentAdapter(variants: ["checkout-flow": ["control", "one-page"], "onboarding": ["control", "video"]])
@@ -91,7 +92,7 @@ struct ExperimentOverridesTests {
 
     @Test("Whether the device is excluded from analytics is readable off the main actor, as an analytics queue reads it")
     func exclusionReadableOffMainActor() async throws {
-        let suite = "ExperimentOverridesTests-\(UUID().uuidString)"
+        let suite = temporarySuiteName("ExperimentOverridesTests")
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         let adapter = FakeExperimentAdapter(variants: ["checkout-flow": ["control", "one-page"]])

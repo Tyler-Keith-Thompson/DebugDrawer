@@ -8,6 +8,7 @@
     import CryptoKit
     import DebugDrawer
     @testable import DebugDrawerReceiver
+    import DebugDrawerTestSupport
     import Foundation
     import os
     import Testing
@@ -109,7 +110,7 @@
             let sessions = DebugDrawerSessions(maximumDuration: 600, auditCapacity: 100, grantPolicy: policy, clock: clock, timer: ManualTimer())
             let receiver = DebugDrawerReceiver(directory: directory, sessions: sessions)
             let flags = FlagServiceAdapter()
-            let flagSuite = "GrantSessionTests.flags.\(UUID().uuidString)"
+            let flagSuite = temporarySuiteName("GrantSessionTests.flags")
             let flagDefaults = try #require(UserDefaults(suiteName: flagSuite))
             defer { flagDefaults.removePersistentDomain(forName: flagSuite) }
             receiver.enable(.featureFlagOverrides(DebugDrawerFeatureFlagOverrides(adapter: flags, defaults: flagDefaults)))
@@ -209,7 +210,7 @@
             let sessions = DebugDrawerSessions(maximumDuration: 600, auditCapacity: 100, grantPolicy: policy, clock: clock, timer: timer)
             let receiver = DebugDrawerReceiver(directory: directory, sessions: sessions)
             let flags = FlagServiceAdapter()
-            let flagSuite = "GrantSessionTests.flags.\(UUID().uuidString)"
+            let flagSuite = temporarySuiteName("GrantSessionTests.flags")
             let flagDefaults = try #require(UserDefaults(suiteName: flagSuite))
             defer { flagDefaults.removePersistentDomain(forName: flagSuite) }
             receiver.enable(.featureFlagOverrides(DebugDrawerFeatureFlagOverrides(adapter: flags, defaults: flagDefaults)))
@@ -284,7 +285,7 @@
             )
             let sessions = DebugDrawerSessions(maximumDuration: 600, auditCapacity: 100, grantPolicy: policy, clock: clock, timer: ManualTimer())
             let receiver = DebugDrawerReceiver(directory: directory, sessions: sessions)
-            let flagSuite = "GrantSessionTests.flags.\(UUID().uuidString)"
+            let flagSuite = temporarySuiteName("GrantSessionTests.flags")
             let flagDefaults = try #require(UserDefaults(suiteName: flagSuite))
             defer { flagDefaults.removePersistentDomain(forName: flagSuite) }
             receiver.enable(.featureFlagOverrides(DebugDrawerFeatureFlagOverrides(adapter: FlagServiceAdapter(), defaults: flagDefaults)))
@@ -324,7 +325,7 @@
             let receiver = DebugDrawerReceiver(directory: directory, sessions: sessions)
             let flags = FlagServiceAdapter()
             let logLevels = LogLevelModel()
-            let flagSuite = "GrantSessionTests.flags.\(UUID().uuidString)"
+            let flagSuite = temporarySuiteName("GrantSessionTests.flags")
             let flagDefaults = try #require(UserDefaults(suiteName: flagSuite))
             defer { flagDefaults.removePersistentDomain(forName: flagSuite) }
             receiver.enable(.featureFlagOverrides(DebugDrawerFeatureFlagOverrides(adapter: flags, defaults: flagDefaults)))
@@ -383,7 +384,7 @@
             let sessions = DebugDrawerSessions(maximumDuration: 600, auditCapacity: 100, grantPolicy: policy, clock: clock, timer: ManualTimer())
             let receiver = DebugDrawerReceiver(directory: directory, sessions: sessions)
             let flags = FlagServiceAdapter()
-            let flagSuite = "GrantSessionTests.flags.\(UUID().uuidString)"
+            let flagSuite = temporarySuiteName("GrantSessionTests.flags")
             let flagDefaults = try #require(UserDefaults(suiteName: flagSuite))
             defer { flagDefaults.removePersistentDomain(forName: flagSuite) }
             receiver.enable(.featureFlagOverrides(DebugDrawerFeatureFlagOverrides(adapter: flags, defaults: flagDefaults)))
@@ -432,7 +433,7 @@
             )
             let sessions = DebugDrawerSessions(maximumDuration: 600, auditCapacity: 100, grantPolicy: policy, clock: clock, timer: ManualTimer())
             let receiver = DebugDrawerReceiver(directory: directory, sessions: sessions)
-            let flagSuite = "GrantSessionTests.flags.\(UUID().uuidString)"
+            let flagSuite = temporarySuiteName("GrantSessionTests.flags")
             let flagDefaults = try #require(UserDefaults(suiteName: flagSuite))
             defer { flagDefaults.removePersistentDomain(forName: flagSuite) }
             receiver.enable(.featureFlagOverrides(DebugDrawerFeatureFlagOverrides(adapter: FlagServiceAdapter(), defaults: flagDefaults)))
@@ -482,7 +483,7 @@
             let sessions = DebugDrawerSessions(maximumDuration: 600, auditCapacity: 100, clock: clock, timer: ManualTimer())
             let receiver = DebugDrawerReceiver(directory: directory, sessions: sessions)
             let flags = FlagServiceAdapter()
-            let flagSuite = "GrantSessionTests.flags.\(UUID().uuidString)"
+            let flagSuite = temporarySuiteName("GrantSessionTests.flags")
             let flagDefaults = try #require(UserDefaults(suiteName: flagSuite))
             defer { flagDefaults.removePersistentDomain(forName: flagSuite) }
             receiver.enable(.featureFlagOverrides(DebugDrawerFeatureFlagOverrides(adapter: flags, defaults: flagDefaults)))

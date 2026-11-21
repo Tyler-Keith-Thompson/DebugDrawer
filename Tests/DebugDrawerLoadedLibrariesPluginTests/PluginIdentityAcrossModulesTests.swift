@@ -1,6 +1,7 @@
 #if DEBUG
     @testable import DebugDrawer
     import DebugDrawerLoadedLibrariesPlugin
+    import DebugDrawerTestSupport
     import Foundation
     import SwiftUI
     import Testing
@@ -18,7 +19,7 @@
     struct PluginIdentityAcrossModulesTests {
         @Test("A plugin named like one in another module registers beside it rather than being dropped")
         func samePluginNameInTwoModulesBothRegister() throws {
-            let suite = "PluginIdentityAcrossModulesTests.\(UUID().uuidString)"
+            let suite = temporarySuiteName("PluginIdentityAcrossModulesTests")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let sut = DebugDrawer(defaults: defaults)

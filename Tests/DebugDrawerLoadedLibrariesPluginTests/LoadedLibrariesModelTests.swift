@@ -1,6 +1,7 @@
 #if DEBUG
     import DebugDrawer
     @testable import DebugDrawerLoadedLibrariesPlugin
+    import DebugDrawerTestSupport
     import Foundation
     import Testing
 
@@ -231,8 +232,8 @@
 
         @Test("Installing reads nothing; leaving one of two drawers keeps the libraries, leaving the last drops them but not the filter")
         func installCounting() throws {
-            let firstSuite = "LoadedLibrariesModelTests.first.\(UUID().uuidString)"
-            let secondSuite = "LoadedLibrariesModelTests.second.\(UUID().uuidString)"
+            let firstSuite = temporarySuiteName("LoadedLibrariesModelTests.first")
+            let secondSuite = temporarySuiteName("LoadedLibrariesModelTests.second")
             let firstDefaults = try #require(UserDefaults(suiteName: firstSuite))
             let secondDefaults = try #require(UserDefaults(suiteName: secondSuite))
             defer {
@@ -269,7 +270,7 @@
 
         @Test("Uninstalling from a drawer that never installed the plugin drops nothing")
         func uninstallFromAnotherDrawer() throws {
-            let suite = "LoadedLibrariesModelTests.\(UUID().uuidString)"
+            let suite = temporarySuiteName("LoadedLibrariesModelTests")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let holder = DebugDrawer(defaults: defaults)

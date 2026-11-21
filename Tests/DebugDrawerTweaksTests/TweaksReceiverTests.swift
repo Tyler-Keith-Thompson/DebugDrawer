@@ -2,6 +2,7 @@
     import Combine
     import DebugDrawer
     @testable import DebugDrawerReceiver
+    import DebugDrawerTestSupport
     @testable import DebugDrawerTweaks
     import Foundation
     import Testing
@@ -148,7 +149,7 @@
         @Test("A sidecar's value persists in the tweaks' storage and reaches the app's typed accessor, before and after a relaunch")
         func valuePersistsAcrossRelaunch() async throws {
             let directory = FileManager.default.temporaryDirectory.appending(path: "TweaksReceiverTests-\(UUID().uuidString)")
-            let suiteName = "com.debugdrawer.tests.tweaks-receiver.\(UUID().uuidString)"
+            let suiteName = temporarySuiteName("com.debugdrawer.tests.tweaks-receiver")
             let defaults = try #require(UserDefaults(suiteName: suiteName))
             defer { defaults.removePersistentDomain(forName: suiteName) }
             let firstStore = TweakStore(storage: UserDefaultsTweakStorage(defaults: defaults), reading: .offeredProductionSafeTweaks)

@@ -1,5 +1,6 @@
 #if DEBUG
     @testable import DebugDrawer
+    import DebugDrawerTestSupport
     import Foundation
     import Testing
 
@@ -58,7 +59,7 @@
     struct ReportUploadTests {
         @Test("The drawer starts with no uploader, so a report is never sent")
         func noUploaderByDefault() throws {
-            let suite = "ReportUploadTests.\(#function).\(UUID().uuidString)"
+            let suite = temporarySuiteName("ReportUploadTests.\(#function)")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let drawer = DebugDrawer(defaults: defaults)
@@ -70,7 +71,7 @@
 
         @Test("Creating a report sends nothing, even with an uploader set; only Send Report does")
         func creatingDoesNotUpload() async throws {
-            let suite = "ReportUploadTests.\(#function).\(UUID().uuidString)"
+            let suite = temporarySuiteName("ReportUploadTests.\(#function)")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let drawer = DebugDrawer(defaults: defaults)

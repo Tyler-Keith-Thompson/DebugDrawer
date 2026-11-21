@@ -1,3 +1,4 @@
+import DebugDrawerTestSupport
 import DebugDrawerTweaks
 import Foundation
 import Testing
@@ -6,7 +7,7 @@ import Testing
 struct UserDefaultsTweakStorageTests {
     @Test("Booleans, integers and strings come back as the cases they were stored as")
     func roundTrip() throws {
-        let suiteName = "com.debugdrawer.tests.tweak-storage.\(UUID().uuidString)"
+        let suiteName = temporarySuiteName("com.debugdrawer.tests.tweak-storage")
         let defaults = try #require(UserDefaults(suiteName: suiteName))
         defer { defaults.removePersistentDomain(forName: suiteName) }
         let sut = UserDefaultsTweakStorage(defaults: defaults)
@@ -23,7 +24,7 @@ struct UserDefaultsTweakStorageTests {
 
     @Test("Storing nil removes the value")
     func remove() throws {
-        let suiteName = "com.debugdrawer.tests.tweak-storage.\(UUID().uuidString)"
+        let suiteName = temporarySuiteName("com.debugdrawer.tests.tweak-storage")
         let defaults = try #require(UserDefaults(suiteName: suiteName))
         defer { defaults.removePersistentDomain(forName: suiteName) }
         let sut = UserDefaultsTweakStorage(defaults: defaults, keyPrefix: "app.")
@@ -37,7 +38,7 @@ struct UserDefaultsTweakStorageTests {
 
     @Test("Each key is stored behind the prefix")
     func prefix() throws {
-        let suiteName = "com.debugdrawer.tests.tweak-storage.\(UUID().uuidString)"
+        let suiteName = temporarySuiteName("com.debugdrawer.tests.tweak-storage")
         let defaults = try #require(UserDefaults(suiteName: suiteName))
         defer { defaults.removePersistentDomain(forName: suiteName) }
         let sut = UserDefaultsTweakStorage(defaults: defaults, keyPrefix: "app.")
@@ -50,7 +51,7 @@ struct UserDefaultsTweakStorageTests {
 
     @Test("A value of a type tweaks don't store reads as nothing")
     func foreignValue() throws {
-        let suiteName = "com.debugdrawer.tests.tweak-storage.\(UUID().uuidString)"
+        let suiteName = temporarySuiteName("com.debugdrawer.tests.tweak-storage")
         let defaults = try #require(UserDefaults(suiteName: suiteName))
         defer { defaults.removePersistentDomain(forName: suiteName) }
         defaults.set(Date(), forKey: "com.debugdrawer.tweaks.when")

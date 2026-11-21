@@ -1,5 +1,6 @@
 #if DEBUG
     @testable import DebugDrawer
+    import DebugDrawerTestSupport
     import Foundation
     import SwiftUI
     import Testing
@@ -75,7 +76,7 @@
 
         @Test("Two global plugins whose types share a name in different namespaces both register")
         func sameTypeNameInTwoNamespacesBothRegister() throws {
-            let suite = "PluginIdentityTests.\(#function).\(UUID().uuidString)"
+            let suite = temporarySuiteName("PluginIdentityTests.\(#function)")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let sut = DebugDrawer(defaults: defaults)
@@ -90,7 +91,7 @@
 
         @Test("Two local plugins whose types share a name in different namespaces are both listed")
         func sameTypeNameInTwoNamespacesBothListLocally() throws {
-            let suite = "PluginIdentityTests.\(#function).\(UUID().uuidString)"
+            let suite = temporarySuiteName("PluginIdentityTests.\(#function)")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let sut = DebugDrawer(defaults: defaults)
@@ -125,7 +126,7 @@
 
         @Test("A global plugin colliding with a registered one of another type leaves the first registered")
         func aCollidingGlobalLeavesTheFirst() throws {
-            let suite = "PluginIdentityTests.\(#function).\(UUID().uuidString)"
+            let suite = temporarySuiteName("PluginIdentityTests.\(#function)")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let sut = DebugDrawer(defaults: defaults)
@@ -139,7 +140,7 @@
 
         @Test("Two instances of one type with different ids both register globally and keep separate collapsed state")
         func instancesWithDifferentIDsBothRegister() throws {
-            let suite = "PluginIdentityTests.\(#function).\(UUID().uuidString)"
+            let suite = temporarySuiteName("PluginIdentityTests.\(#function)")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let sut = DebugDrawer(defaults: defaults)
@@ -169,7 +170,7 @@
 
         @Test("State saved under a plugin's unqualified type name moves to its qualified id when it registers")
         func savedStateMovesToTheQualifiedID() throws {
-            let suite = "PluginIdentityTests.\(#function).\(UUID().uuidString)"
+            let suite = temporarySuiteName("PluginIdentityTests.\(#function)")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             var layout = DrawerLayout()
@@ -201,7 +202,7 @@
 
         @Test("State already saved under the qualified id wins over state saved under the unqualified name")
         func savedStateUnderTheIDWins() throws {
-            let suite = "PluginIdentityTests.\(#function).\(UUID().uuidString)"
+            let suite = temporarySuiteName("PluginIdentityTests.\(#function)")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             defaults.set(true, forKey: "com.debugdrawer.collapsed.UnnamedPlugin")
@@ -216,7 +217,7 @@
 
         @Test("A local plugin's state saved under its unqualified type name moves to its id when it registers")
         func localSavedStateMoves() throws {
-            let suite = "PluginIdentityTests.\(#function).\(UUID().uuidString)"
+            let suite = temporarySuiteName("PluginIdentityTests.\(#function)")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             defaults.set(true, forKey: "com.debugdrawer.collapsed.UnnamedPlugin")
@@ -230,7 +231,7 @@
 
         @Test("A plugin that declares its own id moves no state saved under its type's name")
         func aDeclaredIDMovesNothing() throws {
-            let suite = "PluginIdentityTests.\(#function).\(UUID().uuidString)"
+            let suite = temporarySuiteName("PluginIdentityTests.\(#function)")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             defaults.set(true, forKey: "com.debugdrawer.collapsed.NamedInstancePlugin")

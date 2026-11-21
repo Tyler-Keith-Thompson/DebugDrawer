@@ -3,6 +3,7 @@
         import AppKit
     #endif
     @testable import DebugDrawer
+    import DebugDrawerTestSupport
     import SwiftUI
     import Testing
 
@@ -62,7 +63,7 @@
 
         @Test("A local plugin registered from one window is listed in that window's drawer only; one from no window in every drawer")
         func localPluginsBelongToTheirWindow() throws {
-            let suite = "DrawerMultiWindowTests.\(#function).\(UUID().uuidString)"
+            let suite = temporarySuiteName("DrawerMultiWindowTests.\(#function)")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let sut = DebugDrawer(defaults: defaults)
@@ -83,7 +84,7 @@
 
         @Test("The same plugin registered from two windows stays in each window's drawer until that window's view leaves")
         func samePluginInTwoWindows() throws {
-            let suite = "DrawerMultiWindowTests.\(#function).\(UUID().uuidString)"
+            let suite = temporarySuiteName("DrawerMultiWindowTests.\(#function)")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let sut = DebugDrawer(defaults: defaults)
@@ -102,7 +103,7 @@
 
         @Test("A plugin registered before its view knows its window moves to that window's drawer once it does")
         func registrationMovesToItsWindow() throws {
-            let suite = "DrawerMultiWindowTests.\(#function).\(UUID().uuidString)"
+            let suite = temporarySuiteName("DrawerMultiWindowTests.\(#function)")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let sut = DebugDrawer(defaults: defaults)
@@ -118,7 +119,7 @@
 
         @Test("The detached drawer, the one tvOS, visionOS and watchOS draw, lists every window's local plugins")
         func detachedDrawerListsEveryLocalPlugin() throws {
-            let suite = "DrawerMultiWindowTests.\(#function).\(UUID().uuidString)"
+            let suite = temporarySuiteName("DrawerMultiWindowTests.\(#function)")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let sut = DebugDrawer(defaults: defaults)
@@ -149,7 +150,7 @@
         struct DrawerMultiWindowMacTests {
             @Test("With two windows open, toggle() opens the drawer only in the key window, or in the frontmost while the app is inactive")
             func toggleOpensOnlyTheKeyWindow() throws {
-                let suite = "DrawerMultiWindowMacTests.\(#function).\(UUID().uuidString)"
+                let suite = temporarySuiteName("DrawerMultiWindowMacTests.\(#function)")
                 let defaults = try #require(UserDefaults(suiteName: suite))
                 defer { defaults.removePersistentDomain(forName: suite) }
                 let sut = DebugDrawer(defaults: defaults)
@@ -180,7 +181,7 @@
 
             @Test("toggle(in:) opens the drawer in the window given and leaves the key window's closed")
             func toggleInOpensTheGivenWindow() throws {
-                let suite = "DrawerMultiWindowMacTests.\(#function).\(UUID().uuidString)"
+                let suite = temporarySuiteName("DrawerMultiWindowMacTests.\(#function)")
                 let defaults = try #require(UserDefaults(suiteName: suite))
                 defer { defaults.removePersistentDomain(forName: suite) }
                 let sut = DebugDrawer(defaults: defaults)
@@ -210,7 +211,7 @@
 
             @Test("toggle(in:) closes the drawer it opened in that window")
             func toggleInTwiceCloses() throws {
-                let suite = "DrawerMultiWindowMacTests.\(#function).\(UUID().uuidString)"
+                let suite = temporarySuiteName("DrawerMultiWindowMacTests.\(#function)")
                 let defaults = try #require(UserDefaults(suiteName: suite))
                 defer { defaults.removePersistentDomain(forName: suite) }
                 let sut = DebugDrawer(defaults: defaults)
@@ -227,7 +228,7 @@
 
             @Test("toggle(in:) attaches a window not attached yet and opens the drawer in it")
             func toggleInAttaches() throws {
-                let suite = "DrawerMultiWindowMacTests.\(#function).\(UUID().uuidString)"
+                let suite = temporarySuiteName("DrawerMultiWindowMacTests.\(#function)")
                 let defaults = try #require(UserDefaults(suiteName: suite))
                 defer { defaults.removePersistentDomain(forName: suite) }
                 let sut = DebugDrawer(defaults: defaults)

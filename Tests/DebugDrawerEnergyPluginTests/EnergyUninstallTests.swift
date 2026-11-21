@@ -1,6 +1,7 @@
 #if DEBUG
     @testable import DebugDrawer
     @testable import DebugDrawerEnergyPlugin
+    import DebugDrawerTestSupport
     import Foundation
     import Testing
 
@@ -34,7 +35,7 @@
     @Suite("Energy drops its history once removed from every drawer, unless the app samples")
     struct EnergyUninstallTests {
         private static func drawer() throws -> (DebugDrawer, () -> Void) {
-            let suite = "EnergyUninstallTests.\(UUID().uuidString)"
+            let suite = temporarySuiteName("EnergyUninstallTests")
             let defaults = try #require(UserDefaults(suiteName: suite))
             return (DebugDrawer(defaults: defaults), { defaults.removePersistentDomain(forName: suite) })
         }

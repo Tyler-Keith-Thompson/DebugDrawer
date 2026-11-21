@@ -1,5 +1,6 @@
 import CryptoKit
 @testable import DebugDrawerReceiver
+import DebugDrawerTestSupport
 import Foundation
 import os
 import Testing
@@ -101,7 +102,7 @@ struct EnvironmentsReceiverTests {
 
     @Test("In a session, a sidecar reads, from the store, the default and allowed environments by ID, title and summary, with the active one")
     func listsEnvironments() async throws {
-        let suite = "EnvironmentsReceiverTests-\(UUID().uuidString)"
+        let suite = temporarySuiteName("EnvironmentsReceiverTests")
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         let directory = FileManager.default.temporaryDirectory.appending(path: "EnvironmentsReceiverTests-\(UUID().uuidString)")
@@ -135,7 +136,7 @@ struct EnvironmentsReceiverTests {
 
     @Test("Only allowlisted environments are activated; an unknown or URL-shaped ID is notExposed, a command without an ID malformed")
     func onlyAllowlistedEnvironments() throws {
-        let suite = "EnvironmentsReceiverTests-\(UUID().uuidString)"
+        let suite = temporarySuiteName("EnvironmentsReceiverTests")
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         let directory = FileManager.default.temporaryDirectory.appending(path: "EnvironmentsReceiverTests-\(UUID().uuidString)")
@@ -185,7 +186,7 @@ struct EnvironmentsReceiverTests {
 
     @Test("As the session ends, the host's adapter is told to activate the default, audited changeReverted, and the record is removed")
     func revertsAsSessionEnds() throws {
-        let suite = "EnvironmentsReceiverTests-\(UUID().uuidString)"
+        let suite = temporarySuiteName("EnvironmentsReceiverTests")
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         let directory = FileManager.default.temporaryDirectory.appending(path: "EnvironmentsReceiverTests-\(UUID().uuidString)")
@@ -223,7 +224,7 @@ struct EnvironmentsReceiverTests {
 
     @Test("As the session expires, the timer firing, the default comes back, audited before sessionEnded(.expired)")
     func revertsAsSessionExpires() throws {
-        let suite = "EnvironmentsReceiverTests-\(UUID().uuidString)"
+        let suite = temporarySuiteName("EnvironmentsReceiverTests")
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         let directory = FileManager.default.temporaryDirectory.appending(path: "EnvironmentsReceiverTests-\(UUID().uuidString)")
@@ -261,7 +262,7 @@ struct EnvironmentsReceiverTests {
 
     @Test("The capability's gate turning off puts the default back at once while the session goes on; the receiver's ends the session")
     func revertsAtGateOff() throws {
-        let suite = "EnvironmentsReceiverTests-\(UUID().uuidString)"
+        let suite = temporarySuiteName("EnvironmentsReceiverTests")
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         let directory = FileManager.default.temporaryDirectory.appending(path: "EnvironmentsReceiverTests-\(UUID().uuidString)")
@@ -308,7 +309,7 @@ struct EnvironmentsReceiverTests {
 
     @Test("A switch a session left when the app was killed is undone as the next launch makes the capability, before any session")
     func switchLeftByKillIsUndoneAtLaunch() throws {
-        let suite = "EnvironmentsReceiverTests-\(UUID().uuidString)"
+        let suite = temporarySuiteName("EnvironmentsReceiverTests")
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         let directory = FileManager.default.temporaryDirectory.appending(path: "EnvironmentsReceiverTests-\(UUID().uuidString)")
@@ -344,7 +345,7 @@ struct EnvironmentsReceiverTests {
 
     @Test("A launch that follows a clean one tells the adapter nothing as the capability is made")
     func cleanLaunchActivatesNothing() throws {
-        let suite = "EnvironmentsReceiverTests-\(UUID().uuidString)"
+        let suite = temporarySuiteName("EnvironmentsReceiverTests")
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         let backend = FakeBackend()
@@ -371,7 +372,7 @@ struct EnvironmentsReceiverTests {
         }
         let sessions = DebugDrawerSessions(maximumDuration: 300, auditCapacity: 100, clock: MovableClock(Self.now), timer: ManualTimer())
         let sut = DebugDrawerReceiver(directory: directory, sessions: sessions)
-        let flagSuite = "EnvironmentsReceiverTests.flags.\(UUID().uuidString)"
+        let flagSuite = temporarySuiteName("EnvironmentsReceiverTests.flags")
         let flagDefaults = try #require(UserDefaults(suiteName: flagSuite))
         defer { flagDefaults.removePersistentDomain(forName: flagSuite) }
         sut.enable(.featureFlagOverrides(DebugDrawerFeatureFlagOverrides(adapter: EmptyFlagAdapter(), defaults: flagDefaults)))
@@ -391,7 +392,7 @@ struct EnvironmentsReceiverTests {
 
     @Test("With a grant policy a switch needs a grant listing the capability: none opens no session, another's is capabilityNotGranted")
     func grantRequiredUnderPolicy() throws {
-        let suite = "EnvironmentsReceiverTests-\(UUID().uuidString)"
+        let suite = temporarySuiteName("EnvironmentsReceiverTests")
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         let directory = FileManager.default.temporaryDirectory.appending(path: "EnvironmentsReceiverTests-\(UUID().uuidString)")
@@ -407,7 +408,7 @@ struct EnvironmentsReceiverTests {
         let model = DebugDrawerEnvironments(default: production, allowing: staging, adapter: backend, defaults: defaults)
         let sut = DebugDrawerReceiver(directory: directory, sessions: sessions)
         sut.enable(.environments(model))
-        let flagSuite = "EnvironmentsReceiverTests.flags.\(UUID().uuidString)"
+        let flagSuite = temporarySuiteName("EnvironmentsReceiverTests.flags")
         let flagDefaults = try #require(UserDefaults(suiteName: flagSuite))
         defer { flagDefaults.removePersistentDomain(forName: flagSuite) }
         sut.enable(.featureFlagOverrides(DebugDrawerFeatureFlagOverrides(adapter: EmptyFlagAdapter(), defaults: flagDefaults)))
@@ -452,7 +453,7 @@ struct EnvironmentsReceiverTests {
 
     @Test("requiringGrant() refuses a switch grantMissing in a session without a grant, in a receiver with no policy")
     func requiringGrantWithoutPolicy() throws {
-        let suite = "EnvironmentsReceiverTests-\(UUID().uuidString)"
+        let suite = temporarySuiteName("EnvironmentsReceiverTests")
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         let directory = FileManager.default.temporaryDirectory.appending(path: "EnvironmentsReceiverTests-\(UUID().uuidString)")

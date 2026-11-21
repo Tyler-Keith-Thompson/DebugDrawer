@@ -5,6 +5,7 @@
     import CoreLocation
     @testable import DebugDrawer
     @testable import DebugDrawerLocationPlugin
+    import DebugDrawerTestSupport
     import Foundation
     import ObjectiveC
     import Testing
@@ -80,7 +81,7 @@
             @MainActor
             private static func uninstallThenReinstall() async throws {
                 spoof()
-                let suite = "LocationUninstallExitTests.\(UUID().uuidString)"
+                let suite = temporarySuiteName("LocationUninstallExitTests")
                 let defaults = try #require(UserDefaults(suiteName: suite))
                 defer { defaults.removePersistentDomain(forName: suite) }
                 let drawer = DebugDrawer(defaults: defaults)
@@ -113,7 +114,7 @@
             @MainActor
             private static func leaveInPlace() async throws {
                 spoof()
-                let suite = "LocationUninstallExitTests.\(UUID().uuidString)"
+                let suite = temporarySuiteName("LocationUninstallExitTests")
                 let defaults = try #require(UserDefaults(suiteName: suite))
                 defer { defaults.removePersistentDomain(forName: suite) }
                 let drawer = DebugDrawer(defaults: defaults)

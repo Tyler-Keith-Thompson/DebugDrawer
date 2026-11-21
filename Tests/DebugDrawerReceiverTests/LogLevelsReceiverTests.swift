@@ -1,4 +1,5 @@
 @testable import DebugDrawerReceiver
+import DebugDrawerTestSupport
 import Foundation
 import os
 import Testing
@@ -107,7 +108,7 @@ struct LogLevelsReceiverTests {
 
     @Test("In a session, a sidecar reads, from the store, each subsystem the adapter lists with the levels it may set and its level now")
     func listsSubsystemsWithLevels() async throws {
-        let suite = "LogLevelsReceiverTests-\(UUID().uuidString)"
+        let suite = temporarySuiteName("LogLevelsReceiverTests")
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         let directory = FileManager.default.temporaryDirectory.appending(path: "LogLevelsReceiverTests-\(UUID().uuidString)")
@@ -148,7 +149,7 @@ struct LogLevelsReceiverTests {
 
     @Test("The host's logger hears each level set and reset per subsystem, in order; an unlisted subsystem: notExposed, level: malformed")
     func hostHearsEachLevelChangePerSubsystem() throws {
-        let suite = "LogLevelsReceiverTests-\(UUID().uuidString)"
+        let suite = temporarySuiteName("LogLevelsReceiverTests")
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         let directory = FileManager.default.temporaryDirectory.appending(path: "LogLevelsReceiverTests-\(UUID().uuidString)")
@@ -206,7 +207,7 @@ struct LogLevelsReceiverTests {
 
     @Test("As the session ends, the host's logger is told to reset each subsystem the sidecar raised, and only those, audited changeReverted")
     func levelsResetAsSessionEnds() throws {
-        let suite = "LogLevelsReceiverTests-\(UUID().uuidString)"
+        let suite = temporarySuiteName("LogLevelsReceiverTests")
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         let directory = FileManager.default.temporaryDirectory.appending(path: "LogLevelsReceiverTests-\(UUID().uuidString)")
@@ -246,7 +247,7 @@ struct LogLevelsReceiverTests {
 
     @Test("As the session expires at its maximum duration, the timer firing, every raised level is reset, audited before sessionEnded(.expired)")
     func levelsResetAsSessionExpires() throws {
-        let suite = "LogLevelsReceiverTests-\(UUID().uuidString)"
+        let suite = temporarySuiteName("LogLevelsReceiverTests")
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         let directory = FileManager.default.temporaryDirectory.appending(path: "LogLevelsReceiverTests-\(UUID().uuidString)")
@@ -290,7 +291,7 @@ struct LogLevelsReceiverTests {
 
     @Test("An expiry the timer missed (a suspended app) resets the levels at the next command, which is then refused noActiveSession")
     func levelsResetWhenExpiryFoundLate() throws {
-        let suite = "LogLevelsReceiverTests-\(UUID().uuidString)"
+        let suite = temporarySuiteName("LogLevelsReceiverTests")
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         let directory = FileManager.default.temporaryDirectory.appending(path: "LogLevelsReceiverTests-\(UUID().uuidString)")
@@ -333,7 +334,7 @@ struct LogLevelsReceiverTests {
 
     @Test("Levels a session raised before the app was killed are reset as the next launch makes the capability")
     func levelsLeftByKillAreResetAtLaunch() throws {
-        let suite = "LogLevelsReceiverTests-\(UUID().uuidString)"
+        let suite = temporarySuiteName("LogLevelsReceiverTests")
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         let directory = FileManager.default.temporaryDirectory.appending(path: "LogLevelsReceiverTests-\(UUID().uuidString)")
@@ -383,7 +384,7 @@ struct LogLevelsReceiverTests {
         }
         let sessions = DebugDrawerSessions(maximumDuration: 300, auditCapacity: 100, clock: MovableClock(Self.now), timer: ManualTimer())
         let sut = DebugDrawerReceiver(directory: directory, sessions: sessions)
-        let flagSuite = "LogLevelsReceiverTests.flags.\(UUID().uuidString)"
+        let flagSuite = temporarySuiteName("LogLevelsReceiverTests.flags")
         let flagDefaults = try #require(UserDefaults(suiteName: flagSuite))
         defer { flagDefaults.removePersistentDomain(forName: flagSuite) }
         sut.enable(.featureFlagOverrides(DebugDrawerFeatureFlagOverrides(adapter: EmptyFlagAdapter(), defaults: flagDefaults)))

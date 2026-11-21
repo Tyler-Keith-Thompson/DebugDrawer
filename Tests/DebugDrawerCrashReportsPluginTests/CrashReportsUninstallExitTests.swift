@@ -5,6 +5,7 @@
     @testable import DebugDrawer
     @testable import DebugDrawerCrashReportsPlugin
     import Darwin
+    import DebugDrawerTestSupport
     import Foundation
     import Testing
 
@@ -126,7 +127,7 @@
                         sigaction(SIGSEGV, nil, &action)
                         return unsafeBitCast(action.__sigaction_u.__sa_handler, to: UInt.self)
                     }
-                    let suite = "CrashReportsUninstallExitTests.\(UUID().uuidString)"
+                    let suite = temporarySuiteName("CrashReportsUninstallExitTests")
                     guard let first = UserDefaults(suiteName: suite + ".first"), let second = UserDefaults(suiteName: suite + ".second") else {
                         return false
                     }

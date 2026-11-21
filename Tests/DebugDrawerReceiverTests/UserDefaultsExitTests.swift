@@ -2,6 +2,7 @@
 // leave this file out.
 #if os(macOS)
     @testable import DebugDrawerReceiver
+    import DebugDrawerTestSupport
     import Foundation
     import Testing
 
@@ -70,7 +71,7 @@
         @Test("An edit made in a session survives the app being killed during it, and the next launch puts it back")
         @MainActor
         func editSurvivesKill() async throws {
-            let suite = "UserDefaultsExitTests-\(UUID().uuidString)"
+            let suite = temporarySuiteName("UserDefaultsExitTests")
             let directory = FileManager.default.temporaryDirectory.appending(path: "UserDefaultsExitTests-\(UUID().uuidString)")
             defer { UserDefaults(suiteName: suite)?.removePersistentDomain(forName: suite) }
             UserDefaults(suiteName: suite)?.set("free", forKey: "plan")

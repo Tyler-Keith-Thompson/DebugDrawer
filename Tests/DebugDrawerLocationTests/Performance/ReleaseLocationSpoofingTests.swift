@@ -8,6 +8,7 @@
     import CoreLocation
     import DebugDrawerLocation
     import DebugDrawerReceiver
+    import DebugDrawerTestSupport
     import Foundation
     import Testing
 
@@ -16,7 +17,7 @@
     struct ReleaseLocationSpoofingTests {
         @Test("In release, a sidecar's spoof replaces the host's readings and tells the host, and the session's end tells it nil")
         func spoofsAndRevertsInRelease() throws {
-            let suite = "ReleaseLocationSpoofingTests-\(UUID().uuidString)"
+            let suite = temporarySuiteName("ReleaseLocationSpoofingTests")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let directory = FileManager.default.temporaryDirectory.appending(path: "ReleaseLocationSpoofingTests-\(UUID().uuidString)")

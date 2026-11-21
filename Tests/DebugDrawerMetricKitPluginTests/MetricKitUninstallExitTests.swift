@@ -5,6 +5,7 @@
     @testable import DebugDrawer
     import DebugDrawerMetricKit
     @testable import DebugDrawerMetricKitPlugin
+    import DebugDrawerTestSupport
     import Foundation
     import Testing
 
@@ -88,7 +89,7 @@
                     }
                 }
                 @MainActor func isExpected() -> Bool {
-                    let suite = "MetricKitUninstallExitTests.\(UUID().uuidString)"
+                    let suite = temporarySuiteName("MetricKitUninstallExitTests")
                     guard let first = UserDefaults(suiteName: suite + ".first"), let second = UserDefaults(suiteName: suite + ".second") else {
                         return false
                     }
