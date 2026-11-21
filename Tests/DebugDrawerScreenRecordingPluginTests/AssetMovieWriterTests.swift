@@ -232,6 +232,59 @@
             #expect(!FileManager.default.fileExists(atPath: url.path))
         }
 
+        @Test("Frames keep arriving while the writer fails on the encoder's queue: each is taken without a crash, and finish throws writeFailed")
+        func framesWhileFailing() async throws {
+            let url = FileManager.default.temporaryDirectory.appending(path: "\(UUID().uuidString).mov")
+            defer { try? FileManager.default.removeItem(at: url) }
+            let context = try #require(CGContext(
+                data: nil, width: 64, height: 64, bitsPerComponent: 8, bytesPerRow: 0,
+                space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+            ))
+            let image = try #require(context.makeImage())
+            var assetWriter: AVAssetWriter?
+            let sut = AssetMovieWriter(url: url) { url in
+                let writer = try AVAssetWriter(outputURL: url, fileType: .mov)
+                assetWriter = writer
+                return writer
+            }
+            // Past the eighth frame, where a pixel buffer adaptor would replace its pool.
+            for frame in 0 ..< 12 {
+                sut.append(RecordedFrame(image: image, time: Double(frame) / 30))
+            }
+            let input = try #require(assetWriter?.inputs.first)
+            var buffer: CVPixelBuffer?
+            CVPixelBufferCreate(nil, 64, 64, kCVPixelFormatType_32BGRA, nil, &buffer)
+            var format: CMVideoFormatDescription?
+            CMVideoFormatDescriptionCreateForImageBuffer(allocator: nil, imageBuffer: try #require(buffer), formatDescriptionOut: &format)
+            var timing = CMSampleTimingInfo(
+                duration: CMTime(value: 1, timescale: 30), presentationTimeStamp: CMTime(value: -1, timescale: 1), decodeTimeStamp: .invalid
+            )
+            var sample: CMSampleBuffer?
+            CMSampleBufferCreateReadyWithImageBuffer(
+                allocator: nil, imageBuffer: try #require(buffer), formatDescription: try #require(format), sampleTiming: &timing,
+                sampleBufferOut: &sample
+            )
+            // Once the encoder is ready (Sendable: KVO tells on the encoder's queue), a sample
+            // before the session's start fails the writer on that queue, as a disk filling up
+            // mid-recording would; the frames after it land before, during and after the failure.
+            var ready: AnyCancellable?
+            await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+                ready = input.publisher(for: \.isReadyForMoreMediaData, options: [.initial, .new])
+                    .first { @Sendable isReady in isReady }
+                    .sink { @Sendable _ in continuation.resume() }
+            }
+            ready?.cancel()
+            input.append(try #require(sample))
+            for frame in 12 ..< 200 {
+                sut.append(RecordedFrame(image: image, time: Double(frame) / 30))
+            }
+
+            await #expect(throws: RecordingFailure.writeFailed) {
+                try await sut.finish()
+            }
+            #expect(!FileManager.default.fileExists(atPath: url.path))
+        }
+
         @Test("Frames at uneven times make a movie from the first to one frame after the last, each shown until the next")
         func unevenFrames() async throws {
             let url = FileManager.default.temporaryDirectory.appending(path: "\(UUID().uuidString).mov")

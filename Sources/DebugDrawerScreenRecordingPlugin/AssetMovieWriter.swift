@@ -7,7 +7,7 @@
     /// Writes frames as H.264 in a QuickTime movie with AVAssetWriter.
     ///
     /// Main-actor isolated like the frames it is handed: each is drawn into a pixel buffer from the
-    /// adaptor's pool and appended at once, lasting one frame, and the encoder works on its own
+    /// writer's own pool and appended at once, lasting one frame, and the encoder works on its own
     /// queue. Rejected: ReplayKit's and ScreenCaptureKit's writers, which record the screen, drawer
     /// included.
     @MainActor
@@ -22,7 +22,8 @@
         private struct Session {
             let writer: AVAssetWriter
             let input: AVAssetWriterInput
-            let adaptor: AVAssetWriterInputPixelBufferAdaptor
+            /// The pixel buffers frames are drawn into, made and held by this writer alone.
+            let pool: CVPixelBufferPool
             let width: Int
             let height: Int
             let firstTime: TimeInterval
@@ -127,13 +128,23 @@
         /// Draws `frame` into a pixel buffer and appends it at its time from the first frame,
         /// lasting one frame.
         ///
-        /// The buffer goes to the input in a sample buffer of its own rather than through the
-        /// adaptor, whose append takes no duration; the adaptor still provides the pool, whose
-        /// buffers suit the encoder.
+        /// The buffer goes to the input in a sample buffer of its own, as a pixel buffer adaptor's
+        /// append takes no duration.
         private func write(_ frame: RecordedFrame) {
-            guard var session, let pool = session.adaptor.pixelBufferPool else { return }
+            guard var session else { return }
+            // The buffer comes from the session's own pool, never an AVAssetWriterInputPixelBufferAdaptor's:
+            // the adaptor replaces its pool on AVFoundation's queue, about eight frames into every
+            // movie and again as the writer fails, releasing the old one while the main thread may
+            // be reading pixelBufferPool or drawing from what it read. A host app can't catch the
+            // crash that follows, SIGSEGV at 0x0 (or objc_retain of a freed pointer in the getter):
+            //     0 CVPixelBufferPool::createPixelBuffer(__CFAllocator const*, __CFDictionary const*, int*) + 2388 in CoreVideo
+            //     1 CVPixelBufferPoolCreatePixelBuffer + 96 in CoreVideo
+            //     2 AssetMovieWriter.write(_:)
+            // Rejected: checking the writer's status before each frame (the swap also happens in a
+            // healthy writer, and a failure lands on the encoder's queue after any check), and
+            // holding the adaptor's pool once read (the getter's own read races the swap).
             var buffer: CVPixelBuffer?
-            guard CVPixelBufferPoolCreatePixelBuffer(nil, pool, &buffer) == kCVReturnSuccess, let buffer else { return }
+            guard CVPixelBufferPoolCreatePixelBuffer(nil, session.pool, &buffer) == kCVReturnSuccess, let buffer else { return }
             Self.draw(frame.image, into: buffer, width: session.width, height: session.height)
             var format: CMVideoFormatDescription?
             guard CMVideoFormatDescriptionCreateForImageBuffer(allocator: nil, imageBuffer: buffer, formatDescriptionOut: &format) == noErr,
@@ -191,16 +202,22 @@
                 ]
             ])
             input.expectsMediaDataInRealTime = true
-            let adaptor = AVAssetWriterInputPixelBufferAdaptor(assetWriterInput: input, sourcePixelBufferAttributes: [
+            // IOSurface-backed, as an adaptor's pool is, so the encoder takes each buffer without
+            // copying it.
+            var pool: CVPixelBufferPool?
+            let attributes: [String: Any] = [
                 kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA,
                 kCVPixelBufferWidthKey as String: width,
-                kCVPixelBufferHeightKey as String: height
-            ])
-            guard writer.canAdd(input) else { return nil }
+                kCVPixelBufferHeightKey as String: height,
+                kCVPixelBufferIOSurfacePropertiesKey as String: [String: Any]()
+            ]
+            guard CVPixelBufferPoolCreate(nil, nil, attributes as CFDictionary, &pool) == kCVReturnSuccess, let pool,
+                  writer.canAdd(input)
+            else { return nil }
             writer.add(input)
             guard writer.startWriting() else { return nil }
             writer.startSession(atSourceTime: .zero)
-            return Session(writer: writer, input: input, adaptor: adaptor, width: width, height: height, firstTime: frame.time, lastTime: nil)
+            return Session(writer: writer, input: input, pool: pool, width: width, height: height, firstTime: frame.time, lastTime: nil)
         }
 
         /// Draws `image` into `buffer`, scaled to fit and centred on black.
