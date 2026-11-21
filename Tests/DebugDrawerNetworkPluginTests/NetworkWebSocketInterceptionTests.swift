@@ -5,16 +5,31 @@
 
     // Each test talks to a loopback echo server through a real URLSessionWebSocketTask, after
     // installing the WebSocket interception alone: installing the whole plugin would also swizzle
-    // every session configuration in the test process. The interception records a frame before it
-    // hands the app its completion, so each test reads the shared recorder as soon as its send or
-    // receive returns, finding its own connection by the id kept on its task. That installing
-    // changes nothing until it is called, and that the app gets what it would get without it, are
-    // pinned in a child process (NetworkWebSocketExitTests).
-    @Suite(.timeLimit(.minutes(1)))
+    // every session configuration in the test process. Each test points the route at a recorder of
+    // its own (keeping the shared mocks, conditions and store, which the URL protocol suites use) and
+    // puts the route and the methods back as it ends. The interception records a frame before it
+    // hands the app its completion, so each test reads its recorder as soon as its send or receive
+    // returns, finding its own connection by the id kept on its task. That installing changes
+    // nothing until it is called, and that the app gets what it would get without it, are pinned in
+    // a child process (NetworkWebSocketExitTests).
+    //
+    // The swizzle and the route are the process's, and an uninstall puts back every method whoever
+    // installed it, so the suite is serialized: a test that installs the WebSocket interception in
+    // process belongs in it (an extension of it, as the URL protocol suites extend
+    // NetworkMockInterceptionTests), so no uninstall runs while another test relies on the swizzle.
+    @MainActor
+    @Suite(.serialized, .timeLimit(.minutes(1)))
     struct NetworkWebSocketInterceptionTests {
         @Test("Text sent and echoed back is listed under one connection, the sent frame then the received one, with their times")
         func textEcho() async throws {
-            await MainActor.run { NetworkWebSocketInterception.install() }
+            let recorder = NetworkWebSocketRecorder(connectionCapacity: 50, frameCapacity: 500)
+            let savedRoute = NetworkInterception.route
+            NetworkInterception.route = NetworkRoute(mocks: .shared, conditions: .shared, webSockets: recorder, boundStore: nil)
+            NetworkWebSocketInterception.install()
+            defer {
+                NetworkWebSocketInterception.uninstall()
+                NetworkInterception.route = savedRoute
+            }
             let server = try WebSocketEchoServer()
             defer { server.stop() }
             let port = try await server.start()
@@ -30,7 +45,7 @@
             let after = Date()
 
             let id = try #require(NetworkWebSocketInterception.connectionID(of: task))
-            let actual = try #require(NetworkWebSocketRecorder.shared.connections.first { $0.id == id })
+            let actual = try #require(recorder.connections.first { $0.id == id })
             #expect(actual.url == address)
             #expect(actual.isOpen)
             #expect(actual.opened >= before && actual.opened <= after)
@@ -56,7 +71,14 @@
 
         @Test("A binary frame sent and received through the completion handlers is listed with its size and a hex preview")
         func binaryEchoWithCompletionHandlers() async throws {
-            await MainActor.run { NetworkWebSocketInterception.install() }
+            let recorder = NetworkWebSocketRecorder(connectionCapacity: 50, frameCapacity: 500)
+            let savedRoute = NetworkInterception.route
+            NetworkInterception.route = NetworkRoute(mocks: .shared, conditions: .shared, webSockets: recorder, boundStore: nil)
+            NetworkWebSocketInterception.install()
+            defer {
+                NetworkWebSocketInterception.uninstall()
+                NetworkInterception.route = savedRoute
+            }
             let server = try WebSocketEchoServer()
             defer { server.stop() }
             let port = try await server.start()
@@ -77,7 +99,7 @@
             }
 
             let id = try #require(NetworkWebSocketInterception.connectionID(of: task))
-            let actual = try #require(NetworkWebSocketRecorder.shared.connections.first { $0.id == id })
+            let actual = try #require(recorder.connections.first { $0.id == id })
             let expectedPreview = "00 01 02 03 04 05 06 07 08 09 0a 0b 0c 0d 0e 0f …"
             #expect(actual.frames.map(\.direction) == [.received, .sent])
             #expect(actual.frames.map(\.kind) == [.binary, .binary])
@@ -93,7 +115,14 @@
 
         @Test("A close the server sends is recorded with its code and reason, and the app's receive still fails as it would")
         func serverClose() async throws {
-            await MainActor.run { NetworkWebSocketInterception.install() }
+            let recorder = NetworkWebSocketRecorder(connectionCapacity: 50, frameCapacity: 500)
+            let savedRoute = NetworkInterception.route
+            NetworkInterception.route = NetworkRoute(mocks: .shared, conditions: .shared, webSockets: recorder, boundStore: nil)
+            NetworkWebSocketInterception.install()
+            defer {
+                NetworkWebSocketInterception.uninstall()
+                NetworkInterception.route = savedRoute
+            }
             let server = try WebSocketEchoServer()
             defer { server.stop() }
             let port = try await server.start()
@@ -107,7 +136,7 @@
             }
 
             let id = try #require(NetworkWebSocketInterception.connectionID(of: task))
-            let actual = try #require(NetworkWebSocketRecorder.shared.connections.first { $0.id == id })
+            let actual = try #require(recorder.connections.first { $0.id == id })
             guard case let .closed(close) = actual.state else {
                 Issue.record("Expected the connection closed, got \(actual.state)")
                 return
@@ -122,7 +151,14 @@
 
         @Test("The app's cancel(with:reason:) is recorded with its code and reason, and the receive it cancels doesn't change it")
         func clientCancel() async throws {
-            await MainActor.run { NetworkWebSocketInterception.install() }
+            let recorder = NetworkWebSocketRecorder(connectionCapacity: 50, frameCapacity: 500)
+            let savedRoute = NetworkInterception.route
+            NetworkInterception.route = NetworkRoute(mocks: .shared, conditions: .shared, webSockets: recorder, boundStore: nil)
+            NetworkWebSocketInterception.install()
+            defer {
+                NetworkWebSocketInterception.uninstall()
+                NetworkInterception.route = savedRoute
+            }
             let server = try WebSocketEchoServer()
             defer { server.stop() }
             let port = try await server.start()
@@ -138,7 +174,7 @@
             }
 
             let id = try #require(NetworkWebSocketInterception.connectionID(of: task))
-            let actual = try #require(NetworkWebSocketRecorder.shared.connections.first { $0.id == id })
+            let actual = try #require(recorder.connections.first { $0.id == id })
             guard case let .closed(close) = actual.state else {
                 Issue.record("Expected the connection closed, got \(actual.state)")
                 return
@@ -152,7 +188,14 @@
 
         @Test("A connection the server drops without a close is recorded as failed, with the receive's error")
         func receiveError() async throws {
-            await MainActor.run { NetworkWebSocketInterception.install() }
+            let recorder = NetworkWebSocketRecorder(connectionCapacity: 50, frameCapacity: 500)
+            let savedRoute = NetworkInterception.route
+            NetworkInterception.route = NetworkRoute(mocks: .shared, conditions: .shared, webSockets: recorder, boundStore: nil)
+            NetworkWebSocketInterception.install()
+            defer {
+                NetworkWebSocketInterception.uninstall()
+                NetworkInterception.route = savedRoute
+            }
             let server = try WebSocketEchoServer()
             defer { server.stop() }
             let port = try await server.start()
@@ -167,7 +210,7 @@
             }
 
             let id = try #require(NetworkWebSocketInterception.connectionID(of: task))
-            let actual = try #require(NetworkWebSocketRecorder.shared.connections.first { $0.id == id })
+            let actual = try #require(recorder.connections.first { $0.id == id })
             let expectedMessage = try #require(failure).localizedDescription
             guard case let .failed(message, _) = actual.state else {
                 Issue.record("Expected the connection failed, got \(actual.state)")
@@ -180,7 +223,14 @@
 
         @Test("A ping is recorded as sent, and its pong as received")
         func pingAndPong() async throws {
-            await MainActor.run { NetworkWebSocketInterception.install() }
+            let recorder = NetworkWebSocketRecorder(connectionCapacity: 50, frameCapacity: 500)
+            let savedRoute = NetworkInterception.route
+            NetworkInterception.route = NetworkRoute(mocks: .shared, conditions: .shared, webSockets: recorder, boundStore: nil)
+            NetworkWebSocketInterception.install()
+            defer {
+                NetworkWebSocketInterception.uninstall()
+                NetworkInterception.route = savedRoute
+            }
             let server = try WebSocketEchoServer()
             defer { server.stop() }
             let port = try await server.start()
@@ -200,16 +250,22 @@
             }
 
             let id = try #require(NetworkWebSocketInterception.connectionID(of: task))
-            let actual = try #require(NetworkWebSocketRecorder.shared.connections.first { $0.id == id })
+            let actual = try #require(recorder.connections.first { $0.id == id })
             #expect(actual.frames.map(\.kind) == [.pong, .ping])
             #expect(actual.frames.map(\.direction) == [.received, .sent])
             #expect(actual.frames.map(\.size) == [0, 0])
         }
 
         @Test("Every factory records one connection per task, with the subprotocols the app offered")
-        @MainActor
         func factories() throws {
+            let recorder = NetworkWebSocketRecorder(connectionCapacity: 50, frameCapacity: 500)
+            let savedRoute = NetworkInterception.route
+            NetworkInterception.route = NetworkRoute(mocks: .shared, conditions: .shared, webSockets: recorder, boundStore: nil)
             NetworkWebSocketInterception.install()
+            defer {
+                NetworkWebSocketInterception.uninstall()
+                NetworkInterception.route = savedRoute
+            }
             let url = try #require(URL(string: "ws://127.0.0.1:9/factories/\(UUID().uuidString)"))
             var request = URLRequest(url: url)
             request.setValue("chat, superchat", forHTTPHeaderField: "Sec-WebSocket-Protocol")
@@ -223,7 +279,7 @@
             ]
 
             let ids = try tasks.map { try #require(NetworkWebSocketInterception.connectionID(of: $0)) }
-            let connections = NetworkWebSocketRecorder.shared.connections
+            let connections = recorder.connections
             let actual = ids.map { id in connections.filter { $0.id == id } }
             #expect(Set(ids).count == 3)
             #expect(actual.map(\.count) == [1, 1, 1])
@@ -233,7 +289,14 @@
 
         @Test("A send after the connection is gone is recorded failed, and the app gets the same error")
         func sendError() async throws {
-            await MainActor.run { NetworkWebSocketInterception.install() }
+            let recorder = NetworkWebSocketRecorder(connectionCapacity: 50, frameCapacity: 500)
+            let savedRoute = NetworkInterception.route
+            NetworkInterception.route = NetworkRoute(mocks: .shared, conditions: .shared, webSockets: recorder, boundStore: nil)
+            NetworkWebSocketInterception.install()
+            defer {
+                NetworkWebSocketInterception.uninstall()
+                NetworkInterception.route = savedRoute
+            }
             let server = try WebSocketEchoServer()
             defer { server.stop() }
             let port = try await server.start()
@@ -249,7 +312,7 @@
             }
 
             let id = try #require(NetworkWebSocketInterception.connectionID(of: task))
-            let actual = try #require(NetworkWebSocketRecorder.shared.connections.first { $0.id == id })
+            let actual = try #require(recorder.connections.first { $0.id == id })
             let late = try #require(actual.frames.first)
             #expect(late.text == "too late")
             #expect(late.failure == failure?.localizedDescription)
@@ -270,9 +333,15 @@
         }
 
         @Test("The plugin's store shows a connection once its frames are recorded")
-        @MainActor
         func storeShowsConnection() async throws {
-            await MainActor.run { NetworkWebSocketInterception.install() }
+            let recorder = NetworkWebSocketRecorder(connectionCapacity: 50, frameCapacity: 500)
+            let savedRoute = NetworkInterception.route
+            NetworkInterception.route = NetworkRoute(mocks: .shared, conditions: .shared, webSockets: recorder, boundStore: nil)
+            NetworkWebSocketInterception.install()
+            defer {
+                NetworkWebSocketInterception.uninstall()
+                NetworkInterception.route = savedRoute
+            }
             let server = try WebSocketEchoServer()
             defer { server.stop() }
             let port = try await server.start()
@@ -281,7 +350,8 @@
             let task = URLSession.shared.webSocketTask(with: url)
             task.resume()
             defer { task.cancel(with: .normalClosure, reason: nil) }
-            let shown = NetworkStore.shared.$webSockets.values
+            let store = NetworkStore(ignoreStorage: FakeNetworkIgnoreListStorage(), webSocketRecorder: recorder)
+            let shown = store.$webSockets.values
 
             try await task.send(.string("hello"))
             _ = try await task.receive()
@@ -294,6 +364,35 @@
                 }
             }
             #expect(actual?.frames.map(\.direction) == [.received, .sent])
+        }
+
+        @Test("Installing replaces every WebSocket method the suite's tests rely on, and uninstalling puts each original back")
+        func uninstallRestoresOriginals() throws {
+            let probe = try #require(URL(string: "ws://127.0.0.1:9/originals"))
+            let session = URLSession(configuration: .ephemeral)
+            defer { session.invalidateAndCancel() }
+            let taskClass: AnyClass = type(of: session.webSocketTask(with: probe))
+            let methods: [(type: AnyClass, selector: Selector)] = [
+                (URLSession.self, NSSelectorFromString("webSocketTaskWithURL:")),
+                (URLSession.self, NSSelectorFromString("webSocketTaskWithURL:protocols:")),
+                (URLSession.self, NSSelectorFromString("webSocketTaskWithRequest:")),
+                (taskClass, NSSelectorFromString("sendMessage:completionHandler:")),
+                (taskClass, NSSelectorFromString("receiveMessageWithCompletionHandler:")),
+                (taskClass, #selector(URLSessionWebSocketTask.sendPing(pongReceiveHandler:))),
+                (taskClass, #selector(URLSessionWebSocketTask.cancel(with:reason:)))
+            ]
+            // Installing again changes nothing, so a method another test left replaced would read
+            // the same installed as before: every one differing shows the suite's earlier tests put
+            // the originals back.
+            let before = methods.map { class_getMethodImplementation($0.type, $0.selector) }
+
+            NetworkWebSocketInterception.install()
+            let installed = methods.map { class_getMethodImplementation($0.type, $0.selector) }
+            NetworkWebSocketInterception.uninstall()
+            let actual = methods.map { class_getMethodImplementation($0.type, $0.selector) }
+
+            #expect(zip(before, installed).allSatisfy { $0 != $1 })
+            #expect(actual == before)
         }
     }
 #endif

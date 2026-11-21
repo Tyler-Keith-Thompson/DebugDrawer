@@ -32,10 +32,13 @@
             state.withLock { $0 == .uninstalled }
         }
 
-        /// Where a request starting now is logged and finds its mocks and conditions: the stores of
-        /// the drawer that installed the plugin last, or the shared ones while none holds it.
+        /// Where a request starting now is logged and finds its mocks and conditions, and where
+        /// WebSocket traffic is recorded: the stores of the drawer that installed the plugin last,
+        /// or the shared ones while none holds it. Setting it sends what starts from then on to the
+        /// route set, until the next install or uninstall sets it again.
         nonisolated static var route: NetworkRoute {
-            boundRoute.withLock { $0 }
+            get { boundRoute.withLock { $0 } }
+            set { boundRoute.withLock { $0 = newValue } }
         }
 
         /// The drawers holding the Network plugin, in the order they installed it, each with its
@@ -50,7 +53,7 @@
             guard !installations.contains(where: { $0.drawer == id }) else { return }
             let route = NetworkRoute(model)
             installations.append((id, route))
-            boundRoute.withLock { $0 = route }
+            Self.route = route
             model.store.install()
         }
 
@@ -60,8 +63,7 @@
         static func uninstall(for drawer: DebugDrawer) {
             guard let index = installations.firstIndex(where: { $0.drawer == ObjectIdentifier(drawer) }) else { return }
             let store = installations.remove(at: index).route.store
-            let latest = installations.last?.route ?? .shared
-            boundRoute.withLock { $0 = latest }
+            route = installations.last?.route ?? .shared
             if installations.isEmpty {
                 store.uninstall()
             } else if !installations.contains(where: { $0.route.store === store }) {

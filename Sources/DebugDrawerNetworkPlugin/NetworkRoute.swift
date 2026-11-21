@@ -19,7 +19,12 @@
         /// any install, and while nothing is installed.
         static let shared = NetworkRoute(mocks: .shared, conditions: .shared, webSockets: .shared, boundStore: nil)
 
-        private init(mocks: NetworkMockRules, conditions: NetworkConditions, webSockets: NetworkWebSocketRecorder, boundStore: NetworkStore?) {
+        /// - Parameters:
+        ///   - mocks: The rules requests are answered from.
+        ///   - conditions: The profiles requests are conditioned by.
+        ///   - webSockets: Where WebSocket traffic is recorded.
+        ///   - boundStore: The store requests are logged in; `nil` for the shared one.
+        init(mocks: NetworkMockRules, conditions: NetworkConditions, webSockets: NetworkWebSocketRecorder, boundStore: NetworkStore?) {
             self.mocks = mocks
             self.conditions = conditions
             self.webSockets = webSockets
