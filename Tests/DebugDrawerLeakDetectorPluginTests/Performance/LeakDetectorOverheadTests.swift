@@ -3,14 +3,20 @@
 // ReleaseInstallTests instead.
 #if DEBUG
     @testable import DebugDrawerLeakDetectorPlugin
-    import Foundation
+    import Darwin
     import Testing
 
-    // Measured on an Apple silicon Mac in debug builds (`bazel test`, `swift test`): a turn with
-    // nothing dismissed is one check of an empty dictionary, well under 0.1 µs; a turn that
-    // rechecks ten flagged view controllers costs a few microseconds. The bounds are several times
-    // those figures, so a loaded machine passes and a change that makes an idle turn do real work
-    // (allocate, sort, publish) fails.
+    // Each test times its turns in the test thread's CPU time (CLOCK_THREAD_CPUTIME_ID), which stops
+    // while the thread is descheduled, so other processes loading the machine don't show up as
+    // per-turn cost; the work measured all runs on this thread (ManualTurns ends each turn in the
+    // call, and onChange is called in it). It keeps the fastest of several batches, which leaves
+    // out a batch slowed by a context switch's cold caches or a stretch on an efficiency core.
+    //
+    // Measured on an Apple silicon Mac in debug builds (`bazel test`): a turn with nothing
+    // dismissed costs about 0.8 µs of CPU time, mostly -Onone's copies and exclusivity checks
+    // around one check of an empty dictionary; a turn that rechecks ten flagged view controllers
+    // costs about 50 µs. A change that makes an idle turn do real work (allocate, sort, publish)
+    // fails the 1 µs bound.
     @MainActor
     @Suite(.timeLimit(.minutes(1)))
     struct LeakDetectorOverheadTests {
@@ -34,18 +40,21 @@
             let turns = ManualTurns()
             let sut = LeakMonitor(turns: turns) { _ in }
             let endTurn = try #require(turns.onTurnEnd)
-            let iterations = 500_000
-            let clock = ContinuousClock()
+            let batches = 10
+            let turnsPerBatch = 50000
+            var fastest = Duration.seconds(1)
 
-            let elapsed = clock.measure {
-                for _ in 0 ..< iterations {
+            for _ in 0 ..< batches {
+                let start = clock_gettime_nsec_np(CLOCK_THREAD_CPUTIME_ID)
+                for _ in 0 ..< turnsPerBatch {
                     endTurn()
                 }
+                let end = clock_gettime_nsec_np(CLOCK_THREAD_CPUTIME_ID)
+                fastest = min(fastest, .nanoseconds(end - start) / turnsPerBatch)
             }
-            let actual = elapsed / iterations
 
-            print("Leak detector: an idle turn costs \(actual) with \(sut.suspects.count) suspects")
-            #expect(actual < .microseconds(1))
+            print("Leak detector: an idle turn costs \(fastest) of CPU time with \(sut.suspects.count) suspects")
+            #expect(fastest < .microseconds(1))
         }
 
         @Test("A turn that rechecks ten flagged view controllers costs under 100 µs")
@@ -60,19 +69,22 @@
             let endTurn = try #require(turns.onTurnEnd)
             endTurn()
             endTurn()
-            let iterations = 20000
-            let clock = ContinuousClock()
+            let batches = 10
+            let turnsPerBatch = 2000
+            var fastest = Duration.seconds(1)
 
-            let elapsed = clock.measure {
-                for _ in 0 ..< iterations {
+            for _ in 0 ..< batches {
+                let start = clock_gettime_nsec_np(CLOCK_THREAD_CPUTIME_ID)
+                for _ in 0 ..< turnsPerBatch {
                     endTurn()
                 }
+                let end = clock_gettime_nsec_np(CLOCK_THREAD_CPUTIME_ID)
+                fastest = min(fastest, .nanoseconds(end - start) / turnsPerBatch)
             }
-            let actual = elapsed / iterations
 
-            print("Leak detector: a turn with \(screens.count) flagged view controllers costs \(actual)")
+            print("Leak detector: a turn with \(screens.count) flagged view controllers costs \(fastest) of CPU time")
             #expect(sut.suspects.map(\.count) == [10])
-            #expect(actual < .microseconds(100))
+            #expect(fastest < .microseconds(100))
         }
     }
 #endif
