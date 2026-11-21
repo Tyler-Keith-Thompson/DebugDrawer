@@ -11,16 +11,20 @@ import Foundation
 // NSRegularExpression rather than Swift's `Regex`, which is neither `Sendable` nor `Equatable` and
 // needs newer systems than the package supports.
 //
+// Free text is also read for `key=value` and `key: value` pairs, whose values are masked when the
+// key contains a key pattern, by the same function the drawer's rules use for the Console's copies
+// and report (`maskingKeyValuePairs(with:where:)`), so both mask the same pairs.
+//
 // Rejected: sharing one redaction type through the receiver with the drawer and the analytics
 // mirror (a source break for both, for no new behavior); keeping a body that isn't JSON with value
 // patterns applied (a form body, a multipart upload or a protobuf carries secrets under names no
-// pattern reads, so it is left out and only its size kept); and leaving log text unredacted, as the
-// debug Console's report does (a production capture holds real customers' data).
+// pattern reads, so it is left out and only its size kept); and leaving log text unredacted (a
+// production capture holds real customers' data).
 
 /// What a diagnostics capture masks before anything it captures is kept: header values by name,
-/// values under sensitive keys (URL query items, JSON keys, log metadata keys) or at JSON paths,
-/// and the text any value pattern matches in a log line, a metadata value, a header value, a URL
-/// or a JSON string.
+/// values under sensitive keys (URL query items, JSON keys, log metadata keys, and `key=value` or
+/// `key: value` pairs in text) or at JSON paths, and the text any value pattern matches in a log
+/// line, a metadata value, a header value, a URL or a JSON string.
 ///
 /// ```swift
 /// let redaction = DebugDrawerDiagnosticsRedaction.standard.adding(keys: ["customer"], values: [#"\bACCT-\d{6}\b"#])
@@ -143,12 +147,15 @@ public struct DebugDrawerDiagnosticsRedaction: Equatable, Sendable {
         headerNames.contains(name.lowercased()) || masksKey(name)
     }
 
-    /// `text` with every match of a value pattern masked.
+    /// `text` with the value of every `key=value` and `key: value` pair whose key contains a key
+    /// pattern masked (read as `maskingKeyValuePairs(with:where:)` reads them), then every match of
+    /// a value pattern.
     ///
     /// - Complexity: O(*n* × *p*), where *n* is the length of `text` and *p* the number of
     ///   patterns.
     package func redacting(text: String) -> String {
-        expressions.reduce(text) { text, expression in
+        let pairsMasked = keyPatterns.isEmpty ? text : text.maskingKeyValuePairs(with: Self.mask, where: masksKey)
+        return expressions.reduce(pairsMasked) { text, expression in
             expression.stringByReplacingMatches(
                 in: text, range: NSRange(text.startIndex..., in: text), withTemplate: NSRegularExpression.escapedTemplate(for: Self.mask)
             )

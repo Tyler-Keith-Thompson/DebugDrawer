@@ -7,22 +7,37 @@
     /// earlier launch kept, under Previous.
     ///
     /// It draws ``ConsoleModel``'s snapshots from its transport and sends it commands; it keeps
-    /// only what is its own: whether the lines follow new ones.
+    /// only what is its own: whether the lines follow new ones. Copy All and Copy Line mask what
+    /// they copy by the redaction rules of the drawer it is shown in.
     struct ConsolePluginContent: View {
         @StateObject private var transport: DebugDrawerPluginTransport<ConsoleSnapshot, ConsoleCommand>
+        /// The drawer the plugin is shown in; `nil` outside any drawer.
+        @Environment(\.showingDrawer) private var showingDrawer
         @Environment(\.locale) private var locale
         @Environment(\.timeZone) private var timeZone
         @State private var isFollowing = true
+        /// Puts what Copy All and Copy Line copy on the pasteboard.
+        private let copyToClipboard: (String) -> Void
+        let inspection = Inspection<Self>() // from/for ViewInspector.
 
-        /// - Parameter transport: Joins the view to the model; made once, for the view's lifetime.
-        ///   The shared model's, in the process, unless given.
+        /// - Parameters:
+        ///   - transport: Joins the view to the model; made once, for the view's lifetime. The
+        ///     shared model's, in the process, unless given.
+        ///   - copyToClipboard: Puts copied text on the pasteboard.
         init(
-            transport: @escaping @autoclosure () -> DebugDrawerPluginTransport<ConsoleSnapshot, ConsoleCommand> = .direct(to: ConsoleModel.shared)
+            transport: @escaping @autoclosure () -> DebugDrawerPluginTransport<ConsoleSnapshot, ConsoleCommand> = .direct(to: ConsoleModel.shared),
+            copyToClipboard: @escaping (String) -> Void = debugDrawerCopyToClipboard
         ) {
             _transport = StateObject(wrappedValue: transport())
+            self.copyToClipboard = copyToClipboard
         }
 
         var body: some View {
+            // The rules a copy is masked by are read from this drawer as the copy happens, rather
+            // than through `DebugDrawerRedactionReader`: nothing drawn depends on them, and
+            // observing the drawer would draw the log again at each of its changes. Outside any
+            // drawer, `DebugDrawer.shared`'s, which the app sets, as the reader picks them.
+            let drawer = showingDrawer ?? .shared
             let snapshot = transport.snapshot
             let log = snapshot.log
             let visibleLines = log.shownLines
@@ -38,7 +53,7 @@
                         muteChoices: log.muteChoices,
                         mute: { send(.filter(.mute($0))) },
                         unmute: { send(.filter(.unmute($0))) },
-                        copyAll: { debugDrawerCopyToClipboard(visibleLines.copiedText) }
+                        copyAll: { copyToClipboard(visibleLines.copiedText(redactedBy: drawer.redaction)) }
                     )
                 }
 
@@ -73,7 +88,7 @@
                     }
                 }
 
-                ConsoleLinesWell(lines: visibleLines, isFollowing: $isFollowing, perform: perform)
+                ConsoleLinesWell(lines: visibleLines, isFollowing: $isFollowing) { perform($0, redaction: drawer.redaction) }
                     // A new text view for each source and session, so each opens at its end.
                     .id(shownSession(log))
 
@@ -99,6 +114,7 @@
             // Each source and session opens at its end. Under Previous there is no Resume to
             // follow again, so scrolling up in one session doesn't leave the next scrolled up too.
             .onChange(of: shownSession(log)) { isFollowing = true }
+            .onReceive(inspection.notice) { inspection.visit(self, $0) }
         }
 
         /// The session the lines are from: `nil` for the captured ones.
@@ -106,9 +122,10 @@
             log.source == .previous ? log.previousLog?.summary.id : nil
         }
 
-        /// Runs what a line's context menu offers.
-        private func perform(_ action: ConsoleLineAction) {
+        /// Runs what a line's context menu offers; Copy Line masks the line by `redaction`.
+        private func perform(_ action: ConsoleLineAction, redaction: DebugDrawerRedaction) {
             switch action {
+            case let .copy(line): copyToClipboard(line.copiedText(redactedBy: redaction))
             case let .mute(mute): send(.filter(.mute(mute)))
             case let .showSince(date): send(.filter(.setTimeRange(.since(date))))
             }

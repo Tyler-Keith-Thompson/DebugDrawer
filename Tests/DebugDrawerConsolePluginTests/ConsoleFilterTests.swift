@@ -284,21 +284,21 @@
             #expect(actual == expected)
         }
 
-        @Test("A line's actions mute its subsystem and its category, then show from it on; a stdout line offers only the last")
+        @Test("A line's actions copy it, mute its subsystem and its category, then show from it on; a stdout line offers only copy and the last")
         func lineActions() {
             let time = Date(timeIntervalSince1970: 1_800_000_000)
             let oslog = LogLine(timestamp: time, text: "a", source: .oslog, level: .info, subsystem: "com.example.feed", category: "net")
             let stdout = LogLine(timestamp: time, text: "b", source: .stdout, level: .info)
             let expected: [ConsoleLineAction] = [
-                .mute(.subsystem("com.example.feed")), .mute(.category("net", subsystem: "com.example.feed")), .showSince(time)
+                .copy(oslog), .mute(.subsystem("com.example.feed")), .mute(.category("net", subsystem: "com.example.feed")), .showSince(time)
             ]
-            let expectedTitles = ["Mute Subsystem “com.example.feed”", "Mute Category “net”", "Show Since This Line"]
+            let expectedTitles = ["Copy Line", "Mute Subsystem “com.example.feed”", "Mute Category “net”", "Show Since This Line"]
 
             let actual = ConsoleLineAction.actions(for: oslog)
 
             #expect(actual == expected)
             #expect(actual.map(\.title) == expectedTitles)
-            #expect(ConsoleLineAction.actions(for: stdout) == [.showSince(time)])
+            #expect(ConsoleLineAction.actions(for: stdout) == [.copy(stdout), .showSince(time)])
         }
 
         @Test("A line shows its subsystem's last component and its category, or whichever it has, or nothing")

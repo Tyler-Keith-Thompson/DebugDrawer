@@ -77,6 +77,29 @@
             #expect(actual == url)
         }
 
+        @Test("In free text, each key=value and key: value pair whose key contains a key pattern, ignoring case, has its value masked")
+        func freeText() {
+            let sut = DebugDrawerRedaction.standard
+            let text = #"Signed in user=7 Access_TOKEN=abc123 Session: 42 via /login?next=home&API_KEY=k1"#
+                + #" body {"Password": "hunter 2"}"#
+            let expected = #"Signed in user=7 Access_TOKEN=[REDACTED] Session: [REDACTED] via /login?next=home&API_KEY=[REDACTED]"#
+                + #" body {"Password": "[REDACTED]"}"#
+
+            let actual = sut.redacting(text: text)
+
+            #expect(actual == expected)
+        }
+
+        @Test("With no key patterns, free text comes back unchanged")
+        func freeTextNoRules() {
+            let sut = DebugDrawerRedaction.none.adding(headers: ["Authorization"], jsonPaths: ["user.token"])
+            let text = "token=abc password: hunter2"
+
+            let actual = sut.redacting(text: text)
+
+            #expect(actual == text)
+        }
+
         @Test("A JSON key containing a key pattern is masked at any depth, in arrays too")
         func jsonKeysAtDepth() throws {
             let sut = DebugDrawerRedaction(keys: ["password"])

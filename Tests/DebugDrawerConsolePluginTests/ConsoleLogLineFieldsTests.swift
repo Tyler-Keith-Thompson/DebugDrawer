@@ -96,7 +96,7 @@
                 LogLine(timestamp: time, text: "printed", source: .stdout, level: .info)
             ]
 
-            let actual = lines.copiedText.split(separator: "\n").map { $0.split(separator: " ", maxSplits: 1)[1] }
+            let actual = lines.copiedText(redactedBy: .none).split(separator: "\n").map { $0.split(separator: " ", maxSplits: 1)[1] }
 
             #expect(actual == ["ERR [com.example.feed/networking] Timed out", "printed"])
         }

@@ -106,7 +106,7 @@
             ]
             let expected = ["ERR [com.example.shop/checkout] Payment declined order=1042 user=7", "printed"]
 
-            let actual = lines.copiedText.split(separator: "\n").map { String($0.split(separator: " ", maxSplits: 1)[1]) }
+            let actual = lines.copiedText(redactedBy: .none).split(separator: "\n").map { String($0.split(separator: " ", maxSplits: 1)[1]) }
 
             #expect(actual == expected)
         }

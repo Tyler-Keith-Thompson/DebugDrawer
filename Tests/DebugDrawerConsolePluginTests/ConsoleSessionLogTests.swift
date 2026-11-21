@@ -119,8 +119,8 @@
             var report = DebugDrawerReport()
             var empty = DebugDrawerReport()
 
-            ConsolePlugin.contribute(previous: ConsoleSessionLog(summary: summary, data: data), to: &report)
-            ConsolePlugin.contribute(previous: nil, to: &empty)
+            ConsolePlugin.contribute(previous: ConsoleSessionLog(summary: summary, data: data), redaction: .none, to: &report)
+            ConsolePlugin.contribute(previous: nil, redaction: .none, to: &empty)
 
             let file = try #require(report.files.first)
             #expect(report.files.count == 1)

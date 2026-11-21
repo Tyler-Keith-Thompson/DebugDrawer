@@ -3,8 +3,8 @@
 
     /// A log line as a session's file holds it: one JSON object per line, after the header.
     ///
-    /// The line is kept as it was captured. Log text has no keys for the drawer's redaction rules
-    /// to match, so the Console shows, copies and reports it as logged, and writes it so too.
+    /// The line is kept as it was captured, as the Console shows it; the drawer's redaction rules
+    /// mask it only as it is copied or added to a report.
     struct ConsoleSessionLine: Codable, Equatable {
         /// When it was logged, in ``ConsoleSessionHeader/dateStyle``.
         var time: String

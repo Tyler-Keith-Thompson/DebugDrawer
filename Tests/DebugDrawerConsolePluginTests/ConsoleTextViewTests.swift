@@ -210,7 +210,7 @@
             #expect(following.value)
         }
 
-        @Test("A line's context menu offers Mute Subsystem, Mute Category and Show Since This Line, and runs the one picked")
+        @Test("A line's context menu offers Copy Line, Mute Subsystem, Mute Category and Show Since This Line, and runs the one picked")
         func contextMenu() throws {
             func textView(in view: NSView) -> NSTextView? {
                 view as? NSTextView ?? view.subviews.lazy.compactMap(textView(in:)).first
@@ -238,16 +238,18 @@
                 windowNumber: window.windowNumber, context: nil, eventNumber: 0, clickCount: 1, pressure: 1
             ))
             let secondLine = (text.string as NSString).range(of: "Timed out").location
-            let expectedTitles = ["Mute Subsystem “com.example.feed”", "Mute Category “net”", "Show Since This Line"]
+            let expectedTitles = ["Copy Line", "Mute Subsystem “com.example.feed”", "Mute Category “net”", "Show Since This Line"]
 
             let menu = try #require(text.delegate?.textView?(text, menu: NSMenu(), for: event, at: secondLine))
-            let titles = menu.items.prefix(3).map(\.title)
-            let mute = try #require(menu.items.first)
+            let titles = menu.items.prefix(4).map(\.title)
+            let copy = menu.items[0]
+            let mute = menu.items[1]
+            _ = (copy.target as? NSObject)?.perform(copy.action, with: copy)
             _ = (mute.target as? NSObject)?.perform(mute.action, with: mute)
 
             #expect(titles == expectedTitles)
-            #expect(menu.items[3].isSeparatorItem)
-            #expect(performed.actions == [.mute(.subsystem("com.example.feed"))])
+            #expect(menu.items[4].isSeparatorItem)
+            #expect(performed.actions == [.copy(lines[1]), .mute(.subsystem("com.example.feed"))])
         }
     }
 #endif

@@ -165,7 +165,8 @@ public final class DebugDrawerDiagnosticsCapture: DebugDrawerPluginModel {
     ///
     /// - Parameters:
     ///   - level: How severe the line is.
-    ///   - message: What was logged; the text value patterns match is masked.
+    ///   - message: What was logged; the values of sensitive `key=value` pairs and the text value
+    ///     patterns match are masked.
     ///   - metadata: Key/value fields; each sensitive key's value is masked.
     ///   - subsystem: What logged it (a logger's label); empty for none.
     ///   - category: Its category within the subsystem; empty for none.

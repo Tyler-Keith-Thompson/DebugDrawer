@@ -17,6 +17,27 @@ struct DiagnosticsRedactionTests {
         #expect(actual == expected)
     }
 
+    @Test("Log text has the value of each key=value and key: value pair whose key contains a key pattern masked, before the value patterns run")
+    func keyValuePairsInText() {
+        let sut = DebugDrawerDiagnosticsRedaction.standard.adding(keys: ["customer"])
+        let text = #"Checkout customer_id=C-77 session: 9f2 phone=555-0100 cart=3 {"refresh_token": "r 1"}"#
+        let expected = #"Checkout customer_id=[REDACTED] session: [REDACTED] phone=[REDACTED] cart=3 {"refresh_token": "[REDACTED]"}"#
+
+        let actual = sut.redacting(text: text)
+
+        #expect(actual == expected)
+    }
+
+    @Test("With no rules, log text with key=value pairs comes back unchanged")
+    func keyValuePairsNoRules() {
+        let sut = DebugDrawerDiagnosticsRedaction.none
+        let text = "token=abc session: 9f2"
+
+        let actual = sut.redacting(text: text)
+
+        #expect(actual == text)
+    }
+
     @Test("A field under a sensitive key is masked whole; others have value patterns masked")
     func fieldsMaskedByKey() {
         let sut = DebugDrawerDiagnosticsRedaction.standard

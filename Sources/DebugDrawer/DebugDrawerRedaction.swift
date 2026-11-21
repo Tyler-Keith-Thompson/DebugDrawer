@@ -5,8 +5,9 @@ import Foundation
 ///
 /// A value is sensitive when it sits under a configured header name, under a key that
 /// contains one of the key patterns (headers, URL query items, JSON keys, keychain accounts
-/// and services, cookie names, `UserDefaults` keys), or at one of the JSON paths. Names and
-/// patterns match case-insensitively.
+/// and services, cookie names, `UserDefaults` keys, log lines' metadata keys, and the keys of
+/// `key=value` and `key: value` pairs in free text such as log lines), or at one of the JSON paths.
+/// Names and patterns match case-insensitively.
 ///
 /// A JSON path is dot-separated object keys from the document's root (`user.password`); `*`
 /// matches any one key, and arrays are transparent, so `items.token` matches the `token` of
@@ -96,6 +97,24 @@ public struct DebugDrawerRedaction: Equatable, Sendable {
             masksKey(item.name) && item.value != nil ? URLQueryItem(name: item.name, value: Self.mask) : item
         }
         return components.string ?? url
+    }
+
+    /// Free text, such as a log line, with the value of every `key=value` and `key: value` pair
+    /// whose key contains a key pattern masked: `order=1042 token=abc` becomes
+    /// `order=1042 token=[REDACTED]`. Text with no such pair, and any text when there are no key
+    /// patterns, comes back unchanged.
+    ///
+    /// A key is a run of letters, digits, `_`, `-` and `.` (`x-api-key`, `user.token`), or text in
+    /// quotes (`"access token": "abc"`). The separator is `=` or `:`, spaces allowed around it, but
+    /// not `==`, `::` or `://`. A quoted value is masked inside its quotes; any other value runs up
+    /// to the next whitespace, `&`, `,`, `;`, `)`, `]`, `}` or quote, so each item of a URL's query
+    /// string (`?token=abc&page=2`) is read on its own. A value starting with `{`, `[` or `(` is left
+    /// for the pairs inside it.
+    ///
+    /// - Complexity: O(*n*) in the length of `text`.
+    public func redacting(text: String) -> String {
+        guard !keyPatterns.isEmpty else { return text }
+        return text.maskingKeyValuePairs(with: Self.mask, where: masksKey)
     }
 
     /// A JSON body with every sensitive value masked: values under a key that contains a key

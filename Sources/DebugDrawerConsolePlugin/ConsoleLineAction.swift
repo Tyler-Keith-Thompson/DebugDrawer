@@ -1,23 +1,26 @@
 #if DEBUG
     import Foundation
 
-    /// What a line's context menu offers: muting its subsystem or its category, and showing the
-    /// lines from it on.
-    enum ConsoleLineAction: Hashable {
+    /// What a line's context menu offers: copying it, muting its subsystem or its category, and
+    /// showing the lines from it on.
+    enum ConsoleLineAction: Equatable {
+        /// Copies the line as Copy All copies it, masked by the drawer's redaction rules.
+        case copy(LogLine)
         /// Hides the lines the mute matches.
         case mute(ConsoleMute)
         /// Limits the list to the lines logged at the date or later.
         case showSince(Date)
 
-        /// The actions for `line`: Mute Subsystem and Mute Category when it has them, then Show
-        /// Since This Line.
+        /// The actions for `line`: Copy Line, Mute Subsystem and Mute Category when it has them,
+        /// then Show Since This Line.
         static func actions(for line: LogLine) -> [ConsoleLineAction] {
-            ConsoleMute.choices(for: line).map(ConsoleLineAction.mute) + [.showSince(line.timestamp)]
+            [.copy(line)] + ConsoleMute.choices(for: line).map(ConsoleLineAction.mute) + [.showSince(line.timestamp)]
         }
 
         /// The menu item's title.
         var title: String {
             switch self {
+            case .copy: "Copy Line"
             case let .mute(.subsystem(subsystem)): "Mute Subsystem “\(subsystem)”"
             case let .mute(.category(category, _)): "Mute Category “\(category)”"
             case .showSince: "Show Since This Line"

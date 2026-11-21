@@ -63,7 +63,8 @@ extension DebugDrawerDiagnosticsCapture {
         public let timestamp: Date
         /// How severe it is.
         public let level: Level
-        /// What was logged, with the text value patterns matched masked.
+        /// What was logged, with the values of sensitive `key=value` pairs and the text value patterns
+        /// matched masked.
         public let message: String
         /// Its key/value fields, each sensitive key's value masked.
         public let metadata: [String: String]

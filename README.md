@@ -331,9 +331,27 @@ DebugDrawer.shared.redact(
 ```
 
 Header names and key patterns match case-insensitively; a key pattern matches header names, URL
-query items, JSON keys at any depth, keychain accounts, services and labels, cookie names and
-`UserDefaults` keys. A JSON path is dot-separated keys from the root, `*` matches any one key,
-and arrays are transparent. Assign `DebugDrawer.shared.redaction = .none` to mask nothing.
+query items, JSON keys at any depth, keychain accounts, services and labels, cookie names,
+`UserDefaults` keys, log lines' metadata keys and the keys of pairs in log text. A JSON path is
+dot-separated keys from the root, `*` matches any one key, and arrays are transparent. Assign
+`DebugDrawer.shared.redaction = .none` to mask nothing.
+
+The Console shows its lines as logged, and masks them as they leave it: Copy All, a line's Copy Line
+and the bug report's `console.txt` and `console-previous.txt` mask a metadata field whose key
+matches (`token=[REDACTED]`), and the value of each `key=value` or `key: value` pair in the text
+whose key does (`redacting(text:)`):
+
+- A key is a run of letters, digits, `_`, `-` and `.` (`x-api-key`, `user.token`), or text in
+  quotes, as JSON writes keys (`"access token"`).
+- The separator is `=` or `:`, with spaces allowed around it; `==`, `::` and `://` aren't one.
+- A value in quotes is masked inside them, an escaped quote included (`"token": "[REDACTED]"`); any
+  other value runs up to the next whitespace, `&`, `,`, `;`, `)`, `]`, `}` or quote, so each item
+  of a query string is read on its own (`?page=2&access_token=[REDACTED]&lang=en`). A value starting
+  with `{`, `[` or `(` is left for the pairs inside it.
+- Every pair is read, a repeated key's included, and a value spelled with spaces outside quotes is
+  masked only up to its first space.
+
+Text outside such pairs (a token written into a sentence) has no key to match, and stays as logged.
 
 ### Bug reports
 
@@ -580,8 +598,8 @@ bug report's `App Info/app-info.json` carry all of it, entitlements by key.
 
 The lines logged during a launch, or just before a crash, are kept on disk, so the next launch can
 show them; the unified log of the current process holds no earlier launch's lines on iOS. Each
-line is written as it is captured, as logged: log text has no keys for the redaction rules to
-match, so the Console shows, copies and keeps it unmasked. A launch's session is a file of JSON
+line is written as it is captured, as logged; the redaction rules mask it only as it is copied or
+added to a report (Redacting sensitive values). A launch's session is a file of JSON
 Lines in Application Support, in the app's folder under `DebugDrawer/ConsoleSessions`: a header
 with the start, the app's version and the process, written at install, then one line per log line, with its time, level, source,
 os_log subsystem and category (left out when empty) and text, appended as it comes, so a crash mid-write costs at most the line being written, which is
@@ -651,7 +669,8 @@ report adds the newest earlier session as `console-previous.txt`.
 
 Each os_log line shows its subsystem and category, short and quiet, before its text (`feed/networking`
 for `com.example.feed`'s `networking`). A line's context menu, or its edit menu on iOS, mutes its
-subsystem or its category, or shows the lines from it on; More offers the same mutes for every
+subsystem or its category, copies it (Copy Line, masked as Copy All is), or shows the lines from it
+on; More offers the same mutes for every
 subsystem and category shown, Copy All, and a time range (the last 1, 5 or 15 minutes before the
 newest line). Mutes are kept across launches in the app's folder in Application Support, under
 `DebugDrawer/Console/muted.json`. While they hide lines, a note under the log says how many, with Show
@@ -687,7 +706,8 @@ ConsoleLogSink.log(
 The line shows its metadata after its text as quiet `key=value` fields (`order=1042`), under it at
 accessibility text sizes, and the search matches metadata keys and values as it does the text. The
 subsystem and category show and mute like an os_log line's; Copy All, the bug report and the
-sessions on disk keep the metadata. `ConsoleLogSink` exists in release builds too, where `log` does
+sessions on disk keep the metadata, a field the redaction rules call sensitive masked in a copy or
+report. `ConsoleLogSink` exists in release builds too, where `log` does
 nothing and evaluates none of its arguments, so the bridge needs no `#if DEBUG`.
 
 The plugin depends on no logging package; the app writes the bridge. For swift-log, a `LogHandler`
@@ -2438,7 +2458,8 @@ capture.record(request, response: response, body: data, started: started)
   `.standard.adding(headers:keys:jsonPaths:values:)`): the `Authorization`, `Proxy-Authorization`,
   `Cookie` and `Set-Cookie` headers; values under keys containing `token`, `secret`, `password`,
   `session`, `auth`, `apikey`, `email` or `phone` (headers, URL query items, JSON keys at any
-  depth, a log line's metadata); JSON paths the app lists; a URL's user and password; and, in the
+  depth, a log line's metadata, and `key=value` or `key: value` pairs in the message, read as the
+  Console reads them, Redacting sensitive values); JSON paths the app lists; a URL's user and password; and, in the
   message, metadata values, header values, the URL's path, query and fragment and JSON strings, the
   text that is an email address, a JSON Web Token, a `Bearer` credential or a secret written as
   `password=…`. A body is kept only when it is JSON, redacted the same way; any other body (a form,
