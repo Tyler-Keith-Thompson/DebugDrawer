@@ -74,6 +74,7 @@ extension DebugDrawerReceiverCapability {
         case .persistent:
             capabilityScope = .persistent
         }
+        // The model reverts what a killed launch left itself, above, so the receiver keeps no record.
         return Self(
             id: DebugDrawerUserDefaults.pluginID,
             scope: capabilityScope,
@@ -88,5 +89,6 @@ extension DebugDrawerReceiverCapability {
             },
             snapshots: { encodedSnapshots(of: model) }
         )
+        .recordingNoUnrevertedChanges()
     }
 }

@@ -101,6 +101,11 @@ public final class DebugDrawerReceiver {
     var paused: Set<String> = []
     /// The app's presence file, which lists it in a sidecar's app list, while the receiver runs.
     var presence: PresenceAnnouncement?
+    /// The record of the session-scoped changes owed a revert, once first used, for the
+    /// ``appDirectory`` it was read from (UnrevertedChanges.swift).
+    var unrevertedRecord: UnrevertedChanges?
+    /// Takes each change the sessions revert, and each session they end, off the record.
+    private var reverted: AnyCancellable?
     /// Who the presence file says the app is, and whose directory of the store the receiver
     /// serves: the main bundle, unless a test names another app.
     package var identity = AppPresence.Identity.of(.main)
@@ -133,6 +138,11 @@ public final class DebugDrawerReceiver {
         self.directory = directory
         self.sessions = sessions
         isAllowed = { true }
+        // The sessions record each entry on the main actor, as it happens, so the record follows
+        // each revert before the next command.
+        reverted = sessions.auditEntries.sink { [weak self] entry in
+            MainActor.assumeIsolated { self?.noteReverted(entry) }
+        }
     }
 
     /// A receiver of the store in `directory`, gating every command with `sessions` and, before
@@ -300,7 +310,9 @@ public final class DebugDrawerReceiver {
             sessions.refuse(id, .unknownCapability)
             return
         }
-        sessions.apply(to: id, scope: capability.scope, requiresGrant: capability.requiresGrant) { capability.perform(payload) }
+        sessions.apply(to: id, scope: capability.scope, requiresGrant: capability.requiresGrant) {
+            recordingChange(to: capability) { capability.perform(payload) }
+        }
     }
 
     /// Applies `change`, a change the host asked for itself rather than a sidecar's command (a bug
@@ -319,7 +331,9 @@ public final class DebugDrawerReceiver {
             sessions.refuse(id, .unknownCapability)
             return .unknownCapability
         }
-        return sessions.apply(to: id, scope: capability.scope, requiresGrant: capability.requiresGrant, change)
+        return sessions.apply(to: id, scope: capability.scope, requiresGrant: capability.requiresGrant) { () -> DebugDrawerSessions.CommandOutcome in
+            recordingChange(to: capability) { change().map(DebugDrawerSessions.CommandOutcome.refused) ?? .applied(changes: nil) }
+        }
     }
 
     /// Writes the snapshots `snapshots` delivers to `id`'s file, in place of any written for it

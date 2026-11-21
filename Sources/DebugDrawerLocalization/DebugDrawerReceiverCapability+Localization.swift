@@ -22,6 +22,8 @@ public extension DebugDrawerReceiverCapability {
     ///   reverted with ``LocalizationReview/Command/setMode(_:)`` to
     ///   ``Localization/Mode/standard``.
     static func localizationReview(_ review: LocalizationReview = .shared) -> Self {
+        // The mode lives in memory and goes with the process, so the receiver keeps no record.
         .model(review, id: LocalizationReview.pluginID, scope: .session(revertWith: .setMode(.standard)))
+            .recordingNoUnrevertedChanges()
     }
 }

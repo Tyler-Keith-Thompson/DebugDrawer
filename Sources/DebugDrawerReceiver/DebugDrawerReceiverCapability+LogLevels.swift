@@ -50,6 +50,8 @@ extension DebugDrawerReceiverCapability {
         if !model.snapshot.raisedSubsystems.isEmpty {
             model.perform(.resetAll)
         }
+        // The model reverts what a killed launch left itself, above, so the receiver keeps no record.
         return .model(model, id: DebugDrawerLogLevels.pluginID, scope: .session(revertWith: .resetAll), refusal: model.refusal(of:))
+            .recordingNoUnrevertedChanges()
     }
 }

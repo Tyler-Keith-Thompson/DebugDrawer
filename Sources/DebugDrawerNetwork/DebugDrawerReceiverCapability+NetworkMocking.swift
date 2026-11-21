@@ -28,5 +28,7 @@ public extension DebugDrawerReceiverCapability {
     static func networkMocking(_ mocking: NetworkMocking) -> Self {
         .model(mocking, id: NetworkMocking.pluginID, scope: .session(revertWith: .reset), refusal: NetworkMocking.refusal(for:))
             .requiringGrant()
+            // The rules live in memory and go with the process, so the receiver keeps no record.
+            .recordingNoUnrevertedChanges()
     }
 }

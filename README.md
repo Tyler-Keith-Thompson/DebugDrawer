@@ -2327,6 +2327,15 @@ What the receiver does:
 - **Scopes.** Each capability takes a `DebugDrawerChangeScope`: `.session(revertWith:)` reverts it
   as the session ends or expires (feature flag overrides default to `.session(revertWith:
   .clearAllOverrides)`), `.persistent` keeps it.
+- **Reverted after a kill too.** Sessions live in memory, so a session the app quit or was killed
+  in never ends. The receiver keeps a record in the app's directory of the store,
+  `unreverted-changes.json`, of each session-scoped capability a session changed, written before
+  the change is applied and cleared once it is reverted; as the next launch enables that
+  capability, before or after `start()`, it performs the scope's command and audits it as
+  `changeReverted` in the session that made the change. A capability the next launch doesn't
+  enable keeps its record until a launch does. The shipped capabilities whose state outlives the
+  process keep a record of their own beside the change and revert it as they are made (below), so
+  make every capability at startup.
 - **The app draws the indicator.** Observe `sessions.snapshot` as in "Sidecar sessions" above.
 
 **Feature flag overrides in production.** The risk: an employee holding the sidecar can turn on,
@@ -2783,9 +2792,9 @@ receiver.enable(.tweaks(AppTweaks.backend, AppTweaks.newCheckout))
   so make it at startup before reading tweaks; an app that never makes it reads every default, as
   before.
 - **Persistent by default.** Pass `scope: .session(revertWith: .resetAll)` to reset the
-  production-safe tweaks to their defaults when the session ends instead. A session the app was
-  killed in leaves them as the sidecar set them: unlike the other session-scoped capabilities,
-  tweaks aren't reset as the next launch makes the capability.
+  production-safe tweaks to their defaults when the session ends instead. Tweaks a session set
+  when the app was killed or quit during it are reset as the next launch enables the capability,
+  audited as `changeReverted`, so make it at startup, before the app reads a tweak.
 
 **Analytics events in production.** While a sidecar's session is open, the events the app records
 through `AnalyticsEvents.record` can be mirrored to the sidecar, so QA can check tracking on the

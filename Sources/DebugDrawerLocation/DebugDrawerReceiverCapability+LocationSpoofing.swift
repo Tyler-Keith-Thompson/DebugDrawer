@@ -42,6 +42,8 @@ public extension DebugDrawerReceiverCapability {
         if spoofing.isLeftByKilledLaunch {
             spoofing.endSpoofLeftByKilledLaunch()
         }
+        // The model ends what a killed launch left itself, above, so the receiver keeps no record.
         return .model(spoofing, id: LocationSpoofing.pluginID, scope: .session(revertWith: .stop), refusal: spoofing.refusal(of:))
+            .recordingNoUnrevertedChanges()
     }
 }

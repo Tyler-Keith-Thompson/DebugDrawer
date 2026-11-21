@@ -66,6 +66,8 @@ extension DebugDrawerReceiverCapability {
         if case let .session(revert) = scope.kind, !model.snapshot.overriddenKeys.isEmpty {
             model.perform(revert)
         }
+        // The model reverts what a killed launch left itself, above, so the receiver keeps no record.
         return .model(model, id: DebugDrawerExperimentOverrides.pluginID, scope: scope, refusal: model.refusal(of:))
+            .recordingNoUnrevertedChanges()
     }
 }

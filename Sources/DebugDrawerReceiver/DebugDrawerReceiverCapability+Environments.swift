@@ -69,6 +69,8 @@ extension DebugDrawerReceiverCapability {
         if model.snapshot.isSwitched {
             model.perform(.reset)
         }
+        // The model reverts what a killed launch left itself, above, so the receiver keeps no record.
         return .model(model, id: DebugDrawerEnvironments.pluginID, scope: .session(revertWith: .reset), refusal: model.refusal(of:))
+            .recordingNoUnrevertedChanges()
     }
 }

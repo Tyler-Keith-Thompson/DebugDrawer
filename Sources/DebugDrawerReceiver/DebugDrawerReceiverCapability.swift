@@ -32,6 +32,10 @@ public struct DebugDrawerReceiverCapability {
     /// Whether its commands need a session whose grant lists it, even when the sessions have no
     /// ``DebugDrawerGrantPolicy``: see ``requiringGrant()``.
     public private(set) var requiresGrant = false
+    /// Whether the receiver records, in the store, each session that changed the capability until
+    /// its change is reverted, so a change a launch killed during the session left is reverted as
+    /// the next launch enables it: see ``recordingNoUnrevertedChanges()``.
+    package private(set) var recordsUnrevertedChanges = true
     /// Performs the command `payload` encodes, returning the values it changed for a capability
     /// that records them, or returns why it was refused: when it isn't one of the model's
     /// commands, or the capability refuses it.
@@ -58,7 +62,10 @@ public struct DebugDrawerReceiverCapability {
     ///   - model: The model a sidecar may read and drive.
     ///   - id: The ID a sidecar connects to it by, and the audit log names it by.
     ///   - scope: What becomes of its changes when the session ends: reverted with a command, or
-    ///     kept.
+    ///     kept. With a session scope, a change made in a session the app was killed or quit
+    ///     during is reverted with the same command as the next launch enables the capability,
+    ///     and audited as ``DebugDrawerAuditEntry/Event/changeReverted`` in that session; a model
+    ///     that also reverts its own leftovers meets the command with nothing left to put back.
     /// - Returns: The capability, for ``DebugDrawerReceiver/enable(_:)``.
     public static func model<Model: DebugDrawerPluginModel>(_ model: Model, id: String, scope: DebugDrawerChangeScope<Model>) -> Self {
         .model(model, id: id, scope: scope) { _ in nil }
@@ -111,6 +118,18 @@ public struct DebugDrawerReceiverCapability {
     public func requiringGrant() -> Self {
         var capability = self
         capability.requiresGrant = true
+        return capability
+    }
+
+    /// This capability, with no record of its session-scoped changes kept by the receiver: for one
+    /// whose changes go with the process, are cleaned up as it is enabled, or whose model keeps its
+    /// own record beside the change and reverts it as it is made, so nothing is reverted or
+    /// audited twice.
+    ///
+    /// - Returns: The capability, keeping no record.
+    package func recordingNoUnrevertedChanges() -> Self {
+        var capability = self
+        capability.recordsUnrevertedChanges = false
         return capability
     }
 
@@ -173,6 +192,8 @@ public struct DebugDrawerReceiverCapability {
         if case let .session(revert) = scope.kind, !model.snapshot.overriddenKeys.isEmpty {
             model.perform(revert)
         }
+        // The model reverts what a killed launch left itself, so the receiver keeps no record.
         return .model(model, id: DebugDrawerFeatureFlagOverrides.pluginID, scope: scope, refusal: model.refusal(of:))
+            .recordingNoUnrevertedChanges()
     }
 }

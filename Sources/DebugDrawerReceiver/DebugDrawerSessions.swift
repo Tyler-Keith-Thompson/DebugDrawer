@@ -261,6 +261,13 @@ public final class DebugDrawerSessions: DebugDrawerPluginModel {
         record(capability, .changeReverted, in: session.id, changes: revert())
     }
 
+    /// Performs `revert`, which puts back the change a session of a launch before this one made to
+    /// `capability` and never reverted, the app having been killed or having quit during it, and
+    /// records it as ``DebugDrawerAuditEntry/Event/changeReverted`` in that session, `sessionID`.
+    package func revertChanges(of capability: String, leftBy sessionID: UUID, _ revert: @MainActor () -> [DebugDrawerAuditEntry.Change]?) {
+        record(capability, .changeReverted, in: sessionID, changes: revert())
+    }
+
     /// Records that a command to `capability` was refused for `reason`.
     package func refuse(_ capability: String, _ reason: DebugDrawerAuditEntry.Refusal) {
         Self.logger.notice("Refused a command for \(capability, privacy: .public): \(reason.rawValue, privacy: .public)")

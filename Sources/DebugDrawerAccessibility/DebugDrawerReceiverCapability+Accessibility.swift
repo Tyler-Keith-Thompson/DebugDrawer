@@ -21,6 +21,8 @@ public extension DebugDrawerReceiverCapability {
     /// - Returns: The capability, under ``AccessibilityEnvironmentOverrides/pluginID``, scoped to
     ///   the session and reverted with ``AccessibilityEnvironmentOverrides/Command/reset``.
     static func accessibilityEnvironmentOverrides(_ overrides: AccessibilityEnvironmentOverrides = .shared) -> Self {
+        // The overrides live in memory and go with the process, so the receiver keeps no record.
         .model(overrides, id: AccessibilityEnvironmentOverrides.pluginID, scope: .session(revertWith: .reset))
+            .recordingNoUnrevertedChanges()
     }
 }

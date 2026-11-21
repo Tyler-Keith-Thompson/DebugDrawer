@@ -3,7 +3,10 @@ import DebugDrawerReceiver
 // The capability lives with the tweaks, not in the receiver: the receiver knows models, not
 // plugins, and a host that offers no tweaks links none of this. It is persistent by default, as a
 // tweak is a setting the app keeps across launches; a host that wants a sidecar's changes gone
-// with its session passes `.session(revertWith: .resetAll)`.
+// with its session passes `.session(revertWith: .resetAll)`. The values persist in the tweaks'
+// storage, so a session the app was killed in would leave them set: the receiver's record of
+// unreverted changes resets them as the next launch enables the capability, which the tweaks keep
+// no record of their own for.
 
 public extension DebugDrawerReceiverCapability {
     /// The tweaks marked ``Tweak/productionSafe(_:)`` among `tweak`: a sidecar sees them with the
@@ -25,7 +28,9 @@ public extension DebugDrawerReceiverCapability {
     ///     a build that has the drawer. The standard defaults, under
     ///     ``UserDefaultsTweakStorage/defaultKeyPrefix``, unless given.
     ///   - scope: What becomes of a sidecar's changes when its session ends: kept, by default, or
-    ///     reverted with a command such as ``TweaksModel/Command/resetAll``.
+    ///     reverted with a command such as ``TweaksModel/Command/resetAll``. Reverted also as the
+    ///     next launch enables the capability, when the app was killed or quit during the
+    ///     session.
     /// - Returns: The capability, under ``TweaksModel/pluginID``.
     static func tweaks<each Value: Sendable & Equatable>(
         _ tweak: repeat Tweak<each Value>,

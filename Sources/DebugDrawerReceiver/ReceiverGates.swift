@@ -74,6 +74,8 @@ extension DebugDrawerReceiver {
         }
         capabilities[capability.id] = capability
         capabilityGates[capability.id] = gate
+        // Whatever the gates say: a revert is what a gate turned off asks for too.
+        revertChangesLeftByKill(of: capability)
         paused.remove(capability.id)
         defer { presence?.update(capabilities: servedIDs) }
         guard isRunning else { return }

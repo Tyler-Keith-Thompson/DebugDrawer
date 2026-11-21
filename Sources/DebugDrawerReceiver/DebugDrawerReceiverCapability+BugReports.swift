@@ -40,6 +40,8 @@ public extension DebugDrawerReceiverCapability {
         capability.enabled = { snapshotFile, applyHostChange in
             reports.attach(snapshotFile: snapshotFile, applyHostChange: applyHostChange)
         }
-        return capability
+        // What it keeps it removes as the next launch enables it (the snapshot file it is handed), so
+        // the receiver keeps no record of its changes.
+        return capability.recordingNoUnrevertedChanges()
     }
 }

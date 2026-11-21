@@ -33,6 +33,8 @@ public extension DebugDrawerReceiverCapability {
     static func diagnosticsCapture(_ capture: DebugDrawerDiagnosticsCapture) -> Self {
         var capability = Self.model(capture, id: DebugDrawerDiagnosticsCapture.pluginID, scope: .session(revertWith: .stop))
         capability.enabled = { snapshotFile, _ in capture.attach(snapshotFile: snapshotFile) }
-        return capability
+        // What it keeps it removes as the next launch enables it (the snapshot file it is handed), so
+        // the receiver keeps no record of its changes.
+        return capability.recordingNoUnrevertedChanges()
     }
 }

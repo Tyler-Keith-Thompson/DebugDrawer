@@ -38,6 +38,8 @@ public extension DebugDrawerReceiverCapability {
     static func performanceTraces(_ traces: PerformanceTraces) -> Self {
         var capability = Self.model(traces, id: PerformanceTraces.pluginID, scope: .session(revertWith: .stop))
         capability.enabled = { snapshotFile, _ in traces.attach(snapshotFile: snapshotFile) }
-        return capability
+        // What it keeps it removes as the next launch enables it (the snapshot file it is handed), so
+        // the receiver keeps no record of its changes.
+        return capability.recordingNoUnrevertedChanges()
     }
 }

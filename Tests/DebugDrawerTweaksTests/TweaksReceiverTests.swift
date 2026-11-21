@@ -220,5 +220,86 @@
             #expect(Array(sessions.auditLog.suffix(2).map(\.event)) == expectedTail)
             #expect(storage.values == expectedStored)
         }
+
+        @Test("With the session scope, a tweak a killed launch's session changed is reset as the next launch enables the capability, and audited")
+        func sessionScopeResetsAfterKill() throws {
+            let directory = FileManager.default.temporaryDirectory.appending(path: "TweaksReceiverTests-\(UUID().uuidString)")
+            let layout = AppGroupStoreLayout(directory: AppGroupStoreLayout.appDirectory(inStore: directory))
+            #expect(layout.create())
+            let commands: [(String, Data)] = try [
+                (DebugDrawerSessions.pluginID, TransportMessage.payload(DebugDrawerSessionCommand.open(duration: 60))),
+                (TweaksModel.pluginID, TransportMessage.payload(TweaksModel.Command.setValue(key: "backend", value: .string("local"))))
+            ]
+            for (index, (id, payload)) in commands.enumerated() {
+                let document = StoreDocument(TransportMessage(kind: .command, pluginID: id, payload: payload))
+                try layout.write(document.encoded(), to: layout.commands.appending(path: "\(index).json"))
+            }
+            // The storage outlives the process, as the defaults do; each launch reads it afresh.
+            let storage = FakeTweakStorage(["verbose": .bool(true)])
+            let killedSessions = DebugDrawerSessions(maximumDuration: 300)
+            let killedLaunch = DebugDrawerReceiver(directory: directory, sessions: killedSessions)
+            let killedStore = TweakStore(storage: storage, reading: .offeredProductionSafeTweaks)
+            killedLaunch.enable(.tweaks([AnyTweak(backend), AnyTweak(verbose)], store: killedStore, scope: .session(revertWith: .resetAll)))
+            try killedLaunch.start()
+            let killedSession = try #require(killedSessions.snapshot.session)
+            // Dropped with the session open, as a kill leaves it: nothing ends it.
+            killedLaunch.stop()
+            let leftByKill: Server = killedStore.value(of: backend)
+            let sessions = DebugDrawerSessions(maximumDuration: 300)
+            let sut = DebugDrawerReceiver(directory: directory, sessions: sessions)
+            let store = TweakStore(storage: storage, reading: .offeredProductionSafeTweaks)
+            let expectedStored: [String: TweakStoredValue] = ["verbose": .bool(true)]
+            let expectedEvents: [DebugDrawerAuditEntry.Event] = [.changeReverted]
+
+            sut.enable(.tweaks([AnyTweak(backend), AnyTweak(verbose)], store: store, scope: .session(revertWith: .resetAll)))
+            try sut.start()
+            defer { sut.stop() }
+
+            let actual: Server = store.value(of: backend)
+            #expect(leftByKill == .local)
+            #expect(actual == .production)
+            #expect(storage.values == expectedStored)
+            #expect(sessions.auditLog.map(\.event) == expectedEvents)
+            #expect(sessions.auditLog.map(\.capability) == [TweaksModel.pluginID])
+            #expect(sessions.auditLog.map(\.sessionID) == [killedSession.id])
+        }
+
+        @Test("With the session scope, a session that ended leaves the next launch nothing to reset and nothing to audit")
+        func endedSessionLeavesNothingToReset() throws {
+            let directory = FileManager.default.temporaryDirectory.appending(path: "TweaksReceiverTests-\(UUID().uuidString)")
+            let layout = AppGroupStoreLayout(directory: AppGroupStoreLayout.appDirectory(inStore: directory))
+            #expect(layout.create())
+            let commands: [(String, Data)] = try [
+                (DebugDrawerSessions.pluginID, TransportMessage.payload(DebugDrawerSessionCommand.open(duration: 60))),
+                (TweaksModel.pluginID, TransportMessage.payload(TweaksModel.Command.setValue(key: "backend", value: .string("local")))),
+                (DebugDrawerSessions.pluginID, TransportMessage.payload(DebugDrawerSessionCommand.end))
+            ]
+            for (index, (id, payload)) in commands.enumerated() {
+                let document = StoreDocument(TransportMessage(kind: .command, pluginID: id, payload: payload))
+                try layout.write(document.encoded(), to: layout.commands.appending(path: "\(index).json"))
+            }
+            let storage = FakeTweakStorage()
+            let firstSessions = DebugDrawerSessions(maximumDuration: 300)
+            let firstLaunch = DebugDrawerReceiver(directory: directory, sessions: firstSessions)
+            let firstStore = TweakStore(storage: storage, reading: .offeredProductionSafeTweaks)
+            firstLaunch.enable(.tweaks([AnyTweak(backend)], store: firstStore, scope: .session(revertWith: .resetAll)))
+            try firstLaunch.start()
+            firstLaunch.stop()
+            let revertsInFirst = firstSessions.auditLog.filter { $0.event == .changeReverted }.count
+            // A tester's value set after the session, which a second reset would wipe.
+            storage.values["backend"] = .string("staging")
+            let sessions = DebugDrawerSessions(maximumDuration: 300)
+            let sut = DebugDrawerReceiver(directory: directory, sessions: sessions)
+            let store = TweakStore(storage: storage, reading: .offeredProductionSafeTweaks)
+
+            sut.enable(.tweaks([AnyTweak(backend)], store: store, scope: .session(revertWith: .resetAll)))
+            try sut.start()
+            defer { sut.stop() }
+
+            let actual: Server = store.value(of: backend)
+            #expect(revertsInFirst == 1)
+            #expect(actual == .staging)
+            #expect(sessions.auditLog.isEmpty)
+        }
     }
 #endif

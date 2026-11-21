@@ -26,7 +26,9 @@ public struct DebugDrawerChangeScope<Model: DebugDrawerPluginModel>: Sendable {
     let kind: Kind
 
     /// The capability's changes last for the session: when it ends or expires, the model performs
-    /// `command`, once, if a command was applied to it in that session.
+    /// `command`, once, if a command was applied to it in that session. Enabled on a
+    /// ``DebugDrawerReceiver``, the model also performs it as the next launch enables the
+    /// capability when the app was killed or quit during that session.
     ///
     /// - Parameter command: The command that puts the model back as it was before the session,
     ///   such as resetting an elevated log level.

@@ -114,11 +114,20 @@ system's timer fires in an app that was suspended.
 As the session ends, expires, or the receiver's gate turns off, every session-scoped change is
 reverted and audited as `changeReverted`; a capability's own gate turning off reverts that
 capability's change at once. Persistent changes stay. Sessions live in memory, so a session the
-app was killed in never ends on its own. Most session-scoped capabilities keep a record of what
-they changed and revert it as the next launch makes the capability, so make every capability at
-startup. Two kinds don't (see "Known limitations"): tweaks enabled with a session scope, and a
-model of the app's own enabled with `.model(_:id:scope:)` and a session scope unless that model
-keeps such a record itself.
+app was killed in never ends on its own. The capabilities whose state outlives the process keep a
+record of what they changed and revert it as the next launch makes or enables them, so make every
+capability at startup. Feature flags, experiments, log levels, environments, location and
+UserDefaults keep theirs in the app's own defaults, beside the change. For the rest (tweaks
+enabled with a session scope, a model of the app's own enabled with `.model(_:id:scope:)` and a
+session scope) the receiver keeps one in the app's directory of the store,
+`unreverted-changes.json`: each capability a session changed and the session's ID, written before
+the change is applied and cleared once it is reverted, so a kill at any point leaves at worst one
+revert that finds nothing to put back. As the next launch enables the capability, it performs the
+scope's command and audits `changeReverted` in the session that made the change; a capability that
+launch doesn't enable keeps its entry until one does. Whatever can write the container can add an
+entry, making the next launch perform a capability's session revert, or remove one, so that a
+change a killed session left stays until the next session's revert; it can't make the receiver run
+anything else.
 
 ## The session indicator
 
@@ -318,8 +327,8 @@ Never allowlist a secret.
 `.productionSafe()` to one of its values, which the app reads now and after a relaunch. The risk
 is whatever those tweaks control. **Can't:** read or change a tweak that isn't production-safe,
 or set a value the tweak doesn't offer. **Limits:** persistent by default; with
-`scope: .session(revertWith: .resetAll)` they reset as the session ends, but not after a kill
-(see "Known limitations").
+`scope: .session(revertWith: .resetAll)` they reset as the session ends, and after a kill as the
+next launch enables the capability.
 
 ### Analytics events
 
@@ -407,14 +416,11 @@ and under a policy only to a grant that lists it. Never register a secret.
 
 `.model(_:id:scope:)` serves any `DebugDrawerPluginModel`. Its risk is whatever its commands do;
 its snapshot is readable as above. With a session scope its revert runs as the session ends,
-but after a kill only if the model keeps a record of what it changed and reverts it as it is made.
+and after a kill as the next launch enables it (the receiver's record, under "Sessions"), so its
+revert command should do nothing when nothing is left to put back.
 
 ## Known limitations
 
-- **Session-scoped tweaks survive a kill.** Tweaks enabled with
-  `scope: .session(revertWith: .resetAll)` are stored values, and nothing reverts them at the
-  next launch when the app was killed during the session. The same holds for an app's own model
-  enabled with a session scope, unless it records and reverts its own leftovers.
 - **Snapshots aren't gated.** See "What a sidecar can read without a session".
 - **A grant can open one more session after a relaunch.** See "Signed grants".
 - **The audit log is in memory.** Forward it, or it goes with the process.
