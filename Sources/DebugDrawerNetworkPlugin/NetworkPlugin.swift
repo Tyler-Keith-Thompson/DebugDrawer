@@ -64,7 +64,7 @@ public struct NetworkPlugin: DebugDrawerPlugin {
 
     public var body: some View {
         #if DEBUG
-            NetworkPluginView(transport: transport ?? .direct(to: model ?? .shared))
+            NetworkPluginContent(transport: transport ?? .direct(to: model ?? .shared))
         #else
             EmptyView()
         #endif

@@ -28,7 +28,7 @@
                     requestHeaders: [:], requestBody: nil, statusCode: index.isMultiple(of: 5) ? 404 : 200, isComplete: true
                 )
             }
-            let sut = NetworkPluginView(transport: DebugDrawerPluginTransport(
+            let sut = NetworkPluginContent(transport: DebugDrawerPluginTransport(
                 initial: snapshot, snapshots: AsyncStream { $0.finish() }, send: { _ in }
             ))
             .environment(\.locale, Locale(identifier: "en_US"))

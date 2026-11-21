@@ -60,7 +60,7 @@ public struct ConsolePlugin: DebugDrawerPlugin {
 
     public var body: some View {
         #if DEBUG
-            ConsolePluginView(transport: transport ?? .direct(to: model ?? .shared))
+            ConsolePluginContent(transport: transport ?? .direct(to: model ?? .shared))
         #else
             EmptyView()
         #endif

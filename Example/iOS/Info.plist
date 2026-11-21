@@ -60,5 +60,13 @@
             </array>
         </dict>
     </array>
+    <!-- Remote viewing (ExampleRemoteServer, and the Mac's Remote window): the local network
+         prompt's reason, and the Bonjour service the server advertises and the viewer browses for. -->
+    <key>NSLocalNetworkUsageDescription</key>
+    <string>Lets a Mac on your network show this debug build's logs and requests.</string>
+    <key>NSBonjourServices</key>
+    <array>
+        <string>_debugdrawer._tcp</string>
+    </array>
 </dict>
 </plist>

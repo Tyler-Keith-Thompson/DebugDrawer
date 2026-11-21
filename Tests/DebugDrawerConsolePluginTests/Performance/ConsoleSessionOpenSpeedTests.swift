@@ -42,7 +42,7 @@
             let mutes = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
             let store = ConsoleLogStore(muteStorage: _ConsoleMuteStorage(directory: mutes))
             let model = ConsoleModel(store: store, sessions: ConsoleSessionsModel())
-            let host = NSHostingView(rootView: ConsolePluginView(transport: .direct(to: model)).frame(width: 400, height: 700))
+            let host = NSHostingView(rootView: ConsolePluginContent(transport: .direct(to: model)).frame(width: 400, height: 700))
             let window = NSWindow(contentRect: CGRect(x: 0, y: 0, width: 400, height: 700), styleMask: .borderless, backing: .buffered, defer: true)
             window.contentView = host
             host.layoutSubtreeIfNeeded()

@@ -56,6 +56,17 @@
         return try await viewer.connect(toPlugin: NetworkPlugin().id, snapshot: NetworkSnapshot.self, command: NetworkCommand.self)
     }
 
+    struct DeviceView: View {
+        let device: DebugDrawerNetworkTransport
+
+        var body: some View {
+            HStack(alignment: .top) {
+                ScrollView { NetworkPluginView(transport: device) }
+                ScrollView { ConsolePluginView(transport: device) }
+            }
+        }
+    }
+
     // The examples are compiled; the one run here is the app's setup made and never enabled,
     // which, with the real listener, listens on nothing. `enable()` and the viewer would reach
     // the network, so they are left to the loopback tests.

@@ -2146,6 +2146,32 @@ func viewNetwork(of device: DebugDrawerNetworkDevice, code: String) async throws
 }
 ```
 
+Or show the device with the plugins' own views. `NetworkPluginView(transport:)` and
+`ConsolePluginView(transport:)` take the paired transport, or any `DebugDrawerTransport` (a
+sidecar's too), show "Waiting for Network…" until the device's model answers, then draw what the
+device's drawer draws, live, sending each filter, mock or clear back to the device. They intercept
+and capture nothing on the Mac, and draw nothing in release builds:
+
+```swift
+struct DeviceView: View {
+    let device: DebugDrawerNetworkTransport
+
+    var body: some View {
+        HStack(alignment: .top) {
+            ScrollView { NetworkPluginView(transport: device) }
+            ScrollView { ConsolePluginView(transport: device) }
+        }
+    }
+}
+```
+
+The macOS example app has such a viewer under Debug > Remote Viewer: it lists the devices it finds
+once you click Look for Devices, or connects to an address (`127.0.0.1:<port>` for a server on
+loopback), asks for the code, and shows the device's Network and Console. The example apps serve
+themselves through a Remote Viewing plugin in their drawer, which starts the server and shows each
+viewer's code; launch them with `-ServeRemoteViewers` to start it at launch, plus
+`-RemoteViewersOnLoopback` to listen on 127.0.0.1 alone.
+
 **Info.plist.** iOS asks the person before an app uses the local network, and both the device's
 app and the viewer must declare the service they advertise or browse for. Add to each:
 

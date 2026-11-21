@@ -57,6 +57,7 @@ swift_library(
         "//Sources/DebugDrawer",
         "//Sources/DebugDrawerAnalyticsPlugin",
         "//Sources/DebugDrawerLeakDetectorPlugin",
+        "//Sources/DebugDrawerRemote",
     ],
 )
 
@@ -78,7 +79,7 @@ swift_library(
     module_name = "ExampleApp_macOS",
     # The interposer's dylib, which macos_application copies into Contents/Frameworks, so
     # unsafeInstallDiskIOWithInterposing() records Swift's Data and FileHandle calls too.
-    deps = _SHARED_DEPS + [":ExampleTestBench", "//Sources/DebugDrawerDiskIOInterposer"],
+    deps = _SHARED_DEPS + [":ExampleTestBench", "//Sources/DebugDrawerDiskIOInterposer", "//Sources/DebugDrawerRemote"],
 )
 
 macos_application(

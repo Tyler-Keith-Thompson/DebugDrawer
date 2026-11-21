@@ -300,7 +300,7 @@ TEST_TARGETS = [
     ("DebugDrawerColorVisionPluginTests", ["DebugDrawerColorVisionPlugin", "DebugDrawer", "viewinspector/ViewInspector", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
     ("DebugDrawerAppStateResetTests", ["DebugDrawerAppStateReset", "DebugDrawerReceiver", "DebugDrawer"]),
     ("DebugDrawerAppStateResetPluginTests", ["DebugDrawerAppStateResetPlugin", "DebugDrawerAppStateReset", "DebugDrawer", "viewinspector/ViewInspector", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
-    ("DebugDrawerRemoteTests", ["DebugDrawerRemote", "DebugDrawer", "DebugDrawerReceiver", "DebugDrawerNetworkPlugin", "DebugDrawerNetwork", "DebugDrawerConsolePlugin"]),
+    ("DebugDrawerRemoteTests", ["DebugDrawerRemote", "DebugDrawer", "DebugDrawerReceiver", "DebugDrawerNetworkPlugin", "DebugDrawerNetwork", "DebugDrawerConsolePlugin", "viewinspector/ViewInspector"]),
     ("DebugDrawerSidecarKitTests", ["DebugDrawerSidecarKit", "DebugDrawer", "DebugDrawerReceiver", "DebugDrawerAppInfo", "DebugDrawerLocation", "DebugDrawerAppStateReset", "DebugDrawerHangDetectorPlugin", "DebugDrawerNetworkPlugin", "DebugDrawerConsolePlugin", "viewinspector/ViewInspector"]),
 ]
 

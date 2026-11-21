@@ -54,6 +54,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var appKitWindow: ExampleAppKitWindowController?
     /// The windows opened with Debug > New Window (or -NewWindow).
     private let windows = ExampleWindows()
+    /// The remote viewer, opened with Debug > Remote Viewer (or -OpenRemoteViewer).
+    private let remoteWindow = ExampleRemoteWindow()
 
     static func main() {
         let app = NSApplication.shared
@@ -140,6 +142,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // window as the last continued activity.
         ExampleDeepLink.install()
         installShippedPlugins()
+        // Lists Remote Viewing in the drawer, which serves the Console and Network to a viewer on
+        // another device (this app's Remote window, say) once started; launched with
+        // -ServeRemoteViewers, it starts at launch, and with -RemoteViewersOnLoopback too, on
+        // 127.0.0.1 alone. Compiles in release too, where it serves nothing.
+        ExampleRemoteServer.offer(ConsoleModel.shared, id: ConsolePlugin().id)
+        ExampleRemoteServer.offer(NetworkModel.shared, id: NetworkPlugin().id)
+        ExampleRemoteServer.install()
 
         setupMenuBar()
         // Launched with -AppKitWindow, the app opens only its AppKit window: no SwiftUI root at all.
@@ -150,6 +159,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             createMainWindow()
             windows.openNewWindowIfAsked(behind: mainWindow)
         }
+        remoteWindow.openIfAsked()
         ExamplePresentations.runAppModalAlertIfAsked()
         // Launched with -RunTestBench and action identifiers (or all), runs those test bench actions,
         // then opens the drawer at the plugin -OpenDebugDrawerPlugin names.
@@ -221,6 +231,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         notice.target = self
         debugMenu.addItem(withTitle: "Show AppKit Window", action: #selector(showAppKitWindow), keyEquivalent: "").target = self
         debugMenu.addItem(withTitle: "New Window", action: #selector(ExampleWindows.newWindow), keyEquivalent: "n").target = windows
+        debugMenu.addItem(withTitle: "Remote Viewer", action: #selector(ExampleRemoteWindow.show), keyEquivalent: "").target = remoteWindow
         debugMenuItem.submenu = debugMenu
         mainMenu.addItem(debugMenuItem)
 

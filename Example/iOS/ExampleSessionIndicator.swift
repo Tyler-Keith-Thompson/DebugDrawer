@@ -9,10 +9,17 @@ extension View {
     /// actions play the sidecar; -RunTestBench sidecar.open opens one at launch), with the Console
     /// and Network models for the example sidecar app (Example/Sidecar) to show, and shows
     /// ``ExampleSessionIndicator`` along the bottom, above the app's content, while one is open.
+    /// The same two models go to a Mac's remote viewer (the macOS example's Remote window) through
+    /// the drawer's Remote Viewing plugin, which serves them once started; launched with
+    /// -ServeRemoteViewers, at launch, and with -RemoteViewersOnLoopback too, on 127.0.0.1 alone
+    /// (a simulator shares the Mac's). It serves nothing in release.
     func sidecarSessionIndicator() -> some View {
         ExampleSidecar.offer(ConsoleModel.shared, id: ConsolePlugin().id)
         ExampleSidecar.offer(NetworkModel.shared, id: NetworkPlugin().id)
         ExampleSidecar.install()
+        ExampleRemoteServer.offer(ConsoleModel.shared, id: ConsolePlugin().id)
+        ExampleRemoteServer.offer(NetworkModel.shared, id: NetworkPlugin().id)
+        ExampleRemoteServer.install()
         return safeAreaInset(edge: .bottom, spacing: 0) {
             ExampleSessionIndicator(sessions: ExampleSidecar.sessions, logLevel: ExampleSidecar.logLevel, keeper: ExampleSidecar.keeper)
         }
