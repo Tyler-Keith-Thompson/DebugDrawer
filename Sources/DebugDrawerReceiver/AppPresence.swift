@@ -111,6 +111,7 @@ package final class PresenceAnnouncement {
     private let layout: AppGroupStoreLayout
     private let now: () -> Date
     private var presence: AppPresence
+    private let center: NotificationCenter
     private var foregroundObservation: (any NSObjectProtocol)?
 
     /// Writes `identity`'s presence, serving `capabilities`, into its directory of the store,
@@ -121,21 +122,24 @@ package final class PresenceAnnouncement {
     ///   - identity: Who the app is.
     ///   - capabilities: The IDs the app serves.
     ///   - foreground: What the system posts as the app comes to the foreground.
+    ///   - center: Where `foreground` is posted: the default center, unless a test posts on its own.
     ///   - now: The time now; the system's by default.
     package init(
         directory: URL,
         identity: AppPresence.Identity,
         capabilities: [String],
         foreground: Notification.Name,
+        center: NotificationCenter = .default,
         now: @escaping () -> Date = Date.init
     ) {
         file = AppPresence.file(inAppDirectory: directory)
         layout = AppGroupStoreLayout(directory: directory)
+        self.center = center
         self.now = now
         presence = AppPresence(identity: identity, capabilities: capabilities, lastSeen: now())
         write()
         // No queue: the system posts it on the main thread.
-        foregroundObservation = NotificationCenter.default.addObserver(forName: foreground, object: nil, queue: nil) { [weak self] _ in
+        foregroundObservation = center.addObserver(forName: foreground, object: nil, queue: nil) { [weak self] _ in
             MainActor.assumeIsolated {
                 self?.write()
             }
@@ -152,7 +156,7 @@ package final class PresenceAnnouncement {
     /// Removes the file: the app no longer serves the store. Later calls do nothing.
     package func withdraw() {
         guard let foregroundObservation else { return }
-        NotificationCenter.default.removeObserver(foregroundObservation)
+        center.removeObserver(foregroundObservation)
         self.foregroundObservation = nil
         try? FileManager.default.removeItem(at: file)
     }

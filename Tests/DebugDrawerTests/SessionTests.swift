@@ -535,6 +535,9 @@
             registry.register(logLevels, id: "LogLevels", scope: .session(revertWith: .reset))
             let directory = FileManager.default.temporaryDirectory.appending(path: "SessionTests-\(UUID().uuidString)")
             let server = DebugDrawerAppGroupStoreServer(registry: registry, directory: directory)
+            // The test's own center, so its foreground posts wake no other test's server.
+            let center = NotificationCenter()
+            server.notificationCenter = center
             try server.start()
             let sidecar = try DebugDrawerAppGroupStoreTransport(directory: AppGroupStoreLayout.appDirectory(inStore: directory))
             let session = try await sidecar.connect(
@@ -554,18 +557,18 @@
 
             // Each foreground post performs the commands waiting in the store before it returns.
             levels.send(.set("debug"))
-            NotificationCenter.default.post(name: foreground, object: nil)
+            center.post(name: foreground, object: nil)
             let beforeSession = logLevels.snapshot.level
             session.send(.open(duration: 60))
-            NotificationCenter.default.post(name: foreground, object: nil)
+            center.post(name: foreground, object: nil)
             for await state in session.snapshots() where state.isActive {
                 break
             }
             levels.send(.set("debug"))
-            NotificationCenter.default.post(name: foreground, object: nil)
+            center.post(name: foreground, object: nil)
             let duringSession = logLevels.snapshot.level
             session.send(.end)
-            NotificationCenter.default.post(name: foreground, object: nil)
+            center.post(name: foreground, object: nil)
             for await state in session.snapshots() where !state.isActive {
                 break
             }

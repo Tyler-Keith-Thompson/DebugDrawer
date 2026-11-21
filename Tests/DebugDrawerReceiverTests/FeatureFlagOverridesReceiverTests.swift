@@ -103,6 +103,8 @@ struct FeatureFlagOverridesReceiverTests {
         let adapter = FakeFlagAdapter(["new-checkout": .bool(false)])
         let sessions = DebugDrawerSessions(maximumDuration: 300, auditCapacity: 100, clock: FixedClock(now: Self.now), timer: IdleTimer())
         let sut = DebugDrawerReceiver(directory: directory, sessions: sessions)
+        let center = NotificationCenter()
+        sut.notificationCenter = center
         sut.enable(.featureFlagOverrides(DebugDrawerFeatureFlagOverrides(adapter: adapter, defaults: defaults)))
         try sut.start()
         defer { sut.stop() }
@@ -118,7 +120,7 @@ struct FeatureFlagOverridesReceiverTests {
         // only the foreground can.
         try layout.write(document.encoded(), to: layout.commands.appending(path: "0.json"))
         let whileInBackground = adapter.overrides
-        NotificationCenter.default.post(name: DebugDrawerReceiver.foreground, object: nil)
+        center.post(name: DebugDrawerReceiver.foreground, object: nil)
 
         #expect(whileInBackground.isEmpty)
         #expect(adapter.overrides == expectedOverrides)

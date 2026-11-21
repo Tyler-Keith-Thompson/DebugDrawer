@@ -7,7 +7,7 @@
     struct ViewInspectorPluginTests {
         @Test("The overlays and click indicators start off, with an 8 pt grid and normal animation speed")
         func viewBorderControllerDefaults() {
-            let sut = ViewBorderController.shared
+            let sut = ViewBorderController(appWindows: { [] })
 
             #expect(!sut.isBordersEnabled)
             #expect(!sut.isGridEnabled)
@@ -29,7 +29,7 @@
 
         @Test("Flashing tracked views starts off")
         func flashesStartOff() {
-            let actual = RenderFlashSetting.shared.isOn
+            let actual = RenderFlashSetting().isOn
 
             #expect(!actual)
         }

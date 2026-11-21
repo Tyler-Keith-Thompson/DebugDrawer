@@ -370,7 +370,10 @@ struct EnvironmentsReceiverTests {
         }
         let sessions = DebugDrawerSessions(maximumDuration: 300, auditCapacity: 100, clock: MovableClock(Self.now), timer: ManualTimer())
         let sut = DebugDrawerReceiver(directory: directory, sessions: sessions)
-        sut.enable(.featureFlagOverrides(EmptyFlagAdapter()))
+        let flagSuite = "EnvironmentsReceiverTests.flags.\(UUID().uuidString)"
+        let flagDefaults = try #require(UserDefaults(suiteName: flagSuite))
+        defer { flagDefaults.removePersistentDomain(forName: flagSuite) }
+        sut.enable(.featureFlagOverrides(DebugDrawerFeatureFlagOverrides(adapter: EmptyFlagAdapter(), defaults: flagDefaults)))
         let expectedEnabled = [flagsID]
 
         try sut.start()
@@ -403,7 +406,10 @@ struct EnvironmentsReceiverTests {
         let model = DebugDrawerEnvironments(default: production, allowing: staging, adapter: backend, defaults: defaults)
         let sut = DebugDrawerReceiver(directory: directory, sessions: sessions)
         sut.enable(.environments(model))
-        sut.enable(.featureFlagOverrides(EmptyFlagAdapter()))
+        let flagSuite = "EnvironmentsReceiverTests.flags.\(UUID().uuidString)"
+        let flagDefaults = try #require(UserDefaults(suiteName: flagSuite))
+        defer { flagDefaults.removePersistentDomain(forName: flagSuite) }
+        sut.enable(.featureFlagOverrides(DebugDrawerFeatureFlagOverrides(adapter: EmptyFlagAdapter(), defaults: flagDefaults)))
         try sut.start()
         defer { sut.stop() }
         let signer = DebugDrawerTestGrantSigner(key: serverKey)

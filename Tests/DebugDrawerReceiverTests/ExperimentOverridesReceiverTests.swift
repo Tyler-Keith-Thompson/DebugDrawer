@@ -304,7 +304,10 @@ struct ExperimentOverridesReceiverTests {
         }
         let sessions = DebugDrawerSessions(maximumDuration: 300, auditCapacity: 100, clock: FixedClock(now: Self.now), timer: IdleTimer())
         let sut = DebugDrawerReceiver(directory: directory, sessions: sessions)
-        sut.enable(.featureFlagOverrides(EmptyFlagAdapter()))
+        let flagSuite = "ExperimentOverridesReceiverTests.flags.\(UUID().uuidString)"
+        let flagDefaults = try #require(UserDefaults(suiteName: flagSuite))
+        defer { flagDefaults.removePersistentDomain(forName: flagSuite) }
+        sut.enable(.featureFlagOverrides(DebugDrawerFeatureFlagOverrides(adapter: EmptyFlagAdapter(), defaults: flagDefaults)))
         let expectedEnabled = [flagsID]
 
         try sut.start()

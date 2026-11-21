@@ -315,7 +315,10 @@
             let store = root.appending(path: "Group/DebugDrawer")
             let sessions = DebugDrawerSessions(maximumDuration: 300)
             let receiver = DebugDrawerReceiver(directory: store, sessions: sessions)
-            receiver.enable(.logLevels(NoSubsystems()))
+            let suite = "PushRegistrationSidecarTests.logLevels.\(UUID().uuidString)"
+            let defaults = try #require(UserDefaults(suiteName: suite))
+            defer { defaults.removePersistentDomain(forName: suite) }
+            receiver.enable(.logLevels(DebugDrawerLogLevels(adapter: NoSubsystems(), defaults: defaults)))
             try receiver.start()
             defer { receiver.stop() }
             let (auditEntries, auditEntry) = AsyncStream<DebugDrawerAuditEntry>.makeStream()

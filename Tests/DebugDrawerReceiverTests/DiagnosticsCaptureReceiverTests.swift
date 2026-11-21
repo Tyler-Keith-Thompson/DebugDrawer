@@ -199,7 +199,10 @@ struct DiagnosticsCaptureReceiverTests {
         }
         let sessions = DebugDrawerSessions(maximumDuration: 300, auditCapacity: 100, clock: MovableClock(Self.now), timer: ManualTimer())
         let sut = DebugDrawerReceiver(directory: directory, sessions: sessions)
-        sut.enable(.featureFlagOverrides(EmptyFlagAdapter()))
+        let flagSuite = "DiagnosticsCaptureReceiverTests.flags.\(UUID().uuidString)"
+        let flagDefaults = try #require(UserDefaults(suiteName: flagSuite))
+        defer { flagDefaults.removePersistentDomain(forName: flagSuite) }
+        sut.enable(.featureFlagOverrides(DebugDrawerFeatureFlagOverrides(adapter: EmptyFlagAdapter(), defaults: flagDefaults)))
 
         try sut.start()
         defer { sut.stop() }

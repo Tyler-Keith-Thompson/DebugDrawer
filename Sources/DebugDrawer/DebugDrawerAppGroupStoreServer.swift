@@ -65,6 +65,10 @@ import os
         /// Who the presence file says the app is, and whose directory of the store the server
         /// serves: the main bundle, unless a test names another app.
         package var identity = AppPresence.Identity.of(.main)
+        /// Where the server hears that the app came to the foreground: the default center, which
+        /// the system posts to, unless a test posts on a center of its own, so its post wakes no
+        /// other server or receiver in the process. Set it before ``start()``.
+        package var notificationCenter = NotificationCenter.default
 
         /// The app's own directory in the group's store, `apps/<bundle ID>` in ``directory``,
         /// named by the main bundle's identifier: its presence file, its snapshots and the
@@ -129,13 +133,14 @@ import os
             }
             // No queue, so the commands are performed before the post returns, not on a later
             // turn of the main run loop. The system posts it on the main thread.
-            foregroundObservation = NotificationCenter.default.addObserver(forName: Self.foreground, object: nil, queue: nil) { [weak self] _ in
+            foregroundObservation = notificationCenter.addObserver(forName: Self.foreground, object: nil, queue: nil) { [weak self] _ in
                 MainActor.assumeIsolated {
                     self?.performWaitingCommands()
                 }
             }
             let presence = PresenceAnnouncement(
-                directory: appDirectory, identity: identity, capabilities: registry.servedIDs, foreground: Self.foreground
+                directory: appDirectory, identity: identity, capabilities: registry.servedIDs, foreground: Self.foreground,
+                center: notificationCenter
             )
             // Weak: the registry holds the observer, so a strong capture would keep both alive.
             registryObservation = registry.observe { [weak registry, weak presence] _ in
@@ -155,7 +160,7 @@ import os
             }
             registryObservation = nil
             if let foregroundObservation {
-                NotificationCenter.default.removeObserver(foregroundObservation)
+                notificationCenter.removeObserver(foregroundObservation)
             }
             foregroundObservation = nil
             session?.close()

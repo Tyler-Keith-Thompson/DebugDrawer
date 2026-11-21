@@ -104,6 +104,10 @@ public final class DebugDrawerReceiver {
     /// Who the presence file says the app is, and whose directory of the store the receiver
     /// serves: the main bundle, unless a test names another app.
     package var identity = AppPresence.Identity.of(.main)
+    /// Where the receiver hears that the app came to the foreground: the default
+    /// center, which the system posts to, unless a test posts on a center of its own, so its post
+    /// wakes no other receiver or store server in the process. Set it before ``start()``.
+    package var notificationCenter = NotificationCenter.default
 
     /// The app's own directory in the group's store, `apps/<bundle ID>` in ``directory``, named by
     /// the main bundle's identifier: its presence file, its snapshots and the commands for it.
@@ -209,13 +213,15 @@ public final class DebugDrawerReceiver {
         }
         // No queue, so the commands are performed before the post returns. The system posts it on
         // the main thread.
-        foregroundObservation = NotificationCenter.default.addObserver(forName: Self.foreground, object: nil, queue: nil) { [weak self] _ in
+        foregroundObservation = notificationCenter.addObserver(forName: Self.foreground, object: nil, queue: nil) { [weak self] _ in
             MainActor.assumeIsolated {
                 // The commands waiting first, then the gates: reevaluateGates() does both.
                 self?.reevaluateGates()
             }
         }
-        presence = PresenceAnnouncement(directory: appDirectory, identity: identity, capabilities: servedIDs, foreground: Self.foreground)
+        presence = PresenceAnnouncement(
+            directory: appDirectory, identity: identity, capabilities: servedIDs, foreground: Self.foreground, center: notificationCenter
+        )
     }
 
     /// Stops writing snapshots and performing commands. The snapshots written stay in the store, and
@@ -225,7 +231,7 @@ public final class DebugDrawerReceiver {
         presence?.withdraw()
         presence = nil
         if let foregroundObservation {
-            NotificationCenter.default.removeObserver(foregroundObservation)
+            notificationCenter.removeObserver(foregroundObservation)
         }
         foregroundObservation = nil
         for task in writing.values {

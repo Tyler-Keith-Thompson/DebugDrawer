@@ -142,7 +142,10 @@ struct ReceiverTests {
         }
         let sessions = DebugDrawerSessions(maximumDuration: 300, auditCapacity: 100, clock: FixedClock(now: Self.now), timer: IdleTimer())
         let sut = DebugDrawerReceiver(directory: directory, sessions: sessions)
-        sut.enable(.featureFlagOverrides(adapter))
+        let flagSuite = "ReceiverTests.flags.\(UUID().uuidString)"
+        let flagDefaults = try #require(UserDefaults(suiteName: flagSuite))
+        defer { flagDefaults.removePersistentDomain(forName: flagSuite) }
+        sut.enable(.featureFlagOverrides(DebugDrawerFeatureFlagOverrides(adapter: adapter, defaults: flagDefaults)))
         let expectedOverrides: [String: DebugDrawerFeatureFlagValue] = ["new-checkout": .bool(true)]
 
         try sut.start()
@@ -193,7 +196,10 @@ struct ReceiverTests {
         let sessions = DebugDrawerSessions(maximumDuration: 300, auditCapacity: 100, clock: FixedClock(now: Self.now), timer: IdleTimer())
         let sut = DebugDrawerReceiver(directory: directory, sessions: sessions)
         sut.enable(.model(logLevels, id: "MyApp.LogLevels", scope: .persistent))
-        sut.enable(.featureFlagOverrides(FakeFlagAdapter([:])))
+        let flagSuite = "ReceiverTests.flags.\(UUID().uuidString)"
+        let flagDefaults = try #require(UserDefaults(suiteName: flagSuite))
+        defer { flagDefaults.removePersistentDomain(forName: flagSuite) }
+        sut.enable(.featureFlagOverrides(DebugDrawerFeatureFlagOverrides(adapter: FakeFlagAdapter([:]), defaults: flagDefaults)))
         sessions.perform(.open(duration: 60))
         let snapshotFile = layout.snapshotFile(for: "MyApp.LogLevels")
         try sut.start()
@@ -246,7 +252,10 @@ struct ReceiverTests {
         }
         let sessions = DebugDrawerSessions(maximumDuration: 300, auditCapacity: 100, clock: FixedClock(now: Self.now), timer: IdleTimer())
         let sut = DebugDrawerReceiver(directory: directory, sessions: sessions)
-        sut.enable(.featureFlagOverrides(adapter))
+        let flagSuite = "ReceiverTests.flags.\(UUID().uuidString)"
+        let flagDefaults = try #require(UserDefaults(suiteName: flagSuite))
+        defer { flagDefaults.removePersistentDomain(forName: flagSuite) }
+        sut.enable(.featureFlagOverrides(DebugDrawerFeatureFlagOverrides(adapter: adapter, defaults: flagDefaults)))
         try sut.start()
         defer { sut.stop() }
         let session = try #require(sessions.snapshot.session)
@@ -271,7 +280,10 @@ struct ReceiverTests {
         try layout.write(document.encoded(), to: layout.commands.appending(path: "0.json"))
         let sessions = DebugDrawerSessions(maximumDuration: 300, auditCapacity: 100, clock: FixedClock(now: Self.now), timer: IdleTimer())
         let sut = DebugDrawerReceiver(directory: directory, sessions: sessions)
-        sut.enable(.featureFlagOverrides(adapter))
+        let flagSuite = "ReceiverTests.flags.\(UUID().uuidString)"
+        let flagDefaults = try #require(UserDefaults(suiteName: flagSuite))
+        defer { flagDefaults.removePersistentDomain(forName: flagSuite) }
+        sut.enable(.featureFlagOverrides(DebugDrawerFeatureFlagOverrides(adapter: adapter, defaults: flagDefaults)))
         sessions.perform(.open(duration: 60))
         let session = try #require(sessions.snapshot.session)
         let expected = DebugDrawerAuditEntry(date: Self.now, sessionID: session.id, capability: flagsID, event: .commandRefused(.malformedCommand))
@@ -293,7 +305,10 @@ struct ReceiverTests {
         let adapter = FakeFlagAdapter(["new-checkout": .bool(false)])
         let sessions = DebugDrawerSessions(maximumDuration: 300, auditCapacity: 100, clock: FixedClock(now: Self.now), timer: IdleTimer())
         let sut = DebugDrawerReceiver(directory: directory, sessions: sessions)
-        sut.enable(.featureFlagOverrides(adapter))
+        let flagSuite = "ReceiverTests.flags.\(UUID().uuidString)"
+        let flagDefaults = try #require(UserDefaults(suiteName: flagSuite))
+        defer { flagDefaults.removePersistentDomain(forName: flagSuite) }
+        sut.enable(.featureFlagOverrides(DebugDrawerFeatureFlagOverrides(adapter: adapter, defaults: flagDefaults)))
         let expectedFiles = [layout.snapshotFile(for: sessionsID), layout.snapshotFile(for: flagsID)].map(\.lastPathComponent).sorted()
         let expectedFlags = DebugDrawerFeatureFlagOverrides.Snapshot(
             flags: [DebugDrawerFeatureFlag(key: "new-checkout", value: .bool(false))], overriddenKeys: []
@@ -324,6 +339,8 @@ struct ReceiverTests {
         let sessions = DebugDrawerSessions(maximumDuration: 300, auditCapacity: 100, clock: FixedClock(now: Self.now), timer: IdleTimer())
         let gate = HostGate()
         let sut = DebugDrawerReceiver(directory: directory, sessions: sessions) { gate.isOn }
+        let center = NotificationCenter()
+        sut.notificationCenter = center
         sut.enable(.model(logLevels, id: "MyApp.LogLevels", scope: .session(revertWith: .reset)))
         try sut.start()
         defer { sut.stop() }
@@ -339,7 +356,7 @@ struct ReceiverTests {
         ]
 
         gate.isOn = false
-        NotificationCenter.default.post(name: DebugDrawerReceiver.foreground, object: nil)
+        center.post(name: DebugDrawerReceiver.foreground, object: nil)
 
         #expect(Array(sessions.auditLog.suffix(2)) == expectedTail)
         #expect(sessions.snapshot == .inactive)

@@ -38,7 +38,7 @@
     // The app-group store over an app's life: what a suspended app does with the overrides left
     // for it once it comes back, and how much the store keeps. The directory is a temporary one
     // standing in for the app group's container; the foreground is the notification the system
-    // posts, posted here by hand.
+    // posts, posted here by hand on a center of the test's own.
     @MainActor
     @Suite(.timeLimit(.minutes(1)))
     struct AppGroupStoreLifecycleTests {
@@ -49,6 +49,9 @@
             registry.register(model, id: "Tally")
             let directory = FileManager.default.temporaryDirectory.appending(path: "AppGroupStoreLifecycleTests-\(UUID().uuidString)")
             let server = DebugDrawerAppGroupStoreServer(registry: registry, directory: directory)
+            // The test's own center, so its foreground post wakes no other test's server.
+            let center = NotificationCenter()
+            server.notificationCenter = center
             try server.start()
             let connection = try DebugDrawerAppGroupStoreTransport(directory: AppGroupStoreLayout.appDirectory(inStore: directory))
             let viewer = try await connection.connect(toPlugin: "Tally", snapshot: TallyModel.Snapshot.self, command: TallyModel.Command.self)
@@ -66,7 +69,7 @@
             // override, only the foreground can.
             viewer.send(.note("override"))
             let whileSuspended = model.snapshot
-            NotificationCenter.default.post(name: foreground, object: nil)
+            center.post(name: foreground, object: nil)
             let actual = model.snapshot
 
             #expect(whileSuspended == TallyModel.Snapshot())
@@ -81,6 +84,9 @@
             registry.register(model, id: "Tally")
             let directory = FileManager.default.temporaryDirectory.appending(path: "AppGroupStoreLifecycleTests-\(UUID().uuidString)")
             let server = DebugDrawerAppGroupStoreServer(registry: registry, directory: directory)
+            // The test's own center, so its foreground post wakes no other test's server.
+            let center = NotificationCenter()
+            server.notificationCenter = center
             try server.start()
             let connection = try DebugDrawerAppGroupStoreTransport(directory: AppGroupStoreLayout.appDirectory(inStore: directory))
             let viewer = try await connection.connect(toPlugin: "Tally", snapshot: TallyModel.Snapshot.self, command: TallyModel.Command.self)
@@ -95,7 +101,7 @@
             let commands = AppGroupStoreLayout.appDirectory(inStore: directory).appending(path: "commands")
 
             viewer.send(.note("override"))
-            NotificationCenter.default.post(name: foreground, object: nil)
+            center.post(name: foreground, object: nil)
             let actual = model.snapshot
             let waiting = try FileManager.default.contentsOfDirectory(atPath: commands.path)
 

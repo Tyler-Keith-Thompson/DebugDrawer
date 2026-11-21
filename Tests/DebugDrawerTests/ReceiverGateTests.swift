@@ -60,6 +60,8 @@
         let theme = SettingModel("light")
         let layout: AppGroupStoreLayout
         let receiver: DebugDrawerReceiver
+        /// Where the test posts the foreground, so its post wakes no other test's receiver.
+        let center = NotificationCenter()
         let sidecar: DebugDrawerAppGroupStoreTransport
         let sessionControl: DebugDrawerPluginTransport<DebugDrawerSessionState, DebugDrawerSessionCommand>
         let entries: AsyncStream<DebugDrawerAuditEntry>
@@ -69,6 +71,7 @@
             let directory = FileManager.default.temporaryDirectory.appending(path: "ReceiverGateTests-\(UUID().uuidString)")
             layout = AppGroupStoreLayout(directory: AppGroupStoreLayout.appDirectory(inStore: directory))
             receiver = DebugDrawerReceiver(directory: directory, sessions: sessions) { receiverGate.isOn }
+            receiver.notificationCenter = center
             receiver.enable(.model(logLevels, id: Self.logLevelsID, scope: .session(revertWith: .reset)))
             receiver.enable(.model(theme, id: Self.themeID, scope: .session(revertWith: .reset))) { themeGate.isOn }
             let (entries, entry) = AsyncStream<DebugDrawerAuditEntry>.makeStream()
@@ -217,7 +220,7 @@
             case .foreground:
                 receiverGate.isOn = false
                 logLevels.send(.set("trace"))
-                NotificationCenter.default.post(name: DebugDrawerReceiver.foreground, object: nil)
+                sut.center.post(name: DebugDrawerReceiver.foreground, object: nil)
             case .pendingSnapshotWrite:
                 receiverGate.isOn = false
                 let (pending, snapshot) = AsyncStream<Data>.makeStream()
