@@ -4,7 +4,7 @@ load("@rules_apple//apple:watchos.bzl", "watchos_build_test")
 load("//tools:docc.bzl", "docc_archive")
 load("//tools:swift_rules.bzl", "swift_library")
 
-# The kit a sidecar app is built on: the apps in the group that serve it, listed as they start and stop, a session opened and ended for one, with an optional signed grant, the Console, Network, Bug Reports, Scenarios, Auth, Reset App State, Environment, Location, UserDefaults, Performance and App State views (and any plugin's) over the socket or the store, and a bug report of them, created and sent; debug builds only.
+# The kit a sidecar app is built on: the apps in the group that serve it, listed as they start and stop, a session opened and ended for one, with an optional signed grant, the Console and Network views and one for every capability the receiver ships (flags, experiments, log levels, diagnostics, tweaks, strings, accessibility, analytics, MetricKit, network mocking, bug reports, push registration, scenarios, auth, reset app state, environments, location, UserDefaults, performance and app state), and any plugin's, over the socket or the store, and a bug report of them, created and sent; debug builds only.
 swift_library(
     name = "DebugDrawerSidecarKit",
     srcs = glob(["**/*.swift"]),
@@ -14,17 +14,27 @@ swift_library(
         "//Sources/DebugDrawerAppStateReset",
         "//Sources/DebugDrawerAppInfo",
         "//Sources/DebugDrawerLocation",
+        "//Sources/DebugDrawerTweaks",
+        "//Sources/DebugDrawerAnalytics",
+        "//Sources/DebugDrawerLocalization",
+        "//Sources/DebugDrawerAccessibility",
     ] + select({
         # Linked where they build (PLATFORM_CONDITIONAL_DEPENDENCIES in scripts/modules.py).
         "@platforms//os:macos": [
             "//Sources/DebugDrawerConsolePlugin",
             "//Sources/DebugDrawerNetworkPlugin",
             "//Sources/DebugDrawerHangDetectorPlugin",
+            "//Sources/DebugDrawerMetricKit",
+            "//Sources/DebugDrawerNetwork",
+            "//Sources/DebugDrawerNotifications",
         ],
         "@platforms//os:ios": [
             "//Sources/DebugDrawerConsolePlugin",
             "//Sources/DebugDrawerNetworkPlugin",
             "//Sources/DebugDrawerHangDetectorPlugin",
+            "//Sources/DebugDrawerMetricKit",
+            "//Sources/DebugDrawerNetwork",
+            "//Sources/DebugDrawerNotifications",
         ],
         "//conditions:default": [],
     }),
@@ -44,6 +54,13 @@ docc_archive(
         "//Sources/DebugDrawerHangDetectorPlugin:DebugDrawerHangDetectorPluginDocumentation",
         "//Sources/DebugDrawerAppInfo:DebugDrawerAppInfoDocumentation",
         "//Sources/DebugDrawerLocation:DebugDrawerLocationDocumentation",
+        "//Sources/DebugDrawerTweaks:DebugDrawerTweaksDocumentation",
+        "//Sources/DebugDrawerAnalytics:DebugDrawerAnalyticsDocumentation",
+        "//Sources/DebugDrawerLocalization:DebugDrawerLocalizationDocumentation",
+        "//Sources/DebugDrawerAccessibility:DebugDrawerAccessibilityDocumentation",
+        "//Sources/DebugDrawerMetricKit:DebugDrawerMetricKitDocumentation",
+        "//Sources/DebugDrawerNetwork:DebugDrawerNetworkDocumentation",
+        "//Sources/DebugDrawerNotifications:DebugDrawerNotificationsDocumentation",
     ],
     require_documentation = True,
     tags = ["manual"],

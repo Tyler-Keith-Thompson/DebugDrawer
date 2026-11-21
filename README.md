@@ -2448,8 +2448,9 @@ capture.record(request, response: response, body: data, started: started)
   copy, in the sidecar's report, is the only one that outlives the session. The app keeps no copy
   for having exported it.
 
-Show `capture.snapshot.isCapturing` in the app's session indicator. `Example/Sidecar`'s
-`DiagnosticsCapturePlugin` shows the capture and adds it to the report.
+Show `capture.snapshot.isCapturing` in the app's session indicator. In the sidecar, the kit's
+`DebugDrawerSidecarPlugin.diagnosticsCapture` offers Start Capture, shows the capture, and adds it
+to the report.
 
 **Bug reports from the production app.** For dogfooding on the build that ships: with their
 sidecar's session open, an employee who hits a problem triggers a report in the app, which takes a
@@ -3875,9 +3876,42 @@ DebugDrawerSidecarView(groupIdentifier: "group.com.example.debug", sessionDurati
 ```
 
 Below it, a picker shows the plugins the app serves, drawn by the plugins' own views over the
-transport: `.console` and `.network` by default, `.bugReports` for an app that serves bug
-reports, `.scenarios` for one that registers scenarios, `.authActions` for one that registers
-auth actions, `.appStateReset` for one that allows a reset, `.environments` for one that lets a sidecar switch its backend, `.locationSpoofing` for one that lets a sidecar spoof its location, `.userDefaults` for one that allowlists defaults keys and `.appState` for one that shows its state, which the view hosts as the app is reached so every report carries it (above). A plugin of your own whose model adopts
+transport: `.console` and `.network` by default (a debug build's), and a plugin for every
+capability the receiver ships, each named for its capability, which a sidecar for production
+builds lists:
+
+```swift
+DebugDrawerSidecarView(
+    groupIdentifier: "group.com.example.debug",
+    plugins: [
+        .featureFlagOverrides, .experimentOverrides, .logLevels, .tweaks, .localizationReview,
+        .accessibilityEnvironmentOverrides, .analyticsEvents, .metricKitPayloads, .networkMocking,
+        .diagnosticsCapture, .bugReports, .pushRegistration, .scenarios, .authActions, .appStateReset,
+        .environments, .locationSpoofing, .userDefaults, .performanceTraces, .appState
+    ]
+)
+```
+
+The view shows only those the app picked serves, so listing every one costs nothing for an app
+that enables a few.
+
+| Plugin | Capability | What the sidecar shows and sends |
+|---|---|---|
+| `.featureFlagOverrides` (Flags) | `.featureFlagOverrides` | Each flag with a switch, or a field and Set for a number or a string (only a value of the flag's kind), Clear, Clear All Overrides |
+| `.experimentOverrides` (Experiments) | `.experimentOverrides` | Each experiment with a picker of its variants, which are forced and so excluded from analytics, Clear, Clear All Overrides |
+| `.logLevels` (Log Levels) | `.logLevels` | Each subsystem with a picker of its levels, which are raised, Reset, Reset All Levels |
+| `.tweaks` (Tweaks) | `.tweaks` | Each production-safe tweak with the control it declares (switch, picker, field and Set, stepper), Reset, Reset All |
+| `.localizationReview` (Strings) | `.localizationReview` | The review mode: standard, pseudo-localized or keys |
+| `.accessibilityEnvironmentOverrides` (Accessibility) | `.accessibilityEnvironmentOverrides` | Dynamic Type, Increase Contrast and Reduce Motion, each the system's or overridden, Reset |
+| `.analyticsEvents` (Analytics) | `.analyticsEvents` | The session's events, newest first, with their properties as the app redacted them, Clear |
+| `.metricKitPayloads` (MetricKit) | `.metricKitPayloads` | The payloads the app keeps, crash diagnostics among them, each with Copy JSON and Delete, Delete All; Create Report adds each as JSON |
+| `.networkMocking` (Mocking) | `.networkMocking` | The hosts the app allows, the session's rules and delays with a switch and Remove, a form for a new rule (host, method, path, status, body) and one for a delay, Reset; `.networkMocking(presets:conditionPresets:)` adds the team's own as one-tap additions |
+| `.diagnosticsCapture` (Diagnostics) | `.diagnosticsCapture` | Start Capture, then the app's lines and requests, Stop and Delete; Create Report adds `console.txt` and `network.json` |
+| `.bugReports` | `.bugReports` | The app's reports, annotated, one picked for Create Report (below) |
+| `.pushRegistration` (Push Registration) | `.pushRegistration` | The device token with Copy Token, the APNs server, the notification settings, Refresh |
+| `.scenarios`, `.authActions`, `.appStateReset`, `.environments`, `.locationSpoofing`, `.userDefaults`, `.performanceTraces`, `.appState` | the capability of the same name | As each capability's section above describes; the view hosts `.appState` as the app is reached, so every report carries it |
+
+A plugin of your own whose model adopts
 `DebugDrawerPluginModel` joins them with `DebugDrawerSidecarPlugin(id:title:icon:snapshot:command:plugin:)`,
 whose closure makes the plugin's view over the transport the kit hands it. Create Report writes the
 hosted plugins' report contributions, redacted by `DebugDrawer.shared.redaction`, under a summary
@@ -3900,7 +3934,8 @@ with the link. The receiver's "Security Model and Distribution" article
 ([`SecurityModel.md`](Sources/DebugDrawerReceiver/DebugDrawerReceiver.docc/SecurityModel.md))
 has the details, and what to do if it leaks.
 
-**The example pair.** `Example/Sidecar` is a sidecar built on the kit, and `Example/Receiver` the
+**The example pair.** `Example/Sidecar` is a sidecar built on the kit (its app file lists the
+kit's plugins, and its grant server stands in for a company's), and `Example/Receiver` the
 production app it drives: it links only the receiver and the capability modules, and serves every
 capability the library ships, within sessions that need a grant. `just run sidecar` installs and
 launches both in the iOS simulator, in `group.com.debugdrawer.example`, with the iOS example's
@@ -3919,7 +3954,7 @@ capability has something in the host that changes:
 | Accessibility | The window's Dynamic Type, contrast and Reduce Motion, read back beside them |
 | Analytics | Record Checkout Event's event appears in the sidecar, its `email` redacted |
 | MetricKit | The payloads MetricKit hands the host on a device; Crash leaves a crash diagnostic for the next launch |
-| Mocking | Mock Greeting answers the host's Fetch Greeting, and the host shows "Network mocking active" |
+| Mocking | Add on the Mock Greeting preset (the example passes it to `.networkMocking(presets:conditionPresets:)`) answers the host's Fetch Greeting, and the host shows "Network mocking active"; the Slow Greeting delay holds the answer back two seconds |
 | Bug Reports | Start Capture in Diagnostics and Log Sign-In, then Report a Bug in the host (or Feedback > Report a Bug, Shift-Command-B): the report appears in the sidecar with the window's screenshot, the line and the host's state, its email redacted; type an annotation, then Create Report, and Send Report with an uploader set; the session's end deletes it in the host |
 | Diagnostics | Start Capture, then Log Sign-In and Fetch Greeting: the line and the request appear in the sidecar, the email, session ID and token redacted, and the host shows "Capturing diagnostics for a sidecar"; Create Report adds them to the report, and Stop and Delete or the session's end deletes them in the host |
 | Scenarios | Open Order, Show Paywall and Onboarding Step, each with its parameters: Launch brings the host forward (its `debugdrawer-receiver-example://` scheme on iOS, its bundle identifier on the Mac) and opens the scenario's screen, such as "Order #456" |
@@ -3971,12 +4006,15 @@ of its own.
   `DebugDrawerSidecarView` in the watch app's `WindowGroup`, laid out as the watch navigates. The
   apps are a list, each row opening the app's screen: its version and channel, its session with
   Open Session or End Session below it, a row per plugin it serves that opens the plugin, and
-  Create Report. The kit hosts the receiver's plugins there, `.bugReports`, `.scenarios`,
-  `.authActions`, `.appStateReset`, `.environments`, `.userDefaults`, `.locationSpoofing` and
-  `.appState`, and any `DebugDrawerSidecarPlugin` of the company's own. Console, Network and
-  Performance (`.console`, `.network`, `.performanceTraces`) don't exist on watchOS, as those
-  plugins don't build there, so a watch sidecar names the plugins it shows (`plugins` defaults to
-  none). watchOS lets one app bring another forward only through the system's own URLs, so
+  Create Report. The kit hosts the capabilities' plugins there, `.featureFlagOverrides`,
+  `.experimentOverrides`, `.logLevels`, `.tweaks`, `.localizationReview`,
+  `.accessibilityEnvironmentOverrides`, `.analyticsEvents`, `.diagnosticsCapture`, `.bugReports`,
+  `.scenarios`, `.authActions`, `.appStateReset`, `.environments`, `.userDefaults`,
+  `.locationSpoofing` and `.appState`, and any `DebugDrawerSidecarPlugin` of the company's own.
+  Console, Network, Performance, MetricKit, Mocking and Push Registration (`.console`, `.network`,
+  `.performanceTraces`, `.metricKitPayloads`, `.networkMocking`, `.pushRegistration`) don't exist
+  on watchOS, as the modules they show don't build there, so a watch sidecar names the plugins it
+  shows (`plugins` defaults to none). watchOS lets one app bring another forward only through the system's own URLs, so
   `DebugDrawerSidecarApp.open(url:)` returns `false` there, and Scenarios and Reset App State say
   to open the app instead:
 
@@ -4169,7 +4207,7 @@ ContentView()
 | `DebugDrawerAppStateReset` | The receiver capability (`.appStateReset(_:)`) that lets a sidecar reset the categories a production app allows (never the keychain unless it opts in), listed and confirmed by revision, applied on the next foreground; no drawer, so a release build links it beside the receiver |
 | `DebugDrawerAppStateResetPlugin` | The app's state cleared as a fresh install leaves it, by category: UserDefaults, keychain items, the container's files, caches, cookies, the URL cache and the app's own cleanup, each listed before a confirmation, then relaunched on macOS or quit elsewhere; re-exports `DebugDrawerAppStateReset` |
 | `DebugDrawerRemote` | Plugin models served to a viewer on another device over the local network: an opt-in Network.framework server advertised over Bonjour, each viewer paired with a six-digit code the device shows (and its Remote Viewing plugin, which shows the codes), and the viewer's transport and browser |
-| `DebugDrawerSidecarKit` | A sidecar app, as a library: `DebugDrawerSidecarView` lists the apps in the group that serve a sidecar, opens their sessions (with a grant the company's server gives, when they require one), shows their Console, Network, Bug Reports, Scenarios, Auth, Reset App State, Environment, UserDefaults, Performance, App State and other model-backed plugins over the socket or the store, and makes and uploads a report of them, the app state attached to each; iOS, iPadOS and macOS, and watchOS without Console, Network and Performance; debug builds |
+| `DebugDrawerSidecarKit` | A sidecar app, as a library: `DebugDrawerSidecarView` lists the apps in the group that serve a sidecar, opens their sessions (with a grant the company's server gives, when they require one), shows their Console and Network, a plugin for every capability the receiver ships (Flags, Experiments, Log Levels, Tweaks, Strings, Accessibility, Analytics, MetricKit, Mocking, Diagnostics, Bug Reports, Push Registration, Scenarios, Auth, Reset App State, Environment, Location, UserDefaults, Performance, App State) and other model-backed plugins over the socket or the store, and makes and uploads a report of them, the app state attached to each; iOS, iPadOS and macOS, and watchOS without Console, Network, Performance, MetricKit, Mocking and Push Registration; debug builds |
 
 ## Development
 

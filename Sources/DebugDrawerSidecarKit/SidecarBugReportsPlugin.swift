@@ -8,8 +8,8 @@ import SwiftUI
 // `DebugDrawerReportContributor`, so the kit's Create Report puts the picked report in the bug
 // report beside the other plugins' files, and Send Report sends it through the sidecar's uploader
 // (`DebugDrawer.shared.reportUploader`), as for every other report: the app never sends anything.
-// It ships in the kit beside Console and Network, rather than in each company's sidecar as the
-// other capabilities' plugins do, because the report and its upload are the kit's own.
+// It ships in the kit beside Console and Network, as every capability's plugin does, and the report
+// and its upload are the kit's own.
 //
 // The annotations and the pick live in an object the plugin holds, not in a view's state, as the
 // report is written from the plugin, outside any view. Rejected: drawing on the screenshot (a

@@ -11,13 +11,17 @@ import SwiftUI
 // plugin over a transport to that model. The plugin is a `DebugDrawerPlugin` like any other, so the
 // kit draws its body and header accessory as the drawer would, and puts it in the bug report through
 // `DebugDrawerReportContributor`, without knowing its types. Console and Network ship here, as
-// they are the plugins every sidecar wants; any other plugin whose model adopts
-// `DebugDrawerPluginModel` comes in through the generic initializer, from a module the host links.
+// they are the plugins every sidecar wants, and so does a view of every capability the receiver
+// ships (one file each, `Sidecar<Capability>Plugin.swift`), over the capability's UI-free module, so
+// no company writes its own; any other plugin whose model adopts `DebugDrawerPluginModel` comes in
+// through the generic initializer, from a module the host links.
 //
 // Rejected: a protocol in core that plugins adopt to be hosted (a plugin's model ID is only known
 // from an instance, and core would grow a second plugin contract for one caller); the kit depending
-// on every plugin with a model (a sidecar would link them all, the N5 shape); and the host writing
-// a view per plugin (the plugins' own views over a transport already exist).
+// on every drawer plugin with a model (a sidecar would link them all, the N5 shape; the capability
+// modules it depends on are UI-free and small); a sidecar-view product per capability (every
+// sidecar links them all anyway); and the host writing a view per plugin (the plugins' own views
+// over a transport already exist).
 //
 // Console and Network are linked only where they build (PLATFORM_CONDITIONAL_DEPENDENCIES in
 // scripts/modules.py): not on watchOS, where the kit hosts the receiver's plugins alone, so a watch
@@ -32,8 +36,10 @@ import SwiftUI
 /// ```
 ///
 /// ``console`` and ``network`` show the Console and Network plugins, on macOS and iOS: watchOS
-/// doesn't build them. Any plugin whose model the app serves comes in through
-/// ``init(id:title:icon:snapshot:command:plugin:)``, with the plugin made over the transport.
+/// doesn't build them. Each capability the receiver ships has its own, named for the capability
+/// (``featureFlagOverrides``, ``tweaks``, ``logLevels``, …). Any plugin whose model the app
+/// serves comes in through ``init(id:title:icon:snapshot:command:plugin:)``, with the plugin made
+/// over the transport.
 public struct DebugDrawerSidecarPlugin: Identifiable {
     /// The ID the app serves the plugin's model under.
     public let id: String

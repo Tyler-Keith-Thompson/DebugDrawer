@@ -162,9 +162,11 @@ MODULES = [
     # Transports
     ("DebugDrawerRemote", "Transports", "Plugin models served to a viewer on another device over the local network: an opt-in Network.framework server with Bonjour, each viewer paired with a code the device shows in its Remote Viewing plugin, and the viewer's transport and browser.", ["DebugDrawer"]),
     # Sidecar: what a company builds its employee-only sidecar app on (the charter's D6). It hosts
-    # the views of the plugins it depends on, so it may depend on plugins, and only an app links
-    # it: no module depends on it, and a production app never does.
-    ("DebugDrawerSidecarKit", "Sidecar", "The kit a sidecar app is built on: the apps in the group that serve it, listed as they start and stop, a session opened and ended for one, with an optional signed grant, the Console, Network, Bug Reports, Scenarios, Auth, Reset App State, Environment, Location, UserDefaults, Performance and App State views (and any plugin's) over the socket or the store, and a bug report of them, created and sent; debug builds only.", ["DebugDrawer", "DebugDrawerConsolePlugin", "DebugDrawerNetworkPlugin", "DebugDrawerAppStateReset", "DebugDrawerHangDetectorPlugin", "DebugDrawerAppInfo", "DebugDrawerLocation"]),
+    # the views of the plugins it depends on, so it may depend on plugins, and a view of every
+    # capability the receiver ships, so it depends on each UI-free capability module (a sidecar
+    # links them all; rejected: a sidecar-view product per capability). Only an app links it: no
+    # module depends on it, and a production app never does.
+    ("DebugDrawerSidecarKit", "Sidecar", "The kit a sidecar app is built on: the apps in the group that serve it, listed as they start and stop, a session opened and ended for one, with an optional signed grant, the Console and Network views and one for every capability the receiver ships (flags, experiments, log levels, diagnostics, tweaks, strings, accessibility, analytics, MetricKit, network mocking, bug reports, push registration, scenarios, auth, reset app state, environments, location, UserDefaults, performance and app state), and any plugin's, over the socket or the store, and a bug report of them, created and sent; debug builds only.", ["DebugDrawer", "DebugDrawerConsolePlugin", "DebugDrawerNetworkPlugin", "DebugDrawerAppStateReset", "DebugDrawerHangDetectorPlugin", "DebugDrawerAppInfo", "DebugDrawerLocation", "DebugDrawerTweaks", "DebugDrawerAnalytics", "DebugDrawerLocalization", "DebugDrawerAccessibility", "DebugDrawerMetricKit", "DebugDrawerNetwork", "DebugDrawerNotifications"]),
 ]
 
 # Modules only iOS builds: SwiftUI views and what they draw with. Bazel builds them for the
@@ -207,9 +209,11 @@ EXTRA_PLATFORMS = {
 PLATFORM_CONDITIONAL_DEPENDENCIES = {
     # The kit hosts, on each platform, the plugins ported there: Console, Network and the Hang
     # Detector (whose stack demangling the kit's Performance view uses) aren't ported to watchOS,
-    # where the hang monitor's thread_suspend and thread_get_state don't exist.
-    "DebugDrawerSidecarKit": ["DebugDrawerConsolePlugin", "DebugDrawerNetworkPlugin", "DebugDrawerHangDetectorPlugin"],
-    "DebugDrawerSidecarKitTests": ["DebugDrawerConsolePlugin", "DebugDrawerNetworkPlugin", "DebugDrawerHangDetectorPlugin"],
+    # where the hang monitor's thread_suspend and thread_get_state don't exist. Nor are the MetricKit,
+    # network mocking and push registration capability modules, so the kit's views of those three
+    # exist only where their modules build.
+    "DebugDrawerSidecarKit": ["DebugDrawerConsolePlugin", "DebugDrawerNetworkPlugin", "DebugDrawerHangDetectorPlugin", "DebugDrawerMetricKit", "DebugDrawerNetwork", "DebugDrawerNotifications"],
+    "DebugDrawerSidecarKitTests": ["DebugDrawerConsolePlugin", "DebugDrawerNetworkPlugin", "DebugDrawerHangDetectorPlugin", "DebugDrawerMetricKit", "DebugDrawerNetwork", "DebugDrawerNotifications"],
 }
 
 # Test targets that also run in the simulator of iOS or of a platform in EXTRA_PLATFORMS, by
@@ -333,7 +337,7 @@ TEST_TARGETS = [
     ("DebugDrawerAppStateResetTests", ["DebugDrawerAppStateReset", "DebugDrawerReceiver", "DebugDrawer"]),
     ("DebugDrawerAppStateResetPluginTests", ["DebugDrawerAppStateResetPlugin", "DebugDrawerAppStateReset", "DebugDrawer", "viewinspector/ViewInspector", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
     ("DebugDrawerRemoteTests", ["DebugDrawerRemote", "DebugDrawer", "DebugDrawerReceiver", "DebugDrawerNetworkPlugin", "DebugDrawerNetwork", "DebugDrawerConsolePlugin", "viewinspector/ViewInspector"]),
-    ("DebugDrawerSidecarKitTests", ["DebugDrawerSidecarKit", "DebugDrawer", "DebugDrawerReceiver", "DebugDrawerAppInfo", "DebugDrawerLocation", "DebugDrawerAppStateReset", "DebugDrawerHangDetectorPlugin", "DebugDrawerNetworkPlugin", "DebugDrawerConsolePlugin", "viewinspector/ViewInspector"]),
+    ("DebugDrawerSidecarKitTests", ["DebugDrawerSidecarKit", "DebugDrawer", "DebugDrawerReceiver", "DebugDrawerAppInfo", "DebugDrawerLocation", "DebugDrawerAppStateReset", "DebugDrawerHangDetectorPlugin", "DebugDrawerNetworkPlugin", "DebugDrawerConsolePlugin", "DebugDrawerTweaks", "DebugDrawerAnalytics", "DebugDrawerLocalization", "DebugDrawerAccessibility", "DebugDrawerMetricKit", "DebugDrawerNetwork", "DebugDrawerNotifications", "viewinspector/ViewInspector"]),
 ]
 
 # The modules the test-support target depends on (fixtures are usually written against the

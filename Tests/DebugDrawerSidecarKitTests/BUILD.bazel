@@ -25,17 +25,27 @@ swift_library(
         "//Sources/DebugDrawerAppInfo",
         "//Sources/DebugDrawerLocation",
         "//Sources/DebugDrawerAppStateReset",
+        "//Sources/DebugDrawerTweaks",
+        "//Sources/DebugDrawerAnalytics",
+        "//Sources/DebugDrawerLocalization",
+        "//Sources/DebugDrawerAccessibility",
     ] + select({
         # Linked where they build (PLATFORM_CONDITIONAL_DEPENDENCIES in scripts/modules.py).
         "@platforms//os:macos": [
             "//Sources/DebugDrawerHangDetectorPlugin",
             "//Sources/DebugDrawerNetworkPlugin",
             "//Sources/DebugDrawerConsolePlugin",
+            "//Sources/DebugDrawerMetricKit",
+            "//Sources/DebugDrawerNetwork",
+            "//Sources/DebugDrawerNotifications",
         ],
         "@platforms//os:ios": [
             "//Sources/DebugDrawerHangDetectorPlugin",
             "//Sources/DebugDrawerNetworkPlugin",
             "//Sources/DebugDrawerConsolePlugin",
+            "//Sources/DebugDrawerMetricKit",
+            "//Sources/DebugDrawerNetwork",
+            "//Sources/DebugDrawerNotifications",
         ],
         "//conditions:default": [],
     }) + select({
