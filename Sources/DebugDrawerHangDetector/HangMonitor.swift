@@ -6,8 +6,9 @@ import Foundation
 /// once per hang, and lets the observer report it when the thread gets going again.
 ///
 /// The observer runs on the watched thread, so all it does is read the clock and take an
-/// uncontended lock. The monitor stops (its observers removed, its watcher thread ended) on
-/// ``stop()``, or when it is released.
+/// uncontended lock. While the app is out of sight (``AppVisibility``), nothing counts: a stretch
+/// that the app went out of sight in, or that began out of sight, is dropped. The monitor stops
+/// (its observers removed, its watcher thread ended) on ``stop()``, or when it is released.
 package final class HangMonitor {
     /// The watcher thread's name.
     package static let watcherName = "DebugDrawer hang watcher"
@@ -17,6 +18,9 @@ package final class HangMonitor {
     package let observers: [CFRunLoopObserver]
     /// The watcher thread, until ``stop()`` has joined it.
     private var watcher: pthread_t?
+    /// The observations of the notifications that the app goes out of sight and back.
+    private var visibilityObservations: [any NSObjectProtocol] = []
+    private let visibilityCenter: NotificationCenter
 
     /// Starts watching `runLoop`, whose thread `sampler` samples.
     ///
@@ -24,15 +28,26 @@ package final class HangMonitor {
     ///   - runLoop: The run loop of the thread to watch: the main one, in the app.
     ///   - sampler: Captures that thread's stack.
     ///   - threshold: The shortest stretch that counts as a hang. Traps unless positive.
+    ///   - visibility: When the app is out of sight, so that nothing counts; the system's
+    ///     lifecycle unless given.
     ///   - onHang: Called on the watched thread, after a checkpoint, for each hang.
     package init(
         runLoop: CFRunLoop,
         sampler: some StackSampler,
         threshold: Duration,
+        visibility: AppVisibility = .system,
         onHang: @escaping @Sendable (DetectedHang) -> Void
     ) {
         let state = HangMonitorState(threshold: threshold)
         self.state = state
+        visibilityCenter = visibility.center
+        // No queue, so the pause takes hold before the post returns, inside the stretch the
+        // system posts it from, which is then dropped.
+        visibilityObservations = visibility.hiding.map { name in
+            visibility.center.addObserver(forName: name, object: nil, queue: nil) { _ in state.pause() }
+        } + visibility.showing.map { name in
+            visibility.center.addObserver(forName: name, object: nil, queue: nil) { _ in state.resume() }
+        }
         // Two observers, so each checkpoint is measured where it is: the one that starts a
         // stretch runs before every other observer, and the one that ends it before the run
         // loop sleeps runs after every other (Core Animation commits the frame there, which is
@@ -64,12 +79,16 @@ package final class HangMonitor {
         stop()
     }
 
-    /// Stops watching: removes the observers from the run loop, wakes the watcher thread and
-    /// waits for it to end. Calling it again does nothing.
+    /// Stops watching: removes the observers from the run loop and the notification center,
+    /// wakes the watcher thread and waits for it to end. Calling it again does nothing.
     package func stop() {
         for observer in observers {
             CFRunLoopObserverInvalidate(observer)
         }
+        for observation in visibilityObservations {
+            visibilityCenter.removeObserver(observation)
+        }
+        visibilityObservations = []
         state.stop()
         guard let watcher else { return }
         self.watcher = nil

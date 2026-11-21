@@ -73,6 +73,17 @@ package final class HangMonitorState: Sendable {
         }
     }
 
+    /// The app went out of sight: no stretch counts, the one in progress included, until
+    /// ``resume()``.
+    package func pause() {
+        state.withLockUnchecked { $0.tracker.pause() }
+    }
+
+    /// The app is in sight again: stretches count from now on.
+    package func resume() {
+        state.withLockUnchecked { $0.tracker.resume(at: .now) }
+    }
+
     /// One wake of the watcher now: samples the thread if a hang has just crossed the
     /// threshold.
     package func tick(_ sampler: some StackSampler) {

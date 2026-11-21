@@ -1227,6 +1227,11 @@ once per hang. When the main thread turns its run loop again, the plugin names t
 ("Main thread hung for 612 ms"). A hang that ends before the watcher's next wake is listed
 without a stack. The launch, before the main run loop first waits, isn't counted, and neither is
 time the whole process spent stopped, at a debugger's breakpoint or suspended in the background.
+Nor is a stall while the app is out of sight: on iOS from resigning active until it is active
+again, so the deactivation, the background, the app switcher's snapshot and the return aren't
+hangs, and a stall that the app resigns active in is dropped whole; a stall in the app's own code
+once it is active again is counted, from becoming active. On the Mac an inactive app is still on
+screen, so only a hidden one (and a Mac Catalyst app in the background) isn't counted.
 The `MXHangDiagnostic`s MetricKit delivers, which describe earlier runs, are listed as well,
 with a badge but no toast.
 

@@ -35,6 +35,9 @@ package struct HangTracker: Equatable, Sendable {
     /// The shortest stretch that counts as a hang. Must be positive.
     package var threshold: Duration
     package private(set) var phase: Phase = .launching
+    /// Whether the app is out of sight (resigning active, in the background, coming back), so
+    /// that nothing the thread does counts: set by ``pause()``, cleared by ``resume(at:)``.
+    package private(set) var isPaused = false
     /// When the watcher last woke, which tells a hang from the process being stopped.
     private var lastTick: SuspendingClock.Instant?
 
@@ -57,7 +60,7 @@ package struct HangTracker: Equatable, Sendable {
     ///   process wasn't stopped during it.
     package mutating func checkpoint(at now: SuspendingClock.Instant, isAboutToWait: Bool) -> Hang? {
         var ended: Hang?
-        if case let .busy(since, isCaptured) = phase, now - since >= threshold, !wasStopped(at: now) {
+        if case let .busy(since, isCaptured) = phase, !isPaused, now - since >= threshold, !wasStopped(at: now) {
             ended = Hang(duration: now - since, isCaptured: isCaptured)
         }
         switch (phase, isAboutToWait) {
@@ -81,9 +84,29 @@ package struct HangTracker: Equatable, Sendable {
             phase = .busy(since: now, isCaptured: false)
             return false
         }
-        guard !isCaptured, now - since >= threshold else { return false }
+        guard !isCaptured, !isPaused, now - since >= threshold else { return false }
         phase = .busy(since: since, isCaptured: true)
         return true
+    }
+
+    /// The app went out of sight: the stretch in progress, and every one until ``resume(at:)``,
+    /// is no hang, however long, and the watcher captures nothing meanwhile.
+    ///
+    /// The stretch in progress is dropped whole rather than cut at the pause: the call comes
+    /// from the thread's own work (the system's notification that the app resigns active), so
+    /// that stretch is the system's deactivation, and the part before it can't be told apart.
+    package mutating func pause() {
+        isPaused = true
+    }
+
+    /// The app is in sight again at `now`: stretches count once more, a stretch in progress
+    /// from `now` on, as the time before was out of sight.
+    package mutating func resume(at now: SuspendingClock.Instant) {
+        guard isPaused else { return }
+        isPaused = false
+        if case .busy = phase {
+            phase = .busy(since: now, isCaptured: false)
+        }
     }
 
     /// Whether the watcher missed so many ticks by `now` that the whole process must have been

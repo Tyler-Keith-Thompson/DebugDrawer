@@ -168,4 +168,67 @@ struct HangTrackerTests {
         #expect(tick)
         #expect(actual == HangTracker.Hang(duration: .milliseconds(130), isCaptured: true))
     }
+
+    @Test("A stretch the tracker is paused in is no hang, however long, even one already captured")
+    func pausedStretchDropped() {
+        let start = SuspendingClock.Instant.now
+        var sut = HangTracker(threshold: .milliseconds(100))
+        _ = sut.checkpoint(at: start, isAboutToWait: true)
+        _ = sut.checkpoint(at: start, isAboutToWait: false)
+        let captured = sut.tick(at: start + .milliseconds(100))
+
+        sut.pause()
+        let actual = sut.checkpoint(at: start + .milliseconds(110), isAboutToWait: true)
+
+        #expect(captured)
+        #expect(actual == nil)
+        #expect(sut.isPaused)
+    }
+
+    @Test("While paused, stretches are no hangs and the watcher captures nothing")
+    func pausedNothingCounts() {
+        let start = SuspendingClock.Instant.now
+        var sut = HangTracker(threshold: .milliseconds(100))
+        _ = sut.checkpoint(at: start, isAboutToWait: true)
+        sut.pause()
+        _ = sut.checkpoint(at: start, isAboutToWait: false)
+
+        let ticks = [25, 50, 75, 100, 125].map { sut.tick(at: start + .milliseconds($0)) }
+        let actual = sut.checkpoint(at: start + .milliseconds(130), isAboutToWait: true)
+
+        #expect(ticks.allSatisfy { !$0 })
+        #expect(actual == nil)
+    }
+
+    @Test("Resumed during a stretch, the stretch counts from the resume")
+    func resumeRestartsStretch() {
+        let start = SuspendingClock.Instant.now
+        var sut = HangTracker(threshold: .milliseconds(100))
+        _ = sut.checkpoint(at: start, isAboutToWait: true)
+        sut.pause()
+        _ = sut.checkpoint(at: start, isAboutToWait: false)
+        sut.resume(at: start + .milliseconds(500))
+        let expected = HangTracker.Hang(duration: .milliseconds(120), isCaptured: false)
+
+        let actual = sut.checkpoint(at: start + .milliseconds(620), isAboutToWait: true)
+
+        #expect(actual == expected)
+        #expect(!sut.isPaused)
+    }
+
+    @Test("Resumed while waiting, the next stretch counts as usual; resuming twice changes nothing")
+    func resumeWhileWaiting() {
+        let start = SuspendingClock.Instant.now
+        var sut = HangTracker(threshold: .milliseconds(100))
+        _ = sut.checkpoint(at: start, isAboutToWait: true)
+        sut.pause()
+        sut.resume(at: start + .milliseconds(10))
+        _ = sut.checkpoint(at: start + .milliseconds(20), isAboutToWait: false)
+        sut.resume(at: start + .milliseconds(90))
+        let expected = HangTracker.Hang(duration: .milliseconds(150), isCaptured: false)
+
+        let actual = sut.checkpoint(at: start + .milliseconds(170), isAboutToWait: true)
+
+        #expect(actual == expected)
+    }
 }

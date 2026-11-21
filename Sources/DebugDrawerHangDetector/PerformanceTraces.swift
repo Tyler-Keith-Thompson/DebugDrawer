@@ -49,7 +49,9 @@ import os
 /// Nothing runs until a sidecar, in an open session, sends ``Command/start``: then an observer
 /// on the main run loop and a watcher thread record each stall of the main thread at least
 /// ``hitchThreshold`` long, a hang from ``hangThreshold``, with the main thread's stack, and the
-/// intervals that end. It stops, removing the observer and ending the thread, and deletes what it
+/// intervals that end. A stall while the app is out of sight isn't recorded: on iOS from resigning
+/// active until it is active again (the app switcher's snapshot included), on the Mac while it is
+/// hidden. It stops, removing the observer and ending the thread, and deletes what it
 /// recorded, as the sidecar sends ``Command/stop``, as the session ends or expires, or as a gate
 /// turns it off. Outside a recording, ``beginInterval(_:)`` and ``endInterval(_:)`` record
 /// nothing.
