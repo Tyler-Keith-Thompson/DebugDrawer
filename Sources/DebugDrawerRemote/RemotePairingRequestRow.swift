@@ -13,8 +13,10 @@
                 Text(request.code.groupedInThrees)
                     .font(.system(.title2, design: .monospaced).weight(.semibold))
                     .debugDrawerForegroundStyle(.primary)
-                    .textSelection(.enabled)
                     // Read digit by digit, as the person types it, rather than as two numbers.
+                    // Not selectable: the code is typed on the viewer, never copied, and on
+                    // macOS selectable text with a label of its own sent AppKit's accessibility
+                    // into a loop that overflowed the main thread's stack (DD-288).
                     .accessibilityLabel("Code \(request.code.map(String.init).joined(separator: " "))")
             } accessory: {
                 Button("Reject", role: .destructive, action: onReject)
