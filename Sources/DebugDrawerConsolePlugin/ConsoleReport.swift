@@ -8,7 +8,7 @@ extension ConsolePlugin: DebugDrawerReportContributor {
     /// after a crash, the lines that led up to it. A plugin over a transport adds the lines of
     /// its latest snapshot that the filter passes, as `console.txt`. Both are masked by
     /// `redaction`: a metadata field whose key contains a key pattern, and the value of each such
-    /// `key=value` or `key: value` pair in a line's text (``DebugDrawerRedaction/redacting(text:)``).
+    /// `key=value` or `key: value` pair in a line's text (``/DebugDrawer/DebugDrawerRedaction/redacting(text:)``).
     /// In release builds it adds nothing.
     public func contribute(to report: inout DebugDrawerReport, redaction: DebugDrawerRedaction) {
         #if DEBUG

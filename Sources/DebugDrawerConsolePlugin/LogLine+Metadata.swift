@@ -10,7 +10,7 @@
 
         /// The metadata as the line copies it: as shown, with the value of each field whose key
         /// contains one of `redaction`'s key patterns masked, and the pairs in the other values
-        /// masked as in text (``DebugDrawerRedaction/redacting(text:)``); `nil` for a line without
+        /// masked as in text (``/DebugDrawer/DebugDrawerRedaction/redacting(text:)``); `nil` for a line without
         /// any.
         func copiedMetadata(redactedBy redaction: DebugDrawerRedaction) -> String? {
             joinedMetadata { key, value in
