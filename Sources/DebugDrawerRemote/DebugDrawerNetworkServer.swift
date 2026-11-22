@@ -76,7 +76,7 @@ import os
         }
 
         /// A server that listens through `listener`.
-        init(registry: DebugDrawerModelRegistry, configuration: DebugDrawerNetworkServerConfiguration, listener: any ConnectionListener) {
+        package init(registry: DebugDrawerModelRegistry, configuration: DebugDrawerNetworkServerConfiguration, listener: any ConnectionListener) {
             self.registry = registry
             self.configuration = configuration
             self.listener = listener

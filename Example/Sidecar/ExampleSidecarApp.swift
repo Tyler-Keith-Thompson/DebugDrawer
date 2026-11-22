@@ -1,4 +1,5 @@
 import DebugDrawerNetwork
+import DebugDrawerRemote
 import DebugDrawerSidecarKit
 import ExampleSidecarStore
 import SwiftUI
@@ -10,7 +11,11 @@ import SwiftUI
 // shows. The only thing of the example's own is Mocking's presets, for the host's Fetch Greeting.
 // On the Mac the store is the one `just run sidecar macOS` signed both apps for
 // (ExampleSidecarStore). `-ScriptSession <bundle ID>` opens a session with that app, overrides a
-// flag in it and ends it, unattended (ExampleSessionScript).
+// flag in it and ends it, unattended (ExampleSessionScript). The device-lab bridge is on: each
+// app's screen has a Mac Viewer control that shares the open session with a Mac paired by code
+// (the macOS example's Debug > Remote Viewer). `-ShareWithMac` starts sharing as an app is picked,
+// `-RemoteViewersOnLoopback` listens on 127.0.0.1 alone, advertising nothing, and
+// `-MacViewerPort <port>` listens on that port rather than one the system picks.
 
 @main
 struct ExampleSidecarApp: App {
@@ -33,7 +38,17 @@ struct ExampleSidecarApp: App {
             ) { app in
                 try ExampleGrantServer.grant(for: app)
             }
+            .debugDrawerSidecarRelay(Self.macViewer(), startsServing: ProcessInfo.processInfo.arguments.contains("-ShareWithMac"))
         }
+    }
+
+    /// Where the Mac Viewer listens, as the launch arguments say.
+    private static func macViewer(arguments: [String] = ProcessInfo.processInfo.arguments) -> DebugDrawerNetworkServerConfiguration {
+        var configuration: DebugDrawerNetworkServerConfiguration = arguments.contains("-RemoteViewersOnLoopback") ? .loopback : .init()
+        if let index = arguments.firstIndex(of: "-MacViewerPort"), arguments.indices.contains(index + 1) {
+            configuration.port = UInt16(arguments[index + 1])
+        }
+        return configuration
     }
 }
 

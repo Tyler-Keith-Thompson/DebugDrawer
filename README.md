@@ -2172,6 +2172,9 @@ struct DeviceView: View {
 }
 ```
 
+A sidecar can relay a production app to such a viewer too, within the session it opens ("A device
+lab: sidecars sharing their sessions with a Mac" below).
+
 The macOS example app has such a viewer under Debug > Remote Viewer: it lists the devices it finds
 once you click Look for Devices, or connects to an address (`127.0.0.1:<port>` for a server on
 loopback), asks for the code, and shows the device's Network and Console. The example apps serve
@@ -4026,6 +4029,84 @@ while the host logs its audit entries (`subsystem == "com.debugdrawer.example.re
 receiver serves the store only, so on the Mac too the channel is the store, each command performed
 as its file lands.
 
+### A device lab: sidecars sharing their sessions with a Mac
+
+A QA lab drives production builds on many devices from one Mac. Each device's sidecar relays what
+it reaches of the app picked to a viewer on the Mac, over the local network, and carries the
+viewer's commands back; the production app's receiver still talks over the app group alone and
+opens no listener (a test checks its binary: no Network.framework, no listener symbol). Turn it on
+with one modifier on the kit's view:
+
+```swift
+DebugDrawerSidecarView(groupIdentifier: "TEAMID.com.example.debug", plugins: [.featureFlagOverrides, .tweaks])
+    .debugDrawerSidecarRelay()
+```
+
+Each app's screen then has a Mac Viewer control: Start Serving listens (`startsServing: true`
+listens as soon as an app is picked, for a lab device whose sidecar always shares), each Mac asking
+to pair shows with its six-digit code and Reject, and each paired Mac with Disconnect, as Remote
+Viewing shows them in a drawer. Without the modifier nothing listens. The relay itself is public,
+for a layout of your own: `DebugDrawerSidecarRelay(connection:configuration:)` over a
+`DebugDrawerSidecarConnection`, with `start()`, `stop()`, its `server` (whose `pairingRequests` hold
+the codes to show) and its `snapshot`.
+
+What the relay shares, and when:
+
+- **Only within the session the sidecar's person opens.** While no session is open in the app it
+  serves nothing but its own snapshot; as one opens, it serves each capability the app serves that
+  the session may read, under the capability's own ID, once the app's first snapshot of it
+  arrives. Under a grant policy that is only what the grant lists, the receiver's own rule for
+  what it writes to the store.
+- **Nothing past it.** As the session ends, reaches its expiry date (even while the app, suspended,
+  hasn't ended it yet), or serving stops, every capability is dropped and the transport that read
+  them closed, so a viewer is served nothing the session no longer may read, and the next session
+  starts afresh.
+- **Commands go back as the sidecar's own.** The receiver applies or refuses each one within the
+  session and its grant, and audits it, exactly as if the sidecar had sent it; the relay adds no
+  gate and widens none. The sessions themselves aren't relayed: a viewer can't open or end one, or
+  read its grant.
+
+A viewer pairs as with any `DebugDrawerNetworkServer`, reads `DebugDrawerSidecarRelay.Snapshot`
+under `DebugDrawerSidecarRelay.pluginID` (the app, `sessionExpires`, and the `pluginIDs` shared
+now), and draws each shared capability with the kit's own plugin over the paired transport,
+`plugin(over:)`:
+
+```swift
+@MainActor
+func showFlags(of viewer: DebugDrawerNetworkTransport) async throws -> AnyDebugDrawerPlugin? {
+    let relay = try await viewer.connect(
+        toPlugin: DebugDrawerSidecarRelay.pluginID, snapshot: DebugDrawerSidecarRelay.Snapshot.self, command: Never.self
+    )
+    guard relay.snapshot.pluginIDs.contains(DebugDrawerFeatureFlagOverrides.pluginID) else { return nil }
+    return try await DebugDrawerSidecarPlugin.featureFlagOverrides.plugin(over: viewer)
+}
+```
+
+**Info.plist.** The sidecar app (not the production app) declares the service it advertises, on
+iOS, and a sandboxed Mac sidecar needs the `com.apple.security.network.server` entitlement:
+
+```xml
+<key>NSLocalNetworkUsageDescription</key>
+<string>Shares the app you pick with a Mac in your lab, once you pair it with a code.</string>
+<key>NSBonjourServices</key>
+<array>
+    <string>_debugdrawer._tcp</string>
+</array>
+```
+
+The Mac viewer is a new party to the session: the person holding the sidecar pairs it with the
+code, and the traffic between them is not encrypted, so share on a network you trust. The receiver's
+"Security Model and Distribution" article
+([`SecurityModel.md`](Sources/DebugDrawerReceiver/DebugDrawerReceiver.docc/SecurityModel.md)) has
+the details. The relay is part of the kit, on iOS, iPadOS and macOS; watchOS has no network
+transport, so a watch sidecar doesn't relay.
+
+**In the examples.** `Example/Sidecar` carries the modifier (`-ShareWithMac` starts serving as an app
+is picked, `-RemoteViewersOnLoopback` listens on 127.0.0.1 alone, `-MacViewerPort <port>` on a fixed
+port), and the macOS example's Remote window (Debug > Remote Viewer) shows a relayed app: once
+paired, it lists the capabilities the session shares and draws each with the kit's plugin, live,
+until the session ends.
+
 ### The sidecar on Apple TV, Vision Pro, Apple Watch and Mac Catalyst
 
 The transports, the receiver and `DebugDrawerAppGroupContainer` build and run on every platform
@@ -4262,7 +4343,7 @@ ContentView()
 | `DebugDrawerAppStateReset` | The receiver capability (`.appStateReset(_:)`) that lets a sidecar reset the categories a production app allows (never the keychain unless it opts in), listed and confirmed by revision, applied on the next foreground; no drawer, so a release build links it beside the receiver |
 | `DebugDrawerAppStateResetPlugin` | The app's state cleared as a fresh install leaves it, by category: UserDefaults, keychain items, the container's files, caches, cookies, the URL cache and the app's own cleanup, each listed before a confirmation, then relaunched on macOS or quit elsewhere; re-exports `DebugDrawerAppStateReset` |
 | `DebugDrawerRemote` | Plugin models served to a viewer on another device over the local network: an opt-in Network.framework server advertised over Bonjour, each viewer paired with a six-digit code the device shows (and its Remote Viewing plugin, which shows the codes), and the viewer's transport and browser |
-| `DebugDrawerSidecarKit` | A sidecar app, as a library: `DebugDrawerSidecarView` lists the apps in the group that serve a sidecar, opens their sessions (with a grant the company's server gives, when they require one), shows their Console and Network, a plugin for every capability the receiver ships (Flags, Experiments, Log Levels, Tweaks, Strings, Accessibility, Analytics, MetricKit, Mocking, Diagnostics, Bug Reports, Push Registration, Scenarios, Auth, Reset App State, Environment, Location, UserDefaults, Performance, App State) and other model-backed plugins over the socket or the store, and makes and uploads a report of them, the app state attached to each; iOS, iPadOS and macOS, and watchOS without Console, Network, Performance, MetricKit, Mocking and Push Registration; debug builds |
+| `DebugDrawerSidecarKit` | A sidecar app, as a library: `DebugDrawerSidecarView` lists the apps in the group that serve a sidecar, opens their sessions (with a grant the company's server gives, when they require one), shows their Console and Network, a plugin for every capability the receiver ships (Flags, Experiments, Log Levels, Tweaks, Strings, Accessibility, Analytics, MetricKit, Mocking, Diagnostics, Bug Reports, Push Registration, Scenarios, Auth, Reset App State, Environment, Location, UserDefaults, Performance, App State) and other model-backed plugins over the socket or the store, and makes and uploads a report of them, the app state attached to each, and relays the open session to a paired Mac viewer for device labs (`debugDrawerSidecarRelay()`); iOS, iPadOS and macOS, and watchOS without Console, Network, Performance, MetricKit, Mocking, Push Registration and the relay; debug builds |
 
 ## Development
 

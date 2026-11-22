@@ -4,7 +4,7 @@ load("@rules_apple//apple:watchos.bzl", "watchos_build_test")
 load("//tools:docc.bzl", "docc_archive")
 load("//tools:swift_rules.bzl", "swift_library")
 
-# The kit a sidecar app is built on: the apps in the group that serve it, listed as they start and stop, a session opened and ended for one, with an optional signed grant, the Console and Network views and one for every capability the receiver ships (flags, experiments, log levels, diagnostics, tweaks, strings, accessibility, analytics, MetricKit, network mocking, bug reports, push registration, scenarios, auth, reset app state, environments, location, UserDefaults, performance and app state), and any plugin's, over the socket or the store, and a bug report of them, created and sent; debug builds only.
+# The kit a sidecar app is built on: the apps in the group that serve it, listed as they start and stop, a session opened and ended for one, with an optional signed grant, the Console and Network views and one for every capability the receiver ships (flags, experiments, log levels, diagnostics, tweaks, strings, accessibility, analytics, MetricKit, network mocking, bug reports, push registration, scenarios, auth, reset app state, environments, location, UserDefaults, performance and app state), and any plugin's, over the socket or the store, a bug report of them, created and sent, and a relay that serves a paired Mac viewer what the open session may read and carries its commands back, for device labs; debug builds only.
 swift_library(
     name = "DebugDrawerSidecarKit",
     srcs = glob(["**/*.swift"]),
@@ -21,6 +21,7 @@ swift_library(
     ] + select({
         # Linked where they build (PLATFORM_CONDITIONAL_DEPENDENCIES in scripts/modules.py).
         "@platforms//os:macos": [
+            "//Sources/DebugDrawerRemote",
             "//Sources/DebugDrawerConsolePlugin",
             "//Sources/DebugDrawerNetworkPlugin",
             "//Sources/DebugDrawerHangDetectorPlugin",
@@ -29,6 +30,7 @@ swift_library(
             "//Sources/DebugDrawerNotifications",
         ],
         "@platforms//os:ios": [
+            "//Sources/DebugDrawerRemote",
             "//Sources/DebugDrawerConsolePlugin",
             "//Sources/DebugDrawerNetworkPlugin",
             "//Sources/DebugDrawerHangDetectorPlugin",
@@ -48,6 +50,7 @@ docc_archive(
     catalog = glob(["*.docc/**"], allow_empty = True),
     deps = [
         "//Sources/DebugDrawer:DebugDrawerDocumentation",
+        "//Sources/DebugDrawerRemote:DebugDrawerRemoteDocumentation",
         "//Sources/DebugDrawerConsolePlugin:DebugDrawerConsolePluginDocumentation",
         "//Sources/DebugDrawerNetworkPlugin:DebugDrawerNetworkPluginDocumentation",
         "//Sources/DebugDrawerAppStateReset:DebugDrawerAppStateResetDocumentation",

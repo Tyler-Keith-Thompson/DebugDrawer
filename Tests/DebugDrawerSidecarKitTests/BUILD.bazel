@@ -33,6 +33,7 @@ swift_library(
     ] + select({
         # Linked where they build (PLATFORM_CONDITIONAL_DEPENDENCIES in scripts/modules.py).
         "@platforms//os:macos": [
+            "//Sources/DebugDrawerRemote",
             "//Sources/DebugDrawerHangDetectorPlugin",
             "//Sources/DebugDrawerNetworkPlugin",
             "//Sources/DebugDrawerConsolePlugin",
@@ -41,6 +42,7 @@ swift_library(
             "//Sources/DebugDrawerNotifications",
         ],
         "@platforms//os:ios": [
+            "//Sources/DebugDrawerRemote",
             "//Sources/DebugDrawerHangDetectorPlugin",
             "//Sources/DebugDrawerNetworkPlugin",
             "//Sources/DebugDrawerConsolePlugin",

@@ -80,6 +80,31 @@ Inside the boundary, a command meets these checks, in this order:
 
 Every outcome, applied or refused, is written to the audit log.
 
+### A Mac viewer, through the sidecar
+
+A device lab can have each device's sidecar relay its session to a viewer on a Mac
+(`DebugDrawerSidecarRelay` in `DebugDrawerSidecarKit`, turned on by the sidecar app with
+`debugDrawerSidecarRelay()`). The production app is unchanged by it: the relay runs in the
+sidecar, and the receiver still reads and writes its directory of the group's store alone, with no
+listener and no network code (it doesn't link the network transport, which the module graph and
+a test of the production host's binary check). What the Mac viewer adds:
+
+- **A new party, admitted by the sidecar's person.** The sidecar listens only once its person
+  starts serving (or its app starts it), and a Mac reaches nothing until it pairs with the
+  six-digit code the sidecar shows beside the Mac's name; each code is good for one try on one
+  connection, and pairing is remembered nowhere. A paired Mac acts with the sidecar's authority
+  within the session, so pair only Macs you'd hand the sidecar to.
+- **No wider than the session.** The relay serves only within the session the sidecar's person
+  opened, only the capabilities that session may read (under a grant policy, those its grant
+  lists), and nothing once it ends, reaches its expiry date or serving stops. Each command a Mac
+  sends reaches the receiver as the sidecar's own and meets every check above, the grant
+  included, and is audited like any other. A Mac can't open, end or read a session: the sessions
+  aren't relayed.
+- **On the network, unencrypted.** The traffic between the sidecar and the Mac crosses the local
+  network in the clear, as remote viewing's does: anyone on that network can read what the session
+  shares. Use a network you trust, a lab's own, and keep what the capabilities list as narrow as
+  ever.
+
 ### Outside the model
 
 - A jailbroken device, or a Mac account an attacker already controls: either can read and write
@@ -439,6 +464,8 @@ revert command should do nothing when nothing is left to put back.
 - **What a session reads is readable by the group while it lasts.** See "What a sidecar can
   read, and when".
 - **A grant can open one more session after a relaunch.** See "Signed grants".
+- **A Mac viewer reads the session over the network in the clear.** See "A Mac viewer, through the
+  sidecar".
 - **The audit log is in memory.** Forward it, or it goes with the process.
 
 ## Distributing the sidecar

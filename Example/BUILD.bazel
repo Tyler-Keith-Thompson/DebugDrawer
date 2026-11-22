@@ -3,6 +3,7 @@ load("@rules_apple//apple:macos.bzl", "macos_application")
 load("@rules_apple//apple:tvos.bzl", "tvos_application")
 load("@rules_apple//apple:visionos.bzl", "visionos_application")
 load("@rules_apple//apple:watchos.bzl", "watchos_application")
+load("//tools:python_test.bzl", "python_test")
 load("//tools:swift_rules.bzl", "swift_library")
 
 # ── All plugin deps (shared between macOS and iOS) ───────────────────
@@ -79,7 +80,7 @@ swift_library(
     module_name = "ExampleApp_macOS",
     # The interposer's dylib, which macos_application copies into Contents/Frameworks, so
     # unsafeInstallDiskIOWithInterposing() records Swift's Data and FileHandle calls too.
-    deps = _SHARED_DEPS + [":ExampleTestBench", "//Sources/DebugDrawerDiskIOInterposer", "//Sources/DebugDrawerRemote"],
+    deps = _SHARED_DEPS + [":ExampleTestBench", "//Sources/DebugDrawerDiskIOInterposer", "//Sources/DebugDrawerRemote", "//Sources/DebugDrawerSidecarKit"],
 )
 
 macos_application(
@@ -212,8 +213,9 @@ swift_library(
 )
 
 # The sidecar: the kit's view with its plugin for each capability the production host serves, the
-# example's grant server, Mocking's presets (DebugDrawerNetwork's rule types), and the unattended
-# session script (-ScriptSession), which uses DebugDrawer's sidecar transport directly.
+# example's grant server, Mocking's presets (DebugDrawerNetwork's rule types), the unattended
+# session script (-ScriptSession), which uses DebugDrawer's sidecar transport directly, and the
+# device-lab relay to a Mac viewer (DebugDrawerRemote's server configuration).
 swift_library(
     name = "ExampleAppLib_Sidecar",
     srcs = glob(["Sidecar/*.swift"]),
@@ -223,6 +225,7 @@ swift_library(
         "//Sources/DebugDrawer",
         "//Sources/DebugDrawerNetwork",
         "//Sources/DebugDrawerReceiver",
+        "//Sources/DebugDrawerRemote",
         "//Sources/DebugDrawerSidecarKit",
     ],
 )
@@ -294,6 +297,20 @@ macos_application(
     minimum_os_version = "15.0",
     deps = [":ExampleAppLib_Receiver"],
     visibility = ["//visibility:public"],
+)
+
+# The production host opens no network listener (DD-107): its binary loads no Network.framework
+# and holds no listener symbol, while the sidecar's, which relays to a Mac viewer, holds both.
+# Debug only: in release the sidecar's relay is a stand-in, so the control would hold none.
+python_test(
+    name = "receiver_listener_test",
+    size = "small",
+    src = "receiver_listener_test.py",
+    data = [
+        ":ExampleApp_Receiver_macOS",
+        ":ExampleApp_Sidecar_macOS",
+    ],
+    tags = ["debug-only"],
 )
 
 # ── visionOS ─────────────────────────────────────────────────────────

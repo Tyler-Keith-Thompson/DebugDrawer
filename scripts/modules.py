@@ -165,8 +165,12 @@ MODULES = [
     # the views of the plugins it depends on, so it may depend on plugins, and a view of every
     # capability the receiver ships, so it depends on each UI-free capability module (a sidecar
     # links them all; rejected: a sidecar-view product per capability). Only an app links it: no
-    # module depends on it, and a production app never does.
-    ("DebugDrawerSidecarKit", "Sidecar", "The kit a sidecar app is built on: the apps in the group that serve it, listed as they start and stop, a session opened and ended for one, with an optional signed grant, the Console and Network views and one for every capability the receiver ships (flags, experiments, log levels, diagnostics, tweaks, strings, accessibility, analytics, MetricKit, network mocking, bug reports, push registration, scenarios, auth, reset app state, environments, location, UserDefaults, performance and app state), and any plugin's, over the socket or the store, and a bug report of them, created and sent; debug builds only.", ["DebugDrawer", "DebugDrawerConsolePlugin", "DebugDrawerNetworkPlugin", "DebugDrawerAppStateReset", "DebugDrawerHangDetectorPlugin", "DebugDrawerAppInfo", "DebugDrawerLocation", "DebugDrawerTweaks", "DebugDrawerAnalytics", "DebugDrawerLocalization", "DebugDrawerAccessibility", "DebugDrawerMetricKit", "DebugDrawerNetwork", "DebugDrawerNotifications"]),
+    # module depends on it, and a production app never does. It also depends on the network
+    # transport (DebugDrawerRemote) for the device-lab relay, which serves a Mac viewer what the
+    # sidecar reads within its session (DD-107): the relay belongs to the sidecar app, whose
+    # person opens the session and shows the pairing code, and the production app keeps talking
+    # to the app group alone.
+    ("DebugDrawerSidecarKit", "Sidecar", "The kit a sidecar app is built on: the apps in the group that serve it, listed as they start and stop, a session opened and ended for one, with an optional signed grant, the Console and Network views and one for every capability the receiver ships (flags, experiments, log levels, diagnostics, tweaks, strings, accessibility, analytics, MetricKit, network mocking, bug reports, push registration, scenarios, auth, reset app state, environments, location, UserDefaults, performance and app state), and any plugin's, over the socket or the store, a bug report of them, created and sent, and a relay that serves a paired Mac viewer what the open session may read and carries its commands back, for device labs; debug builds only.", ["DebugDrawer", "DebugDrawerRemote", "DebugDrawerConsolePlugin", "DebugDrawerNetworkPlugin", "DebugDrawerAppStateReset", "DebugDrawerHangDetectorPlugin", "DebugDrawerAppInfo", "DebugDrawerLocation", "DebugDrawerTweaks", "DebugDrawerAnalytics", "DebugDrawerLocalization", "DebugDrawerAccessibility", "DebugDrawerMetricKit", "DebugDrawerNetwork", "DebugDrawerNotifications"]),
 ]
 
 # Modules only iOS builds: SwiftUI views and what they draw with. Bazel builds them for the
@@ -211,9 +215,10 @@ PLATFORM_CONDITIONAL_DEPENDENCIES = {
     # Detector (whose stack demangling the kit's Performance view uses) aren't ported to watchOS,
     # where the hang monitor's thread_suspend and thread_get_state don't exist. Nor are the MetricKit,
     # network mocking and push registration capability modules, so the kit's views of those three
-    # exist only where their modules build.
-    "DebugDrawerSidecarKit": ["DebugDrawerConsolePlugin", "DebugDrawerNetworkPlugin", "DebugDrawerHangDetectorPlugin", "DebugDrawerMetricKit", "DebugDrawerNetwork", "DebugDrawerNotifications"],
-    "DebugDrawerSidecarKitTests": ["DebugDrawerConsolePlugin", "DebugDrawerNetworkPlugin", "DebugDrawerHangDetectorPlugin", "DebugDrawerMetricKit", "DebugDrawerNetwork", "DebugDrawerNotifications"],
+    # exist only where their modules build. The network transport isn't ported there either, so the
+    # device-lab relay exists only where it builds.
+    "DebugDrawerSidecarKit": ["DebugDrawerRemote", "DebugDrawerConsolePlugin", "DebugDrawerNetworkPlugin", "DebugDrawerHangDetectorPlugin", "DebugDrawerMetricKit", "DebugDrawerNetwork", "DebugDrawerNotifications"],
+    "DebugDrawerSidecarKitTests": ["DebugDrawerRemote", "DebugDrawerConsolePlugin", "DebugDrawerNetworkPlugin", "DebugDrawerHangDetectorPlugin", "DebugDrawerMetricKit", "DebugDrawerNetwork", "DebugDrawerNotifications"],
 }
 
 # Test targets that also run in the simulator of iOS or of a platform in EXTRA_PLATFORMS, by
@@ -337,7 +342,7 @@ TEST_TARGETS = [
     ("DebugDrawerAppStateResetTests", ["DebugDrawerAppStateReset", "DebugDrawerReceiver", "DebugDrawer", "DebugDrawerTestSupport"]),
     ("DebugDrawerAppStateResetPluginTests", ["DebugDrawerAppStateResetPlugin", "DebugDrawerAppStateReset", "DebugDrawer", "DebugDrawerTestSupport", "viewinspector/ViewInspector", "swift-snapshot-testing/SnapshotTesting", "xctest-dynamic-overlay/IssueReportingTestSupport"]),
     ("DebugDrawerRemoteTests", ["DebugDrawerRemote", "DebugDrawer", "DebugDrawerReceiver", "DebugDrawerNetworkPlugin", "DebugDrawerNetwork", "DebugDrawerConsolePlugin", "DebugDrawerTestSupport", "viewinspector/ViewInspector"]),
-    ("DebugDrawerSidecarKitTests", ["DebugDrawerSidecarKit", "DebugDrawer", "DebugDrawerReceiver", "DebugDrawerAppInfo", "DebugDrawerLocation", "DebugDrawerAppStateReset", "DebugDrawerHangDetectorPlugin", "DebugDrawerNetworkPlugin", "DebugDrawerConsolePlugin", "DebugDrawerTweaks", "DebugDrawerAnalytics", "DebugDrawerLocalization", "DebugDrawerAccessibility", "DebugDrawerMetricKit", "DebugDrawerNetwork", "DebugDrawerNotifications", "DebugDrawerTestSupport", "viewinspector/ViewInspector"]),
+    ("DebugDrawerSidecarKitTests", ["DebugDrawerSidecarKit", "DebugDrawer", "DebugDrawerReceiver", "DebugDrawerRemote", "DebugDrawerAppInfo", "DebugDrawerLocation", "DebugDrawerAppStateReset", "DebugDrawerHangDetectorPlugin", "DebugDrawerNetworkPlugin", "DebugDrawerConsolePlugin", "DebugDrawerTweaks", "DebugDrawerAnalytics", "DebugDrawerLocalization", "DebugDrawerAccessibility", "DebugDrawerMetricKit", "DebugDrawerNetwork", "DebugDrawerNotifications", "DebugDrawerTestSupport", "viewinspector/ViewInspector"]),
 ]
 
 # The modules the test-support target depends on (fixtures are usually written against the
@@ -577,6 +582,20 @@ def check():
     # A capability (a plugin's release-build half) depends on the receiver alone, and only its own
     # plugin may depend on it.
     capabilities = [m[0] for m in MODULES if m[1] == "Capabilities"]
+    # The production app opens no network listener (DD-107): the network transport, the one module
+    # that imports Network.framework, is never in what a release build links, so a sidecar relays to
+    # a Mac viewer and the production app talks to the app group alone.
+    module_deps = dict((m[0], m[3]) for m in MODULES)
+    def closure(name):
+        found, pending = set(), [name]
+        while pending:
+            for d in module_deps.get(pending.pop(), []):
+                if d in module_deps and d not in found:
+                    found.add(d)
+                    pending.append(d)
+        return found
+    for name in ["DebugDrawerReceiver"] + capabilities:
+        assert "DebugDrawerRemote" not in closure(name), f"{name} links into release builds, so it can't depend on DebugDrawerRemote"
     for name, group, _, deps in MODULES:
         if group in ("Plugins", "Transports"):
             allowed = ["DebugDrawer"] + (["oslogclient/OSLogClient"] if name == "DebugDrawerConsolePlugin" else [])

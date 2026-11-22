@@ -192,5 +192,24 @@ class TestHelperTests(unittest.TestCase):
         self.assertEqual(actual, ["DebugDrawer", "viewinspector/ViewInspector"])
 
 
+class ReleaseBuildTests(unittest.TestCase):
+    """What a release build links (the receiver and the capabilities) opens no listener."""
+
+    def test_a_capability_that_reaches_the_network_transport_fails_the_check(self):
+        saved = modules.MODULES
+        modules.MODULES = [
+            (name, group, description, deps + ["DebugDrawerRemote"] if name == "DebugDrawerNetwork" else deps)
+            for name, group, description, deps in saved
+        ]
+        try:
+            with self.assertRaisesRegex(AssertionError, "DebugDrawerNetwork links into release builds, so it can't depend on DebugDrawerRemote"):
+                modules.check()
+        finally:
+            modules.MODULES = saved
+
+    def test_the_graph_as_it_is_passes_the_check(self):
+        modules.check()
+
+
 if __name__ == "__main__":
     unittest.main()

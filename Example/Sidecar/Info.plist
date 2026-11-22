@@ -14,6 +14,12 @@
     <string>APPL</string>
     <key>UILaunchScreen</key>
     <dict/>
+    <key>NSLocalNetworkUsageDescription</key>
+    <string>Shares the app you pick with a Mac in your lab, once you pair it with a code.</string>
+    <key>NSBonjourServices</key>
+    <array>
+        <string>_debugdrawer._tcp</string>
+    </array>
     <key>LSMinimumSystemVersion</key>
     <string>15.0</string>
 </dict>

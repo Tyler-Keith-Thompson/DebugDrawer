@@ -3,14 +3,19 @@ import DebugDrawer
 import DebugDrawerConsolePlugin
 import DebugDrawerNetworkPlugin
 import DebugDrawerRemote
+import DebugDrawerSidecarKit
 import Network
 import SwiftUI
 
 // The Mac viewer of remote viewing: the devices advertising on the local network, a connection by
 // address for a server on loopback (a simulator's, or this app's own with -RemoteViewersOnLoopback),
 // the code the device shows, then that device's Network and Console, live. The example apps' device
-// side is ExampleRemoteServer (the drawer's Remote Viewing plugin). Release builds compile it all,
-// and there the browser finds nothing and pairing fails as unreachable.
+// side is ExampleRemoteServer (the drawer's Remote Viewing plugin). A device's sidecar can relay a
+// production app the same way (DD-107, the device-lab bridge: Example/Sidecar's Mac Viewer): then
+// the window reads the relay's own snapshot and shows each capability the session shares with the
+// sidecar kit's own plugin views, live, sending what the person changes back through the sidecar,
+// until the session ends. Release builds compile it all, and there the browser finds nothing and
+// pairing fails as unreachable.
 
 /// Debug > Remote Viewer: the window, made the first time it is asked for.
 @MainActor
@@ -177,7 +182,7 @@ struct ExampleRemotePairing: View {
     private var status: String {
         switch transport.pairingState {
         case .connecting: "Connecting…"
-        case .waitingForCode: "Type the code \(deviceName) shows for this Mac, under Remote Viewing in its drawer."
+        case .waitingForCode: "Type the code \(deviceName) shows for this Mac, under Remote Viewing in its drawer or Mac Viewer in its sidecar."
         case .paired: "Paired"
         case let .failed(error): "Not paired: \(error.reason). Cancel and connect again."
         }
@@ -198,11 +203,14 @@ struct ExampleRemotePairing: View {
     }
 }
 
-/// The paired device's Network and Console, side by side, as its drawer shows them.
+/// The paired device: a sidecar's relay of a production app once the relay answers, else its
+/// Network and Console, side by side, as its drawer shows them.
 struct ExampleRemotePluginsView: View {
     @ObservedObject var transport: DebugDrawerNetworkTransport
     let deviceName: String
     let disconnect: () -> Void
+    /// The relay's own snapshot, once a sidecar's relay answers; a debug build's drawer never does.
+    @State private var relay: DebugDrawerPluginTransport<DebugDrawerSidecarRelay.Snapshot, Never>?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -216,11 +224,22 @@ struct ExampleRemotePluginsView: View {
             }
             .padding()
             Divider()
-            HStack(alignment: .top, spacing: 0) {
-                column("Network", systemImage: "network") { NetworkPluginView(transport: transport) }
-                Divider()
-                column("Console", systemImage: "terminal") { ConsolePluginView(transport: transport) }
+            if let relay {
+                ExampleRelayedAppView(transport: transport, relay: relay)
+            } else {
+                HStack(alignment: .top, spacing: 0) {
+                    column("Network", systemImage: "network") { NetworkPluginView(transport: transport) }
+                    Divider()
+                    column("Console", systemImage: "terminal") { ConsolePluginView(transport: transport) }
+                }
             }
+        }
+        // Waits for as long as the window shows the device: a drawer serves no relay, so this
+        // never returns there.
+        .task {
+            relay = try? await transport.connect(
+                toPlugin: DebugDrawerSidecarRelay.pluginID, snapshot: DebugDrawerSidecarRelay.Snapshot.self, command: Never.self
+            )
         }
     }
 
@@ -250,6 +269,95 @@ extension DebugDrawerPairingError {
         case .wrongCode: "the code was wrong"
         case .disconnected: "the connection closed"
         case .cancelled: "cancelled"
+        }
+    }
+}
+
+/// A production app as a device's sidecar relays it: the app, the session it relays within, and
+/// a picker of the capabilities the session shares, each drawn by the sidecar kit's own plugin over
+/// the paired transport, so what the person changes here reaches the app as the sidecar's own
+/// commands would. As the session ends the plugins go, since the relay serves nothing past it.
+struct ExampleRelayedAppView: View {
+    let transport: DebugDrawerNetworkTransport
+    @ObservedObject var relay: DebugDrawerPluginTransport<DebugDrawerSidecarRelay.Snapshot, Never>
+    @State private var selected: String?
+    @State private var hosted: [String: AnyDebugDrawerPlugin] = [:]
+
+    /// The kit's plugins this viewer can draw, in its order.
+    private static let plugins: [DebugDrawerSidecarPlugin] = [
+        .featureFlagOverrides, .experimentOverrides, .logLevels, .tweaks, .localizationReview, .accessibilityEnvironmentOverrides,
+        .analyticsEvents, .metricKitPayloads, .networkMocking, .diagnosticsCapture, .pushRegistration, .scenarios, .authActions,
+        .environments, .locationSpoofing, .userDefaults, .performanceTraces, .appState
+    ]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack {
+                Text("\(relay.snapshot.displayName) \(relay.snapshot.version) (\(relay.snapshot.build)), through its sidecar")
+                Spacer()
+                if let expires = relay.snapshot.sessionExpires {
+                    Text("Session until \(expires, style: .time)")
+                        .foregroundStyle(.secondary)
+                } else {
+                    Text("No session open on the device")
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .padding(.horizontal)
+            .padding(.vertical, 8)
+            Divider()
+            if shared.isEmpty {
+                ContentUnavailableView(
+                    "Nothing Shared",
+                    systemImage: "lock",
+                    description: Text("The sidecar shares the app's capabilities only while a session it opened is open.")
+                )
+            } else {
+                HStack(spacing: 0) {
+                    // A list rather than segments: a production host may share a score of them.
+                    List(shared, selection: shown) { plugin in
+                        Label(plugin.title, systemImage: plugin.icon).tag(Optional(plugin.id))
+                    }
+                    .frame(width: 200)
+                    .accessibilityLabel("Shared plugins")
+                    Divider()
+                    if let id = shown.wrappedValue, let plugin = hosted[id] {
+                        ScrollView {
+                            VStack(alignment: .leading, spacing: 0) {
+                                plugin.body
+                            }
+                            .padding(14)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    } else {
+                        ProgressView("Waiting for the plugin…")
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    }
+                }
+            }
+        }
+        .task(id: shown.wrappedValue) {
+            guard let id = shown.wrappedValue, hosted[id] == nil,
+                  let plugin = Self.plugins.first(where: { $0.id == id }) else { return }
+            hosted[id] = try? await plugin.plugin(over: transport)
+        }
+        // A plugin the relay no longer shares is dropped, so the next session shows its own.
+        .onChange(of: relay.snapshot.pluginIDs) { _, ids in
+            hosted = hosted.filter { ids.contains($0.key) }
+        }
+    }
+
+    /// The kit's plugins the relay shares now.
+    private var shared: [DebugDrawerSidecarPlugin] {
+        Self.plugins.filter { relay.snapshot.pluginIDs.contains($0.id) }
+    }
+
+    /// The plugin shown: the one picked while shared, else the first.
+    private var shown: Binding<String?> {
+        Binding {
+            selected.flatMap { id in shared.first { $0.id == id }?.id } ?? shared.first?.id
+        } set: {
+            selected = $0
         }
     }
 }

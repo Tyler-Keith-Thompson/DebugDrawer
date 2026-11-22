@@ -90,6 +90,24 @@ public struct DebugDrawerSidecarPlugin: Identifiable {
         }
     }
 
+    /// The plugin over a transport of the caller's, once the model's first snapshot arrives: for a
+    /// viewer outside the sidecar's own screens, such as a Mac showing what a sidecar relays
+    /// (``DebugDrawerSidecarRelay``) over a `DebugDrawerNetworkTransport`.
+    ///
+    /// ```swift
+    /// let flags = try await DebugDrawerSidecarPlugin.featureFlagOverrides.plugin(over: viewer)
+    /// ```
+    ///
+    /// It waits while the model's side serves no snapshot of it.
+    ///
+    /// - Parameter transport: The connection to the models' side.
+    /// - Returns: The plugin, ready to draw.
+    /// - Throws: What the transport's `connect` throws: `mismatchedTypes` when the model under
+    ///   ``id`` has other types, `disconnected` and `cancelled`.
+    @MainActor public func plugin(over transport: any DebugDrawerTransport) async throws(DebugDrawerTransportError) -> AnyDebugDrawerPlugin {
+        try await connect(transport)
+    }
+
     /// The plugins a sidecar shows unless it names its own: Console and Network where they build,
     /// none on watchOS.
     @MainActor @usableFromInline static var defaults: [DebugDrawerSidecarPlugin] {

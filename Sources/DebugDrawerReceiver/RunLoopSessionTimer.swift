@@ -8,11 +8,14 @@ import Foundation
 
 /// The production session timer: a one-shot timer on the main run loop.
 @MainActor
-final class RunLoopSessionTimer: SessionTimer {
+package final class RunLoopSessionTimer: SessionTimer {
     /// The scheduled timer; `nil` once cancelled.
     private(set) var timer: Timer?
 
-    func schedule(at date: Date, _ fire: @escaping @MainActor () -> Void) {
+    /// A timer with nothing scheduled.
+    package init() {}
+
+    package func schedule(at date: Date, _ fire: @escaping @MainActor () -> Void) {
         cancel()
         let timer = Timer(fire: date, interval: 0, repeats: false) { _ in
             // A timer added to the main run loop fires on the main thread.
@@ -22,7 +25,7 @@ final class RunLoopSessionTimer: SessionTimer {
         self.timer = timer
     }
 
-    func cancel() {
+    package func cancel() {
         timer?.invalidate()
         timer = nil
     }

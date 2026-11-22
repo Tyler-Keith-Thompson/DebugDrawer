@@ -71,6 +71,10 @@
         let sessionDuration: TimeInterval
         let grant: (@MainActor (DebugDrawerSidecarApp) async throws -> String)?
         @State private var selected: DebugDrawerSidecarPlugin.ID?
+        #if canImport(DebugDrawerRemote)
+            /// The device-lab relay's settings, when the sidecar app turned it on.
+            @Environment(\.sidecarRelaySettings) private var relaySettings
+        #endif
 
         var body: some View {
             Group {
@@ -94,6 +98,7 @@
                 Section {
                     SidecarStatusBar(app: connection.app, channel: connection.channel)
                     session
+                    relay
                 }
                 Section("Plugins") {
                     if plugins.isEmpty {
@@ -119,6 +124,7 @@
             VStack(alignment: .leading, spacing: 0) {
                 SidecarStatusBar(app: connection.app, channel: connection.channel)
                 session
+                relay
                 Divider()
                 if plugins.isEmpty {
                     noPlugins
@@ -157,6 +163,16 @@
                     end: connection.endSession
                 )
             }
+        }
+
+        /// The Mac Viewer control, when the sidecar app turned the relay on; nothing otherwise, so
+        /// nothing listens.
+        @ViewBuilder private var relay: some View {
+            #if canImport(DebugDrawerRemote)
+                if let relaySettings {
+                    SidecarRelayHost(connection: connection, settings: relaySettings, layout: layout)
+                }
+            #endif
         }
 
         private var noPlugins: some View {
