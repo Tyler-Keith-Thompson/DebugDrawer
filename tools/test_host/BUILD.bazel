@@ -4,7 +4,7 @@ load("//tools:swift_rules.bzl", "swift_library")
 swift_library(
     name = "TestHostLibrary",
     testonly = True,
-    srcs = ["TestHost.swift"],
+    srcs = glob(["**/*.swift"]),
     module_name = "TestHost",
     target_compatible_with = ["@platforms//os:ios"],
 )
@@ -23,6 +23,10 @@ ios_application(
     ],
     infoplists = ["Info.plist"],
     minimum_os_version = "17.0",
+    # Built only as the simulator tests' host, which only a Mac runs: `bazel test //...` on Linux
+    # would otherwise build it and find no iOS toolchain. Not `target_compatible_with`: the rule
+    # builds itself for iOS, where no constraint tells the host machine apart.
+    tags = ["manual"],
     visibility = ["//visibility:public"],
     deps = [":TestHostLibrary"],
 )

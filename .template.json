@@ -1,8 +1,8 @@
 {
-  "commit": "8b53801648d321603144053bdb107be52f446140",
+  "commit": "16da3d6d7c7274bbad5e0e11f48852854bb2fcda",
   "name": "DebugDrawer",
   "type": "library",
-  "benchmarks": false,
+  "benchmarks": true,
   "mutation": false,
   "fuzz": false,
   "differential": false,
@@ -12,5 +12,6 @@
   "database": false,
   "ci": false,
   "trunk": false,
-  "views": true
+  "views": true,
+  "simulator": true
 }

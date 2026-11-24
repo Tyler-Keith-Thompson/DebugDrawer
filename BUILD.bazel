@@ -6,15 +6,10 @@ load("//tools:dynamic_libraries.bzl", "DYNAMIC_LIBRARY_PACKAGES")
 load("//tools:examples.bzl", "EXAMPLE_PACKAGES")
 load("//tools:executables.bzl", "EXECUTABLE_PACKAGES")
 load("//tools:macros.bzl", "MACRO_PACKAGES")
+load("//tools:ios.bzl", "IOS_PACKAGES", "SIMULATOR_TEST_PACKAGES")
 load("//tools:performance_tests.bzl", "PERFORMANCE_TEST_PACKAGES")
 load("//tools:swiftpm.bzl", "swiftpm_manifest_test")
 load("//tools:test_helpers.bzl", "TEST_HELPER_PACKAGES")
-
-# Nothing here builds for iOS only (IOS_MODULES in scripts/modules.py, which writes tools/ios.bzl
-# for an app), and no tests run in the simulator.
-IOS_PACKAGES = []
-
-SIMULATOR_TEST_PACKAGES = []
 
 # The example apps (Example/BUILD.bazel), each launchable from a scheme of its own.
 APP_TARGETS = [
