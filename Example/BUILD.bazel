@@ -1,3 +1,4 @@
+load("@rules_apple//apple:apple.bzl", "local_provisioning_profile")
 load("@rules_apple//apple:ios.bzl", "ios_application", "ios_framework")
 load("@rules_apple//apple:macos.bzl", "macos_application")
 load("@rules_apple//apple:tvos.bzl", "tvos_application")
@@ -106,6 +107,23 @@ swift_library(
     deps = _SHARED_DEPS + [":ExampleTestBench"],
 )
 
+# `just run device` builds the iOS example for a paired iPhone with --define=example_device=true:
+# signed with the profile Xcode's automatic signing makes for its bundle ID (scripts/device_example.py
+# checks it is there first and says how to make it), with entitlements naming the profile's team.
+# Without the define the simulator build is unchanged and needs no profile.
+config_setting(
+    name = "device",
+    define_values = {"example_device": "true"},
+)
+
+local_provisioning_profile(
+    name = "ExampleApp_iOS_profile",
+    profile_name = "iOS Team Provisioning Profile: com.debugdrawer.example.ios",
+    # Only a device build needs the profile; `manual` keeps `bazel build //Example/...` from
+    # looking for it on a Mac that has none.
+    tags = ["manual"],
+)
+
 ios_application(
     name = "ExampleApp_iOS",
     bundle_id = "com.debugdrawer.example.ios",
@@ -115,8 +133,15 @@ ios_application(
     # English and German tables, German missing a few keys, for the Localization plugin.
     resources = glob(["iOS/Resources/**"]),
     minimum_os_version = "17.0",
-    entitlements = "iOS/ExampleApp_iOS.entitlements",
+    entitlements = select({
+        ":device": "iOS/ExampleApp_iOS_device.entitlements",
+        "//conditions:default": "iOS/ExampleApp_iOS.entitlements",
+    }),
     frameworks = [":DebugDrawerDiskIOInterposer_iOS"],
+    provisioning_profile = select({
+        ":device": ":ExampleApp_iOS_profile",
+        "//conditions:default": None,
+    }),
     deps = [":ExampleAppLib_iOS"],
     visibility = ["//visibility:public"],
 )

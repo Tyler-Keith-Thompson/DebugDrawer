@@ -14,6 +14,10 @@ LSREGISTER := "/System/Library/Frameworks/CoreServices.framework/Frameworks/Laun
 BAZEL_RELEASE_OUTPUT_BASE := cache_directory() / "bazel" / ("_bazel_" + env("USER", "root")) / replace_regex(sha256(PROJECT_ROOT + ":release"), '^(.{32}).*$', '$1')
 BAZEL_RELEASE := "bazel --output_base=" + BAZEL_RELEASE_OUTPUT_BASE
 
+# Device builds (just run device) change the CPU the same way, so they get a base of their own too.
+BAZEL_DEVICE_OUTPUT_BASE := cache_directory() / "bazel" / ("_bazel_" + env("USER", "root")) / replace_regex(sha256(PROJECT_ROOT + ":device"), '^(.{32}).*$', '$1')
+BAZEL_DEVICE := "bazel --output_base=" + BAZEL_DEVICE_OUTPUT_BASE
+
 # SwiftPM runs through Xcode's default toolchain. A development snapshot selected through
 # TOOLCHAINS (or first on PATH via swiftly) can fail to read the SDK's Testing module.
 SWIFT := "env -u TOOLCHAINS xcrun --toolchain default swift"
@@ -328,7 +332,7 @@ VISIONOS_DEVICE := env("VISIONOS_DEVICE", "Apple Vision Pro")
 TVOS_DEVICE := env("TVOS_DEVICE", "Apple TV 4K (4th generation)")
 WATCHOS_DEVICE := env("WATCHOS_DEVICE", "Apple Watch Series 12 (46mm)")
 
-[doc('Build and launch an example app: just run, just run iOS, just run appkit, just run uikit, just run sidecar [iOS|macOS], just run catalyst, just run visionOS, just run tvOS or just run watchOS')]
+[doc('Build and launch an example app: just run, just run iOS, just run device (the iOS example on a paired iPhone), just run appkit, just run uikit, just run sidecar [iOS|macOS], just run catalyst, just run visionOS, just run tvOS or just run watchOS')]
 run target="macOS" *args="":
     #!/usr/bin/env bash
     set -euo pipefail
@@ -372,6 +376,20 @@ run target="macOS" *args="":
             ;;
         iOS|ios)
             {{BAZEL}} run //Example:ExampleApp_iOS
+            ;;
+        device|Device)
+            # The iOS example on a paired iPhone or iPad (DEBUGDRAWER_DEVICE picks one by name or
+            # UDID), signed with the profile Xcode's automatic signing made for it. The check
+            # names the missing setup, a device or that profile, before anything builds.
+            UDID=$(python3 {{PROJECT_ROOT}}/scripts/device_example.py check)
+            RUN_DIR="/tmp/debugdrawer-example-device"
+            rm -rf "$RUN_DIR"
+            mkdir -p "$RUN_DIR"
+            {{BAZEL_DEVICE}} build --config=device //Example:ExampleApp_iOS
+            IPA=$({{BAZEL_DEVICE}} cquery --config=device //Example:ExampleApp_iOS --output=files 2>/dev/null | grep '\.ipa$')
+            unzip -qo "$IPA" -d "$RUN_DIR"
+            xcrun devicectl device install app --device "$UDID" "$RUN_DIR/Payload/DebugDrawerExample.app"
+            xcrun devicectl device process launch --device "$UDID" com.debugdrawer.example.ios {{args}}
             ;;
         appkit|AppKit)
             # The AppKit-only Mac example: no SwiftUI root, the test bench in its Debug menu.

@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- The device build's (just run device): ExampleApp_iOS.entitlements with the signing team in
+         place of FAKETEAMID. rules_apple fills in $(AppIdentifierPrefix) from the provisioning
+         profile, which must also grant push and the app group (scripts/device_example.py says how
+         to make it). -->
+    <key>aps-environment</key>
+    <string>development</string>
+    <key>application-identifier</key>
+    <string>$(AppIdentifierPrefix)com.debugdrawer.example.ios</string>
+    <key>keychain-access-groups</key>
+    <array>
+        <string>$(AppIdentifierPrefix)com.debugdrawer.example.ios</string>
+        <string>$(AppIdentifierPrefix)com.debugdrawer.example.shared</string>
+    </array>
+    <key>com.apple.security.application-groups</key>
+    <array>
+        <string>group.com.debugdrawer.example</string>
+    </array>
+</dict>
+</plist>

@@ -27,6 +27,15 @@ python_test(
     data = ["catalyst_example.py"],
 )
 
+# The iPhone and provisioning profile `just run device` installs the iOS example with
+# (scripts/device_example.py).
+python_test(
+    name = "device_example_test",
+    size = "small",
+    src = "device_example_test.py",
+    data = ["device_example.py"],
+)
+
 # The simulator `just test-ios` runs on, one per checkout (scripts/ios_simulator.py).
 python_test(
     name = "ios_simulator_test",

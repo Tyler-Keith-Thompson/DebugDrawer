@@ -70,6 +70,11 @@ common:rules_xcodeproj --allow_analysis_cache_discard
 common:rules_xcodeproj_generator --allow_analysis_cache_discard
 common:rules_xcodeproj_indexbuild --allow_analysis_cache_discard
 
+# `just run device`: the iOS example built for a paired iPhone, signed with its provisioning
+# profile (Example/BUILD.bazel). It runs in an output base of its own (BAZEL_DEVICE in the
+# justfile), as release builds do, so switching to it never discards the debug analysis cache.
+common:device --define=example_device=true --ios_multi_cpus=arm64
+
 # Per-developer overrides. Gitignored; a missing file is fine. On a Mac, BuildBuddy needs no
 # file: tools/bazel turns it on when the Keychain holds the key (`just buildbuddy-key`).
 try-import %workspace%/user.bazelrc

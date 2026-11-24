@@ -6,8 +6,36 @@ import Security
 enum ExampleKeychain {
     /// Launched with this argument, the app adds the items before it starts.
     static let launchArgument = "-SeedKeychain"
-    /// The app's own group and the shared one its entitlements name.
-    static let accessGroups = ["FAKETEAMID.com.debugdrawer.example.ios", "FAKETEAMID.com.debugdrawer.example.shared"]
+    /// The app's own group and the shared one its entitlements name, under the team the app is
+    /// signed for: FAKETEAMID in the simulator, the signing team's ID on a device.
+    static var accessGroups: [String] {
+        let prefix = appIdentifierPrefix() ?? "FAKETEAMID"
+        return ["\(prefix).com.debugdrawer.example.ios", "\(prefix).com.debugdrawer.example.shared"]
+    }
+
+    /// The team prefix of the app's default access group, which the keychain gives an item added
+    /// without one. A probe item reads it, since iOS has no public call that returns the app's own
+    /// entitlements; it is deleted again at once.
+    private static func appIdentifierPrefix() -> String? {
+        let probe: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: "com.debugdrawer.example.access-group-probe",
+            kSecAttrAccount as String: "probe",
+            kSecUseDataProtectionKeychain as String: true
+        ]
+        SecItemDelete(probe as CFDictionary)
+        defer { SecItemDelete(probe as CFDictionary) }
+        var added = probe
+        added[kSecValueData as String] = Data()
+        added[kSecReturnAttributes as String] = true
+        var result: CFTypeRef?
+        guard SecItemAdd(added as CFDictionary, &result) == errSecSuccess,
+              let attributes = result as? [String: Any],
+              let group = attributes[kSecAttrAccessGroup as String] as? String,
+              let prefix = group.split(separator: ".").first
+        else { return nil }
+        return String(prefix)
+    }
     /// The key's application tag.
     static let keyTag = Data("com.debugdrawer.example.signing".utf8)
 
@@ -22,9 +50,10 @@ enum ExampleKeychain {
     /// the shared group, and a permanent P-256 key the keychain generates. The key's private data
     /// never leaves the keychain.
     static func seed() {
+        let groups = accessGroups
         let passwords = [
-            (service: "com.debugdrawer.example.api", account: "api-user", value: "api-token", group: accessGroups[0]),
-            (service: "com.debugdrawer.example.shared", account: "shared-user", value: "shared-token", group: accessGroups[1])
+            (service: "com.debugdrawer.example.api", account: "api-user", value: "api-token", group: groups[0]),
+            (service: "com.debugdrawer.example.shared", account: "shared-user", value: "shared-token", group: groups[1])
         ]
         for password in passwords {
             let item: [String: Any] = [
