@@ -5,12 +5,15 @@
 # runs at once (several worktrees, say) would share one, and the first to finish would delete it
 # under the other. The name here is the run's own.
 #
-# The runner sets SIMULATOR_DEVICE_TYPE (a device type's name, "iPhone 17") and
-# SIMULATOR_OS_VERSION ("27.2"); only the UDID goes to stdout, which the runner reads.
+# The runner sets SIMULATOR_DEVICE_TYPE (a device type's name, "iPhone 17"), SIMULATOR_OS_VERSION
+# ("27.2"; empty since rules_apple 5 unless the runner or --ios_simulator_version names one) and
+# SIMULATOR_SDK_VERSION (the Xcode's iOS SDK, the runtime used when no version is named); only the
+# UDID goes to stdout, which the runner reads.
 
 set -euo pipefail
 
-runtime="com.apple.CoreSimulator.SimRuntime.iOS-${SIMULATOR_OS_VERSION//./-}"
+version="${SIMULATOR_OS_VERSION:-$SIMULATOR_SDK_VERSION}"
+runtime="com.apple.CoreSimulator.SimRuntime.iOS-${version//./-}"
 simulator_id=$(xcrun simctl create "Bazel ${SIMULATOR_DEVICE_TYPE} $$-$RANDOM" "$SIMULATOR_DEVICE_TYPE" "$runtime")
 if ! xcrun simctl bootstatus "$simulator_id" -b >&2; then
   xcrun simctl delete "$simulator_id" >&2 || true

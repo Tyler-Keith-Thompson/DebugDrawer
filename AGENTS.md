@@ -48,18 +48,75 @@ tools/lint.bzl                   `just lint`: SwiftLint (.swiftlint.yml) and a11
 external packages and platforms. `just modules` regenerates `Package.swift`, every `BUILD.bazel`,
 the umbrella module and `swift/Package.swift` from it. Never edit the generated files by hand;
 `//:package_swift_test` fails when `Package.swift` disagrees with the Bazel graph.
+`just modules` refuses a table or function defined twice in it, which a template update can merge
+in beside the project's own: keep one definition, holding the project's rows, and delete the other.
 
 - Add a module: a row in `MODULES` (name, group, description, dependencies), then `just modules`.
 - Add a test target: a row in `TEST_TARGETS`. A target with a `Performance/` directory of Swift
   sources must be listed in `PERFORMANCE_TESTS`, and the reverse.
 - Add a test helper (shared checks several test targets run): a row in `TEST_HELPERS`. It is a
   testonly library visible only to `//Tests/...`, which no module may list.
+- Run a test target in the iOS simulator as well: a row in `TESTED_PLATFORMS["iOS"]`, then
+  `just modules`. It runs through `//tools:ios_test_runner` in a new simulator, hosted by
+  `tools/test_host`, without the packages `BAZEL_TESTED_PLATFORM_EXCLUDED_PACKAGES` names. Leave
+  the template's `SIMULATOR_TESTS` empty: its runner links every Apple-only package and has no
+  such exclusions. The iOS apps are the hand-written ones under `Example/`, so the template's
+  `--ios` option doesn't apply.
+- Give a test target an environment variable under `bazel test` (an integration test that runs
+  only when `TEST_DATABASE_URL` is set, say): its name and the variables in `TEST_ENVIRONMENT`
+  (`{"<Target>Tests": ["TEST_DATABASE_URL"]}`), then `just modules`. Bazel strips the test
+  environment; the generator writes the names as `env_inherit` on that target's `swift_test`, its
+  Performance one and its simulator `ios_unit_test`, so only those targets see the variable and
+  only their cached results depend on it. Not `--test_env` in `.bazelrc`, which hands it to every
+  test. SwiftPM passes the whole environment already. `check()` refuses a name that isn't a test
+  target.
 - Add an executable: a row in `EXECUTABLES` (name, description, dependencies). It holds only
   `@main`; its code lives in a module, where tests reach it.
 - Add a dynamic library (C code that must be an image of its own, loaded at launch, such as
   `DebugDrawerDiskIOInterposer`'s dyld interposing tuples): a row in `DYNAMIC_LIBRARIES`. It is a
   `.dynamic` product in SwiftPM and a dylib in Bazel; only test targets and apps link it, and a
   module that uses it finds its functions with `dlsym`.
+- Add an example module (a demo app's views, a sample server's routes): a row in `MODULES` and its
+  name in `EXAMPLE_MODULES`, then `just modules`. It builds and tests like any module, but has no
+  library product, umbrella import or DocC archive, so neither it nor its dependencies ship. Only
+  executables, test targets and other example modules may depend on it (`check()` enforces it).
+- Offer a module on its own but not through `import DebugDrawer` (a test-support back end, such as
+  an in-memory store adopters use in their tests): its name in `NON_UMBRELLA_MODULES` too, then
+  `just modules`. It keeps its library product and DocC archive; only the umbrella leaves it out.
+  The umbrella catalog's topic list is hand-written: list it there under a heading of its own, not
+  among the production modules.
+- A library module that imports Swift Testing (a helper adopters add to their test targets: a
+  custom `Trait`, an assertion that records an `Issue`): its name in `TESTING_MODULES` and
+  `NON_UMBRELLA_MODULES` too, then `just modules`. Bazel finds Testing only on the developer search
+  paths, which rules_swift gives testonly targets alone; the generator gives them to its
+  `swift_library` and its docs' symbol graph. A module that depends on it must be listed too, and no
+  executable may (`check()` enforces both).
+- Give a module resources (data files, Apple's privacy manifest): put them under `Sources/<Module>/`
+  and list each in `RESOURCES` (`{"<Module>": [("process", "Data/x.json"), ("copy", "Fixtures")]}`,
+  paths relative to the module, rules as SwiftPM's `.process` and `.copy`), then `just modules`.
+  Package.swift gets `resources:`, and Bazel the same `DebugDrawer_<Module>.bundle`
+  (`tools/resources.bzl`): nested in an app's or test bundle's resources on Apple platforms, in the
+  runfiles of `bazel test` and `bazel run` on macOS and Linux, found by a generated `Bundle.module`.
+  The module reads them through `Bundle.module` under either build system, and its tests read them
+  through the module. Bazel processes `process` files only inside Apple bundles (strings, asset
+  catalogs); elsewhere they are copied as they are, as SwiftPM does off Apple platforms. A module
+  that calls a required-reason API or collects data ships `PrivacyInfo.xcprivacy`, listed as
+  `("copy", "PrivacyInfo.xcprivacy")` so it sits at the bundle's root; `check()` refuses one left
+  out, a listed path that doesn't exist, and one inside another listed directory.
+- Give a test target fixture files (JSON to compare byte for byte, a sample input): put them under
+  `Tests/<Target>/` and list them in `RESOURCES` under the target's name
+  (`{"<Target>": [("copy", "Fixtures")]}`, paths relative to `Tests/<Target>`), then `just modules`.
+  The target gets its own `DebugDrawer_<Target>.bundle` the same way, in its swift_test, its
+  simulator ios_unit_test and its SwiftPM test target, and its tests read the files through
+  `Bundle.module`. Not under `Performance/`, which the target leaves out: the speed-reliant tests
+  of a `PERFORMANCE_TESTS` target list theirs under `<X>PerformanceTests`, paths relative to
+  `Tests/<X>/Performance`, and read them through `Bundle.module` in debug and release alike.
+- Add a command plugin (`swift package <verb>`): a row in `PLUGINS` (name, verb, description, and
+  the reason it writes to the package directory, or `None` when it writes nothing there), its
+  sources in `Plugins/<name>/` (an `@main` `CommandPlugin`), then `just modules`. Package.swift gets
+  a `.plugin` target and product; Bazel builds none of it, so no test reaches the plugin. Keep it
+  thin, its logic in a module or an executable it builds and runs, and run it on the package
+  (`swift package --allow-writing-to-package-directory <verb>`) after a change to it.
 - Add an external package: a row in `PACKAGES`, its `swiftpkg_<identity>` repository in
   `MODULE.bazel`'s `use_repo`, then `just modules` and `just resolve`.
 - A package whose main module takes the project's name (`import DebugDrawer` is the library
@@ -75,6 +132,13 @@ the umbrella module and `swift/Package.swift` from it. Never edit the generated 
   edges that carry a condition, so the generator also conditions that dependency's own
   dependencies that don't build there (`closure_conditions()`: the Console plugin's OSLogClient,
   the Network plugin's DebugDrawerNetwork), on the dependency's platforms.
+- Raise the Swift floor (a dependency's manifest needs a newer Swift): set `SWIFT` (every
+  manifest's tools version, CI's and the Docker image's Swift, the minimum the docs state) and
+  `SWIFT_TOOLCHAIN` (the swift.org release swiftly installs where Xcode's toolchain falls short)
+  in `scripts/modules.py`, then `just modules`. It writes them into the generated manifests and
+  replaces the previous ones in every other file that names them (`SWIFT_SITES`), from the record
+  in `tools/swift_version.bzl`. Never edit a version in those files by hand. `just template-update`
+  keeps the project's versions, and says when the template's have passed them.
 - A module name takes a `Module` suffix only when it would otherwise equal its main type's name
   (`GreetingModule` would hold `Greeting`). No catch-all modules ("Core", "Utilities").
 
@@ -125,7 +189,8 @@ Every shell command gets a timeout. macOS has no `timeout`; use
 - First-party warnings are errors (`tools/swift_rules.bzl`); dependencies build quietly. Fix the
   warning, never suppress it. DocC's are too: `just docs` fails on a link that doesn't resolve.
 - Exit tests (`#expect(processExitsWith:)`) go in files of their own, apart from the other tests:
-  builds for platforms that cannot start a child process leave those files out.
+  builds for platforms that cannot start a child process (iOS, visionOS, tvOS, watchOS) leave
+  those files out.
 
 ## DebugDrawer
 

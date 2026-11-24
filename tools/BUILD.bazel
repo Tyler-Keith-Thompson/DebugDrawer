@@ -28,8 +28,8 @@ python_test(
 )
 
 # Runs the iOS test bundles (TESTED_PLATFORMS in scripts/modules.py), hosted by //tools/test_host,
-# through xcodebuild in a new simulator that is deleted afterwards. rules_apple's ordered runner,
-# since its default one (xctestrunner) fails a run that holds only Swift Testing tests.
+# through xcodebuild in a new simulator that is deleted afterwards. An ios_xctestrun_runner of
+# its own, rather than the default, for that simulator and its deletion.
 ios_xctestrun_runner(
     name = "ios_test_runner",
     create_simulator_action = ":create_simulator",
@@ -88,6 +88,16 @@ config_setting(
     visibility = ["//visibility:public"],
 )
 
+# Source locations for the DocC rules (tools/docc.bzl), wherever a module's compile ran.
+exports_files(["docc_symbol_graph.py"])
+
+python_test(
+    name = "docc_symbol_graph_test",
+    size = "small",
+    src = "docc_symbol_graph_test.py",
+    data = ["docc_symbol_graph.py"],
+)
+
 # Debug builds (the default; `--config=release` builds opt). Modules that generate mocks define
 # MOCKING only under this setting (MOCKING in scripts/modules.py).
 config_setting(
@@ -108,3 +118,7 @@ python_test(
     src = "documentation_coverage_test.py",
     data = ["documentation_coverage.py"],
 )
+
+# The Info.plist of a module's resource bundle on Apple platforms (RESOURCES in scripts/modules.py,
+# tools/resources.bzl): the keys SwiftPM writes into the bundle it builds for the same resources.
+exports_files(["ResourceBundleInfo.plist"])

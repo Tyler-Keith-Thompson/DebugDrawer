@@ -1,7 +1,7 @@
 """First-party Swift rule wrappers.
 
-Every first-party `swift_library` / `swift_test` / `swift_binary` loads from here instead of
-`@rules_swift//swift:swift.bzl`. The wrappers flip rules_swift features so our
+Every first-party `swift_library` / `swift_test` / `swift_binary` / `swift_compiler_plugin` loads
+from here instead of `@rules_swift//swift:swift.bzl`. The wrappers flip rules_swift features so our
 own code is held to a stricter warnings policy than third-party code:
 
   * `.bazelrc` enables `swift.suppress_warnings` globally, so swiftc gets
@@ -19,6 +19,7 @@ nothing a test installs writes into the developer's `~/Library`.
 load(
     "@rules_swift//swift:swift.bzl",
     _swift_binary = "swift_binary",
+    _swift_compiler_plugin = "swift_compiler_plugin",
     _swift_library = "swift_library",
     _swift_test = "swift_test",
 )
@@ -115,6 +116,15 @@ def swift_test(name, features = [], copts = [], tags = [], size = None, visibili
 
 def swift_binary(name, features = [], copts = [], **kwargs):
     _swift_binary(
+        name = name,
+        features = features + _FIRST_PARTY_FEATURES,
+        copts = copts + _FIRST_PARTY_COPTS,
+        package_name = _PACKAGE_NAME,
+        **kwargs
+    )
+
+def swift_compiler_plugin(name, features = [], copts = [], **kwargs):
+    _swift_compiler_plugin(
         name = name,
         features = features + _FIRST_PARTY_FEATURES,
         copts = copts + _FIRST_PARTY_COPTS,
