@@ -26,6 +26,11 @@ holds the types the core uses from it: `DebugDrawerPluginModel`, the sessions
 
 - <doc:GettingStarted>
 - <doc:InstallingInSwiftUI>
+- <doc:UsingTheDrawer>
+- <doc:ShippedPlugins>
+- <doc:PluginRequirements>
+- <doc:SupportedPlatforms>
+- <doc:Modules>
 - <doc:ReleaseBuilds>
 
 ### The Drawer

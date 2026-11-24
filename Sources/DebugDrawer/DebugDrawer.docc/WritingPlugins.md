@@ -82,7 +82,7 @@ identifier with `.debugdrawer` appended, so none of it shows among the app's sta
 ### Search actions
 
 The drawer's search field finds plugins by title, and runs the ``DebugDrawerAction``s a plugin
-declares, each found by its title or keywords:
+declares, each found by its title or keywords. A plugin declares no actions unless it says so:
 
 ```swift
 struct SessionPlugin: DebugDrawerPlugin {
@@ -97,26 +97,42 @@ struct SessionPlugin: DebugDrawerPlugin {
         [
             DebugDrawerAction("Expire token", keywords: ["auth", "logout"]) {
                 UserDefaults.standard.removeObject(forKey: "authToken")
-            }
+            },
         ]
     }
 }
 ```
+
+<doc:UsingTheDrawer> describes the search field and its keys.
 
 ### Badges and toasts
 
 A plugin can raise a problem while the drawer is closed. ``DebugDrawerPlugin/setBadge(_:)`` puts
 a count on its header until ``DebugDrawerPlugin/clearBadge()``, and
 ``DebugDrawerPlugin/postToast(_:)`` shows a toast in the window's corner that opens the drawer at
-the plugin when tapped. Posts from one plugin coalesce into one toast that counts them, and the
-toast goes away by itself ``DebugDrawer/DebugDrawer/toastLifetime`` seconds after the last post,
-staying while the pointer is over it or accessibility focus is on it. They reach every drawer
-that holds the plugin, globally or locally: ``DebugDrawer/DebugDrawer/shared`` for a plugin
-installed there, a `DebugDrawer()` of your own for one installed in it, and both for one in both.
-A plugin no drawer holds yet posts to ``DebugDrawer/DebugDrawer/shared``. These are methods on the
-plugin, so they compile in release, where they do nothing.
+the plugin, expanded and scrolled into view, when tapped. Posts from one plugin coalesce into one
+toast that shows the latest message and counts them, and a post made while the drawer is open is
+dropped. The toast goes away by itself ``DebugDrawer/DebugDrawer/toastLifetime`` (6) seconds
+after the last post, and stays while the pointer is over it or accessibility focus is on it.
+
+Badges and toasts reach every drawer that holds the plugin, globally or locally:
+``DebugDrawer/DebugDrawer/shared`` for a plugin installed there, a `DebugDrawer()` of your own for
+one installed in it, and both for one in both. A plugin no drawer holds yet posts to
+``DebugDrawer/DebugDrawer/shared``. The counts of Analytics, Crash Reports, Hangs, Leaks and
+MetricKit badge only the drawers that installed the plugin: each drawer shows the count as it
+installs the plugin and clears it as it removes it. These are methods on the plugin, so they
+compile in release, where they do nothing.
 
 ```swift
+struct UploadsPlugin: DebugDrawerPlugin {
+    var title = "Uploads"
+    var icon = "arrow.up.circle"
+
+    var body: some View {
+        Text("No uploads")
+    }
+}
+
 let uploads = UploadsPlugin()
 uploads.setBadge(2)
 uploads.postToast("Upload of report.pdf failed")
@@ -137,7 +153,25 @@ A plugin can show something while its section is closed. Its
 ``DebugDrawerPlugin/headerAccessory`` sits at the trailing edge of its header row: a count of
 what it found, a short summary, or a borderless action. Its ``DebugDrawerPlugin/hud`` is a
 compact readout the developer can pin to the floating HUD, which stays on screen while the drawer
-is closed.
+is closed (<doc:UsingTheDrawer> describes the HUD). A plugin declares no readout unless it says
+so:
+
+```swift
+struct QueuePlugin: DebugDrawerPlugin {
+    var title = "Queue"
+    var icon = "tray.full"
+
+    var body: some View {
+        Text("3 jobs waiting")
+    }
+
+    var hud: Text? {
+        Text("3 jobs")
+    }
+}
+```
+
+A plugin can declare both:
 
 ```swift
 struct JobsPlugin: DebugDrawerPlugin {
@@ -165,6 +199,12 @@ A plugin is a value the drawer reads, not a view, so it holds no `@State`. Keep 
 state in a view its body returns, or in an observable store the plugin and the app share, and
 pass the services it uses (storage, a clock, the network) in through its initializer, so a test
 can hand it fakes.
+
+### Work that needs a clean view of the app
+
+A plugin that needs the app without the drawer over it, as a screenshot does, runs its work in
+`DebugDrawer.shared.performWhileHidden(drawer:_:)`. The call hides the HUD, and every open drawer
+unless `drawer` is false, runs the work once that has drawn, then shows them again.
 
 ### Lifecycle
 
@@ -234,6 +274,27 @@ drawer.unregisterGlobal(id: SocketPlugin(monitor: monitor).id) // uninstall(from
 ```
 
 In release builds a drawer of your own is a stand-in too: it holds nothing and calls no hook.
+
+Every shipped plugin starts its work in `install(in:)` and undoes it in `uninstall(from:)`, so
+`unregisterGlobal(id:)` takes a plugin out of the app as well as out of the drawer. Network, Disk
+I/O, Location and View Inspector give each method they swizzled its original implementation back
+and unregister the URL protocol. Accessibility clears its overrides. The plugins that watch the
+app stop their observers, handlers and threads and let go of what they captured. What a plugin
+saved to disk or to `UserDefaults` (mock rules, earlier sessions, reports, settings) stays for the
+next install, and installing again starts it all over. Work a plugin does for every app window is
+counted by drawer, and stops once the last drawer holding the plugin removes it. If other code
+swizzled a method again on top of the plugin's, putting the original back would break that code,
+so the plugin leaves it in place and it calls straight through, recording nothing, until the
+plugin is installed again.
+
+When two drawers hold Network, Console or View Inspector, the one that installed it last gets
+what it captures (requests, log lines, render counts), and Network's mock rules and conditions
+come from that drawer's plugin. Once that drawer removes the plugin, the one before it captures
+again. Location works the same way: `installLocation()` on a drawer of your own gives it a
+simulator of its own, with its switch and coordinate kept in that drawer's defaults, and the app's
+location managers get the locations of the drawer that installed it last.
+`ScreenRecording.install(in:)` gives a drawer its own recorder, list and Show Touches setting. An
+app that uses only the shared drawer sees no difference.
 
 A shipped plugin made with its public initializer works over the shared stores, the ones
 `install*()` fills. The Network, Console, View Inspector, Accessibility and Tweaks plugins also
@@ -516,7 +577,8 @@ open, ends one with `DebugDrawerSessions.end()`, and reads `DebugDrawerSessions.
 (the newest `DebugDrawerSessions.auditCapacity` entries) or forwards every
 `DebugDrawerAuditEntry` from `DebugDrawerSessions.auditEntries`. An entry holds its date,
 session, capability and event, never what a command carried. Commands from the in-process
-transport, the app's own drawer, aren't gated. The README's "Sidecar sessions" shows the setup.
+transport, the app's own drawer, aren't gated. The Sidecar Kit documentation's Sidecar Sessions article
+shows the setup.
 
 **Production builds.** Everything above is debug-only. A release build links the
 `DebugDrawerReceiver` product instead: `DebugDrawerReceiver(directory:sessions:)` serves the same
@@ -565,8 +627,8 @@ device identifier serves it only for the session: `DebugDrawerNotifications` hol
 it in memory and puts it, with the push environment and the notification settings, in the snapshot
 only while a session is open, and not for a session whose grant doesn't list it. The receiver's module holds
 `DebugDrawerPluginModel`, the sessions and the store's wire format, real in every build, and
-`DebugDrawer` re-exports it; it serves no socket and holds no view. The README's "Production
-builds: the receiver" shows the setup.
+`DebugDrawer` re-exports it; it serves no socket and holds no view. The DebugDrawerReceiver
+documentation's Serving a Sidecar from a Production Build article shows the setup.
 
 **Grants.** Sessions made with a `DebugDrawerGrantPolicy`
 (`DebugDrawerSessions(maximumDuration:auditCapacity:grantPolicy:)`) open only with a signed grant
@@ -579,8 +641,8 @@ capability the grant lists (`DebugDrawerAuditEntry.Refusal.capabilityNotGranted`
 holds for the debug registry's sessions as for the receiver's. A capability too risky to offer on
 team signing alone declares it with `DebugDrawerReceiverCapability.requiringGrant()`: in a session
 without a grant, which is every session without a policy, its commands are refused as
-`DebugDrawerAuditEntry.Refusal.grantMissing`. Without a policy, nothing changes. The README's
-"Signed grants" documents the format and a test signer.
+`DebugDrawerAuditEntry.Refusal.grantMissing`. Without a policy, nothing changes. The DebugDrawerReceiver
+documentation's Signed Grants article documents the format and a test signer.
 
 **In the background.** A `DebugDrawerBackgroundKeeper` made with the sessions keeps the app
 running while one is open, so a sidecar in the foreground keeps the socket, and ends every request
@@ -596,7 +658,8 @@ asks only for what the platform sanctions, and claims no background mode:
 
 Made with the ``DebugDrawerSocketServer``, the keeper also ends the session when the last viewer
 disconnects from the socket on its own (``DebugDrawerSocketServer/viewerDisconnections``), not
-when the app stops the server. The keeper is part of `DebugDrawerReceiver` and works in release builds too. The README's "Sidecar sessions in the background" has the setup.
+when the app stops the server. The keeper is part of `DebugDrawerReceiver` and works in release builds too. The DebugDrawerReceiver
+documentation's Keeping the App Reachable in the Background article has the setup.
 
 **Why it is built this way.** The protocol hands out ``DebugDrawerPluginTransport``s rather than
 raw messages, so a view never changes and the in-process transport keeps `direct(to:)`'s

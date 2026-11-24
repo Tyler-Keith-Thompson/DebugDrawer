@@ -101,8 +101,34 @@ struct OrdersRootView: View {
 ```
 
 ``DebugDrawer/DebugDrawer/open()`` and ``DebugDrawer/DebugDrawer/close()`` open and close it
-outright, and do nothing if it is already so. Read ``DebugDrawer/DebugDrawer/isOpen`` (or observe
-`$isOpen`) to know whether it is open; setting it is deprecated.
+outright, and do nothing if it is already so; use them where the trigger knows which it wants.
+Read ``DebugDrawer/DebugDrawer/isOpen`` to know whether the key window's drawer is open, and
+observe `$isOpen` for each change. Open and close the drawer with these calls; setting `isOpen` is
+deprecated.
+
+Some other triggers, including one for tvOS:
+
+```swift
+// A keyboard shortcut of the app's own (Ctrl-D here)
+.background {
+    Button("") { DebugDrawer.shared.toggle() }
+        .keyboardShortcut("d", modifiers: .control)
+        .hidden()
+}
+
+// Shake gesture (iOS)
+override func motionEnded(_ motion: UIEvent.EventSubtype, with event: UIEvent?) {
+    if motion == .motionShake { DebugDrawer.shared.toggle() }
+}
+
+// Triple-tap (iOS)
+.onTapGesture(count: 3) { DebugDrawer.shared.toggle() }
+
+// Play/Pause on the Siri Remote (tvOS), attached outside .debugDrawer() so it also closes it
+ContentView()
+    .debugDrawer()
+    .onPlayPauseCommand { DebugDrawer.shared.toggle() }
+```
 
 Each window has a drawer of its own, open or closed apart from the others;
 ``DebugDrawer/DebugDrawer/toggle()``, ``DebugDrawer/DebugDrawer/open()``,
@@ -112,6 +138,7 @@ window's, as "Use the drawer with several windows" below describes.
 While the drawer is open, Cmd-K focuses its search field, Cmd-Option-Down and Cmd-Option-Up move
 between plugins, and Escape clears the search, then leaves a plugin shown alone, then closes the
 drawer. None of these exists while it is closed, so they never take a key from the app.
+<doc:UsingTheDrawer> lists the shortcuts and keyboard navigation in full.
 
 ### Use the drawer with several windows
 
@@ -144,8 +171,9 @@ which lists every local plugin.
 The drawer lists every plugin in sections with disclosure triangles, as Xcode's navigators do. A
 section header's chevron, its Show Alone action, or the jump bar's menu shows one plugin alone at
 the panel's full height, with the jump bar ending at it; the back button returns to the list.
-Where the window is too narrow for a panel beside the app (an iPhone in portrait), the panel is as
-wide as the window and opens at the list, and each row shows its plugin alone.
+The panel is 316 points wide. Where the window is narrower than two of those (an iPhone in
+portrait), the panel is as wide as the window and opens at the list, and each row shows its
+plugin alone.
 
 ### Where the drawer appears
 
@@ -160,9 +188,30 @@ wide as the window and opens at the list, and each row shows its plugin alone.
   covers it.
 - **watchOS:** a full-screen list of the plugins, each row opening that plugin's view.
 
+<doc:SupportedPlatforms> covers the drawer on Apple TV and Apple Watch in more detail.
+
 ### Order the other modifiers around it
 
 A modifier that changes the app's own views and not the drawer, such as the Accessibility
 plugin's environment overrides, goes before `debugDrawer()`, so the drawer it adds keeps its own
 look. A command that should also work while the drawer is open, such as tvOS's
 `onPlayPauseCommand` to close it again, goes after it.
+
+Some shipped plugins add a modifier of their own to the app's views. Each one goes above
+`.debugDrawer()`:
+
+```swift
+import DebugDrawerAccessibilityPlugin
+import DebugDrawerDesignOverlayPlugin
+import DebugDrawerLocalizationPlugin
+import DebugDrawerViewInspectorPlugin
+
+ContentView()
+    .debugLocalization()            // redraws the app's text when the Localization mode changes
+    .debugAccessibilityOverrides()  // environment overrides; must be above .debugDrawer()
+    .debugGrid()                    // alignment grid, controlled from the View Inspector plugin
+    .debugDesignOverlay()           // the Design Overlay plugin's mockup, under the drawer
+    .debugDrawer()
+```
+
+<doc:ShippedPlugins> describes the plugins these modifiers belong to.

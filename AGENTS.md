@@ -258,7 +258,9 @@ A feature is done when it has all of these. Copy what its sibling features in th
 have.
 
 1. **Code and docs.** The implementation, with doc comments per "Docs" below. A new module gets a
-   row in `scripts/modules.py`, then `just modules` and the README's module table.
+   row in `scripts/modules.py`, then `just modules`, a line in the README's plugin list (a
+   plugin) and a row in the core catalog's Modules article. A plugin's guide is an article in
+   its module's DocC catalog (`Sources/<Module>/<Module>.docc`), linked from the README.
 2. **Tests** in `Tests/<Module>Tests`:
    - hand-worked cases;
    - edge cases: empty input, one element, the boundaries of every range;
@@ -419,6 +421,14 @@ library with none of that can skip this section.
   and when it would become the right one. Doc comments describe the API; these record decisions. A
   comment that restates the code is deleted.
 - The README's examples are tests (`Tests/DebugDrawerTests`).
+- The README is the front page: what the project is, how to install or run it, one short example,
+  and links. Everything else (guides, every option, reference) goes in the DocC catalogs, which
+  the README links to. When a section grows past a screen, move it out rather than trim the
+  README's other sections to make room.
+- Run prose docs through the `humanizer` skill (`/humanizer`) before committing them: READMEs, DocC
+  articles, doc comments and this file. It removes the tells of generated text (inflated claims,
+  stock phrases, forced lists of three) without changing what the text says. Docs only: not code,
+  `//` comments, commit messages or backlog items.
 
 ### Git (*default*)
 

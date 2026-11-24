@@ -6,17 +6,20 @@ Add the package, write a plugin, attach the drawer to the app's root view and op
 
 DebugDrawer requires Swift 6.3. The drawer and the shipped plugins support macOS 15 and iOS 17
 or later. This module also builds for Mac Catalyst, visionOS 1, tvOS 17 and watchOS 10 or
-later, as some of the shipped plugins do; the package's README lists which. On a platform a
+later, as some of the shipped plugins do; <doc:SupportedPlatforms> lists which. On a platform a
 plugin doesn't build for, an app registers plugins of its own.
+
+The package's tests compile every example in these articles (`Tests/DebugDrawerTests`), so the
+examples can't drift from the code.
 
 ### Add the package
 
 Add the package, then the core and only the plugins you want to the app's target. Each plugin
-is a library of its own:
+is a library of its own, and <doc:Modules> lists them all:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/Tyler-Keith-Thompson/DebugDrawer", from: "0.1.2"),
+    .package(url: "https://github.com/Tyler-Keith-Thompson/DebugDrawer", from: "0.1.3"),
 ],
 ```
 
@@ -24,6 +27,8 @@ dependencies: [
 .target(name: "MyApp", dependencies: [
     .product(name: "DebugDrawer", package: "DebugDrawer"),
     .product(name: "DebugDrawerConsolePlugin", package: "DebugDrawer"),
+    .product(name: "DebugDrawerPerformancePlugin", package: "DebugDrawer"),
+    // ... as many or as few as you need (Modules, below)
 ]),
 ```
 
@@ -62,13 +67,18 @@ let settings = Text("Settings").debugLocalPlugin(CachePlugin())
 DebugDrawer.shared.toggle()
 ```
 
-None of this needs `#if DEBUG`: every call compiles in every build, and in release each does
-nothing; <doc:ReleaseBuilds> lists what each does there.
+None of this needs `#if DEBUG`: every public API exists in every configuration, and release
+builds get stand-ins that do nothing. There `DebugDrawer.shared` drops the plugins registered
+with it and never opens, the plugins' `install*()` calls install nothing, and `.debugDrawer()` and
+`.debugLocalPlugin()` return the view unchanged. <doc:ReleaseBuilds> lists what each call does
+there.
 
 ### Next steps
 
 - <doc:InstallingInSwiftUI> places the drawer in an app's scene and opens it from a gesture or
   a keyboard shortcut.
+- <doc:ShippedPlugins> installs the plugins that come with the package.
+- <doc:UsingTheDrawer> covers grouping, pinning, search, the keyboard and the HUD.
 - <doc:WritingPlugins> covers the plugin protocol: global and local plugins, categories, search
   actions, badges, toasts and the HUD.
 - <doc:BuildingPluginViews> lists the rows, buttons and styles plugins are built from.

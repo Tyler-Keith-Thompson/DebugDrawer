@@ -19,7 +19,7 @@ import Foundation
 /// grant's ID), `sub` (who holds it), `aud` (the app's bundle identifier, or an array of them),
 /// `nbf` and `exp` (seconds since 1970) and `capabilities` (an array of capability IDs). The
 /// signature is over the ASCII bytes of the header and claims segments joined by `.`: 64 bytes,
-/// Ed25519's, or ES256's `r` and `s`. The README's "Signed grants" section shows a signer.
+/// Ed25519's, or ES256's `r` and `s`. <doc:SignedGrants> shows a signer.
 public struct DebugDrawerSignedGrantVerifier: DebugDrawerGrantVerifier {
     /// The `typ` a grant's header must name.
     public static let tokenType = "debugdrawer-grant+jwt"

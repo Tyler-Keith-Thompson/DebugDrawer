@@ -18,7 +18,37 @@ distribute the sidecar so it stays with your employees.
 
 ### Essentials
 
+- <doc:ProductionBuilds>
 - <doc:SecurityModel>
 - ``DebugDrawerReceiver``
 - ``DebugDrawerReceiverCapability``
 - ``DebugDrawerSessions``
+
+### Sessions
+
+- <doc:SignedGrants>
+- <doc:BackgroundSessions>
+- <doc:RemoteKillSwitch>
+
+### Capabilities
+
+- <doc:FeatureFlagOverrides>
+- <doc:ExperimentOverrides>
+- <doc:LogLevels>
+- <doc:DiagnosticsCapture>
+- <doc:ProductionBugReports>
+- <doc:LaunchScenarios>
+- <doc:AuthActions>
+- <doc:ResettingAppState>
+- <doc:ProductionTweaks>
+- <doc:AnalyticsEventsMirroring>
+- <doc:LocalizationReviewInProduction>
+- <doc:AccessibilityOverridesInProduction>
+- <doc:CrashReportsAndMetricKit>
+- <doc:PushTokenForTestPushes>
+- <doc:ProductionNetworkMocks>
+- <doc:SwitchingEnvironments>
+- <doc:LocationSpoofingInProduction>
+- <doc:AllowlistedUserDefaults>
+- <doc:HangsAndSignposts>
+- <doc:AppStateInReports>

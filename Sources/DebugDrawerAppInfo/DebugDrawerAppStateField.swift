@@ -5,7 +5,7 @@ import Foundation
 // and nothing is read while no one is debugging. Keys that look like secrets ("token", "password")
 // are not refused: a name says nothing about the value under it (a key named "plan" can still be
 // handed a token), so a refusal would only teach hosts to rename keys. The host is told instead,
-// here and in the README, never to register a secret.
+// here and in the receiver's AppStateInReports article, never to register a secret.
 
 /// A value of the host's own that the app state capability shows a sidecar beside the build: a
 /// key, and a closure that reads the value as the state is read.

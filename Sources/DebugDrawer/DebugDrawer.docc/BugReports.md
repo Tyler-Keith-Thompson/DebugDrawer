@@ -9,7 +9,23 @@ The drawer's header has a Create Report button. It asks every registered plugin 
 ``DebugDrawerReportContributor`` for its files and zips them with a `summary.txt` (the app, its
 version, the OS, the device model, the date and the list of files), one folder per plugin, named
 after its title. Every file is plain text, JSON, an HTTP Archive, a PNG or a QuickTime movie, so
-the report opens without DebugDrawer.
+the report opens without DebugDrawer, and the redaction rules mask what they call sensitive. When
+the zip is ready, the drawer shows its name and a share button.
+
+The shipped plugins add these files:
+
+| Plugin | Adds |
+|---|---|
+| Console | Its log lines, and an earlier launch's (`console-previous.txt`) |
+| Network | An HTTP Archive (`network.har`) of the captured requests |
+| App Info | Its facts |
+| UserDefaults | The app's keys |
+| Cookies | The stored cookies |
+| Screenshot | The key window |
+| Screen Recording | The newest recording |
+| Keychain | Nothing |
+
+A plugin that doesn't adopt ``DebugDrawerReportContributor`` is left out of the report.
 
 ### Contribute a plugin's files
 
@@ -44,10 +60,17 @@ same zip the button does, for a test or a trigger of the app's own.
 
 ### Redaction
 
+Network's Copy cURL, Keychain's and UserDefaults' Copy Value, Cookies' Copy and Analytics' Copy
+JSON mask what the drawer's redaction rules call sensitive. The same values are masked on screen
+until the eye button beside them reveals them, and revealing never changes a copy. A plugin
+installed in a `DebugDrawer()` of your own masks by that drawer's rules, and Network writes its
+sessions to disk by them.
+
 The drawer's rules, ``DebugDrawer/DebugDrawer/redaction``, start as
 ``DebugDrawerRedaction/standard``: the `Authorization`, `Proxy-Authorization`, `Cookie` and
-`Set-Cookie` headers, and keys containing `token`, `secret`, `password`, `session`, `auth` or an
-API key's name. Add the app's own with ``DebugDrawer/DebugDrawer/redact(headers:keys:jsonPaths:)``:
+`Set-Cookie` headers, and keys containing `token`, `secret`, `password`, `session`, `auth` or
+`apikey`. Add the app's own with one call to
+``DebugDrawer/DebugDrawer/redact(headers:keys:jsonPaths:)``:
 
 ```swift
 DebugDrawer.shared.redact(
@@ -57,14 +80,41 @@ DebugDrawer.shared.redact(
 )
 ```
 
-The same rules mask values in the shipped plugins' copy buttons, and on screen until revealed.
+Header names and key patterns match case-insensitively. A key pattern matches header names, URL
+query items, JSON keys at any depth, keychain accounts, services and labels, cookie names,
+`UserDefaults` keys, log lines' metadata keys and the keys of pairs in log text. A JSON path is
+dot-separated keys from the root, `*` matches any one key, and arrays are transparent. Assign
+`DebugDrawer.shared.redaction = .none` to mask nothing.
+
+#### Console lines
+
+The Console shows its lines as logged, and masks them as they leave it. Copy All, a line's Copy
+Line, and the bug report's `console.txt` and `console-previous.txt` mask a metadata field whose
+key matches (`token=[REDACTED]`). They also mask the value of each `key=value` or `key: value`
+pair in the text whose key matches (`redacting(text:)`):
+
+- A key is a run of letters, digits, `_`, `-` and `.` (`x-api-key`, `user.token`), or text in
+  quotes, as JSON writes keys (`"access token"`).
+- The separator is `=` or `:`, with spaces allowed around it; `==`, `::` and `://` aren't
+  separators.
+- A value in quotes is masked inside them, an escaped quote included (`"token": "[REDACTED]"`).
+  Any other value runs up to the next whitespace, `&`, `,`, `;`, `)`, `]`, `}` or quote, so each
+  item of a query string is read on its own (`?page=2&access_token=[REDACTED]&lang=en`). A value
+  starting with `{`, `[` or `(` is left for the pairs inside it.
+- Every pair is read, including a repeated key's. A value spelled with spaces outside quotes is
+  masked only up to its first space.
+
+A token written into a sentence, outside such a pair, has no key to match and stays as logged.
 
 ### Send reports to your team
 
-Until the app sets an uploader, a report stays on the device and the library makes no network
-request. Assign a ``DebugDrawerReportUploader`` to
-``DebugDrawer/DebugDrawer/reportUploader`` and the drawer shows Send Report beside each finished
-report, the upload's progress, and the uploader's error with a Retry button:
+To send a report straight to your team (an internal endpoint, an issue tracker's webhook), assign
+a ``DebugDrawerReportUploader`` to ``DebugDrawer/DebugDrawer/reportUploader``. The uploader is
+handed the zip's URL and reports the fraction sent. The drawer then shows Send Report beside each
+finished report, the upload's progress, and the uploader's error with a Retry button when it
+fails. The zip stays on disk until the system clears the temporary directory, so a failed upload
+can be retried or the report shared instead. Until the app sets an uploader there is no send
+button, a report stays on the device, and DebugDrawer itself makes no network request.
 
 ```swift
 struct TeamReportUploader: DebugDrawerReportUploader {
@@ -87,4 +137,5 @@ DebugDrawer.shared.reportUploader = TeamReportUploader(endpoint: reportsEndpoint
 
 The contributor and uploader protocols, ``DebugDrawerReport`` and ``DebugDrawerRedaction`` exist
 in every build, so these conformances compile in release, where there is no drawer and nothing
-calls them.
+calls them. There ``DebugDrawer/DebugDrawer/createReport(in:)`` throws
+``DebugDrawerReport/WriteFailed``.

@@ -36,6 +36,28 @@ A plugin's body returns a view like this one, which keeps the state the plugin i
 These views exist in every build and draw nothing in release, so a plugin's body compiles
 unchanged there.
 
+### The views at a glance
+
+| View | Shows |
+|---|---|
+| `DebugDrawerSection` | A group of rows with an optional heading and footer note |
+| `DebugDrawerRow` | An icon, a title, details and a trailing accessory such as a toggle |
+| `DebugDrawerKeyValueRow` | A label and a monospaced value; pass `redacted:` to mask a sensitive value until revealed |
+| `DebugDrawerIssueRow` | An issue glyph, a title and its status, a monospaced subline and details |
+| `DebugDrawerGaugeRow` | A measure with a bar meter, as Xcode's debug gauges |
+| `DebugDrawerStackFrameRow` | A stack frame with an own-code or system badge |
+| `DebugDrawerTypeBadgeRow` | A binary with a letter badge for its kind, its path and version |
+| `DebugDrawerActionRow` | A plugin's push buttons, a destructive one at the trailing edge |
+| `DebugDrawerIssueGlyph`, `DebugDrawerIssueCount` | A severity glyph, alone or with a count |
+| `DebugDrawerUnreadDot` | The dot beside what hasn't been opened |
+| `DebugDrawerCodeText`, `DebugDrawerCodeBlock` | A monospaced token cut in the middle, and a well of code or JSON |
+| `DebugDrawerCopyButton` | A button that copies the text its closure returns when pressed |
+| `DebugDrawerSparkline` | A line graph of recent samples |
+| `DebugDrawerSearchableList` | A filter field above a scrolling list of rows; the plugin filters the rows |
+
+A plugin's `headerAccessory` puts a count, a summary or an action at the trailing edge of its
+header row, and it shows while the plugin is closed too (<doc:WritingPlugins>).
+
 ### Sections and rows
 
 - ``DebugDrawerSection``: a group of rows with an optional heading and a note below them.
