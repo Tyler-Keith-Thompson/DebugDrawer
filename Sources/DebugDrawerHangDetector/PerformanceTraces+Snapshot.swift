@@ -307,3 +307,30 @@ extension PerformanceTraces {
         return "\(seconds * 1000 + attoseconds / 1_000_000_000_000_000) ms"
     }
 }
+
+// Decoding goes through the throwing initializer, so a snapshot read from a file or a sidecar
+// can't hold bounds no host could make; encoding stays synthesized, under the same keys.
+extension PerformanceTraces.Limits {
+    private enum CodingKeys: String, CodingKey {
+        case stalls, intervals
+    }
+
+    /// Decodes bounds, refusing those ``init(stalls:intervals:)`` refuses.
+    ///
+    /// - Parameter decoder: The decoder to read from.
+    /// - Throws: `DecodingError.dataCorrupted` whose `underlyingError` is the
+    ///   ``PerformanceTraces/InvalidLimits`` case the initializer throws, with the container's
+    ///   coding path, and the decoder's own errors for a missing or mistyped field.
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let stalls = try container.decode(Int.self, forKey: .stalls)
+        let intervals = try container.decode(Int.self, forKey: .intervals)
+        do {
+            self = try Self(stalls: stalls, intervals: intervals)
+        } catch {
+            throw DecodingError.dataCorrupted(
+                DecodingError.Context(codingPath: container.codingPath, debugDescription: "Recording limits out of range", underlyingError: error)
+            )
+        }
+    }
+}

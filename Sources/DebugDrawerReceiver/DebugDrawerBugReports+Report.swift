@@ -184,3 +184,33 @@ extension DebugDrawerBugReports {
         case refused(DebugDrawerAuditEntry.Refusal)
     }
 }
+
+// Decoding goes through the throwing initializer, so a snapshot read from a file or a sidecar
+// can't hold bounds no host could make; encoding stays synthesized, under the same keys.
+extension DebugDrawerBugReports.Limits {
+    private enum CodingKeys: String, CodingKey {
+        case reports, logLines, stateBytes, screenshotBytes
+    }
+
+    /// Decodes bounds, refusing those ``init(reports:logLines:stateBytes:screenshotBytes:)``
+    /// refuses.
+    ///
+    /// - Parameter decoder: The decoder to read from.
+    /// - Throws: `DecodingError.dataCorrupted` whose `underlyingError` is the
+    ///   ``DebugDrawerBugReports/InvalidLimits`` case the initializer throws, with the container's
+    ///   coding path, and the decoder's own errors for a missing or mistyped field.
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let reports = try container.decode(Int.self, forKey: .reports)
+        let logLines = try container.decode(Int.self, forKey: .logLines)
+        let stateBytes = try container.decode(Int.self, forKey: .stateBytes)
+        let screenshotBytes = try container.decode(Int.self, forKey: .screenshotBytes)
+        do {
+            self = try Self(reports: reports, logLines: logLines, stateBytes: stateBytes, screenshotBytes: screenshotBytes)
+        } catch {
+            throw DecodingError.dataCorrupted(
+                DecodingError.Context(codingPath: container.codingPath, debugDescription: "Bug report limits out of range", underlyingError: error)
+            )
+        }
+    }
+}

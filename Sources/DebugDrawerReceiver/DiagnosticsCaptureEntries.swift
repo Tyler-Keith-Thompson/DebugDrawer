@@ -320,3 +320,32 @@ extension [String: String] {
         reduce(0) { $0 + $1.key.utf8.count + $1.value.utf8.count }
     }
 }
+
+// Decoding goes through the throwing initializer, so a snapshot read from a file or a sidecar
+// can't hold bounds no host could make; encoding stays synthesized, under the same keys.
+extension DebugDrawerDiagnosticsCapture.Limits {
+    private enum CodingKeys: String, CodingKey {
+        case lines, requests, bodyBytes, totalBytes
+    }
+
+    /// Decodes bounds, refusing those ``init(lines:requests:bodyBytes:totalBytes:)`` refuses.
+    ///
+    /// - Parameter decoder: The decoder to read from.
+    /// - Throws: `DecodingError.dataCorrupted` whose `underlyingError` is the
+    ///   ``DebugDrawerDiagnosticsCapture/InvalidLimits`` case the initializer throws, with the
+    ///   container's coding path, and the decoder's own errors for a missing or mistyped field.
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let lines = try container.decode(Int.self, forKey: .lines)
+        let requests = try container.decode(Int.self, forKey: .requests)
+        let bodyBytes = try container.decode(Int.self, forKey: .bodyBytes)
+        let totalBytes = try container.decode(Int.self, forKey: .totalBytes)
+        do {
+            self = try Self(lines: lines, requests: requests, bodyBytes: bodyBytes, totalBytes: totalBytes)
+        } catch {
+            throw DecodingError.dataCorrupted(
+                DecodingError.Context(codingPath: container.codingPath, debugDescription: "Capture limits out of range", underlyingError: error)
+            )
+        }
+    }
+}
