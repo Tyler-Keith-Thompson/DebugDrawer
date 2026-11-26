@@ -11,11 +11,11 @@
     @Suite("installNetwork(bodyLimit:), in a child process", .timeLimit(.minutes(1)))
     struct NetworkBodyLimitExitTests {
         @Test("A response larger than the limit reaches the app whole; the log keeps its first bytes, marked truncated, with its full size")
-        func capsCapturedBody() async {
+        func capsCapturedBody() async throws {
             await #expect(processExitsWith: .success) {
                 useHomeFolderOfItsOwn()
-                await MainActor.run {
-                    DebugDrawer.shared.installNetwork(sessions: .off, bodyLimit: 4)
+                try await MainActor.run {
+                    try DebugDrawer.shared.installNetwork(sessions: .off, bodyLimit: 4)
                 }
                 // The server answers `{"ok":true}`, 11 bytes.
                 guard let server = try? RecordingServer(), let port = try? await server.start(),
@@ -41,11 +41,11 @@
         }
 
         @Test("A streamed request body past the limit reaches the server whole; the log keeps its first bytes, marked truncated, with its size")
-        func capsCapturedStreamedRequestBody() async {
+        func capsCapturedStreamedRequestBody() async throws {
             await #expect(processExitsWith: .success) {
                 useHomeFolderOfItsOwn()
-                await MainActor.run {
-                    DebugDrawer.shared.installNetwork(sessions: .off, bodyLimit: 4)
+                try await MainActor.run {
+                    try DebugDrawer.shared.installNetwork(sessions: .off, bodyLimit: 4)
                 }
                 let sent = Data(#"{"name":"tea","quantity":2}"#.utf8)
                 guard let server = try? RecordingServer(), let port = try? await server.start(),
@@ -73,16 +73,6 @@
                     && captured.requestBodySize == sent.count
                     && captured.isRequestBodyTruncated
                 exit(isExpected ? EXIT_SUCCESS : EXIT_FAILURE)
-            }
-        }
-
-        @Test("A negative body limit traps")
-        func negativeLimitTraps() async {
-            await #expect(processExitsWith: .failure) {
-                useHomeFolderOfItsOwn()
-                await MainActor.run {
-                    DebugDrawer.shared.installNetwork(sessions: .off, bodyLimit: -1)
-                }
             }
         }
     }

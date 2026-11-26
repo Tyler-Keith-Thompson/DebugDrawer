@@ -8,6 +8,8 @@ import os
 
 /// The Console plugin's install, and the lines the Log button logs.
 enum ExampleConsole {
+    private static let installLogger = Logger(subsystem: "ExampleApp", category: "ExampleConsole")
+
     /// Launched with this argument and a number, `-ConsoleSessionsKept 2`, the app keeps that many
     /// earlier launches' log lines rather than five, so pruning can be checked by relaunching.
     static let sessionsArgument = "-ConsoleSessionsKept"
@@ -15,11 +17,21 @@ enum ExampleConsole {
     /// Installs the Console plugin, keeping the number of sessions the launch argument asks for.
     @MainActor
     static func install() {
+        do {
+            try installThrowing()
+        } catch {
+            installLogger.error("The Console plugin refused its configuration: \(String(describing: error), privacy: .public)")
+        }
+    }
+
+    /// What ``install()`` does, throwing what the plugin refuses.
+    @MainActor
+    private static func installThrowing() throws {
         let arguments = ProcessInfo.processInfo.arguments
         let kept = arguments.firstIndex(of: sessionsArgument)
             .flatMap { arguments.indices.contains($0 + 1) ? Int(arguments[$0 + 1]) : nil }
             .map { max($0, 0) }
-        let sessions = kept.map { ConsoleSessionPersistence(maxSessions: $0) } ?? .standard
+        let sessions = try kept.map { try ConsoleSessionPersistence(maxSessions: $0) } ?? .standard
         DebugDrawer.shared.installConsole(sessions: sessions)
     }
 

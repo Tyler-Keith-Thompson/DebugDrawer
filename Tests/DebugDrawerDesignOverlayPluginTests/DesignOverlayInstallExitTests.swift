@@ -36,7 +36,7 @@
     @Suite("Design Overlay install, in a child process")
     struct DesignOverlayInstallExitTests {
         @Test("Install registers the plugin, with a HUD readout, in the Interface category")
-        func install() async {
+        func install() async throws {
             // The children get a home folder of their own, so the files they keep in Application Support and
             // Caches stay out of the Mac's, whatever runs the test; each checks the move took.
             let home = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString).path(percentEncoded: false)
@@ -67,28 +67,12 @@
                 let isExpected = await MainActor.run {
                     let storage = FakeMockupStorage()
                     let model = DesignOverlayModel(storage: storage)
-                    DesignOverlayInstallation.install(mockup: nil, model: model)
-                    DesignOverlayInstallation.install(mockup: MockupFixture.png(width: 64, height: 32), model: model)
+                    DesignOverlayInstallation.install(model: model)
+                    _ = try? DesignOverlayInstallation.install(mockup: MockupFixture.png(width: 64, height: 32), model: model)
                     let plugins = DebugDrawer.shared.globalPlugins.count { $0.title == "Design Overlay" }
                     return plugins == 1 && model.mockup?.pixelSize == CGSize(width: 64, height: 32) && storage.mockup == nil
                 }
                 exit(isExpected ? EXIT_SUCCESS : EXIT_FAILURE)
-            }
-        }
-
-        @Test("Installing with data that isn't an image traps")
-        func notAnImageTraps() async {
-            // The children get a home folder of their own, so the files they keep in Application Support and
-            // Caches stay out of the Mac's, whatever runs the test; each checks the move took.
-            let home = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString).path(percentEncoded: false)
-            defer { try? FileManager.default.removeItem(atPath: home) }
-
-            await #expect(processExitsWith: .failure) { [home = home as String] in
-                setenv("CFFIXED_USER_HOME", home, 1)
-                guard URL.applicationSupportDirectory.path(percentEncoded: false).hasPrefix(home) else { exit(EXIT_SUCCESS) }
-                await MainActor.run {
-                    _ = DesignOverlayInstallation.install(mockup: Data("not an image".utf8), model: DesignOverlayModel(storage: FakeMockupStorage()))
-                }
             }
         }
 

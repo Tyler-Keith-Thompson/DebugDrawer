@@ -76,6 +76,9 @@
             }
             set {
                 if let newValue {
+                    // Can't fire: the type is internal, and its only setters, LocationModel's
+                    // applyTypedCoordinate and setCoordinate, return early on a coordinate out of
+                    // range, so neither typed text nor a sidecar's request reaches it.
                     precondition(CLLocationCoordinate2DIsValid(newValue), "Latitude must be in -90...90 and longitude in -180...180")
                 }
                 change {

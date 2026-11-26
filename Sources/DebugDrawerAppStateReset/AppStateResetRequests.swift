@@ -35,7 +35,7 @@ import Foundation
 /// reset it confirms, run as the app next comes to the foreground.
 ///
 /// ```swift
-/// let reset = AppStateResetRequests(sessions: sessions, allowing: [.caches, .urlCache])
+/// let reset = try AppStateResetRequests(sessions: sessions, allowing: [.caches, .urlCache])
 /// receiver.enable(.appStateReset(reset))
 /// ```
 @MainActor
@@ -44,6 +44,9 @@ public final class AppStateResetRequests: DebugDrawerPluginModel {
     public nonisolated static let pluginID = "DebugDrawer.AppStateReset"
     /// The most items a category lists, and failures a result names; the rest are counted.
     public nonisolated static let maximumListedItems = 500
+
+    /// The keychain named among the allowed categories, where only `allowingKeychain` allows it.
+    public struct KeychainAsCategory: Error, Equatable, Sendable {}
 
     /// What is served now.
     @Published public private(set) var snapshot: Snapshot
@@ -62,9 +65,6 @@ public final class AppStateResetRequests: DebugDrawerPluginModel {
 
     /// Resets of the running app's state that a sidecar asks for within `sessions`' sessions,
     /// limited to `categories`.
-    ///
-    /// Traps when `categories` holds ``AppStateReset/Category/keychain``: allow the keychain with
-    /// `allowingKeychain` alone.
     ///
     /// The app groups the app's entitlements name are found on their own on the Mac and in a
     /// development or ad hoc build, which embeds a provisioning profile; an App Store or
@@ -85,6 +85,8 @@ public final class AppStateResetRequests: DebugDrawerPluginModel {
     ///   - launchURL: A URL of the app's own scheme that brings it to the foreground, which a
     ///     sidecar opens after asking for a reset (on iOS the only way it can); `nil` when it has
     ///     none. The reset waits for the foreground however the app gets there.
+    /// - Throws: ``KeychainAsCategory`` when `categories` holds
+    ///   ``AppStateReset/Category/keychain``: allow the keychain with `allowingKeychain` alone.
     public convenience init(
         sessions: DebugDrawerSessions,
         allowing categories: Set<AppStateReset.Category>,
@@ -93,7 +95,7 @@ public final class AppStateResetRequests: DebugDrawerPluginModel {
         directories: [URL] = [],
         cleanup: AppStateReset.Cleanup? = nil,
         launchURL: URL? = nil
-    ) {
+    ) throws(KeychainAsCategory) {
         let bundleID = Bundle.main.bundleIdentifier ?? ProcessInfo.processInfo.processName
         var groups = AppGroupEntitlements.identifiers()
         groups += appGroups.filter { !groups.contains($0) }
@@ -107,7 +109,7 @@ public final class AppStateResetRequests: DebugDrawerPluginModel {
             cleanup: cleanup
         )
         appState.namesKeychainAccounts = false
-        self.init(
+        try self.init(
             sessions: sessions, allowing: categories, allowingKeychain: allowingKeychain, appState: appState,
             launchURL: launchURL, foreground: _AppForeground(), now: Date.init
         )
@@ -115,6 +117,8 @@ public final class AppStateResetRequests: DebugDrawerPluginModel {
 
     /// Resets of `appState`, brought forward with `launchURL`, run as `foreground` says the app is in the foreground, timed with
     /// `now`.
+    ///
+    /// - Throws: ``KeychainAsCategory`` when `categories` holds ``AppStateReset/Category/keychain``.
     package init(
         sessions: DebugDrawerSessions,
         allowing categories: Set<AppStateReset.Category>,
@@ -123,8 +127,8 @@ public final class AppStateResetRequests: DebugDrawerPluginModel {
         launchURL: URL?,
         foreground: any AppForeground,
         now: @escaping () -> Date
-    ) {
-        precondition(!categories.contains(.keychain), "Allow the keychain with allowingKeychain: true, not as a category")
+    ) throws(KeychainAsCategory) {
+        guard !categories.contains(.keychain) else { throw KeychainAsCategory() }
         var allowed = categories
         if allowingKeychain {
             allowed.insert(.keychain)

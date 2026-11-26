@@ -33,10 +33,10 @@
             await #expect(processExitsWith: .signal(SIGSEGV)) { [home = home as String, store = store as String, archive = archive as String] in
                 setenv("CFFIXED_USER_HOME", home, 1)
                 guard URL.applicationSupportDirectory.path(percentEncoded: false).hasPrefix(home) else { exit(EXIT_SUCCESS) }
-                await MainActor.run {
+                try await MainActor.run {
                     let sessions = DebugDrawerSessions(maximumDuration: 300)
                     let receiver = DebugDrawerReceiver(directory: URL(filePath: store, directoryHint: .isDirectory), sessions: sessions)
-                    receiver.enable(.metricKitPayloads(sessions: sessions, directory: URL(filePath: archive, directoryHint: .isDirectory)))
+                    try receiver.enable(.metricKitPayloads(sessions: sessions, directory: URL(filePath: archive, directoryHint: .isDirectory)))
                     try? receiver.start()
                 }
                 // A fault, not raise(3): a signal raised on a Swift concurrency thread, which
@@ -58,10 +58,10 @@
 
                     func unsubscribe() {}
                 }
-                let isKept = await MainActor.run {
+                let isKept = try await MainActor.run {
                     let sessions = DebugDrawerSessions(maximumDuration: 300)
                     let receiver = DebugDrawerReceiver(directory: URL(filePath: store, directoryHint: .isDirectory), sessions: sessions)
-                    let mirror = MetricKitPayloadsMirror(
+                    let mirror = try MetricKitPayloadsMirror(
                         sessions: sessions,
                         directory: URL(filePath: archive, directoryHint: .isDirectory),
                         redaction: .standard,
@@ -82,7 +82,7 @@
             func relaunch() async throws -> (servedBeforeSession: Bool, during: MetricKitPayloadsMirror.Snapshot?) {
                 let sessions = DebugDrawerSessions(maximumDuration: 300)
                 let receiver = DebugDrawerReceiver(directory: URL(filePath: store, directoryHint: .isDirectory), sessions: sessions)
-                receiver.enable(.metricKitPayloads(sessions: sessions, directory: URL(filePath: archive, directoryHint: .isDirectory)))
+                try receiver.enable(.metricKitPayloads(sessions: sessions, directory: URL(filePath: archive, directoryHint: .isDirectory)))
                 try receiver.start()
                 defer { receiver.stop() }
                 let sidecar = try DebugDrawerAppGroupStoreTransport(directory: receiver.appDirectory)
@@ -154,11 +154,11 @@
                     NSGetUncaughtExceptionHandler().map { unsafeBitCast($0, to: UInt.self) }
                 }
                 let before = (actions(), exceptionHandler())
-                let after = await MainActor.run {
+                let after = try await MainActor.run {
                     let url = URL(filePath: directory, directoryHint: .isDirectory)
                     let sessions = DebugDrawerSessions(maximumDuration: 300)
                     let receiver = DebugDrawerReceiver(directory: url.appending(path: "Store"), sessions: sessions)
-                    receiver.enable(.metricKitPayloads(sessions: sessions, directory: url.appending(path: "Payloads")))
+                    try receiver.enable(.metricKitPayloads(sessions: sessions, directory: url.appending(path: "Payloads")))
                     try? receiver.start()
                     sessions.perform(.open(duration: 60))
                     return (actions(), exceptionHandler())

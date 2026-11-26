@@ -15,21 +15,29 @@
         /// Behind a lock rather than main-actor state: the URL protocol's `canInit` and the
         /// WebSocket factories read it synchronously, on whatever thread URL loading runs them.
         private static let domains = OSAllocatedUnfairLock<[NetworkIgnoredDomain]>(initialState: [])
+        private static let logger = Logger(subsystem: "DebugDrawerNetworkPlugin", category: "NetworkBypass")
 
-        /// Bypasses `hosts` from now on, in place of the hosts bypassed before.
+        /// The domains `hosts` name, to bypass.
         ///
-        /// Traps on text that isn't a host, naming it and why: an app that lists a host to keep it
-        /// out of interception must not have it intercepted over a typo, and the trap shows at the
-        /// first debug launch.
-        static func bypass(_ hosts: [String]) {
-            let parsed = hosts.map { text -> NetworkIgnoredDomain in
+        /// - Throws: `NetworkPlugin.InvalidInstallation.bypassedTextNotAHost` when one of `hosts`
+        ///   isn't a host: an app that lists a host to keep it out of interception must not have it
+        ///   intercepted over a typo. The log names the text and why.
+        static func parse(_ hosts: [String]) throws(NetworkPlugin.InvalidInstallation) -> [NetworkIgnoredDomain] {
+            var parsed: [NetworkIgnoredDomain] = []
+            for text in hosts {
                 do throws(NetworkIgnoredDomain.ParseError) {
-                    return try NetworkIgnoredDomain(parsing: text)
+                    try parsed.append(NetworkIgnoredDomain(parsing: text))
                 } catch {
-                    preconditionFailure("installNetwork(bypassing:) can't bypass \"\(text)\": \(error.message)")
+                    logger.error("installNetwork(bypassing:) can't bypass \(text, privacy: .public): \(error.message, privacy: .public)")
+                    throw .bypassedTextNotAHost
                 }
             }
-            domains.withLock { $0 = parsed }
+            return parsed
+        }
+
+        /// Bypasses `domains` from now on, in place of the domains bypassed before.
+        static func bypass(_ domains: [NetworkIgnoredDomain]) {
+            self.domains.withLock { $0 = domains }
         }
 
         /// Whether `url`'s host is bypassed; `false` for a URL without a host.

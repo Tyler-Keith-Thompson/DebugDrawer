@@ -54,11 +54,11 @@
     @Suite
     struct MetricKitPayloadsMirrorTests {
         @Test("Nothing is served while no session is open; the payloads kept are served as one opens, and none once it ends")
-        func servedOnlyDuringSession() {
+        func servedOnlyDuringSession() throws {
             let directory = FileManager.default.temporaryDirectory.appending(path: "MetricKitPayloadsMirrorTests-\(UUID().uuidString)")
             let sessions = DebugDrawerSessions(maximumDuration: 300)
             let source = FakeSource(held: [ReceivedMetricKitPayload(kind: .diagnostics, json: MetricKitFixtures.crashDiagnosticPayload)])
-            let sut = MetricKitPayloadsMirror(sessions: sessions, directory: directory, redaction: .standard, capacity: 10, source: source)
+            let sut = try MetricKitPayloadsMirror(sessions: sessions, directory: directory, redaction: .standard, capacity: 10, source: source)
 
             let beforeSession = sut.snapshot
             sessions.perform(.open(duration: 60))
@@ -79,7 +79,7 @@
             let directory = FileManager.default.temporaryDirectory.appending(path: "MetricKitPayloadsMirrorTests-\(UUID().uuidString)")
             let sessions = DebugDrawerSessions(maximumDuration: 300)
             let source = FakeSource()
-            let sut = MetricKitPayloadsMirror(sessions: sessions, directory: directory, redaction: .standard, capacity: 10, source: source)
+            let sut = try MetricKitPayloadsMirror(sessions: sessions, directory: directory, redaction: .standard, capacity: 10, source: source)
             sessions.perform(.open(duration: 60))
             // The fixture's timeStampBegin, 2026-11-17 00:00:00 +0000.
             let expected = Date(timeIntervalSince1970: 1_794_873_600)
@@ -93,10 +93,10 @@
         }
 
         @Test("With no payload present, a session is served none")
-        func nonePresent() {
+        func nonePresent() throws {
             let directory = FileManager.default.temporaryDirectory.appending(path: "MetricKitPayloadsMirrorTests-\(UUID().uuidString)")
             let sessions = DebugDrawerSessions(maximumDuration: 300)
-            let sut = MetricKitPayloadsMirror(sessions: sessions, directory: directory, redaction: .standard, capacity: 10, source: FakeSource())
+            let sut = try MetricKitPayloadsMirror(sessions: sessions, directory: directory, redaction: .standard, capacity: 10, source: FakeSource())
 
             sessions.perform(.open(duration: 60))
 
@@ -111,11 +111,13 @@
             let metrics = ReceivedMetricKitPayload(kind: .metrics, json: MetricKitFixtures.metricPayload)
             let firstLaunch = DebugDrawerSessions(maximumDuration: 300)
             let firstSource = FakeSource(held: [crash])
-            let first = MetricKitPayloadsMirror(sessions: firstLaunch, directory: directory, redaction: .standard, capacity: 10, source: firstSource)
+            let first = try MetricKitPayloadsMirror(
+                sessions: firstLaunch, directory: directory, redaction: .standard, capacity: 10, source: firstSource
+            )
             firstSource.deliver([crash, metrics])
             _ = first
             let sessions = DebugDrawerSessions(maximumDuration: 300)
-            let sut = MetricKitPayloadsMirror(
+            let sut = try MetricKitPayloadsMirror(
                 sessions: sessions, directory: directory, redaction: .standard, capacity: 10, source: FakeSource(held: [crash])
             )
 
@@ -133,11 +135,11 @@
         }
 
         @Test("The newest payloads are kept up to the capacity: the one whose period ended first goes")
-        func capacity() {
+        func capacity() throws {
             let directory = FileManager.default.temporaryDirectory.appending(path: "MetricKitPayloadsMirrorTests-\(UUID().uuidString)")
             let sessions = DebugDrawerSessions(maximumDuration: 300)
             let source = FakeSource()
-            let sut = MetricKitPayloadsMirror(sessions: sessions, directory: directory, redaction: .standard, capacity: 2, source: source)
+            let sut = try MetricKitPayloadsMirror(sessions: sessions, directory: directory, redaction: .standard, capacity: 2, source: source)
             sessions.perform(.open(duration: 60))
             let payloads = (1 ... 3).map { day in
                 ReceivedMetricKitPayload(
@@ -156,11 +158,11 @@
         }
 
         @Test("JSON that isn't an object, or larger than the limit once redacted, is dropped")
-        func dropsUnreadableAndOversized() {
+        func dropsUnreadableAndOversized() throws {
             let directory = FileManager.default.temporaryDirectory.appending(path: "MetricKitPayloadsMirrorTests-\(UUID().uuidString)")
             let sessions = DebugDrawerSessions(maximumDuration: 300)
             let source = FakeSource()
-            let sut = MetricKitPayloadsMirror(
+            let sut = try MetricKitPayloadsMirror(
                 sessions: sessions, directory: directory, redaction: .standard, capacity: 10, maximumPayloadSize: 64, source: source
             )
             sessions.perform(.open(duration: 60))
@@ -184,7 +186,7 @@
             let metrics = ReceivedMetricKitPayload(kind: .metrics, json: MetricKitFixtures.metricPayload)
             let sessions = DebugDrawerSessions(maximumDuration: 300)
             let source = FakeSource(held: [crash, metrics])
-            let sut = MetricKitPayloadsMirror(sessions: sessions, directory: directory, redaction: .standard, capacity: 10, source: source)
+            let sut = try MetricKitPayloadsMirror(sessions: sessions, directory: directory, redaction: .standard, capacity: 10, source: source)
             sessions.perform(.open(duration: 60))
             let crashID = try #require(sut.snapshot.payloads.first { $0.kind == .diagnostics }?.id)
 
@@ -193,7 +195,7 @@
             source.deliver([crash])
             let afterRedelivery = sut.snapshot.payloads.map(\.kind)
             let relaunchSessions = DebugDrawerSessions(maximumDuration: 300)
-            let relaunched = MetricKitPayloadsMirror(
+            let relaunched = try MetricKitPayloadsMirror(
                 sessions: relaunchSessions, directory: directory, redaction: .standard, capacity: 10, source: FakeSource(held: [crash, metrics])
             )
             relaunchSessions.perform(.open(duration: 60))
@@ -208,10 +210,10 @@
         }
 
         @Test("Releasing the mirror unsubscribes it from its source")
-        func unsubscribesOnRelease() {
+        func unsubscribesOnRelease() throws {
             let directory = FileManager.default.temporaryDirectory.appending(path: "MetricKitPayloadsMirrorTests-\(UUID().uuidString)")
             let source = FakeSource()
-            var sut: MetricKitPayloadsMirror? = MetricKitPayloadsMirror(
+            var sut: MetricKitPayloadsMirror? = try MetricKitPayloadsMirror(
                 sessions: DebugDrawerSessions(maximumDuration: 300), directory: directory, redaction: .standard, capacity: 10, source: source
             )
             _ = sut
@@ -222,7 +224,7 @@
         }
 
         @Test("Under a grant policy, a session whose grant doesn't list the capability is served no payloads, kept or arriving")
-        func grantWithoutCapability() {
+        func grantWithoutCapability() throws {
             let directory = FileManager.default.temporaryDirectory.appending(path: "MetricKitPayloadsMirrorTests-\(UUID().uuidString)")
             let policy = DebugDrawerGrantPolicy(
                 verifier: AcceptingGrantVerifier(audience: "com.example.app", capabilities: ["DebugDrawer.FeatureFlagOverrides"]),
@@ -230,7 +232,7 @@
             )
             let sessions = DebugDrawerSessions(maximumDuration: 300, grantPolicy: policy)
             let source = FakeSource(held: [ReceivedMetricKitPayload(kind: .diagnostics, json: MetricKitFixtures.crashDiagnosticPayload)])
-            let sut = MetricKitPayloadsMirror(sessions: sessions, directory: directory, redaction: .standard, capacity: 10, source: source)
+            let sut = try MetricKitPayloadsMirror(sessions: sessions, directory: directory, redaction: .standard, capacity: 10, source: source)
 
             sessions.perform(.open(duration: 60, grant: "flags-only"))
             let opened = sut.snapshot
@@ -243,7 +245,7 @@
         }
 
         @Test("Under a grant policy, a session whose grant lists the capability is served the payloads kept and those arriving")
-        func grantWithCapability() {
+        func grantWithCapability() throws {
             let directory = FileManager.default.temporaryDirectory.appending(path: "MetricKitPayloadsMirrorTests-\(UUID().uuidString)")
             let policy = DebugDrawerGrantPolicy(
                 verifier: AcceptingGrantVerifier(audience: "com.example.app", capabilities: [MetricKitPayloadsMirror.pluginID]),
@@ -251,7 +253,7 @@
             )
             let sessions = DebugDrawerSessions(maximumDuration: 300, grantPolicy: policy)
             let source = FakeSource(held: [ReceivedMetricKitPayload(kind: .diagnostics, json: MetricKitFixtures.crashDiagnosticPayload)])
-            let sut = MetricKitPayloadsMirror(sessions: sessions, directory: directory, redaction: .standard, capacity: 10, source: source)
+            let sut = try MetricKitPayloadsMirror(sessions: sessions, directory: directory, redaction: .standard, capacity: 10, source: source)
 
             sessions.perform(.open(duration: 60, grant: "metrickit"))
             let opened = sut.snapshot.payloads.map(\.kind)

@@ -22,12 +22,12 @@
         }
 
         @Test("In release, trackLifetime compiles, accepts any count and keeps nothing alive")
-        func trackLifetimeDoesNothing() {
+        func trackLifetimeDoesNothing() throws {
             final class Model {}
             var model: Model? = Model()
             weak let weakModel = model
 
-            LeakDetector.trackLifetime(of: model!, maxCount: 0)
+            try LeakDetector.trackLifetime(of: model!, maxCount: 0)
             model = nil
 
             #expect(weakModel == nil)

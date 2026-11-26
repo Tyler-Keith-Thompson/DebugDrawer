@@ -17,7 +17,7 @@
             let header = try #require(_dyld_get_image_header(0))
 
             ScreenRecording.install()
-            ScreenRecording.install(capacity: 1)
+            try ScreenRecording.install(capacity: 1)
             var linked: [String] = []
             var command = UnsafeRawPointer(header).advanced(by: MemoryLayout<mach_header_64>.size)
             for _ in 0 ..< header.pointee.ncmds {

@@ -57,7 +57,7 @@
             )
             let sessions = DebugDrawerSessions(maximumDuration: 300)
             let foreground = TestForeground()
-            let model = AppStateResetRequests(
+            let model = try AppStateResetRequests(
                 sessions: sessions, allowing: [.userDefaults, .caches], allowingKeychain: false, appState: appState, launchURL: nil,
                 foreground: foreground, now: Date.init
             )

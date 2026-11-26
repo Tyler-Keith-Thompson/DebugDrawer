@@ -20,7 +20,7 @@
             let clock = MovableClock(Date())
             let sessions = DebugDrawerSessions(maximumDuration: 300, auditCapacity: 10, clock: clock, timer: ManualTimer())
             let thread = StallingThread()
-            let sut = PerformanceTraces(
+            let sut = try PerformanceTraces(
                 sessions: sessions, hitchThreshold: .milliseconds(50), hangThreshold: .milliseconds(50), limits: .standard,
                 now: { clock.now }, watchedThread: { (thread.runLoop, thread.sampler) }
             )
@@ -62,7 +62,7 @@
             let clock = MovableClock(Date())
             let sessions = DebugDrawerSessions(maximumDuration: 300, auditCapacity: 10, clock: clock, timer: ManualTimer())
             let thread = StallingThread()
-            let sut = PerformanceTraces(
+            let sut = try PerformanceTraces(
                 sessions: sessions, hitchThreshold: .milliseconds(50), hangThreshold: .seconds(20), limits: .standard,
                 now: { clock.now }, watchedThread: { (thread.runLoop, thread.sampler) }
             )
@@ -84,10 +84,10 @@
         }
 
         @Test("Outside a session, start starts no monitor and records no interval")
-        func noSession() {
+        func noSession() throws {
             let clock = MovableClock(Date())
             let sessions = DebugDrawerSessions(maximumDuration: 300, auditCapacity: 10, clock: clock, timer: ManualTimer())
-            let sut = PerformanceTraces(
+            let sut = try PerformanceTraces(
                 sessions: sessions, hitchThreshold: .milliseconds(100), hangThreshold: .milliseconds(250), limits: .standard,
                 now: { clock.now }, watchedThread: { (CFRunLoopGetMain(), MachThreadStackSampler.currentThread()) }
             )
@@ -103,10 +103,10 @@
         }
 
         @Test("Before start, in an open session, nothing runs and an interval records nothing")
-        func sessionWithoutStart() {
+        func sessionWithoutStart() throws {
             let clock = MovableClock(Date())
             let sessions = DebugDrawerSessions(maximumDuration: 300, auditCapacity: 10, clock: clock, timer: ManualTimer())
-            let sut = PerformanceTraces(
+            let sut = try PerformanceTraces(
                 sessions: sessions, hitchThreshold: .milliseconds(100), hangThreshold: .milliseconds(250), limits: .standard,
                 now: { clock.now }, watchedThread: { (CFRunLoopGetMain(), MachThreadStackSampler.currentThread()) }
             )
@@ -124,7 +124,7 @@
             let clock = MovableClock(Date())
             let sessions = DebugDrawerSessions(maximumDuration: 300, auditCapacity: 10, clock: clock, timer: ManualTimer())
             let runLoop = try #require(CFRunLoopGetMain())
-            let sut = PerformanceTraces(
+            let sut = try PerformanceTraces(
                 sessions: sessions, hitchThreshold: .milliseconds(100), hangThreshold: .milliseconds(250), limits: .standard,
                 now: { clock.now }, watchedThread: { (runLoop, MachThreadStackSampler.currentThread()) }
             )
@@ -154,7 +154,7 @@
             let timer = ManualTimer()
             let sessions = DebugDrawerSessions(maximumDuration: 300, auditCapacity: 10, clock: clock, timer: timer)
             let runLoop = try #require(CFRunLoopGetMain())
-            let sut = PerformanceTraces(
+            let sut = try PerformanceTraces(
                 sessions: sessions, hitchThreshold: .milliseconds(100), hangThreshold: .milliseconds(250), limits: .standard,
                 now: { clock.now }, watchedThread: { (runLoop, MachThreadStackSampler.currentThread()) }
             )
@@ -183,7 +183,7 @@
             let clock = MovableClock(start)
             let sessions = DebugDrawerSessions(maximumDuration: 300, auditCapacity: 10, clock: clock, timer: ManualTimer())
             let runLoop = try #require(CFRunLoopGetMain())
-            let sut = PerformanceTraces(
+            let sut = try PerformanceTraces(
                 sessions: sessions, hitchThreshold: .milliseconds(100), hangThreshold: .milliseconds(250), limits: .standard,
                 now: { clock.now }, watchedThread: { (runLoop, MachThreadStackSampler.currentThread()) }
             )
@@ -217,9 +217,9 @@
             let clock = MovableClock(Date(timeIntervalSinceReferenceDate: 800_000_000))
             let sessions = DebugDrawerSessions(maximumDuration: 300, auditCapacity: 10, clock: clock, timer: ManualTimer())
             let runLoop = try #require(CFRunLoopGetMain())
-            let sut = PerformanceTraces(
+            let sut = try PerformanceTraces(
                 sessions: sessions, hitchThreshold: .milliseconds(100), hangThreshold: .milliseconds(250),
-                limits: PerformanceTraces.Limits(stalls: 1, intervals: 2),
+                limits: try PerformanceTraces.Limits(stalls: 1, intervals: 2),
                 now: { clock.now }, watchedThread: { (runLoop, MachThreadStackSampler.currentThread()) }
             )
             let (published, publish) = AsyncStream<PerformanceTraces.Snapshot>.makeStream()
@@ -249,7 +249,7 @@
             let clock = MovableClock(start)
             let sessions = DebugDrawerSessions(maximumDuration: 300, auditCapacity: 10, clock: clock, timer: ManualTimer())
             let runLoop = try #require(CFRunLoopGetMain())
-            let sut = PerformanceTraces(
+            let sut = try PerformanceTraces(
                 sessions: sessions, hitchThreshold: .milliseconds(100), hangThreshold: .milliseconds(250), limits: .standard,
                 now: { clock.now }, watchedThread: { (runLoop, MachThreadStackSampler.currentThread()) }
             )
@@ -271,7 +271,7 @@
             let clock = MovableClock(start)
             let sessions = DebugDrawerSessions(maximumDuration: 300, auditCapacity: 10, clock: clock, timer: ManualTimer())
             let runLoop = try #require(CFRunLoopGetMain())
-            let sut = PerformanceTraces(
+            let sut = try PerformanceTraces(
                 sessions: sessions, hitchThreshold: .milliseconds(100), hangThreshold: .milliseconds(250), limits: .standard,
                 now: { clock.now }, watchedThread: { (runLoop, MachThreadStackSampler.currentThread()) }
             )

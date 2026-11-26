@@ -45,7 +45,7 @@ struct ListingSpeedTests {
             cleanup: nil
         )
         let sessions = DebugDrawerSessions(maximumDuration: 300)
-        let model = AppStateResetRequests(
+        let model = try AppStateResetRequests(
             sessions: sessions, allowing: [.userDefaults, .caches], allowingKeychain: false, appState: appState, launchURL: nil,
             foreground: ForegroundApp(), now: Date.init
         )

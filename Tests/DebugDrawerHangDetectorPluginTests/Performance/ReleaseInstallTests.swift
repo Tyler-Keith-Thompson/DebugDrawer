@@ -10,7 +10,7 @@
     struct ReleaseInstallTests {
         @MainActor
         @Test("In release, install compiles and starts no watcher thread")
-        func installStartsNothing() {
+        func installStartsNothing() throws {
             func threadNames() -> [String] {
                 var threads: thread_act_array_t?
                 var count: mach_msg_type_number_t = 0
@@ -27,7 +27,7 @@
             }
             let before = threadNames().count
 
-            HangDetector.install(threshold: .milliseconds(1))
+            try HangDetector.install(threshold: .milliseconds(1))
             let actual = threadNames()
 
             #expect(!actual.contains("DebugDrawer hang watcher"))

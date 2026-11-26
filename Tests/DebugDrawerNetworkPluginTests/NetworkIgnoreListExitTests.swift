@@ -9,7 +9,7 @@
     @Suite("installNetwork(ignoring:), in a child process", .timeLimit(.minutes(1)))
     struct NetworkIgnoreListExitTests {
         @Test("The app's hosts join the ignore list; a request to one is captured but left out of the log's list")
-        func seedsHideRequests() async {
+        func seedsHideRequests() async throws {
             // The children get a home folder of their own, so the files they keep in Application Support and
             // Caches stay out of the Mac's, whatever runs the test; each checks the move took.
             let home = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString).path(percentEncoded: false)
@@ -21,10 +21,10 @@
                 // Sessions go to a folder of the child's own, so nothing is written to the test
                 // runner's Application Support; the seeds aren't written at install.
                 let sessions = FileManager.default.temporaryDirectory.appending(path: "NetworkIgnoreListExitTests-\(UUID().uuidString)")
-                await MainActor.run {
-                    DebugDrawer.shared.installNetwork(
+                try await MainActor.run {
+                    try DebugDrawer.shared.installNetwork(
                         ignoring: ["analytics.invalid", "not a host"],
-                        sessions: NetworkSessionPersistence(storage: _NetworkSessionStorage(directory: sessions))
+                        sessions: try NetworkSessionPersistence(storage: _NetworkSessionStorage(directory: sessions))
                     )
                 }
                 // `.invalid` never resolves, so the request fails at once, with or without a network.

@@ -34,7 +34,7 @@ public extension DebugDrawerReceiverCapability {
     /// launches; supply an ``AppStateReset/Cleanup`` to clear that too.
     ///
     /// ```swift
-    /// let appStateReset = AppStateResetRequests(sessions: sessions, allowing: [.caches, .urlCache])
+    /// let appStateReset = try AppStateResetRequests(sessions: sessions, allowing: [.caches, .urlCache])
     /// receiver.enable(.appStateReset(appStateReset))
     /// ```
     ///

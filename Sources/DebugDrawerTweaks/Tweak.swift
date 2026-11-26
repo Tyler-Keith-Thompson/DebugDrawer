@@ -100,11 +100,10 @@ public extension Tweak where Value == String {
     ///   - title: What the drawer shows beside the picker.
     ///   - key: Identifies the stored value.
     ///   - options: The strings to choose among, in the order shown.
-    ///   - defaultValue: The choice until someone picks another; one of `options`.
-    /// - Precondition: `options` contains `defaultValue`. A stored string that is no longer one
-    ///   of `options` reads as `defaultValue`.
+    ///   - defaultValue: The choice until someone picks another; one of `options`, or
+    ///     `installTweaks` throws. A stored string that is no longer one of `options` reads as
+    ///     `defaultValue`.
     static func picker(_ title: String, key: String, options: [String], default defaultValue: String) -> Tweak {
-        precondition(options.contains(defaultValue), "The default of picker tweak \(key) isn't one of its options")
         let choices = Set(options)
         return Tweak(
             title: title,
@@ -123,15 +122,13 @@ public extension Tweak where Value == Int {
     /// - Parameters:
     ///   - title: What the drawer shows beside the stepper.
     ///   - key: Identifies the stored value.
-    ///   - defaultValue: The value until someone steps it; within `range`.
+    ///   - defaultValue: The value until someone steps it; within `range`, or `installTweaks`
+    ///     throws.
     ///   - range: The values the stepper reaches. A stored value outside it reads as the nearest
     ///     bound.
-    ///   - step: How far one press moves the value.
-    /// - Precondition: `range` contains `defaultValue`, and `step` is positive.
+    ///   - step: How far one press moves the value; positive, or `installTweaks` throws.
     static func stepper(_ title: String, key: String, default defaultValue: Int, in range: ClosedRange<Int>, step: Int = 1) -> Tweak {
-        precondition(range.contains(defaultValue), "The default of stepper tweak \(key) is outside its range")
-        precondition(step > 0, "The step of stepper tweak \(key) isn't positive")
-        return Tweak(
+        Tweak(
             title: title,
             key: key,
             defaultValue: defaultValue,

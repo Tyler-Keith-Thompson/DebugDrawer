@@ -31,7 +31,7 @@ final class ProductionAppStateSnapshot {
     let receiver: DebugDrawerReceiver
 
     init(flags: DebugDrawerFeatureFlagOverrides, account: Account, container: URL) throws {
-        appState = DebugDrawerAppState(
+        appState = try DebugDrawerAppState(
             sessions: sessions,
             featureFlags: flags,
             userID: { account.userID },

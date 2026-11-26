@@ -20,7 +20,7 @@ final class ProductionDiagnostics {
 
     init(container: URL) throws {
         receiver = DebugDrawerReceiver(directory: container.appending(path: "DebugDrawer"), sessions: sessions)
-        receiver.enable(.metricKitPayloads(sessions: sessions))
+        try receiver.enable(.metricKitPayloads(sessions: sessions))
         try receiver.start()
     }
 }

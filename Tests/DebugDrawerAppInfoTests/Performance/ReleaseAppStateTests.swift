@@ -28,7 +28,7 @@
             let rawID = "release-user-5512"
             let sessions = DebugDrawerSessions(maximumDuration: 300)
             let receiver = DebugDrawerReceiver(directory: store, sessions: sessions)
-            let appState = DebugDrawerAppState(
+            let appState = try DebugDrawerAppState(
                 sessions: sessions, buildMetadata: AppInfoBuildMetadata(gitCommit: "4f9c2e1"), userID: { rawID },
                 values: [DebugDrawerAppStateField("plan") { "pro" }], defaults: defaults
             )

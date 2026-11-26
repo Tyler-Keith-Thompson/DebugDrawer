@@ -40,37 +40,9 @@
                     return DebugDrawer.shared.globalPlugins.contains { $0.title == "Hangs" }
                 }
                 let first = watcherCount()
-                await MainActor.run { HangDetector.install(threshold: .milliseconds(500)) }
+                try await MainActor.run { try HangDetector.install(threshold: .milliseconds(500)) }
                 let second = watcherCount()
                 exit(before == 0 && isRegistered && first == 1 && second == 1 ? EXIT_SUCCESS : EXIT_FAILURE)
-            }
-        }
-
-        @Test("A threshold of zero traps")
-        func zeroThreshold() async {
-            // The children get a home folder of their own, so the files they keep in Application Support and
-            // Caches stay out of the Mac's, whatever runs the test; each checks the move took.
-            let home = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString).path(percentEncoded: false)
-            defer { try? FileManager.default.removeItem(atPath: home) }
-
-            await #expect(processExitsWith: .failure) { [home = home as String] in
-                setenv("CFFIXED_USER_HOME", home, 1)
-                guard URL.applicationSupportDirectory.path(percentEncoded: false).hasPrefix(home) else { exit(EXIT_SUCCESS) }
-                await MainActor.run { HangDetector.install(threshold: .zero) }
-            }
-        }
-
-        @Test("A negative threshold traps")
-        func negativeThreshold() async {
-            // The children get a home folder of their own, so the files they keep in Application Support and
-            // Caches stay out of the Mac's, whatever runs the test; each checks the move took.
-            let home = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString).path(percentEncoded: false)
-            defer { try? FileManager.default.removeItem(atPath: home) }
-
-            await #expect(processExitsWith: .failure) { [home = home as String] in
-                setenv("CFFIXED_USER_HOME", home, 1)
-                guard URL.applicationSupportDirectory.path(percentEncoded: false).hasPrefix(home) else { exit(EXIT_SUCCESS) }
-                await MainActor.run { HangDetector.install(threshold: .milliseconds(-1)) }
             }
         }
 
@@ -84,12 +56,12 @@
             await #expect(processExitsWith: .success) { [home = home as String] in
                 setenv("CFFIXED_USER_HOME", home, 1)
                 guard URL.applicationSupportDirectory.path(percentEncoded: false).hasPrefix(home) else { exit(EXIT_FAILURE) }
-                let isInstalled = await MainActor.run {
+                let isInstalled = try await MainActor.run {
                     // At startup; a stall of the main thread over 250 ms is a hang.
                     HangDetector.install()
 
                     // Or with a threshold of the app's own, which the drawer can change later.
-                    HangDetector.install(threshold: .milliseconds(100))
+                    try HangDetector.install(threshold: .milliseconds(100))
 
                     return DebugDrawer.shared.globalPlugins.contains { $0.title == "Hangs" }
                 }

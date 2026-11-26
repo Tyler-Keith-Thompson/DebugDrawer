@@ -19,8 +19,10 @@
         /// An assembler holding no bytes.
         ///
         /// - Parameter maximumLineLength: The most bytes a line waits for its newline with; at
-        ///   least 4, the longest UTF-8 sequence. Traps when it is less.
+        ///   least 4, the longest UTF-8 sequence.
         init(maximumLineLength: Int = 16384) {
+            // Can't fire: the type is internal, and the module makes it only with the default; no
+            // input reaches it.
             precondition(maximumLineLength >= 4, "A line must hold the longest UTF-8 sequence")
             self.maximumLineLength = maximumLineLength
         }

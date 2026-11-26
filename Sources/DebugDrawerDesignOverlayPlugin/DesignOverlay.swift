@@ -6,7 +6,7 @@ import Foundation
 ///
 /// ```swift
 /// // At startup:
-/// DesignOverlay.install()
+/// try DesignOverlay.install()
 ///
 /// // On the app's content, beneath .debugDrawer():
 /// ContentView()
@@ -23,19 +23,35 @@ import Foundation
 /// The type exists in every build, so the calls compile unchanged in release, where they do
 /// nothing.
 public enum DesignOverlay {
+    /// Mockup data that isn't an image Image I/O reads.
+    public struct NotAnImage: Error, Equatable, Sendable {}
+
     /// Adds the Design Overlay plugin: in debug builds only; in release it does nothing.
     ///
     /// The mockup and the settings saved by an earlier launch are read again. Calling it again
     /// replaces the plugin and keeps what it shows.
+    @MainActor
+    public static func install() {
+        #if DEBUG
+            DesignOverlayInstallation.install()
+        #endif
+    }
+
+    /// Adds the Design Overlay plugin showing `mockup` for this launch: in debug builds only; in
+    /// release it does nothing.
+    ///
+    /// The settings saved by an earlier launch are read again, and the saved mockup is kept for
+    /// the next. Calling it again replaces the plugin.
     ///
     /// - Parameter mockup: The data of an image (PNG, JPEG, HEIC or any format Image I/O reads)
-    ///   to show for this launch in place of the saved one, which is kept; `nil` shows the saved
-    ///   one. An app's own launch argument can hand it a bundled comp this way.
-    /// - Precondition: `mockup` is `nil` or the data of an image.
+    ///   to show in place of the saved one. An app's own launch argument can hand it a bundled
+    ///   comp this way.
+    /// - Throws: ``NotAnImage`` when `mockup` isn't the data of an image, installing nothing.
+    ///   Release builds decode nothing and throw nothing.
     @MainActor
-    public static func install(mockup: Data? = nil) {
+    public static func install(mockup: Data) throws(NotAnImage) {
         #if DEBUG
-            DesignOverlayInstallation.install(mockup: mockup)
+            try DesignOverlayInstallation.install(mockup: mockup)
         #endif
     }
 }

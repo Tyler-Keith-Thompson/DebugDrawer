@@ -107,8 +107,10 @@
     final class EventStore: ObservableObject {
         @Published private(set) var events: [AnalyticsEvent] = []
         @Published private(set) var droppedCount = 0
-        private let buffer = CaptureBuffer<AnalyticsEvent>(maxCount: 1_000, maxByteCount: 1_048_576) {
-            $0.payload.count
+        private let buffer: CaptureBuffer<AnalyticsEvent>
+
+        init(maxCount: Int = 1_000, maxByteCount: Int = 1_048_576) throws(CaptureBuffer<AnalyticsEvent>.InvalidLimit) {
+            buffer = try CaptureBuffer(maxCount: maxCount, maxByteCount: maxByteCount) { $0.payload.count }
         }
 
         /// Called from any thread.
@@ -245,8 +247,8 @@
         }
 
         @Test("Writing plugins: a store keeps its events in a capture buffer and counts the ones it dropped")
-        func captureBuffer() {
-            let sut = EventStore()
+        func captureBuffer() throws {
+            let sut = try EventStore()
             let expected = ["opened", "closed"]
 
             for name in ["launched", "opened", "closed"] {

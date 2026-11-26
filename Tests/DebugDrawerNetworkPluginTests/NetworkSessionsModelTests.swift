@@ -10,7 +10,7 @@
     @Suite(.timeLimit(.minutes(1)))
     struct NetworkSessionsModelTests {
         @Test("Reloading lists the earlier sessions, the newest first, without the current one")
-        func reloadLists() async {
+        func reloadLists() async throws {
             let storage = FakeNetworkSessionStorage()
             let entry = NetworkEntry(
                 timestamp: Date(timeIntervalSince1970: 1_800_000_001), method: "GET", url: "https://api.example.com/v1/orders",
@@ -19,14 +19,14 @@
             var expected: [String] = []
             for launch in 0 ..< 2 {
                 let earlier = NetworkSessionRecorder(
-                    NetworkSessionPersistence(storage: storage),
+                    try NetworkSessionPersistence(storage: storage),
                     started: Date(timeIntervalSince1970: 1_800_000_000 + Double(launch) * 60)
                 )
                 earlier.record(entry, original: nil, redaction: .standard)
                 _ = await earlier.previousSessions()
                 expected.insert(earlier.currentName, at: 0)
             }
-            let current = NetworkSessionRecorder(NetworkSessionPersistence(storage: storage), started: Date(timeIntervalSince1970: 1_800_000_600))
+            let current = NetworkSessionRecorder(try NetworkSessionPersistence(storage: storage), started: Date(timeIntervalSince1970: 1_800_000_600))
             current.record(entry, original: nil, redaction: .standard)
             let sut = NetworkSessionsModel(recorder: current)
 
@@ -42,11 +42,11 @@
                 timestamp: Date(timeIntervalSince1970: 1_800_000_001), method: "GET", url: "https://api.example.com/v1/orders",
                 host: "api.example.com", path: "/v1/orders", requestHeaders: [:], requestBody: nil, statusCode: 200, isComplete: true
             )
-            let earlier = NetworkSessionRecorder(NetworkSessionPersistence(storage: storage), started: Date(timeIntervalSince1970: 1_800_000_000))
+            let earlier = NetworkSessionRecorder(try NetworkSessionPersistence(storage: storage), started: Date(timeIntervalSince1970: 1_800_000_000))
             earlier.record(entry, original: nil, redaction: .standard)
             _ = await earlier.previousSessions()
             let sut = NetworkSessionsModel(recorder: NetworkSessionRecorder(
-                NetworkSessionPersistence(storage: storage), started: Date(timeIntervalSince1970: 1_800_000_060)
+                try NetworkSessionPersistence(storage: storage), started: Date(timeIntervalSince1970: 1_800_000_060)
             ))
             await sut.reload()
             let id = try #require(sut.sessions.first?.id)
@@ -73,7 +73,7 @@
             var names: [String] = []
             for launch in 0 ..< 2 {
                 let earlier = NetworkSessionRecorder(
-                    NetworkSessionPersistence(storage: storage),
+                    try NetworkSessionPersistence(storage: storage),
                     started: Date(timeIntervalSince1970: 1_800_000_000 + Double(launch) * 60)
                 )
                 earlier.record(entry, original: nil, redaction: .standard)
@@ -81,7 +81,7 @@
                 names.append(earlier.currentName)
             }
             let sut = NetworkSessionsModel(recorder: NetworkSessionRecorder(
-                NetworkSessionPersistence(storage: storage), started: Date(timeIntervalSince1970: 1_800_000_600)
+                try NetworkSessionPersistence(storage: storage), started: Date(timeIntervalSince1970: 1_800_000_600)
             ))
             await sut.reload()
 

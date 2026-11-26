@@ -231,33 +231,5 @@
                 exit(isShown ? EXIT_SUCCESS : EXIT_FAILURE)
             }
         }
-
-        @Test("A limit of zero traps")
-        func zeroLimit() async {
-            // The children get a home folder of their own, so the files they keep in Application Support and
-            // Caches stay out of the Mac's, whatever runs the test; each checks the move took.
-            let home = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString).path(percentEncoded: false)
-            defer { try? FileManager.default.removeItem(atPath: home) }
-
-            await #expect(processExitsWith: .failure) { [home = home as String] in
-                setenv("CFFIXED_USER_HOME", home, 1)
-                guard URL.applicationSupportDirectory.path(percentEncoded: false).hasPrefix(home) else { exit(EXIT_SUCCESS) }
-                LeakDetector.trackLifetime(of: NSObject(), maxCount: 0)
-            }
-        }
-
-        @Test("A negative limit traps")
-        func negativeLimit() async {
-            // The children get a home folder of their own, so the files they keep in Application Support and
-            // Caches stay out of the Mac's, whatever runs the test; each checks the move took.
-            let home = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString).path(percentEncoded: false)
-            defer { try? FileManager.default.removeItem(atPath: home) }
-
-            await #expect(processExitsWith: .failure) { [home = home as String] in
-                setenv("CFFIXED_USER_HOME", home, 1)
-                guard URL.applicationSupportDirectory.path(percentEncoded: false).hasPrefix(home) else { exit(EXIT_SUCCESS) }
-                LeakDetector.trackLifetime(of: NSObject(), maxCount: -1)
-            }
-        }
     }
 #endif

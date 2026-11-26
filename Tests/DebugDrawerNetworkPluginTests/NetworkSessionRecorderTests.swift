@@ -13,7 +13,7 @@
         func previousSessionAfterRelaunch() async throws {
             let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
             defer { try? FileManager.default.removeItem(at: directory) }
-            let persistence = NetworkSessionPersistence(storage: _NetworkSessionStorage(directory: directory))
+            let persistence = try NetworkSessionPersistence(storage: _NetworkSessionStorage(directory: directory))
             let started = Date(timeIntervalSince1970: 1_800_000_000)
             let first = NetworkSessionRecorder(persistence, started: started)
             let orders = NetworkEntry(
@@ -50,7 +50,7 @@
             let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
             defer { try? FileManager.default.removeItem(at: directory) }
             let storage = _NetworkSessionStorage(directory: directory)
-            let persistence = NetworkSessionPersistence(storage: storage)
+            let persistence = try NetworkSessionPersistence(storage: storage)
             let first = NetworkSessionRecorder(persistence, started: Date(timeIntervalSince1970: 1_800_000_000))
             for index in 1 ... 2 {
                 first.record(
@@ -79,7 +79,7 @@
             let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
             defer { try? FileManager.default.removeItem(at: directory) }
             let storage = _NetworkSessionStorage(directory: directory)
-            let sut = NetworkSessionRecorder(NetworkSessionPersistence(storage: storage), started: Date(timeIntervalSince1970: 1_800_000_000))
+            let sut = NetworkSessionRecorder(try NetworkSessionPersistence(storage: storage), started: Date(timeIntervalSince1970: 1_800_000_000))
             let entry = NetworkEntry(
                 timestamp: Date(timeIntervalSince1970: 1_800_000_001), method: "POST",
                 url: "https://api.example.com/v1/login?api_key=query-secret-1", host: "api.example.com", path: "/v1/login",
@@ -104,7 +104,7 @@
         func pruneByCount() async throws {
             let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
             defer { try? FileManager.default.removeItem(at: directory) }
-            let persistence = NetworkSessionPersistence(maxSessions: 2, storage: _NetworkSessionStorage(directory: directory))
+            let persistence = try NetworkSessionPersistence(maxSessions: 2, storage: _NetworkSessionStorage(directory: directory))
             var names: [String] = []
             for launch in 0 ..< 4 {
                 let recorder = NetworkSessionRecorder(persistence, started: Date(timeIntervalSince1970: 1_800_000_000 + Double(launch) * 60))
@@ -135,7 +135,7 @@
             let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
             defer { try? FileManager.default.removeItem(at: directory) }
             let storage = _NetworkSessionStorage(directory: directory)
-            let roomy = NetworkSessionPersistence(storage: storage)
+            let roomy = try NetworkSessionPersistence(storage: storage)
             let entry = NetworkEntry(
                 timestamp: Date(timeIntervalSince1970: 1_800_000_001), method: "GET", url: "https://api.example.com/v1/orders",
                 host: "api.example.com", path: "/v1/orders", requestHeaders: [:], requestBody: nil, statusCode: 200, isComplete: true
@@ -151,7 +151,7 @@
             let newerBytes = try #require(sizes[newer.currentName])
             // Room for both sessions at launch, and for the next one's header and entry, as large
             // as either's, only once one goes.
-            let tight = NetworkSessionPersistence(maxBytes: oldestBytes + newerBytes + 10, storage: storage)
+            let tight = try NetworkSessionPersistence(maxBytes: oldestBytes + newerBytes + 10, storage: storage)
 
             let sut = NetworkSessionRecorder(tight, started: Date(timeIntervalSince1970: 1_800_000_120))
             let atLaunch = await sut.previousSessions().map(\.id)
@@ -176,7 +176,7 @@
             var names: [String] = []
             for launch in 0 ..< 3 {
                 let recorder = NetworkSessionRecorder(
-                    NetworkSessionPersistence(storage: storage),
+                    try NetworkSessionPersistence(storage: storage),
                     started: Date(timeIntervalSince1970: 1_800_000_000 + Double(launch) * 60)
                 )
                 recorder.record(entry, original: nil, redaction: .standard)
@@ -187,7 +187,7 @@
             let expected = [names[2]]
 
             let sut = NetworkSessionRecorder(
-                NetworkSessionPersistence(maxBytes: largest + 1, storage: storage),
+                try NetworkSessionPersistence(maxBytes: largest + 1, storage: storage),
                 started: Date(timeIntervalSince1970: 1_800_001_000)
             )
             let actual = await sut.previousSessions().map(\.id)
@@ -202,7 +202,7 @@
             let storage = _NetworkSessionStorage(directory: directory)
             let maxBytes = 1_500
             let sut = NetworkSessionRecorder(
-                NetworkSessionPersistence(maxBytes: maxBytes, storage: storage),
+                try NetworkSessionPersistence(maxBytes: maxBytes, storage: storage),
                 started: Date(timeIntervalSince1970: 1_800_000_000)
             )
             let recorded = (0 ..< 10).map { index in
@@ -233,7 +233,7 @@
         func oversizedRequestSkipped() async throws {
             let storage = FakeNetworkSessionStorage()
             let sut = NetworkSessionRecorder(
-                NetworkSessionPersistence(maxBytes: 3_000, storage: storage),
+                try NetworkSessionPersistence(maxBytes: 3_000, storage: storage),
                 started: Date(timeIntervalSince1970: 1_800_000_000)
             )
             let download = NetworkEntry(
@@ -268,14 +268,14 @@
                 timestamp: Date(timeIntervalSince1970: 1_800_000_001), method: "GET", url: "https://api.example.com/v1/orders",
                 host: "api.example.com", path: "/v1/orders", requestHeaders: [:], requestBody: nil, statusCode: 200, isComplete: true
             )
-            let earlier = NetworkSessionRecorder(NetworkSessionPersistence(storage: storage), started: Date(timeIntervalSince1970: 1_800_000_000))
+            let earlier = NetworkSessionRecorder(try NetworkSessionPersistence(storage: storage), started: Date(timeIntervalSince1970: 1_800_000_000))
             earlier.record(entry, original: nil, redaction: .standard)
             _ = await earlier.previousSessions()
             let before = try storage.sessionFiles().count
 
             let sut = NetworkSessionRecorder(
 
-                NetworkSessionPersistence(maxSessions: 0, storage: storage),
+                try NetworkSessionPersistence(maxSessions: 0, storage: storage),
 
                 started: Date(timeIntervalSince1970: 1_800_000_060)
 
@@ -294,7 +294,7 @@
         func concurrentRecords() async throws {
             let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
             defer { try? FileManager.default.removeItem(at: directory) }
-            let persistence = NetworkSessionPersistence(storage: _NetworkSessionStorage(directory: directory))
+            let persistence = try NetworkSessionPersistence(storage: _NetworkSessionStorage(directory: directory))
             let sut = NetworkSessionRecorder(persistence, started: Date(timeIntervalSince1970: 1_800_000_000), capacity: 1_000)
             let count = 300
             let expected = Set((0 ..< count).map { "https://api.example.com/\($0)" })
@@ -328,7 +328,7 @@
         func boundedWhileWriting() async throws {
             let storage = FakeNetworkSessionStorage(holdsAppends: true)
             let sut = NetworkSessionRecorder(
-                NetworkSessionPersistence(storage: storage),
+                try NetworkSessionPersistence(storage: storage),
                 started: Date(timeIntervalSince1970: 1_800_000_000), capacity: 3
             )
             var started = storage.appendsStarted.makeAsyncIterator()
@@ -360,7 +360,7 @@
         func webSocketAndHeader() async throws {
             let storage = FakeNetworkSessionStorage()
             let started = Date(timeIntervalSince1970: 1_800_000_000)
-            let sut = NetworkSessionRecorder(NetworkSessionPersistence(storage: storage), started: started)
+            let sut = NetworkSessionRecorder(try NetworkSessionPersistence(storage: storage), started: started)
             var connection = NetworkWebSocketConnection(url: "wss://stream.example.com/prices?token=socket-secret", opened: started)
             connection.end(.failed(message: "The network connection was lost.", at: started.addingTimeInterval(2)))
 
@@ -388,10 +388,10 @@
                 timestamp: Date(timeIntervalSince1970: 1_800_000_001), method: "GET", url: "https://api.example.com/v1/orders",
                 host: "api.example.com", path: "/v1/orders", requestHeaders: [:], requestBody: nil, statusCode: 200, isComplete: true
             )
-            let earlier = NetworkSessionRecorder(NetworkSessionPersistence(storage: storage), started: Date(timeIntervalSince1970: 1_800_000_000))
+            let earlier = NetworkSessionRecorder(try NetworkSessionPersistence(storage: storage), started: Date(timeIntervalSince1970: 1_800_000_000))
             earlier.record(entry, original: nil, redaction: .standard)
             _ = await earlier.previousSessions()
-            let sut = NetworkSessionRecorder(NetworkSessionPersistence(storage: storage), started: Date(timeIntervalSince1970: 1_800_000_060))
+            let sut = NetworkSessionRecorder(try NetworkSessionPersistence(storage: storage), started: Date(timeIntervalSince1970: 1_800_000_060))
             sut.record(entry, original: nil, redaction: .standard)
 
             await sut.delete([earlier.currentName, sut.currentName])

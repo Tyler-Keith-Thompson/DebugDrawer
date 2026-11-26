@@ -31,7 +31,7 @@ import Foundation
 /// build metadata always, and only what the host registers beside them.
 ///
 /// ```swift
-/// let appState = DebugDrawerAppState(
+/// let appState = try DebugDrawerAppState(
 ///     sessions: sessions,
 ///     featureFlags: flagOverrides,
 ///     environments: environments,
@@ -74,6 +74,14 @@ public final class DebugDrawerAppState: DebugDrawerPluginModel {
         case refresh
     }
 
+    /// Fields the state can't take.
+    public enum InvalidField: Error, Equatable, Sendable {
+        /// A field's key is empty.
+        case emptyKey
+        /// Two fields share a key.
+        case duplicateKey
+    }
+
     /// What is served now.
     @Published public private(set) var snapshot = Snapshot(sessionID: nil, state: nil)
 
@@ -91,8 +99,7 @@ public final class DebugDrawerAppState: DebugDrawerPluginModel {
     /// The app's state, served during `sessions`' open session: the main bundle's version and
     /// build, `buildMetadata`, and each source the host passes.
     ///
-    /// Every source is off unless passed: with none, the state holds the build alone. Traps when
-    /// two fields share a key.
+    /// Every source is off unless passed: with none, the state holds the build alone.
     ///
     /// - Parameters:
     ///   - sessions: The receiver's sessions, which the snapshot follows.
@@ -109,6 +116,8 @@ public final class DebugDrawerAppState: DebugDrawerPluginModel {
     ///   - values: The host's own values, each read as the state is read. Never register a secret
     ///     or a raw identifier there: what they return leaves the process.
     ///   - defaults: Where the install's hashing key is kept; the app's own, never an app group's.
+    /// - Throws: ``InvalidField/emptyKey`` when a field's key is empty, and
+    ///   ``InvalidField/duplicateKey`` when two fields share a key.
     public convenience init(
         sessions: DebugDrawerSessions,
         buildMetadata: AppInfoBuildMetadata = AppInfoBuildMetadata(),
@@ -118,14 +127,17 @@ public final class DebugDrawerAppState: DebugDrawerPluginModel {
         userID: (@MainActor () -> String?)? = nil,
         values: [DebugDrawerAppStateField] = [],
         defaults: UserDefaults = .standard
-    ) {
-        self.init(
+    ) throws(InvalidField) {
+        try self.init(
             sessions: sessions, bundle: .main, buildMetadata: buildMetadata, featureFlags: featureFlags, experiments: experiments,
             environments: environments, userID: userID, values: values, defaults: defaults, now: Date.init
         )
     }
 
     /// The app's state, as `bundle` describes the build, read at `now`.
+    ///
+    /// - Throws: As ``init(sessions:buildMetadata:featureFlags:experiments:environments:userID:values:defaults:)``
+    ///   does.
     package init(
         sessions: DebugDrawerSessions,
         bundle: Bundle,
@@ -137,8 +149,9 @@ public final class DebugDrawerAppState: DebugDrawerPluginModel {
         values: [DebugDrawerAppStateField],
         defaults: UserDefaults,
         now: @escaping () -> Date
-    ) {
-        precondition(Set(values.map(\.key)).count == values.count, "Two app state fields share a key")
+    ) throws(InvalidField) {
+        guard !values.contains(where: \.key.isEmpty) else { throw .emptyKey }
+        guard Set(values.map(\.key)).count == values.count else { throw .duplicateKey }
         identity = AppPresence.Identity.of(bundle)
         self.buildMetadata = buildMetadata.filled(from: bundle.infoDictionary)
         self.featureFlags = featureFlags

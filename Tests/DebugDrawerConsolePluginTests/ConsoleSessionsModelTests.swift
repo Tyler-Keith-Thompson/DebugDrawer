@@ -10,20 +10,20 @@
     @Suite(.timeLimit(.minutes(1)))
     struct ConsoleSessionsModelTests {
         @Test("Reloading lists the earlier sessions, the newest first, without the current one")
-        func reloadLists() async {
+        func reloadLists() async throws {
             let storage = FakeConsoleSessionStorage()
             let line = LogLine(timestamp: Date(timeIntervalSince1970: 1_800_000_001), text: "Feed loaded", source: .oslog, level: .info)
             var expected: [String] = []
             for launch in 0 ..< 2 {
                 let earlier = ConsoleSessionRecorder(
-                    ConsoleSessionPersistence(storage: storage),
+                    try ConsoleSessionPersistence(storage: storage),
                     started: Date(timeIntervalSince1970: 1_800_000_000 + Double(launch) * 60)
                 )
                 earlier.record(line)
                 _ = await earlier.previousSessions()
                 expected.insert(earlier.currentName, at: 0)
             }
-            let current = ConsoleSessionRecorder(ConsoleSessionPersistence(storage: storage), started: Date(timeIntervalSince1970: 1_800_000_600))
+            let current = ConsoleSessionRecorder(try ConsoleSessionPersistence(storage: storage), started: Date(timeIntervalSince1970: 1_800_000_600))
             current.record(line)
             let sut = ConsoleSessionsModel(recorder: current)
 
@@ -36,11 +36,11 @@
         func unreadable() async throws {
             let storage = FakeConsoleSessionStorage()
             let line = LogLine(timestamp: Date(timeIntervalSince1970: 1_800_000_001), text: "Feed loaded", source: .oslog, level: .info)
-            let earlier = ConsoleSessionRecorder(ConsoleSessionPersistence(storage: storage), started: Date(timeIntervalSince1970: 1_800_000_000))
+            let earlier = ConsoleSessionRecorder(try ConsoleSessionPersistence(storage: storage), started: Date(timeIntervalSince1970: 1_800_000_000))
             earlier.record(line)
             _ = await earlier.previousSessions()
             let sut = ConsoleSessionsModel(recorder: ConsoleSessionRecorder(
-                ConsoleSessionPersistence(storage: storage), started: Date(timeIntervalSince1970: 1_800_000_060)
+                try ConsoleSessionPersistence(storage: storage), started: Date(timeIntervalSince1970: 1_800_000_060)
             ))
             await sut.reload()
             let id = try #require(sut.sessions.first?.id)
@@ -64,14 +64,14 @@
             var names: [String] = []
             for launch in 0 ..< 2 {
                 let earlier = ConsoleSessionRecorder(
-                    ConsoleSessionPersistence(storage: storage),
+                    try ConsoleSessionPersistence(storage: storage),
                     started: Date(timeIntervalSince1970: 1_800_000_000 + Double(launch) * 60)
                 )
                 earlier.record(line)
                 _ = await earlier.previousSessions()
                 names.append(earlier.currentName)
             }
-            let current = ConsoleSessionRecorder(ConsoleSessionPersistence(storage: storage), started: Date(timeIntervalSince1970: 1_800_000_600))
+            let current = ConsoleSessionRecorder(try ConsoleSessionPersistence(storage: storage), started: Date(timeIntervalSince1970: 1_800_000_600))
             let sut = ConsoleSessionsModel(recorder: current)
             await sut.reload()
 

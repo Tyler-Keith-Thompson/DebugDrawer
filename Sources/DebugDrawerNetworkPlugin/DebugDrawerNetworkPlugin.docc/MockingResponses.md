@@ -19,7 +19,7 @@ let outage = NetworkMockRule(
     matcher: .init(methods: ["GET", "POST"], host: .wildcard("*.example.com"), path: .wildcard("/v1/orders/**")),
     response: .init(status: 503, body: .text(#"{"error":"maintenance"}"#), contentType: "application/json")
 )
-DebugDrawer.shared.installNetwork(mocks: [outage])
+try DebugDrawer.shared.installNetwork(mocks: [outage])
 ```
 
 ### Matching

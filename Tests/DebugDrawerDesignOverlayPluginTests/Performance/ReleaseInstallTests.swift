@@ -11,7 +11,7 @@
     struct ReleaseInstallTests {
         @MainActor
         @Test("In release, install takes any data without decoding or trapping, and writes nothing to Caches")
-        func installDoesNothing() {
+        func installDoesNothing() throws {
             // The sandboxed folder, and the one a Mac app outside the sandbox uses.
             let bundleIdentifier = Bundle.main.bundleIdentifier ?? ProcessInfo.processInfo.processName
             let folders = [
@@ -21,7 +21,7 @@
             let existed = folders.map { FileManager.default.fileExists(atPath: $0.path) }
 
             DesignOverlay.install()
-            DesignOverlay.install(mockup: Data("not an image".utf8))
+            try DesignOverlay.install(mockup: Data("not an image".utf8))
             let actual = folders.map { FileManager.default.fileExists(atPath: $0.path) }
 
             #expect(actual == existed)

@@ -22,8 +22,11 @@
 
         /// An empty capture that keeps at most `limit` bytes.
         ///
-        /// - Parameter limit: The most bytes kept; traps when it is negative.
+        /// - Parameter limit: The most bytes kept; 0 or more.
         init(limit: Int) {
+            // Can't fire: the type is internal, and every limit it is given is the process's
+            // `NetworkBodyCapture.limit`, which is the non-negative default or a body limit
+            // installNetwork took after throwing on a negative one, or that limit passed on.
             precondition(limit >= 0, "A body limit can't be negative")
             self.limit = limit
         }

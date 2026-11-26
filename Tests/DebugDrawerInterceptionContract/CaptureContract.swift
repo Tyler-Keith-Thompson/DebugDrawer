@@ -8,7 +8,7 @@ import Testing
 @MainActor
 public protocol CaptureContract: InterceptionContract {
     /// Sets how many calls the plugin keeps.
-    func limitCapture(to count: Int)
+    func limitCapture(to count: Int) throws
 
     /// Makes one call the plugin keeps, as the app would, tagged `marker`, and returns once the
     /// app has its result.
@@ -46,7 +46,7 @@ public extension CaptureContract {
         try await withTwoDrawers { drawer, _ in
             let markers = (0 ... limit * 2).map { Self.marker("bounded\($0)") }
             install(in: drawer)
-            limitCapture(to: limit)
+            try limitCapture(to: limit)
 
             for marker in markers {
                 try await makeCapturedCall(marker)

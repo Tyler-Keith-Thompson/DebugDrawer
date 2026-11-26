@@ -58,7 +58,7 @@
             )
             let sessions = DebugDrawerSessions(maximumDuration: 300)
             let foreground = FakeForeground()
-            let model = AppStateResetRequests(
+            let model = try AppStateResetRequests(
                 sessions: sessions, allowing: [.userDefaults, .files, .caches], allowingKeychain: false, appState: appState,
                 launchURL: nil, foreground: foreground, now: Date.init
             )
@@ -177,7 +177,7 @@
                 try layout.write(document.encoded(), to: layout.commands.appending(path: "\(index).json"))
             }
             let sessions = DebugDrawerSessions(maximumDuration: 300)
-            let model = AppStateResetRequests(
+            let model = try AppStateResetRequests(
                 sessions: sessions, allowing: .all, allowingKeychain: false, appState: fixture.appState, launchURL: nil,
                 foreground: FakeForeground(isInForeground: true), now: Date.init
             )
@@ -212,7 +212,7 @@
                 try layout.write(document.encoded(), to: layout.commands.appending(path: "\(index).json"))
             }
             let sessions = DebugDrawerSessions(maximumDuration: 300)
-            let model = AppStateResetRequests(
+            let model = try AppStateResetRequests(
                 sessions: sessions, allowing: .all, allowingKeychain: false, appState: fixture.appState, launchURL: nil,
                 foreground: FakeForeground(), now: Date.init
             )
@@ -233,7 +233,7 @@
                 defer { fixture.remove() }
                 let store = fixture.root.appending(path: "Store")
                 let sessions = DebugDrawerSessions(maximumDuration: 300)
-                let model = AppStateResetRequests(
+                let model = try AppStateResetRequests(
                     sessions: sessions, allowing: [.caches], allowingKeychain: false, appState: fixture.appState, launchURL: nil,
                     foreground: _AppForeground(), now: Date.init
                 )

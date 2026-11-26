@@ -29,7 +29,7 @@
                 .appending(path: "SidecarPerformanceTracesTests-\(UUID().uuidString)")
                 .appending(path: "DebugDrawer")
             let sessions = DebugDrawerSessions(maximumDuration: 300)
-            let traces = PerformanceTraces(sessions: sessions)
+            let traces = try PerformanceTraces(sessions: sessions)
             let receiver = DebugDrawerReceiver(directory: store, sessions: sessions)
             receiver.identity = AppPresence.Identity(bundleIdentifier: "com.example.shop", displayName: "Shop", version: "2.4", build: "881")
             receiver.enable(.performanceTraces(traces))
@@ -105,7 +105,7 @@
         @Test("Create Report adds performance.txt from the snapshot and tells the app it was exported")
         func reportContribution() async throws {
             let sessions = DebugDrawerSessions(maximumDuration: 300)
-            let traces = PerformanceTraces(sessions: sessions)
+            let traces = try PerformanceTraces(sessions: sessions)
             sessions.perform(.open(duration: 60))
             traces.perform(.start)
             traces.endInterval(traces.beginInterval("Load feed"))

@@ -135,9 +135,9 @@ struct PerformanceTracesOverheadTests {
 
     @MainActor
     @Test("A signpost interval costs under 5 µs while recording and under 1 µs while nothing records")
-    func signpostCost() {
+    func signpostCost() throws {
         let sessions = DebugDrawerSessions(maximumDuration: 300)
-        let sut = PerformanceTraces(sessions: sessions, limits: PerformanceTraces.Limits(stalls: 1, intervals: 100))
+        let sut = try PerformanceTraces(sessions: sessions, limits: try PerformanceTraces.Limits(stalls: 1, intervals: 100))
         let batches = 10
         let iterations = 20000
         var idle = Duration.seconds(1)

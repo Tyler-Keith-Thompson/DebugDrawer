@@ -28,7 +28,7 @@ struct AppStateTests {
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         let sessions = DebugDrawerSessions(maximumDuration: 300)
-        let sut = DebugDrawerAppState(sessions: sessions, defaults: defaults)
+        let sut = try DebugDrawerAppState(sessions: sessions, defaults: defaults)
         let expected: Set<String> = ["bundleIdentifier", "version", "build", "buildMetadata", "date"]
 
         sessions.perform(.open(duration: 60))
@@ -68,7 +68,7 @@ struct AppStateTests {
         let bundle = try #require(Bundle(url: url))
         let read = Date(timeIntervalSince1970: 1_800_000_000)
         let sessions = DebugDrawerSessions(maximumDuration: 300)
-        let sut = DebugDrawerAppState(
+        let sut = try DebugDrawerAppState(
             sessions: sessions, bundle: bundle, buildMetadata: AppInfoBuildMetadata(gitCommit: "4f9c2e1"),
             featureFlags: nil, experiments: nil, environments: nil, userID: nil, values: [], defaults: defaults, now: { read }
         )
@@ -89,7 +89,7 @@ struct AppStateTests {
         defer { defaults.removePersistentDomain(forName: suite) }
         let sessions = DebugDrawerSessions(maximumDuration: 300)
         let reads = ReadCount()
-        let sut = DebugDrawerAppState(
+        let sut = try DebugDrawerAppState(
             sessions: sessions,
             userID: {
                 reads.count += 1
@@ -134,7 +134,7 @@ struct AppStateTests {
             allowing: DebugDrawerEnvironment("staging", title: "Staging"),
             adapter: FakeBackend(), defaults: defaults
         )
-        let sut = DebugDrawerAppState(
+        let sut = try DebugDrawerAppState(
             sessions: sessions, featureFlags: flags, experiments: experiments, environments: environments,
             userID: { "user-8271" },
             values: [
@@ -175,7 +175,7 @@ struct AppStateTests {
             allowing: DebugDrawerEnvironment("staging", title: "Staging"),
             adapter: FakeBackend(), defaults: defaults
         )
-        let sut = DebugDrawerAppState(sessions: sessions, featureFlags: flags, environments: environments, defaults: defaults)
+        let sut = try DebugDrawerAppState(sessions: sessions, featureFlags: flags, environments: environments, defaults: defaults)
         sessions.perform(.open(duration: 60))
         let expectedFlags: [String: DebugDrawerFeatureFlagValue] = ["new-checkout": .bool(true)]
         let expectedEnvironment = DebugDrawerAppState.ActiveEnvironment(id: "staging", title: "Staging", isSwitched: true)
@@ -195,7 +195,7 @@ struct AppStateTests {
         defer { defaults.removePersistentDomain(forName: suite) }
         let sessions = DebugDrawerSessions(maximumDuration: 300)
         let cart = Cart()
-        let sut = DebugDrawerAppState(
+        let sut = try DebugDrawerAppState(
             sessions: sessions, values: [DebugDrawerAppStateField("cartItems") { .number(cart.items) }], defaults: defaults
         )
         let expected: [String: DebugDrawerAppStateValue] = ["cartItems": .number(4)]
@@ -222,9 +222,9 @@ struct AppStateTests {
         }
         let sessions = DebugDrawerSessions(maximumDuration: 300)
         let rawID = "user-8271"
-        let first = DebugDrawerAppState(sessions: sessions, userID: { rawID }, defaults: defaults).read().hashedUserID
-        let relaunched = DebugDrawerAppState(sessions: sessions, userID: { rawID }, defaults: defaults).read().hashedUserID
-        let elsewhere = DebugDrawerAppState(sessions: sessions, userID: { rawID }, defaults: otherInstall).read().hashedUserID
+        let first = try DebugDrawerAppState(sessions: sessions, userID: { rawID }, defaults: defaults).read().hashedUserID
+        let relaunched = try DebugDrawerAppState(sessions: sessions, userID: { rawID }, defaults: defaults).read().hashedUserID
+        let elsewhere = try DebugDrawerAppState(sessions: sessions, userID: { rawID }, defaults: otherInstall).read().hashedUserID
         let key = try #require(defaults.data(forKey: UserIDHasher.keyDefaultsKey))
         let expected = HMAC<SHA256>.authenticationCode(for: Data(rawID.utf8), using: SymmetricKey(data: key))
             .map { String(format: "%02x", $0) }.joined()
@@ -243,7 +243,7 @@ struct AppStateTests {
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         let sessions = DebugDrawerSessions(maximumDuration: 300)
-        let sut = DebugDrawerAppState(sessions: sessions, userID: { nil }, defaults: defaults)
+        let sut = try DebugDrawerAppState(sessions: sessions, userID: { nil }, defaults: defaults)
 
         let actual = sut.read()
 
@@ -260,7 +260,7 @@ struct AppStateTests {
             audience: "com.example.shop"
         )
         let sessions = DebugDrawerSessions(maximumDuration: 300, grantPolicy: policy)
-        let sut = DebugDrawerAppState(sessions: sessions, userID: { "user-1" }, defaults: defaults)
+        let sut = try DebugDrawerAppState(sessions: sessions, userID: { "user-1" }, defaults: defaults)
 
         sessions.perform(.open(duration: 60, grant: "grant-1"))
 
@@ -279,7 +279,7 @@ struct AppStateTests {
             audience: "com.example.shop"
         )
         let sessions = DebugDrawerSessions(maximumDuration: 300, grantPolicy: policy)
-        let sut = DebugDrawerAppState(sessions: sessions, defaults: defaults)
+        let sut = try DebugDrawerAppState(sessions: sessions, defaults: defaults)
 
         sessions.perform(.open(duration: 60, grant: "grant-2"))
 

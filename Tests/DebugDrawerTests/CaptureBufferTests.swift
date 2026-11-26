@@ -5,8 +5,8 @@
 
     struct CaptureBufferTests {
         @Test("Past maxCount, the oldest elements go and the newest stay, oldest first")
-        func countBound() {
-            let sut = CaptureBuffer<String>(maxCount: 3)
+        func countBound() throws {
+            let sut = try CaptureBuffer<String>(maxCount: 3)
             let expected = ["c", "d", "e"]
 
             for element in ["a", "b", "c", "d", "e"] {
@@ -19,8 +19,8 @@
         }
 
         @Test("Past maxByteCount, the oldest elements go until the kept ones' costs fit")
-        func byteBound() {
-            let sut = CaptureBuffer<String>(maxCount: 100, maxByteCount: 10) { $0.utf8.count }
+        func byteBound() throws {
+            let sut = try CaptureBuffer<String>(maxCount: 100, maxByteCount: 10) { $0.utf8.count }
             let expected = ["dddd", "eeeee"]
             let expectedBytes = 9
             let expectedEvictedBytes = 6
@@ -37,8 +37,8 @@
         }
 
         @Test("An element that alone costs more than maxByteCount is evicted at once, with every older one")
-        func elementPastByteBound() {
-            let sut = CaptureBuffer<String>(maxCount: 100, maxByteCount: 4) { $0.utf8.count }
+        func elementPastByteBound() throws {
+            let sut = try CaptureBuffer<String>(maxCount: 100, maxByteCount: 4) { $0.utf8.count }
             sut.append("ab")
 
             sut.append("too long")
@@ -50,8 +50,8 @@
         }
 
         @Test("Evictions take the oldest first, in the order the elements were appended, across many compactions")
-        func evictionOrder() {
-            let sut = CaptureBuffer<Int>(maxCount: 7)
+        func evictionOrder() throws {
+            let sut = try CaptureBuffer<Int>(maxCount: 7)
             let expected = Array(993 ..< 1000)
 
             for element in 0 ..< 1000 {
@@ -64,8 +64,8 @@
         }
 
         @Test("A buffer with maxCount 0 keeps nothing and counts every append as evicted")
-        func zeroCount() {
-            let sut = CaptureBuffer<Int>(maxCount: 0)
+        func zeroCount() throws {
+            let sut = try CaptureBuffer<Int>(maxCount: 0)
 
             sut.append(contentsOf: [1, 2, 3])
             let actual = sut.snapshot()
@@ -75,13 +75,13 @@
         }
 
         @Test("Lowering maxCount or maxByteCount evicts the oldest now")
-        func loweringBounds() {
-            let sut = CaptureBuffer<String>(maxCount: 10) { $0.utf8.count }
+        func loweringBounds() throws {
+            let sut = try CaptureBuffer<String>(maxCount: 10) { $0.utf8.count }
             sut.append(contentsOf: ["aa", "bb", "cc", "dd"])
 
-            sut.maxCount = 3
+            try sut.setMaxCount(3)
             let afterCount = sut.snapshot().elements
-            sut.maxByteCount = 4
+            try sut.setMaxByteCount(4)
             let afterBytes = sut.snapshot().elements
 
             #expect(afterCount == ["bb", "cc", "dd"])
@@ -90,7 +90,7 @@
 
         @Test("IDs increase by one per append and stay with their element as older ones are evicted")
         func stableIDs() throws {
-            let sut = CaptureBuffer<String>(maxCount: 2)
+            let sut = try CaptureBuffer<String>(maxCount: 2)
             let first = sut.append("a")
             let second = sut.append("b")
             let third = sut.append("c")
@@ -107,8 +107,8 @@
         }
 
         @Test("A snapshot from an ID holds the elements from it on, and names the oldest the buffer holds")
-        func snapshotFrom() {
-            let sut = CaptureBuffer<String>(maxCount: 3)
+        func snapshotFrom() throws {
+            let sut = try CaptureBuffer<String>(maxCount: 3)
             sut.append(contentsOf: ["a", "b", "c"])
             let earlier = sut.snapshot()
             sut.append(contentsOf: ["d", "e"])
@@ -123,8 +123,8 @@
         }
 
         @Test("A snapshot from an evicted ID starts at the oldest kept, and one from past the end is empty")
-        func snapshotFromBounds() {
-            let sut = CaptureBuffer<String>(maxCount: 2)
+        func snapshotFromBounds() throws {
+            let sut = try CaptureBuffer<String>(maxCount: 2)
             sut.append(contentsOf: ["a", "b", "c", "d"])
 
             let fromEvicted = sut.snapshot(from: CaptureBuffer<String>.ElementID(rawValue: 0))
@@ -138,12 +138,12 @@
         }
 
         @Test("A list built from earlier snapshots keeps its elements from the oldest the buffer still holds")
-        func keptCount() {
-            let sut = CaptureBuffer<String>(maxCount: 3)
+        func keptCount() throws {
+            let sut = try CaptureBuffer<String>(maxCount: 3)
             sut.append(contentsOf: ["a", "b", "c"])
             let earlier = sut.snapshot()
             sut.append(contentsOf: ["d", "e"])
-            let cleared = CaptureBuffer<String>(maxCount: 3)
+            let cleared = try CaptureBuffer<String>(maxCount: 3)
             cleared.append(contentsOf: ["a", "b"])
             let clearedEarlier = cleared.snapshot()
             cleared.removeAll()
@@ -158,8 +158,8 @@
         }
 
         @Test("An empty buffer's snapshot names the ID the next append gets")
-        func emptyFirstID() {
-            let sut = CaptureBuffer<String>(maxCount: 1)
+        func emptyFirstID() throws {
+            let sut = try CaptureBuffer<String>(maxCount: 1)
             sut.append("a")
             sut.removeAll()
 
@@ -171,8 +171,8 @@
         }
 
         @Test("Updating an element changes it in place and counts its new cost against the byte bound")
-        func update() {
-            let sut = CaptureBuffer<String>(maxCount: 10, maxByteCount: 6) { $0.utf8.count }
+        func update() throws {
+            let sut = try CaptureBuffer<String>(maxCount: 10, maxByteCount: 6) { $0.utf8.count }
             sut.append("aa")
             let id = sut.append("b")
 
@@ -186,8 +186,8 @@
         }
 
         @Test("Updating an evicted element finds nothing and changes nothing")
-        func updateEvicted() {
-            let sut = CaptureBuffer<String>(maxCount: 1)
+        func updateEvicted() throws {
+            let sut = try CaptureBuffer<String>(maxCount: 1)
             let evicted = sut.append("a")
             sut.append("b")
             let before = sut.generation
@@ -200,8 +200,8 @@
         }
 
         @Test("Every change bumps the generation once: an append, a batch, an update, an evicting bound, a removeAll")
-        func generation() {
-            let sut = CaptureBuffer<Int>(maxCount: 10)
+        func generation() throws {
+            let sut = try CaptureBuffer<Int>(maxCount: 10)
             var generations = [sut.generation]
 
             let id = sut.append(1)
@@ -210,7 +210,7 @@
             generations.append(sut.generation)
             sut.update(id) { $0 = 10 }
             generations.append(sut.generation)
-            sut.maxCount = 2
+            try sut.setMaxCount(2)
             generations.append(sut.generation)
             sut.removeAll()
             generations.append(sut.generation)
@@ -221,21 +221,21 @@
         }
 
         @Test("What changes nothing leaves the generation alone: an empty batch, a bound that evicts nothing")
-        func generationUnchanged() {
-            let sut = CaptureBuffer<Int>(maxCount: 10)
+        func generationUnchanged() throws {
+            let sut = try CaptureBuffer<Int>(maxCount: 10)
             sut.append(1)
             let expected = sut.generation
 
             sut.append(contentsOf: [])
-            sut.maxCount = 5
-            sut.maxByteCount = 100
+            try sut.setMaxCount(5)
+            try sut.setMaxByteCount(100)
 
             #expect(sut.generation == expected)
         }
 
         @Test("removeAll empties the buffer and starts the eviction counts over")
-        func removeAll() {
-            let sut = CaptureBuffer<Int>(maxCount: 1)
+        func removeAll() throws {
+            let sut = try CaptureBuffer<Int>(maxCount: 1)
             sut.append(contentsOf: [1, 2, 3])
 
             sut.removeAll()
@@ -253,7 +253,7 @@
                 let name: String
                 let size: Int
             }
-            let sut = CaptureBuffer<Event>(maxCount: 2) { $0.size }
+            let sut = try CaptureBuffer<Event>(maxCount: 2) { $0.size }
             sut.append(Event(name: "read", size: 4))
             sut.append(Event(name: "write", size: 8))
             sut.append(Event(name: "delete", size: 0))
@@ -268,8 +268,8 @@
         }
 
         @Test("Appends from many threads at once all land, each with its own ID, within the bound")
-        func concurrentAppends() async {
-            let sut = CaptureBuffer<Int>(maxCount: 1000)
+        func concurrentAppends() async throws {
+            let sut = try CaptureBuffer<Int>(maxCount: 1000)
             let threads = 8
             let perThread = 500
 
@@ -294,8 +294,8 @@
         }
 
         @Test("Each thread's appends keep their order in the buffer")
-        func concurrentOrder() async {
-            let sut = CaptureBuffer<[Int]>(maxCount: 10000)
+        func concurrentOrder() async throws {
+            let sut = try CaptureBuffer<[Int]>(maxCount: 10000)
             let threads = 4
             let perThread = 1000
 
@@ -314,6 +314,58 @@
                 let actual = elements.filter { $0[0] == thread }.map { $0[1] }
                 #expect(actual == Array(0 ..< perThread))
             }
+        }
+
+        @Test("A negative maxCount throws negativeMaxCount")
+        func negativeMaxCount() {
+            let expected = CaptureBuffer<Int>.InvalidLimit.negativeMaxCount
+
+            #expect(throws: expected) {
+                _ = try CaptureBuffer<Int>(maxCount: -1)
+            }
+        }
+
+        @Test("A negative maxByteCount throws negativeMaxByteCount")
+        func negativeMaxByteCount() {
+            let expected = CaptureBuffer<Int>.InvalidLimit.negativeMaxByteCount
+
+            #expect(throws: expected) {
+                _ = try CaptureBuffer<Int>(maxCount: 1, maxByteCount: -1)
+            }
+        }
+
+        @Test("Bounds of 0 are taken: the edge of the valid range")
+        func zeroBounds() throws {
+            let sut = try CaptureBuffer<Int>(maxCount: 0, maxByteCount: 0)
+
+            #expect(sut.maxCount == 0)
+            #expect(sut.maxByteCount == 0)
+        }
+
+        @Test("Setting a negative maxCount throws negativeMaxCount and keeps the bound and the elements")
+        func settingNegativeMaxCount() throws {
+            let sut = try CaptureBuffer<Int>(maxCount: 3)
+            sut.append(contentsOf: [1, 2, 3])
+            let expectedGeneration = sut.generation
+
+            #expect(throws: CaptureBuffer<Int>.InvalidLimit.negativeMaxCount) {
+                try sut.setMaxCount(-1)
+            }
+            #expect(sut.maxCount == 3)
+            #expect(sut.snapshot().elements == [1, 2, 3])
+            #expect(sut.generation == expectedGeneration)
+        }
+
+        @Test("Setting a negative maxByteCount throws negativeMaxByteCount and keeps the bound")
+        func settingNegativeMaxByteCount() throws {
+            let sut = try CaptureBuffer<String>(maxCount: 3, maxByteCount: 10) { $0.utf8.count }
+            sut.append("abc")
+
+            #expect(throws: CaptureBuffer<String>.InvalidLimit.negativeMaxByteCount) {
+                try sut.setMaxByteCount(-1)
+            }
+            #expect(sut.maxByteCount == 10)
+            #expect(sut.snapshot().elements == ["abc"])
         }
     }
 #endif

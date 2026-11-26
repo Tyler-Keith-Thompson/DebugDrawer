@@ -7,20 +7,6 @@
 
     @Suite(.timeLimit(.minutes(1)))
     struct NetworkSessionExitTests {
-        @Test("A negative session count traps")
-        func negativeSessions() async {
-            await #expect(processExitsWith: .failure) {
-                _ = NetworkSessionPersistence(maxSessions: -1)
-            }
-        }
-
-        @Test("A size limit of 0 traps")
-        func zeroBytes() async {
-            await #expect(processExitsWith: .failure) {
-                _ = NetworkSessionPersistence(maxBytes: 0)
-            }
-        }
-
         @Test("Requests written before the app crashes are listed as the previous session by the next launch")
         func survivesCrash() async throws {
             // The children get a home folder of their own, so what they keep there (Application Support,
@@ -36,7 +22,7 @@
                 guard URL.applicationSupportDirectory.path(percentEncoded: false).hasPrefix(home) else { exit(EXIT_SUCCESS) }
                 let storage = _NetworkSessionStorage(directory: URL(filePath: path, directoryHint: .isDirectory))
                 let recorder = NetworkSessionRecorder(
-                    NetworkSessionPersistence(storage: storage),
+                    try NetworkSessionPersistence(storage: storage),
                     started: Date(timeIntervalSince1970: 1_800_000_000)
                 )
                 for index in 1 ... 3 {
@@ -55,7 +41,7 @@
                 abort()
             }
             let sut = NetworkSessionRecorder(
-                NetworkSessionPersistence(storage: _NetworkSessionStorage(directory: directory)),
+                try NetworkSessionPersistence(storage: _NetworkSessionStorage(directory: directory)),
                 started: Date(timeIntervalSince1970: 1_800_000_100)
             )
             let session = try #require(await sut.previousSessions().first)

@@ -14,7 +14,7 @@ import DebugDrawerScreenRecordingPlugin
 ScreenRecording.install()
 
 // Or keep the newest ten recordings rather than five:
-ScreenRecording.install(capacity: 10)
+try ScreenRecording.install(capacity: 10)
 ```
 
 `ScreenRecording` exists in every configuration and does nothing in release, so the call needs no

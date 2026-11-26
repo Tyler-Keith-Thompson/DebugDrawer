@@ -38,6 +38,10 @@ package final class HangMonitorState: Sendable {
 
     /// Traps unless `threshold` is positive.
     package init(threshold: Duration) {
+        // Can't fire: the state is package API, and every threshold reaching it has been checked
+        // where it entered. `PerformanceTraces` throws on a hitch threshold that isn't positive,
+        // `HangDetector.install(threshold:)` on a threshold that isn't, and the rest are the
+        // positive defaults and the Hangs picker's positive choices.
         precondition(threshold > .zero, "The hang threshold must be positive")
         // The buffer is only touched under the lock, which makes the unchecked state safe.
         state = OSAllocatedUnfairLock(uncheckedState: State(
@@ -55,6 +59,8 @@ package final class HangMonitorState: Sendable {
     package var threshold: Duration {
         get { state.withLockUnchecked { $0.tracker.threshold } }
         set {
+            // Can't fire, as in `init(threshold:)`: the monitor sets it only from a store whose
+            // threshold was checked on install or picked from the Hangs picker's positive choices.
             precondition(newValue > .zero, "The hang threshold must be positive")
             state.withLockUnchecked { $0.tracker.threshold = newValue }
             wake.signal()

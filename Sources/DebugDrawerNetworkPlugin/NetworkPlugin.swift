@@ -7,6 +7,14 @@ import SwiftUI
 // intercepts and registers nothing.
 
 public struct NetworkPlugin: DebugDrawerPlugin {
+    /// What `installNetwork` can't take: it installs nothing then.
+    public enum InvalidInstallation: Error, Equatable, Sendable {
+        /// The body limit is negative.
+        case negativeBodyLimit
+        /// A text to bypass isn't a host or a domain.
+        case bypassedTextNotAHost
+    }
+
     /// The plugin's identity in the drawer, which its saved state, HUD pin and badges are kept under.
     public nonisolated var id: String {
         "NetworkPlugin"
@@ -132,8 +140,7 @@ public extension DebugDrawer {
     ///     reach the plugin's URL protocol: the app's session sends them as it would without the
     ///     plugin, and only its delegate sees their TLS challenges. The plugin doesn't log, mock,
     ///     condition or resend them, and doesn't record their WebSocket tasks. Replaces the hosts
-    ///     an earlier call bypassed. Traps on one that isn't a host, so a typo can't let the
-    ///     plugin take requests the app meant to keep out.
+    ///     an earlier call bypassed.
     ///   - sessions: How many earlier launches' requests are kept on disk, in how many bytes,
     ///     and where; each request is written, redacted, as it completes, and the log shows
     ///     the earlier sessions under Previous. ``NetworkSessionPersistence/off`` writes none.
@@ -141,7 +148,11 @@ public extension DebugDrawer {
     ///     unless given. A larger body is kept to its first `bodyLimit` bytes and marked
     ///     truncated, with its full size, so a large upload, download or stream costs the log no
     ///     more; the server and the app still get every byte. Applies to the requests that start
-    ///     after the call. Traps when negative.
+    ///     after the call.
+    /// - Throws: `NetworkPlugin.InvalidInstallation.negativeBodyLimit` when `bodyLimit` is
+    ///   negative, and `.bypassedTextNotAHost` when one of `bypassing` isn't a host, so a typo
+    ///   can't let the plugin take requests the app meant to keep out. Either way it installs
+    ///   nothing. Release builds install nothing and throw nothing.
     func installNetwork(
         mocks: [NetworkMockRule] = [],
         conditions: [NetworkConditionProfile] = [],
@@ -149,11 +160,12 @@ public extension DebugDrawer {
         bypassing: [String] = [],
         sessions: NetworkSessionPersistence = .standard,
         bodyLimit: Int = 1_048_576
-    ) {
+    ) throws(NetworkPlugin.InvalidInstallation) {
         #if DEBUG
-            precondition(bodyLimit >= 0, "installNetwork(bodyLimit:) can't be negative")
+            guard bodyLimit >= 0 else { throw .negativeBodyLimit }
+            let bypassed = try NetworkBypass.parse(bypassing)
             // Before the URL protocol is registered, so no request to a bypassed host is taken.
-            NetworkBypass.bypass(bypassing)
+            NetworkBypass.bypass(bypassed)
             NetworkBodyCapture.limit.withLock { $0 = bodyLimit }
             NetworkMocksModel.shared.load(adding: mocks)
             NetworkConditionsModel.shared.load(adding: conditions)

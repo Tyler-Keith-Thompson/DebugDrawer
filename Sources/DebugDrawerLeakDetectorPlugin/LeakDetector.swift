@@ -27,6 +27,21 @@ public enum LeakDetector {
         #endif
     }
 
+    /// A `maxCount` the detector can't take: 0 or less.
+    public struct InvalidMaxCount: Error, Equatable, Sendable {}
+
+    /// Counts `object` among the live instances of its class until it deallocates; while more than
+    /// one is alive, the class is a suspect: in debug builds only; in release it does nothing.
+    ///
+    /// As ``trackLifetime(of:maxCount:)`` does with a `maxCount` of 1.
+    ///
+    /// - Parameter object: The object to count.
+    public static func trackLifetime(of object: AnyObject) {
+        #if DEBUG
+            LeakDetectorInstallation.track(object, maxCount: 1)
+        #endif
+    }
+
     /// Counts `object` among the live instances of its class until it deallocates; while more than
     /// `maxCount` are alive, the class is a suspect: in debug builds only; in release it does
     /// nothing.
@@ -40,10 +55,12 @@ public enum LeakDetector {
     /// - Parameters:
     ///   - object: The object to count.
     ///   - maxCount: How many instances of `object`'s class should be alive at most at once; the
-    ///     last value given for a class is the one used. Traps in debug builds unless positive.
-    public static func trackLifetime(of object: AnyObject, maxCount: Int = 1) {
+    ///     last value given for a class is the one used.
+    /// - Throws: ``InvalidMaxCount`` when `maxCount` is 0 or less, counting nothing. Release builds
+    ///   count nothing and throw nothing.
+    public static func trackLifetime(of object: AnyObject, maxCount: Int) throws(InvalidMaxCount) {
         #if DEBUG
-            precondition(maxCount > 0, "maxCount must be positive")
+            guard maxCount > 0 else { throw InvalidMaxCount() }
             LeakDetectorInstallation.track(object, maxCount: maxCount)
         #endif
     }

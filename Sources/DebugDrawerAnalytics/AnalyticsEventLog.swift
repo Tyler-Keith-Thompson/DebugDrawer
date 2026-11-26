@@ -38,6 +38,8 @@
         ///   - capacity: How many events are kept; at least 1.
         ///   - now: The time an event is recorded at.
         package init(capacity: Int, now: @escaping @Sendable () -> Date = { Date() }) {
+            // Can't fire: package API, made once in the module as `shared`, with the constant
+            // AnalyticsEvents.defaultCapacity, and by tests with positive constants.
             precondition(capacity > 0, "The log keeps at least one event")
             state = OSAllocatedUnfairLock(initialState: State(capacity: capacity))
             self.now = now
@@ -87,6 +89,9 @@
         ///
         /// - Parameter capacity: At least 1.
         package func resize(to capacity: Int) {
+            // Can't fire: package API, called only by AnalyticsEventsInstallation, which is
+            // reached from AnalyticsEvents.install(), with the positive default, and from
+            // install(capacity:), which throws on a capacity below 1 first.
             precondition(capacity > 0, "The log keeps at least one event")
             let onChange = state.withLock { state -> (@Sendable () -> Void)? in
                 let oldestFirst = Array(state.ring[state.start...] + state.ring[..<state.start])

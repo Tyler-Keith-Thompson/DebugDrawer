@@ -55,7 +55,7 @@
                     }
                     defer { server.stop() }
                     let port = try await server.start()
-                    DebugDrawer.shared.installNetwork(sessions: .off)
+                    try DebugDrawer.shared.installNetwork(sessions: .off)
                     let model = NetworkModel.shared
                     // `.invalid` never resolves (RFC 6761), and no rule or condition answers it.
                     let unresolvable = "https://nowhere.invalid/\(UUID().uuidString)"

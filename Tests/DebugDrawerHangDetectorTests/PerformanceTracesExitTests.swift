@@ -55,7 +55,7 @@
                         try layout.write(document.encoded(), to: layout.commands.appending(path: "\(index).json"))
                     }
                     let sessions = DebugDrawerSessions(maximumDuration: 300)
-                    let traces = PerformanceTraces(sessions: sessions)
+                    let traces = try PerformanceTraces(sessions: sessions)
                     let receiver = DebugDrawerReceiver(directory: directory, sessions: sessions)
                     // Another capability, as a receiver with none enabled opens no session.
                     receiver.enable(.diagnosticsCapture(DebugDrawerDiagnosticsCapture(sessions: sessions)))
@@ -106,7 +106,7 @@
                         try layout.write(document.encoded(), to: layout.commands.appending(path: "\(UUID().uuidString).json"))
                     }
                     let sessions = DebugDrawerSessions(maximumDuration: 300)
-                    let traces = PerformanceTraces(sessions: sessions)
+                    let traces = try PerformanceTraces(sessions: sessions)
                     let receiver = DebugDrawerReceiver(directory: directory, sessions: sessions)
                     receiver.enable(.performanceTraces(traces))
                     try send(PerformanceTraces.pluginID, TransportMessage.payload(PerformanceTraces.Command.start))
@@ -173,7 +173,7 @@
                     let clock = MovableClock(Date())
                     let timer = ManualTimer()
                     let sessions = DebugDrawerSessions(maximumDuration: 300, auditCapacity: 100, clock: clock, timer: timer)
-                    let traces = PerformanceTraces(sessions: sessions)
+                    let traces = try PerformanceTraces(sessions: sessions)
                     let receiver = DebugDrawerReceiver(directory: directory, sessions: sessions)
                     receiver.enable(.performanceTraces(traces))
                     try receiver.start()
@@ -228,7 +228,7 @@
                         try layout.write(document.encoded(), to: layout.commands.appending(path: "\(index).json"))
                     }
                     let sessions = DebugDrawerSessions(maximumDuration: 300)
-                    let traces = PerformanceTraces(sessions: sessions)
+                    let traces = try PerformanceTraces(sessions: sessions)
                     let receiver = DebugDrawerReceiver(directory: directory, sessions: sessions)
                     receiver.enable(.performanceTraces(traces))
                     try receiver.start()
@@ -282,7 +282,7 @@
                         try layout.write(document.encoded(), to: layout.commands.appending(path: "\(index).json"))
                     }
                     let sessions = DebugDrawerSessions(maximumDuration: 300)
-                    let traces = PerformanceTraces(sessions: sessions)
+                    let traces = try PerformanceTraces(sessions: sessions)
                     let receiver = DebugDrawerReceiver(directory: directory, sessions: sessions)
                     let gate = Gate()
                     receiver.enable(.performanceTraces(traces), isAllowed: { gate.isOpen })
@@ -335,7 +335,7 @@
                         try layout.write(document.encoded(), to: layout.commands.appending(path: "\(index).json"))
                     }
                     let sessions = DebugDrawerSessions(maximumDuration: 300)
-                    let traces = PerformanceTraces(sessions: sessions)
+                    let traces = try PerformanceTraces(sessions: sessions)
                     let receiver = DebugDrawerReceiver(directory: directory, sessions: sessions)
                     receiver.enable(.performanceTraces(traces))
                     try receiver.start()
@@ -356,32 +356,6 @@
                 }
                 let isRecorded = (try? await hangIsRecorded()) ?? false
                 exit(isRecorded ? EXIT_SUCCESS : EXIT_FAILURE)
-            }
-        }
-
-        @Test("Hitch and hang thresholds that aren't positive, or a hitch threshold past the hang threshold, trap")
-        func thresholdsTrap() async {
-            await #expect(processExitsWith: .failure) {
-                await MainActor.run {
-                    _ = PerformanceTraces(sessions: DebugDrawerSessions(maximumDuration: 60), hitchThreshold: .zero)
-                }
-            }
-            await #expect(processExitsWith: .failure) {
-                await MainActor.run {
-                    _ = PerformanceTraces(
-                        sessions: DebugDrawerSessions(maximumDuration: 60), hitchThreshold: .milliseconds(300), hangThreshold: .milliseconds(250)
-                    )
-                }
-            }
-        }
-
-        @Test("Limits that keep no stall or no interval trap")
-        func emptyLimitsTrap() async {
-            await #expect(processExitsWith: .failure) {
-                _ = PerformanceTraces.Limits(stalls: 0, intervals: 1)
-            }
-            await #expect(processExitsWith: .failure) {
-                _ = PerformanceTraces.Limits(stalls: 1, intervals: 0)
             }
         }
     }

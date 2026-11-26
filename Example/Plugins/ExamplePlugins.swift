@@ -33,6 +33,7 @@ import DebugDrawerTweaksPlugin
 import DebugDrawerUserDefaultsPlugin
 import DebugDrawerViewInspectorPlugin
 import Foundation
+import os
 
 // Every global plugin, each with its defaults, for the examples with no SwiftUI root: the UIKit app
 // and the AppKit app link this one library rather than each keeping a copy, and show that such a
@@ -42,6 +43,8 @@ import Foundation
 /// The plugins the UIKit and AppKit examples install.
 @MainActor
 public enum ExamplePlugins {
+    private static let logger = Logger(subsystem: "ExamplePlugins", category: "ExamplePlugins")
+
     /// Installs every global plugin. Each compiles in release too, where it does nothing; Background
     /// Tasks does nothing on macOS either, which has no BGTaskScheduler.
     ///
@@ -69,7 +72,11 @@ public enum ExamplePlugins {
         // system sends it, to the UIKit app's scene(_:continue:) or the AppKit app's
         // application(_:continue:restorationHandler:). A URL it opens goes to the app's own routing.
         DebugDrawer.shared.installDeepLink(openURL: openURL)
-        DebugDrawer.shared.installNetwork()
+        do {
+            try DebugDrawer.shared.installNetwork()
+        } catch {
+            logger.error("The Network plugin refused its configuration: \(String(describing: error), privacy: .public)")
+        }
         DebugDrawer.shared.installConsole()
         DebugDrawer.shared.installDiskIO()
         DebugDrawer.shared.installViewInspector()
@@ -83,10 +90,14 @@ public enum ExamplePlugins {
         DebugDrawer.shared.installLoadedLibraries()
         DebugDrawer.shared.installCookies()
         DebugDrawer.shared.installLaunchTime()
-        DebugDrawer.shared.installTweaks {
-            TweakSection("Greeting") {
-                greeting
+        do {
+            try DebugDrawer.shared.installTweaks {
+                TweakSection("Greeting") {
+                    greeting
+                }
             }
+        } catch {
+            logger.error("The Tweaks plugin refused its configuration: \(String(describing: error), privacy: .public)")
         }
         DebugDrawer.shared.installFeatureFlags(provider: flags)
     }

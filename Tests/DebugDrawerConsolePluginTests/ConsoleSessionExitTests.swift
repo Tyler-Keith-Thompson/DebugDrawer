@@ -7,20 +7,6 @@
 
     @Suite(.timeLimit(.minutes(1)))
     struct ConsoleSessionExitTests {
-        @Test("A negative session count traps")
-        func negativeSessions() async {
-            await #expect(processExitsWith: .failure) {
-                _ = ConsoleSessionPersistence(maxSessions: -1)
-            }
-        }
-
-        @Test("A size limit of 0 traps")
-        func zeroBytes() async {
-            await #expect(processExitsWith: .failure) {
-                _ = ConsoleSessionPersistence(maxBytes: 0)
-            }
-        }
-
         @Test("Lines written before the app crashes are listed as the previous session by the next launch")
         func survivesCrash() async throws {
             // The children get a home folder of their own, so what they keep there (Application Support,
@@ -36,7 +22,7 @@
                 guard URL.applicationSupportDirectory.path(percentEncoded: false).hasPrefix(home) else { exit(EXIT_SUCCESS) }
                 let storage = _ConsoleSessionStorage(directory: URL(filePath: path, directoryHint: .isDirectory))
                 let recorder = ConsoleSessionRecorder(
-                    ConsoleSessionPersistence(storage: storage),
+                    try ConsoleSessionPersistence(storage: storage),
                     started: Date(timeIntervalSince1970: 1_800_000_000)
                 )
                 for index in 1 ... 3 {
@@ -49,7 +35,7 @@
                 abort()
             }
             let sut = ConsoleSessionRecorder(
-                ConsoleSessionPersistence(storage: _ConsoleSessionStorage(directory: directory)),
+                try ConsoleSessionPersistence(storage: _ConsoleSessionStorage(directory: directory)),
                 started: Date(timeIntervalSince1970: 1_800_000_100)
             )
             let session = try #require(await sut.previousSessions().first)

@@ -58,7 +58,7 @@
             let directory = FileManager.default.temporaryDirectory.appending(path: "AnalyticsMirrorSessionTests-\(UUID().uuidString)")
             let sessions = DebugDrawerSessions(maximumDuration: 300)
             let receiver = DebugDrawerReceiver(directory: directory, sessions: sessions)
-            receiver.enable(.analyticsEvents(sessions: sessions))
+            try receiver.enable(.analyticsEvents(sessions: sessions))
             try receiver.start()
             defer { receiver.stop() }
             let sidecar = try DebugDrawerAppGroupStoreTransport(directory: AppGroupStoreLayout.appDirectory(inStore: directory))
@@ -129,7 +129,7 @@
             let timer = ManualTimer()
             let sessions = DebugDrawerSessions(maximumDuration: 300, auditCapacity: 100, clock: clock, timer: timer)
             let receiver = DebugDrawerReceiver(directory: directory, sessions: sessions)
-            let mirror = AnalyticsEventsMirror(sessions: sessions, redaction: .standard, capacity: 100) { clock.now }
+            let mirror = try AnalyticsEventsMirror(sessions: sessions, redaction: .standard, capacity: 100) { clock.now }
             receiver.enable(.model(mirror, id: AnalyticsEventsMirror.pluginID, scope: .persistent))
             try receiver.start()
             defer { receiver.stop() }

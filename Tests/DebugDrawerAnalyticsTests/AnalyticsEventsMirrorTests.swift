@@ -80,11 +80,11 @@ struct AnalyticsEventsMirrorTests {
     }
 
     @Test("The mirror follows the sessions: a session's events, numbered from 1, then none once it ends, and a new list for the next")
-    func followsSessions() async {
+    func followsSessions() async throws {
         let clock = MovableClock(Self.start)
         let inboxes = AnalyticsMirrorInboxes()
         let sessions = DebugDrawerSessions(maximumDuration: 300, auditCapacity: 10, clock: clock, timer: IdleTimer())
-        let sut = AnalyticsEventsMirror(sessions: sessions, redaction: .none, capacity: 10, inboxes: inboxes) { clock.now }
+        let sut = try AnalyticsEventsMirror(sessions: sessions, redaction: .none, capacity: 10, inboxes: inboxes) { clock.now }
         let (published, publish) = AsyncStream<AnalyticsEventsMirror.Snapshot>.makeStream()
         let subscription = sut.$snapshot.sink { publish.yield($0) }
         defer { subscription.cancel() }
@@ -119,11 +119,11 @@ struct AnalyticsEventsMirrorTests {
     }
 
     @Test("A snapshot keeps the newest events up to the capacity; clear drops them and later ones still arrive")
-    func capacityAndClear() async {
+    func capacityAndClear() async throws {
         let clock = MovableClock(Self.start)
         let inboxes = AnalyticsMirrorInboxes()
         let sessions = DebugDrawerSessions(maximumDuration: 300, auditCapacity: 10, clock: clock, timer: IdleTimer())
-        let sut = AnalyticsEventsMirror(sessions: sessions, redaction: .none, capacity: 2, inboxes: inboxes) { clock.now }
+        let sut = try AnalyticsEventsMirror(sessions: sessions, redaction: .none, capacity: 2, inboxes: inboxes) { clock.now }
         let (published, publish) = AsyncStream<AnalyticsEventsMirror.Snapshot>.makeStream()
         let subscription = sut.$snapshot.sink { publish.yield($0) }
         defer { subscription.cancel() }
@@ -157,7 +157,7 @@ struct AnalyticsEventsMirrorTests {
         let clock = MovableClock(Self.start)
         let inboxes = AnalyticsMirrorInboxes()
         let sessions = DebugDrawerSessions(maximumDuration: 300, auditCapacity: 10, clock: clock, timer: IdleTimer())
-        let sut = AnalyticsEventsMirror(sessions: sessions, redaction: .none, capacity: 10, inboxes: inboxes) { clock.now }
+        let sut = try AnalyticsEventsMirror(sessions: sessions, redaction: .none, capacity: 10, inboxes: inboxes) { clock.now }
         let (published, publish) = AsyncStream<AnalyticsEventsMirror.Snapshot>.makeStream()
         let subscription = sut.$snapshot.sink { publish.yield($0) }
         defer { subscription.cancel() }
@@ -183,7 +183,7 @@ struct AnalyticsEventsMirrorTests {
     }
 
     @Test("Under a grant policy, a session whose grant doesn't list the capability is mirrored no events: its inbox never opens")
-    func grantWithoutCapability() {
+    func grantWithoutCapability() throws {
         let clock = MovableClock(Self.start)
         let inboxes = AnalyticsMirrorInboxes()
         let policy = DebugDrawerGrantPolicy(
@@ -191,7 +191,7 @@ struct AnalyticsEventsMirrorTests {
             audience: "com.example.app"
         )
         let sessions = DebugDrawerSessions(maximumDuration: 300, auditCapacity: 10, grantPolicy: policy, clock: clock, timer: IdleTimer())
-        let sut = AnalyticsEventsMirror(sessions: sessions, redaction: .none, capacity: 10, inboxes: inboxes) { clock.now }
+        let sut = try AnalyticsEventsMirror(sessions: sessions, redaction: .none, capacity: 10, inboxes: inboxes) { clock.now }
 
         sessions.perform(.open(duration: 60, grant: "flags-only"))
         let isMirroring = inboxes.isMirroring
@@ -204,7 +204,7 @@ struct AnalyticsEventsMirrorTests {
     }
 
     @Test("Under a grant policy, a session whose grant lists the capability is mirrored its events")
-    func grantWithCapability() async {
+    func grantWithCapability() async throws {
         let clock = MovableClock(Self.start)
         let inboxes = AnalyticsMirrorInboxes()
         let policy = DebugDrawerGrantPolicy(
@@ -212,7 +212,7 @@ struct AnalyticsEventsMirrorTests {
             audience: "com.example.app"
         )
         let sessions = DebugDrawerSessions(maximumDuration: 300, auditCapacity: 10, grantPolicy: policy, clock: clock, timer: IdleTimer())
-        let sut = AnalyticsEventsMirror(sessions: sessions, redaction: .none, capacity: 10, inboxes: inboxes) { clock.now }
+        let sut = try AnalyticsEventsMirror(sessions: sessions, redaction: .none, capacity: 10, inboxes: inboxes) { clock.now }
         let (published, publish) = AsyncStream<AnalyticsEventsMirror.Snapshot>.makeStream()
         let subscription = sut.$snapshot.sink { publish.yield($0) }
         defer { subscription.cancel() }
@@ -228,5 +228,27 @@ struct AnalyticsEventsMirrorTests {
 
         #expect(actual.sessionID == sessions.snapshot.session?.id)
         #expect(actual.events.map(\.name) == expected)
+    }
+
+    @Test("A capacity of 0 throws InvalidCapacity, from the capability too")
+    func zeroCapacity() {
+        let sessions = DebugDrawerSessions(maximumDuration: 300)
+        let capacity = 0
+
+        #expect(throws: AnalyticsEventsMirror.InvalidCapacity.self) {
+            _ = try AnalyticsEventsMirror(sessions: sessions, redaction: .none, capacity: capacity)
+        }
+        #expect(throws: AnalyticsEventsMirror.InvalidCapacity.self) {
+            _ = try DebugDrawerReceiverCapability.analyticsEvents(sessions: sessions, capacity: capacity)
+        }
+    }
+
+    @Test("A capacity of 1 is taken: the edge of the valid range")
+    func oneCapacity() throws {
+        let expected = 1
+
+        let sut = try AnalyticsEventsMirror(sessions: DebugDrawerSessions(maximumDuration: 300), redaction: .none, capacity: expected)
+
+        #expect(sut.capacity == expected)
     }
 }

@@ -1,5 +1,6 @@
 #if !DEBUG
     import Combine
+    import DebugDrawer
     import Foundation
 
     // The release stand-in of the store in DebugDrawerConsolePlugin.swift: the same members, so
@@ -20,10 +21,28 @@
         public var filterLevel: LogLine.Level = .debug
 
         /// Kept, never read: release builds keep no lines.
-        public var capacity = 2000
+        public private(set) var capacity = 2000
 
         /// Kept, never read: release builds keep no lines.
-        public var byteCapacity = 4 * 1_048_576
+        public private(set) var byteCapacity = 4 * 1_048_576
+
+        /// Keeps `capacity`, never reading it.
+        ///
+        /// - Throws: `CaptureBuffer.InvalidLimit.negativeMaxCount` when `capacity` is negative,
+        ///   changing nothing.
+        public func setCapacity(_ capacity: Int) throws(CaptureBuffer<LogLine>.InvalidLimit) {
+            guard capacity >= 0 else { throw .negativeMaxCount }
+            self.capacity = capacity
+        }
+
+        /// Keeps `byteCapacity`, never reading it.
+        ///
+        /// - Throws: `CaptureBuffer.InvalidLimit.negativeMaxByteCount` when `byteCapacity` is
+        ///   negative, changing nothing.
+        public func setByteCapacity(_ byteCapacity: Int) throws(CaptureBuffer<LogLine>.InvalidLimit) {
+            guard byteCapacity >= 0 else { throw .negativeMaxByteCount }
+            self.byteCapacity = byteCapacity
+        }
 
         /// Always empty.
         public var filteredLines: [LogLine] {

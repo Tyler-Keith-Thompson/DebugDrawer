@@ -19,7 +19,7 @@
             let sessions = DebugDrawerSessions(maximumDuration: 300)
             let receiver = DebugDrawerReceiver(directory: store, sessions: sessions)
             let thread = StallingThread()
-            let traces = PerformanceTraces(
+            let traces = try PerformanceTraces(
                 sessions: sessions, hitchThreshold: .milliseconds(50), hangThreshold: .milliseconds(50), limits: .standard,
                 now: { Date() }, watchedThread: { (thread.runLoop, thread.sampler) }
             )
@@ -92,7 +92,7 @@
             try layout.write(document.encoded(), to: snapshotFile)
             let existedBefore = FileManager.default.fileExists(atPath: snapshotFile.path)
 
-            receiver.enable(.performanceTraces(PerformanceTraces(sessions: sessions)))
+            receiver.enable(.performanceTraces(try PerformanceTraces(sessions: sessions)))
 
             #expect(existedBefore)
             #expect(!FileManager.default.fileExists(atPath: snapshotFile.path))

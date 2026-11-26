@@ -1,5 +1,6 @@
 import DebugDrawer
 import DebugDrawerTweaksPlugin
+import os
 import SwiftUI
 
 // The iOS example declares the same tweaks in its own copy of this file: each app is its own
@@ -12,6 +13,8 @@ enum ExampleServer: String, CaseIterable {
 
 /// The example's own debug settings. They exist in every build; in release each reads its default.
 enum ExampleTweaks {
+    private static let installLogger = Logger(subsystem: "ExampleApp", category: "ExampleTweaks")
+
     /// The defaults key the example's counter is kept under, which Reset counter removes.
     static let counterKey = "exampleCounter"
     static let counterStep = Tweak.stepper("Counter step", key: "counterStep", default: 1, in: 1 ... 10)
@@ -22,7 +25,17 @@ enum ExampleTweaks {
     /// Adds the Tweaks plugin.
     @MainActor
     static func install() {
-        DebugDrawer.shared.installTweaks {
+        do {
+            try installThrowing()
+        } catch {
+            installLogger.error("The Tweaks plugin refused its configuration: \(String(describing: error), privacy: .public)")
+        }
+    }
+
+    /// What ``install()`` does, throwing what the plugin refuses.
+    @MainActor
+    private static func installThrowing() throws {
+        try DebugDrawer.shared.installTweaks {
             TweakSection("Counter") {
                 counterStep
                 TweakAction("Reset counter") {

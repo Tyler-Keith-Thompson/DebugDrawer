@@ -19,7 +19,7 @@
             let layout = AppGroupStoreLayout(directory: AppGroupStoreLayout.appDirectory(inStore: directory))
             let sessions = DebugDrawerSessions(maximumDuration: 300)
             let receiver = DebugDrawerReceiver(directory: directory, sessions: sessions)
-            receiver.enable(.analyticsEvents(sessions: sessions))
+            try receiver.enable(.analyticsEvents(sessions: sessions))
             try receiver.start()
             defer { receiver.stop() }
             let watcher = try #require(DirectoryWatcher(directory: layout.snapshots))

@@ -27,9 +27,9 @@ nonisolated(unsafe) var addresses: [UInt] = []
 
 /// Opens a session in which `traces` records, as a sidecar's Start Recording does, and traps unless
 /// it records.
-@MainActor func startRecording(limits: PerformanceTraces.Limits = .standard) {
+@MainActor func startRecording(limits: PerformanceTraces.Limits = .standard) throws {
     let opened = DebugDrawerSessions(maximumDuration: 3600)
-    let recorder = PerformanceTraces(sessions: opened, limits: limits)
+    let recorder = try PerformanceTraces(sessions: opened, limits: limits)
     opened.perform(.open(duration: 3600))
     recorder.perform(.start)
     guard recorder.snapshot.isRecording else {
@@ -123,9 +123,9 @@ let benchmarks: @Sendable () -> Void = {
     Benchmark(
         "HangDetector: main run loop turn, recording",
         configuration: .init(setup: {
-            await MainActor.run {
+            try await MainActor.run {
                 keepMainRunLoopAlive()
-                startRecording()
+                try startRecording()
             }
         })
     ) { benchmark in
@@ -184,10 +184,10 @@ let benchmarks: @Sendable () -> Void = {
     Benchmark(
         "HangDetector: BASELINE signpost interval, nothing recording",
         configuration: .init(setup: {
-            await MainActor.run {
+            try await MainActor.run {
                 let idle = DebugDrawerSessions(maximumDuration: 3600)
                 sessions = idle
-                traces = PerformanceTraces(sessions: idle)
+                traces = try PerformanceTraces(sessions: idle)
             }
         })
     ) { benchmark in
@@ -210,7 +210,7 @@ let benchmarks: @Sendable () -> Void = {
     Benchmark(
         "HangDetector: signpost interval, recording",
         configuration: .init(setup: {
-            await MainActor.run { startRecording(limits: PerformanceTraces.Limits(stalls: 1, intervals: 100)) }
+            try await MainActor.run { try startRecording(limits: PerformanceTraces.Limits(stalls: 1, intervals: 100)) }
         })
     ) { benchmark in
         let intervals = benchmark.scaledIterations.count

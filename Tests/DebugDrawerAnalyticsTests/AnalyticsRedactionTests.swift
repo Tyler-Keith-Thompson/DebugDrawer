@@ -49,8 +49,8 @@ struct AnalyticsRedactionTests {
     }
 
     @Test("A host's rules add to the standard ones: its keys and value patterns mask too, and the standard ones still do")
-    func hostRulesAdd() {
-        let sut = AnalyticsRedaction.standard.adding(keys: ["Customer_Name"], values: [#"\bACCT-\d{6}\b"#])
+    func hostRulesAdd() throws {
+        let sut = try AnalyticsRedaction.standard.adding(keys: ["Customer_Name"], values: [#"\bACCT-\d{6}\b"#])
         let mask = AnalyticsValue.string(AnalyticsRedaction.mask)
         let properties: [String: AnalyticsValue] = [
             "customer_name": "Ada", "reference": "for acct-123456 today", "short": "ACCT-12", "email": "a@b.co"
@@ -65,15 +65,20 @@ struct AnalyticsRedactionTests {
     }
 
     @Test("No rules mask nothing; an empty key pattern is ignored; rules are equal by their patterns")
-    func noneAndEquality() {
+    func noneAndEquality() throws {
         let properties: [String: AnalyticsValue] = ["password": "p", "note": "a@b.co"]
+        let emptyKey = try AnalyticsRedaction(keys: [""])
+        let upper = try AnalyticsRedaction(keys: ["A"], values: ["x"])
+        let lower = try AnalyticsRedaction(keys: ["a"], values: ["x"])
+        let matchesX = try AnalyticsRedaction(values: ["x"])
+        let matchesY = try AnalyticsRedaction(values: ["y"])
 
         let actual = AnalyticsRedaction.none.redacting(properties)
 
         #expect(actual == properties)
-        #expect(AnalyticsRedaction(keys: [""]) == AnalyticsRedaction.none)
-        #expect(AnalyticsRedaction(keys: ["A"], values: ["x"]) == AnalyticsRedaction(keys: ["a"], values: ["x"]))
-        #expect(AnalyticsRedaction(values: ["x"]) != AnalyticsRedaction(values: ["y"]))
+        #expect(emptyKey == AnalyticsRedaction.none)
+        #expect(upper == lower)
+        #expect(matchesX != matchesY)
         #expect(!AnalyticsRedaction.none.masksKey("password"))
         #expect(!AnalyticsRedaction.none.masksValue("a@b.co"))
     }

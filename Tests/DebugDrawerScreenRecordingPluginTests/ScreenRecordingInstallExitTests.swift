@@ -77,38 +77,6 @@
             }
         }
 
-        @Test("Installing with a capacity below one traps")
-        func zeroCapacityTraps() async {
-            // The children get a home folder of their own, so the files they keep in Application Support and
-            // Caches stay out of the Mac's, whatever runs the test; each checks the move took.
-            let home = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString).path(percentEncoded: false)
-            defer { try? FileManager.default.removeItem(atPath: home) }
-
-            await #expect(processExitsWith: .failure) { [home = home as String] in
-                setenv("CFFIXED_USER_HOME", home, 1)
-                guard URL.applicationSupportDirectory.path(percentEncoded: false).hasPrefix(home) else { exit(EXIT_SUCCESS) }
-                await MainActor.run {
-                    ScreenRecording.install(capacity: 0)
-                }
-            }
-        }
-
-        @Test("Installing on a drawer of its own with a capacity below one traps too")
-        func zeroCapacityTrapsOnAnyDrawer() async {
-            // The children get a home folder of their own, so the files they keep in Application Support and
-            // Caches stay out of the Mac's, whatever runs the test; each checks the move took.
-            let home = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString).path(percentEncoded: false)
-            defer { try? FileManager.default.removeItem(atPath: home) }
-
-            await #expect(processExitsWith: .failure) { [home = home as String] in
-                setenv("CFFIXED_USER_HOME", home, 1)
-                guard URL.applicationSupportDirectory.path(percentEncoded: false).hasPrefix(home) else { exit(EXIT_SUCCESS) }
-                await MainActor.run {
-                    ScreenRecording.install(capacity: 0, in: DebugDrawer())
-                }
-            }
-        }
-
         @Test("README: Screen Recording")
         func readme() async {
             // The children get a home folder of their own, so the files they keep in Application Support and
@@ -119,12 +87,12 @@
             await #expect(processExitsWith: .success) { [home = home as String] in
                 setenv("CFFIXED_USER_HOME", home, 1)
                 guard URL.applicationSupportDirectory.path(percentEncoded: false).hasPrefix(home) else { exit(EXIT_FAILURE) }
-                let isInstalled = await MainActor.run {
+                let isInstalled = try await MainActor.run {
                     // At startup:
                     ScreenRecording.install()
 
                     // Or keep the newest ten recordings rather than five:
-                    ScreenRecording.install(capacity: 10)
+                    try ScreenRecording.install(capacity: 10)
 
                     return DebugDrawer.shared.globalPlugins.count { $0.title == "Screen Recording" } == 1
                 }

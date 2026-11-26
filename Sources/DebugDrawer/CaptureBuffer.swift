@@ -12,7 +12,7 @@ import os
 /// which is `Codable` when the elements are, for export and transport.
 ///
 /// ```swift
-/// let lines = CaptureBuffer<String>(maxCount: 2_000, maxByteCount: 4_194_304) { $0.utf8.count }
+/// let lines = try CaptureBuffer<String>(maxCount: 2_000, maxByteCount: 4_194_304) { $0.utf8.count }
 /// lines.append("Loaded 25 items")   // from any thread
 /// let shown = lines.snapshot()      // on the main actor, for the view
 /// Text("\(shown.evictedCount) older lines dropped")
@@ -120,32 +120,39 @@ public final class CaptureBuffer<Element: Sendable>: Sendable {
         }
     }
 
-    /// The most elements the buffer keeps; setting it lower evicts the oldest now.
-    ///
-    /// Traps when set negative.
+    /// The most elements the buffer keeps; ``setMaxCount(_:)`` changes it.
     public var maxCount: Int {
-        get { state.withLockUnchecked { $0.maxCount } }
-        set {
-            precondition(newValue >= 0, "A capture buffer's maxCount can't be negative")
-            state.withLockUnchecked { state in
-                state.maxCount = newValue
-                if state.evictPastBounds() { state.generation &+= 1 }
-            }
+        state.withLockUnchecked { $0.maxCount }
+    }
+
+    /// The most the byte costs of the kept elements add up to; ``setMaxByteCount(_:)`` changes it.
+    public var maxByteCount: Int {
+        state.withLockUnchecked { $0.maxByteCount }
+    }
+
+    /// Keeps at most `maxCount` elements from now on; a lower bound evicts the oldest now.
+    ///
+    /// - Parameter maxCount: The most elements kept.
+    /// - Throws: ``InvalidLimit/negativeMaxCount`` when `maxCount` is negative, changing nothing.
+    public func setMaxCount(_ maxCount: Int) throws(InvalidLimit) {
+        guard maxCount >= 0 else { throw .negativeMaxCount }
+        state.withLockUnchecked { state in
+            state.maxCount = maxCount
+            if state.evictPastBounds() { state.generation &+= 1 }
         }
     }
 
-    /// The most the byte costs of the kept elements add up to; setting it lower evicts the oldest
-    /// now.
+    /// Keeps elements whose byte costs add up to at most `maxByteCount` from now on; a lower bound
+    /// evicts the oldest now.
     ///
-    /// Traps when set negative.
-    public var maxByteCount: Int {
-        get { state.withLockUnchecked { $0.maxByteCount } }
-        set {
-            precondition(newValue >= 0, "A capture buffer's maxByteCount can't be negative")
-            state.withLockUnchecked { state in
-                state.maxByteCount = newValue
-                if state.evictPastBounds() { state.generation &+= 1 }
-            }
+    /// - Parameter maxByteCount: The most the kept elements' byte costs add up to.
+    /// - Throws: ``InvalidLimit/negativeMaxByteCount`` when `maxByteCount` is negative, changing
+    ///   nothing.
+    public func setMaxByteCount(_ maxByteCount: Int) throws(InvalidLimit) {
+        guard maxByteCount >= 0 else { throw .negativeMaxByteCount }
+        state.withLockUnchecked { state in
+            state.maxByteCount = maxByteCount
+            if state.evictPastBounds() { state.generation &+= 1 }
         }
     }
 
@@ -171,14 +178,25 @@ public final class CaptureBuffer<Element: Sendable>: Sendable {
     ///     line's text or a request's bodies. Called once per append and per update, under the
     ///     buffer's lock, so it must not call back into the buffer. Every element costs 0 by
     ///     default.
-    /// - Precondition: `maxCount` and `maxByteCount` aren't negative.
-    public init(
+    /// - Throws: ``InvalidLimit/negativeMaxCount`` or ``InvalidLimit/negativeMaxByteCount`` when
+    ///   that bound is negative.
+    public convenience init(
         maxCount: Int,
         maxByteCount: Int = .max,
         byteCount: @escaping @Sendable (Element) -> Int = { _ in 0 }
+    ) throws(InvalidLimit) {
+        guard maxCount >= 0 else { throw .negativeMaxCount }
+        guard maxByteCount >= 0 else { throw .negativeMaxByteCount }
+        self.init(uncheckedMaxCount: maxCount, maxByteCount: maxByteCount, byteCount: byteCount)
+    }
+
+    /// An empty buffer whose bounds the caller knows aren't negative: a plugin's own constants,
+    /// which no input reaches.
+    package init(
+        uncheckedMaxCount maxCount: Int,
+        maxByteCount: Int = .max,
+        byteCount: @escaping @Sendable (Element) -> Int = { _ in 0 }
     ) {
-        precondition(maxCount >= 0, "A capture buffer's maxCount can't be negative")
-        precondition(maxByteCount >= 0, "A capture buffer's maxByteCount can't be negative")
         state = OSAllocatedUnfairLock(uncheckedState: State(maxCount: maxCount, maxByteCount: maxByteCount, byteCount: byteCount))
     }
 

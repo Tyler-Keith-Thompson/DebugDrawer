@@ -34,7 +34,7 @@
                     let accepting = PinningDelegate(accepts: true)
                     let rejectingSession = URLSession(configuration: .ephemeral, delegate: rejecting, delegateQueue: nil)
                     let acceptingSession = URLSession(configuration: .ephemeral, delegate: accepting, delegateQueue: nil)
-                    await MainActor.run { DebugDrawer.shared.installNetwork(sessions: .off) }
+                    try await MainActor.run { try DebugDrawer.shared.installNetwork(sessions: .off) }
                     let server = try ScriptedServer(identity: SelfSignedIdentity.make()) { _ in
                         "HTTP/1.1 200 OK\r\nContent-Length: 6\r\nConnection: close\r\n\r\nsecure"
                     }
@@ -83,7 +83,7 @@
                 }
 
                 func check() async throws {
-                    await MainActor.run { DebugDrawer.shared.installNetwork(bypassing: ["LocalHost"], sessions: .off) }
+                    try await MainActor.run { try DebugDrawer.shared.installNetwork(bypassing: ["LocalHost"], sessions: .off) }
                     let server = try ScriptedServer(identity: SelfSignedIdentity.make()) { _ in
                         "HTTP/1.1 200 OK\r\nContent-Length: 6\r\nConnection: close\r\n\r\nsecure"
                     }
@@ -125,16 +125,6 @@
             }
         }
 
-        @Test("installNetwork(bypassing:) traps on text that isn't a host")
-        func bypassingMalformedHostTraps() async {
-            await #expect(processExitsWith: .failure) {
-                useHomeFolderOfItsOwn()
-                await MainActor.run {
-                    DebugDrawer.shared.installNetwork(bypassing: ["*.example.com"], sessions: .off)
-                }
-            }
-        }
-
         @Test("An SSE stream held open reaches the app event by event through the forwarding path; the log keeps its first bodyLimit bytes")
         func eventStreamHeldOpen() async {
             await #expect(processExitsWith: .success) {
@@ -151,7 +141,7 @@
 
                 func check() async throws {
                     let bodyLimit = 64
-                    await MainActor.run { DebugDrawer.shared.installNetwork(sessions: .off, bodyLimit: bodyLimit) }
+                    try await MainActor.run { try DebugDrawer.shared.installNetwork(sessions: .off, bodyLimit: bodyLimit) }
                     let server = try EventStreamServer()
                     defer { server.stop() }
                     let port = try await server.start()

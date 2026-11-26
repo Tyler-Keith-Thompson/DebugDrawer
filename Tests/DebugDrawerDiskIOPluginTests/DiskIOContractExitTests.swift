@@ -75,8 +75,8 @@
             return AppResult(wrote: wrote, read: read, listed: listed, missingRead: missingRead, removeMissingError: removeMissingError)
         }
 
-        func limitCapture(to count: Int) {
-            DiskIOStore.shared.capacity = count
+        func limitCapture(to count: Int) throws {
+            try DiskIOStore.shared.setCapacity(count)
         }
 
         func makeCapturedCall(_ marker: String) async throws {

@@ -40,6 +40,8 @@
 
         @available(*, unavailable)
         required init?(coder _: NSCoder) {
+            // Can't fire: unavailable, so no code can call it, and the type isn't public, so no
+            // storyboard or nib names it; the system decodes only views an archive names.
             fatalError("The drawer's window is made in code.")
         }
 

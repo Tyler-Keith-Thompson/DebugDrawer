@@ -18,6 +18,18 @@ public enum ScreenRecording {
     /// How many recordings are kept unless ``install(capacity:)`` is given another number.
     public static let defaultCapacity = 5
 
+    /// A capacity a recorder can't take: below 1.
+    public struct InvalidCapacity: Error, Equatable, Sendable {}
+
+    /// Adds the Screen Recording plugin to `DebugDrawer.shared`, keeping ``defaultCapacity``
+    /// recordings: in debug builds only; in release it does nothing.
+    ///
+    /// The same as ``install(in:)`` with the shared drawer.
+    @MainActor
+    public static func install() {
+        install(in: .shared)
+    }
+
     /// Adds the Screen Recording plugin to `DebugDrawer.shared`: in debug builds only; in release
     /// it does nothing.
     ///
@@ -25,10 +37,28 @@ public enum ScreenRecording {
     ///
     /// - Parameter capacity: How many recordings are kept; once a new one is saved past it, the
     ///   oldest are deleted.
-    /// - Precondition: `capacity` is at least 1.
+    /// - Throws: ``InvalidCapacity`` when `capacity` is below 1, installing nothing.
     @MainActor
-    public static func install(capacity: Int = defaultCapacity) {
-        install(capacity: capacity, in: .shared)
+    public static func install(capacity: Int) throws(InvalidCapacity) {
+        try install(capacity: capacity, in: .shared)
+    }
+
+    /// Adds the Screen Recording plugin to `drawer`, keeping ``defaultCapacity`` recordings: in
+    /// debug builds only; in release it does nothing.
+    ///
+    /// As ``install(capacity:in:)`` does with ``defaultCapacity``.
+    ///
+    /// ```swift
+    /// let drawer = DebugDrawer(defaults: UserDefaults(suiteName: "ScreenRecordingTests")!)
+    /// ScreenRecording.install(in: drawer)
+    /// ```
+    ///
+    /// - Parameter drawer: The drawer to add the plugin to, which keeps its state.
+    @MainActor
+    public static func install(in drawer: DebugDrawer) {
+        #if DEBUG
+            ScreenRecordingInstallation.install(capacity: defaultCapacity, in: drawer)
+        #endif
     }
 
     /// Adds the Screen Recording plugin to `drawer`: in debug builds only; in release it does
@@ -43,20 +73,16 @@ public enum ScreenRecording {
     /// Recordings saved by earlier launches are listed again. Calling it again with the same
     /// drawer keeps the plugin and a recording in progress, and takes the new capacity.
     ///
-    /// ```swift
-    /// let drawer = DebugDrawer(defaults: UserDefaults(suiteName: "ScreenRecordingTests")!)
-    /// ScreenRecording.install(in: drawer)
-    /// ```
-    ///
     /// - Parameters:
     ///   - capacity: How many recordings are kept; once a new one is saved past it, the oldest
     ///     are deleted.
     ///   - drawer: The drawer to add the plugin to, which keeps its state.
-    /// - Precondition: `capacity` is at least 1.
+    /// - Throws: ``InvalidCapacity`` when `capacity` is below 1, installing nothing. Release
+    ///   builds install nothing and throw nothing.
     @MainActor
-    public static func install(capacity: Int = defaultCapacity, in drawer: DebugDrawer) {
+    public static func install(capacity: Int, in drawer: DebugDrawer) throws(InvalidCapacity) {
         #if DEBUG
-            precondition(capacity > 0, "ScreenRecording keeps at least one recording")
+            guard capacity > 0 else { throw InvalidCapacity() }
             ScreenRecordingInstallation.install(capacity: capacity, in: drawer)
         #endif
     }

@@ -41,7 +41,7 @@
                 ReceivedMetricKitPayload(kind: .metrics, json: MetricKitFixtures.metricPayload),
                 ReceivedMetricKitPayload(kind: .diagnostics, json: MetricKitFixtures.crashDiagnosticPayload)
             ])
-            let mirror = MetricKitPayloadsMirror(
+            let mirror = try MetricKitPayloadsMirror(
                 sessions: sessions, directory: root.appending(path: "Payloads"), redaction: .standard, capacity: 10, source: source
             )
             receiver.enable(.model(mirror, id: MetricKitPayloadsMirror.pluginID, scope: .persistent))
@@ -92,7 +92,7 @@
             let store = root.appending(path: "Group/DebugDrawer")
             let sessions = DebugDrawerSessions(maximumDuration: 300)
             let receiver = DebugDrawerReceiver(directory: store, sessions: sessions)
-            let mirror = MetricKitPayloadsMirror(
+            let mirror = try MetricKitPayloadsMirror(
                 sessions: sessions, directory: root.appending(path: "Payloads"), redaction: .standard, capacity: 10,
                 source: HeldPayloadsSource(held: [])
             )
@@ -130,7 +130,7 @@
             let store = root.appending(path: "Group/DebugDrawer")
             let sessions = DebugDrawerSessions(maximumDuration: 300)
             let receiver = DebugDrawerReceiver(directory: store, sessions: sessions)
-            let mirror = MetricKitPayloadsMirror(
+            let mirror = try MetricKitPayloadsMirror(
                 sessions: sessions, directory: root.appending(path: "Payloads"), redaction: .standard, capacity: 10,
                 source: HeldPayloadsSource(held: [ReceivedMetricKitPayload(kind: .metrics, json: MetricKitFixtures.metricPayload)])
             )

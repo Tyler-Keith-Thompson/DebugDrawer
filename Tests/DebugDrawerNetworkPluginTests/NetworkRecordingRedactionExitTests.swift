@@ -39,7 +39,7 @@
                 /// `recorder` has written everything recorded before the call.
                 func written(by recorder: NetworkSessionRecorder, in directory: URL) async throws -> [String: [String: String]] {
                     _ = await recorder.previousSessions()
-                    let reader = NetworkSessionRecorder(NetworkSessionPersistence(storage: _NetworkSessionStorage(directory: directory)))
+                    let reader = NetworkSessionRecorder(try NetworkSessionPersistence(storage: _NetworkSessionStorage(directory: directory)))
                     let session = try #require(await reader.previousSessions().first { $0.id == recorder.currentName })
                     let log = try await reader.log(of: session)
                     return Dictionary(uniqueKeysWithValues: log.entries.map { ($0.url, $0.requestHeaders) })
@@ -51,7 +51,7 @@
                     let defaults = try #require(UserDefaults(suiteName: suite))
                     defer { defaults.removePersistentDomain(forName: suite) }
                     let directory = URL(filePath: home, directoryHint: .isDirectory).appending(path: "Sessions", directoryHint: .isDirectory)
-                    let recorder = NetworkSessionRecorder(NetworkSessionPersistence(storage: _NetworkSessionStorage(directory: directory)))
+                    let recorder = NetworkSessionRecorder(try NetworkSessionPersistence(storage: _NetworkSessionStorage(directory: directory)))
                     let store = NetworkStore(ignoreStorage: FakeNetworkIgnoreListStorage())
                     store.persist(to: recorder)
                     let mocks = NetworkMocksModel(storage: FakeNetworkMockStorage(), active: NetworkMockRules())
@@ -123,7 +123,7 @@
                 /// `recorder` has written everything recorded before the call.
                 func written(by recorder: NetworkSessionRecorder, in directory: URL) async throws -> [String: [String: String]] {
                     _ = await recorder.previousSessions()
-                    let reader = NetworkSessionRecorder(NetworkSessionPersistence(storage: _NetworkSessionStorage(directory: directory)))
+                    let reader = NetworkSessionRecorder(try NetworkSessionPersistence(storage: _NetworkSessionStorage(directory: directory)))
                     let session = try #require(await reader.previousSessions().first { $0.id == recorder.currentName })
                     let log = try await reader.log(of: session)
                     return Dictionary(uniqueKeysWithValues: log.entries.map { ($0.url, $0.requestHeaders) })
@@ -140,7 +140,7 @@
                         secondDefaults.removePersistentDomain(forName: secondSuite)
                     }
                     let directory = URL(filePath: home, directoryHint: .isDirectory).appending(path: "Sessions", directoryHint: .isDirectory)
-                    let recorder = NetworkSessionRecorder(NetworkSessionPersistence(storage: _NetworkSessionStorage(directory: directory)))
+                    let recorder = NetworkSessionRecorder(try NetworkSessionPersistence(storage: _NetworkSessionStorage(directory: directory)))
                     let store = NetworkStore(ignoreStorage: FakeNetworkIgnoreListStorage())
                     store.persist(to: recorder)
                     let mocks = NetworkMocksModel(storage: FakeNetworkMockStorage(), active: NetworkMockRules())

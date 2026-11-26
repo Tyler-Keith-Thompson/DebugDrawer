@@ -50,7 +50,9 @@
         ///   - limit: How many of the newest events the recorder keeps; its totals count all.
         ///   - byteLimit: How many bytes of paths the kept events hold, at most.
         init(limit: Int = 500, byteLimit: Int = 1_048_576) {
-            buffer = CaptureBuffer(maxCount: limit, maxByteCount: byteLimit) { $0.capturedByteCount }
+            // Unchecked: the recorder is internal, made with these defaults or a test's positive
+            // limits; the store's setters, which take the app's values, go through the checked ones.
+            buffer = CaptureBuffer(uncheckedMaxCount: limit, maxByteCount: byteLimit) { $0.capturedByteCount }
         }
 
         /// Each batch, on the main queue, once per turn of it that follows a record.
@@ -63,14 +65,28 @@
 
         /// How many events the recorder keeps.
         var limit: Int {
-            get { buffer.maxCount }
-            set { buffer.maxCount = newValue }
+            buffer.maxCount
         }
 
         /// How many bytes of paths the kept events hold, at most.
         var byteLimit: Int {
-            get { buffer.maxByteCount }
-            set { buffer.maxByteCount = newValue }
+            buffer.maxByteCount
+        }
+
+        /// Keeps at most `limit` events from now on.
+        ///
+        /// - Throws: `CaptureBuffer.InvalidLimit.negativeMaxCount` when `limit` is negative,
+        ///   changing nothing.
+        func setLimit(_ limit: Int) throws(CaptureBuffer<IOEvent>.InvalidLimit) {
+            try buffer.setMaxCount(limit)
+        }
+
+        /// Keeps events whose paths hold at most `byteLimit` bytes from now on.
+        ///
+        /// - Throws: `CaptureBuffer.InvalidLimit.negativeMaxByteCount` when `byteLimit` is
+        ///   negative, changing nothing.
+        func setByteLimit(_ byteLimit: Int) throws(CaptureBuffer<IOEvent>.InvalidLimit) {
+            try buffer.setMaxByteCount(byteLimit)
         }
 
         /// The kept events from `id` on, with the ID of the oldest kept.

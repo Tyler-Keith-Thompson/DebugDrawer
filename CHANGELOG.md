@@ -38,6 +38,31 @@ the entry becomes the GitHub release's notes.
 - DD-260: `just test` runs core's tests for Mac Catalyst through Bazel, where it only compiled the Catalyst libraries before: `//Tests/DebugDrawerTests:DebugDrawerTests_macCatalyst` builds `DebugDrawerTests` and its dependencies with the Catalyst target triple, links a Mac Catalyst executable and runs it on the Mac, so a failing test there fails the run. `tools/catalyst.bzl` adds `catalyst_test`, used for the test targets in `scripts/modules.py`'s new `CATALYST_TESTS`; their libraries leave out SnapshotTesting there through the `//tools:catalyst` select key, and the snapshot tests sit under `#if canImport(SnapshotTesting)`.
 - DD-244: Screen Recording and the Location Simulator keep their state in the drawer they are installed on, so a test can install either on a `DebugDrawer(defaults:)` of its own. `ScreenRecording.install(capacity:in:)` is new: the drawer gets a recorder, list of recordings, report choice, capacity and Show Touches setting of its own (Show Touches in its defaults); the movies stay in the app's one recordings folder. `installLocation()` on a drawer of your own gives it a Location model and simulator of its own, the switch and coordinate kept in its defaults; on `DebugDrawer.shared` it is `LocationModel.shared`, as before. `CLLocationManager`'s methods are swapped once for the process, and the app's managers get the locations of the drawer that installed the plugin last, as Network, Console and View Inspector capture for theirs: that drawer takes over the managers the one before was updating, and hands them back as it removes the plugin. `ScreenRecording.install(capacity:)` and `installLocation()` on the shared drawer work as before.
 
+
+### Changed (breaking)
+
+- DD-293: `CaptureBuffer.init(maxCount:maxByteCount:byteCount:)` throws `CaptureBuffer.InvalidLimit`.
+- DD-293: `CaptureBuffer.maxCount` and `maxByteCount` are get-only; `setMaxCount(_:)` and `setMaxByteCount(_:)` throw `InvalidLimit`.
+- DD-293: `DebugDrawer.installNetwork(mocks:conditions:ignoring:bypassing:sessions:bodyLimit:)` throws `NetworkPlugin.InvalidInstallation`.
+- DD-293: `NetworkSessionPersistence.init(maxSessions:maxBytes:storage:)` throws `NetworkSessionPersistence.InvalidLimit`.
+- DD-293: `NetworkStore.capacity` and `byteCapacity` are get-only; `setCapacity(_:)` and `setByteCapacity(_:)` throw.
+- DD-293: `ConsoleSessionPersistence.init(maxSessions:maxBytes:storage:)` throws `ConsoleSessionPersistence.InvalidLimit`.
+- DD-293: `ConsoleLogStore.capacity` and `byteCapacity` are get-only; `setCapacity(_:)` and `setByteCapacity(_:)` throw.
+- DD-293: `DiskIOStore.capacity` and `byteCapacity` are get-only; `setCapacity(_:)` and `setByteCapacity(_:)` throw.
+- DD-293: `HangDetector.install(threshold:)` throws `HangDetector.NonPositiveThreshold` and has no default; `install()` uses the default threshold.
+- DD-293: `PerformanceTraces.init(sessions:hitchThreshold:hangThreshold:limits:)` throws `PerformanceTraces.InvalidThresholds`.
+- DD-293: `PerformanceTraces.Limits.init(stalls:intervals:)` throws `PerformanceTraces.InvalidLimits`.
+- DD-293: `AppStateResetRequests.init(sessions:allowing:allowingKeychain:appGroups:directories:cleanup:launchURL:)` throws `AppStateResetRequests.KeychainAsCategory`.
+- DD-293: `DesignOverlay.install(mockup:)` takes `Data` rather than `Data?`, has no default and throws `DesignOverlay.NotAnImage`; `install()` installs with no mockup.
+- DD-293: `ScreenRecording.install(capacity:)` and `install(capacity:in:)` throw `ScreenRecording.InvalidCapacity` and have no default; `install()` and `install(in:)` keep the default capacity.
+- DD-293: `AnalyticsEvents.install(capacity:)` throws `AnalyticsEvents.InvalidCapacity` and has no default; `install()` keeps the default capacity.
+- DD-293: `DebugDrawerReceiverCapability.analyticsEvents(sessions:redaction:capacity:)` throws `AnalyticsEventsMirror.InvalidCapacity`.
+- DD-293: `AnalyticsRedaction.init(keys:values:)` and `adding(keys:values:)` throw `AnalyticsRedaction.InvalidPattern`.
+- DD-293: `DebugDrawerReceiverCapability.metricKitPayloads(sessions:directory:redaction:capacity:)` throws `MetricKitPayloadsMirror.InvalidCapacity`.
+- DD-293: `DebugDrawer.installTweaks(storage:_:)` throws `TweaksPlugin.InvalidTweaks`; `Tweak.picker` and `Tweak.stepper` no longer trap on a default the control can't hold.
+- DD-293: `DebugDrawerAppState.init(sessions:buildMetadata:featureFlags:experiments:environments:userID:values:defaults:)` throws `DebugDrawerAppState.InvalidField`; `DebugDrawerAppStateField.init(_:value:)` no longer traps on an empty key.
+- DD-293: `LeakDetector.trackLifetime(of:maxCount:)` throws `LeakDetector.InvalidMaxCount` and has no default; `trackLifetime(of:)` allows one instance.
+
 ### Fixed
 
 - DD-288: reading a Remote Viewing pairing request through accessibility on macOS (VoiceOver, or any app walking the drawer's accessibility tree) no longer can crash the app with a stack overflow. The request's code was selectable text with an accessibility label of its own, which sent SwiftUI's and AppKit's accessibility into a loop; the code is no longer selectable (it is typed on the viewer, not copied) and still reads digit by digit ("Code 1 2 3 4 5 6"). This covers the Sidecar's Mac Viewer too, which shows the same row.

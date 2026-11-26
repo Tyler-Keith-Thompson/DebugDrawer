@@ -25,7 +25,7 @@
                 .appending(path: "DebugDrawer")
             let rawID = "cust-4410-sam"
             let sessions = DebugDrawerSessions(maximumDuration: 300)
-            let appState = DebugDrawerAppState(
+            let appState = try DebugDrawerAppState(
                 sessions: sessions, buildMetadata: AppInfoBuildMetadata(gitCommit: "4f9c2e1"), userID: { rawID },
                 values: [DebugDrawerAppStateField("plan") { "pro" }, DebugDrawerAppStateField("supportToken") { "st-81f2" }],
                 defaults: defaults
@@ -118,7 +118,7 @@
             let suite = temporarySuiteName("SidecarAppStateTests")
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
-            let appState = DebugDrawerAppState(sessions: DebugDrawerSessions(maximumDuration: 300), defaults: defaults)
+            let appState = try DebugDrawerAppState(sessions: DebugDrawerSessions(maximumDuration: 300), defaults: defaults)
             let plugin = AppStatePlugin(transport: .direct(to: appState))
             let sut = AppStateView(snapshot: appState.snapshot) { _ in }
             var report = DebugDrawerReport()

@@ -29,7 +29,7 @@ let paymentsOffline = NetworkConditionProfile(
     failureRate: 100,
     failure: .notConnectedToInternet
 )
-DebugDrawer.shared.installNetwork(conditions: [slowImages, paymentsOffline])
+try DebugDrawer.shared.installNetwork(conditions: [slowImages, paymentsOffline])
 ```
 
 ### How a profile applies

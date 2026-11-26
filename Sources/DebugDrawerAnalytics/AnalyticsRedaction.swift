@@ -16,8 +16,8 @@ import Foundation
 /// that one of ``valuePatterns`` matches.
 ///
 /// ```swift
-/// let redaction = AnalyticsRedaction.standard.adding(keys: ["customer_name"], values: [#"\b\d{3}-\d{2}-\d{4}\b"#])
-/// receiver.enable(.analyticsEvents(sessions: sessions, redaction: redaction))
+/// let redaction = try AnalyticsRedaction.standard.adding(keys: ["customer_name"], values: [#"\b\d{3}-\d{2}-\d{4}\b"#])
+/// try receiver.enable(.analyticsEvents(sessions: sessions, redaction: redaction))
 /// ```
 ///
 /// A masked value becomes the string ``mask``, whatever its type was; an object or array under a
@@ -36,31 +36,43 @@ public struct AnalyticsRedaction: Equatable, Sendable {
     /// ``valuePatterns``, compiled once.
     private var expressions: [NSRegularExpression]
 
+    /// A value pattern that isn't a regular expression `NSRegularExpression` compiles.
+    public struct InvalidPattern: Error, Equatable, Sendable {}
+
     /// Rules masking the values of keys containing `keys`, and string values matching `values`.
     ///
     /// - Parameters:
     ///   - keys: Substrings of a key, matched ignoring case; an empty one is ignored.
     ///   - values: Regular expressions in `NSRegularExpression` syntax, matched ignoring case.
-    /// - Precondition: Each of `values` is a valid regular expression.
-    public init(keys: some Sequence<String> = [String](), values: some Sequence<String> = [String]()) {
-        keyPatterns = Set(keys.map { $0.lowercased() }.filter { !$0.isEmpty })
-        valuePatterns = Set(values)
-        expressions = valuePatterns.sorted().map { pattern in
-            // A pattern is the host's own literal, so a bad one is a programming error found the
-            // first time the app runs, not an input to recover from; and a rule silently dropped
-            // would let what it was meant to mask through.
+    /// - Throws: ``InvalidPattern`` when one of `values` isn't a valid regular expression: a rule
+    ///   dropped quietly would let through what it was meant to mask.
+    public init(keys: some Sequence<String> = [String](), values: some Sequence<String> = [String]()) throws(InvalidPattern) {
+        let patterns = Set(values)
+        var expressions: [NSRegularExpression] = []
+        for pattern in patterns.sorted() {
             guard let expression = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]) else {
-                preconditionFailure("AnalyticsRedaction's value pattern \(pattern) isn't a valid regular expression")
+                throw InvalidPattern()
             }
-            return expression
+            expressions.append(expression)
         }
+        keyPatterns = Set(keys.map { $0.lowercased() }.filter { !$0.isEmpty })
+        valuePatterns = patterns
+        self.expressions = expressions
+    }
+
+    /// Rules over patterns the caller knows compile: ``standard``'s and ``none``'s constants,
+    /// which no input reaches and a test compiles. A pattern that didn't compile would be left out.
+    private init(uncheckedKeys keys: [String], values: [String]) {
+        keyPatterns = Set(keys)
+        valuePatterns = Set(values)
+        expressions = valuePatterns.sorted().compactMap { try? NSRegularExpression(pattern: $0, options: [.caseInsensitive]) }
     }
 
     /// Personal data and credentials in their usual places: keys containing `email`, `phone`,
     /// `token`, `secret`, `password`, `session`, `auth` or `apikey`/`api_key`/`api-key`, and values
     /// that hold an email address or a JSON Web Token.
     public static let standard = AnalyticsRedaction(
-        keys: ["email", "phone", "token", "secret", "password", "session", "auth", "apikey", "api_key", "api-key"],
+        uncheckedKeys: ["email", "phone", "token", "secret", "password", "session", "auth", "apikey", "api_key", "api-key"],
         values: [
             // An email address anywhere in the value.
             #"[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}"#,
@@ -70,7 +82,7 @@ public struct AnalyticsRedaction: Equatable, Sendable {
     )
 
     /// No rules: nothing is masked.
-    public static let none = AnalyticsRedaction()
+    public static let none = AnalyticsRedaction(uncheckedKeys: [], values: [])
 
     /// These rules with more key and value patterns.
     ///
@@ -78,9 +90,12 @@ public struct AnalyticsRedaction: Equatable, Sendable {
     ///   - keys: More substrings of a key, matched ignoring case.
     ///   - values: More regular expressions, matched ignoring case.
     /// - Returns: The rules with both.
-    /// - Precondition: Each of `values` is a valid regular expression.
-    public func adding(keys: some Sequence<String> = [String](), values: some Sequence<String> = [String]()) -> AnalyticsRedaction {
-        AnalyticsRedaction(keys: keyPatterns.union(keys.map { $0.lowercased() }), values: valuePatterns.union(values))
+    /// - Throws: ``InvalidPattern`` when one of `values` isn't a valid regular expression.
+    public func adding(
+        keys: some Sequence<String> = [String](),
+        values: some Sequence<String> = [String]()
+    ) throws(InvalidPattern) -> AnalyticsRedaction {
+        try AnalyticsRedaction(keys: keyPatterns.union(keys.map { $0.lowercased() }), values: valuePatterns.union(values))
     }
 
     /// Whether a property's value is sensitive because of its key: the key contains one of the key

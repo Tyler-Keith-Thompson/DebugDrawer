@@ -29,7 +29,7 @@
                 allowing: DebugDrawerEnvironment("staging", title: "Staging"),
                 adapter: FakeBackend(), defaults: defaults
             )
-            let appState = DebugDrawerAppState(
+            let appState = try DebugDrawerAppState(
                 sessions: sessions, buildMetadata: AppInfoBuildMetadata(gitCommit: "4f9c2e1"), environments: environments,
                 values: [DebugDrawerAppStateField("plan") { "pro" }], defaults: defaults
             )
@@ -82,7 +82,7 @@
             let rawID = "cust-7Q2X-9941-jane"
             let sessions = DebugDrawerSessions(maximumDuration: 300)
             let receiver = DebugDrawerReceiver(directory: store, sessions: sessions)
-            let appState = DebugDrawerAppState(sessions: sessions, userID: { rawID }, defaults: defaults)
+            let appState = try DebugDrawerAppState(sessions: sessions, userID: { rawID }, defaults: defaults)
             receiver.enable(.appState(appState))
             try receiver.start()
             defer { receiver.stop() }

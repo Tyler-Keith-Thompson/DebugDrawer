@@ -19,8 +19,8 @@ final class ProductionAppState: ObservableObject {
     @Published private(set) var summary = ""
     private var resets: AnyCancellable?
 
-    init(sessions: DebugDrawerSessions) {
-        requests = AppStateResetRequests(sessions: sessions, allowing: [.userDefaults, .caches], launchURL: Self.launchURL)
+    init(sessions: DebugDrawerSessions) throws {
+        requests = try AppStateResetRequests(sessions: sessions, allowing: [.userDefaults, .caches], launchURL: Self.launchURL)
         refresh()
         // Read again once a reset has run, which it does as the app comes to the foreground.
         resets = requests.$snapshot.map(\.lastReset).removeDuplicates().dropFirst().sink { [weak self] _ in

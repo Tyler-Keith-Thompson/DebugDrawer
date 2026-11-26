@@ -15,7 +15,7 @@ import DebugDrawerHangDetectorPlugin
 HangDetector.install()
 
 // Or with a threshold of the app's own, which the drawer can change later.
-HangDetector.install(threshold: .milliseconds(100))
+try HangDetector.install(threshold: .milliseconds(100))
 ```
 
 `HangDetector` exists in every configuration, so the call needs no `#if DEBUG`. In release it

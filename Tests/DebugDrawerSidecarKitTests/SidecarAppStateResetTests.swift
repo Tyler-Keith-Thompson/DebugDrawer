@@ -79,7 +79,7 @@
                 container: AppContainer(files: [], caches: [], kept: [], appFolderName: "com.example.shop"),
                 cookies: NoCookies(), responseCache: CountingResponseCache(), cleanup: nil
             )
-            let model = AppStateResetRequests(
+            let model = try AppStateResetRequests(
                 sessions: sessions, allowing: [.caches, .urlCache], allowingKeychain: false, appState: appState, launchURL: nil,
                 foreground: TestForeground(), now: Date.init
             )
@@ -120,7 +120,7 @@
                 cookies: NoCookies(), responseCache: responseCache, cleanup: nil
             )
             let foreground = TestForeground()
-            let model = AppStateResetRequests(
+            let model = try AppStateResetRequests(
                 sessions: sessions, allowing: [.caches, .urlCache], allowingKeychain: false, appState: appState, launchURL: nil,
                 foreground: foreground, now: Date.init
             )
@@ -257,11 +257,11 @@
                 cookies: NoCookies(), responseCache: CountingResponseCache(), cleanup: nil
             )
             let sessions = DebugDrawerSessions(maximumDuration: 300)
-            let allowing = AppStateResetRequests(
+            let allowing = try AppStateResetRequests(
                 sessions: sessions, allowing: [.caches], allowingKeychain: false, appState: appState, launchURL: nil,
                 foreground: TestForeground(), now: Date.init
             )
-            let none = AppStateResetRequests(
+            let none = try AppStateResetRequests(
                 sessions: sessions, allowing: [], allowingKeychain: false, appState: appState, launchURL: nil,
                 foreground: TestForeground(), now: Date.init
             )

@@ -12,7 +12,7 @@
         @MainActor func addsMissedLines() async throws {
             let storage = FakeConsoleSessionStorage()
             let started = Date(timeIntervalSince1970: 1_800_000_000)
-            let earlier = ConsoleSessionRecorder(ConsoleSessionPersistence(storage: storage), started: started, processIdentifier: 4242)
+            let earlier = ConsoleSessionRecorder(try ConsoleSessionPersistence(storage: storage), started: started, processIdentifier: 4242)
             earlier.record(LogLine(timestamp: started.addingTimeInterval(1), text: "Feed loaded", source: .oslog, level: .info))
             earlier.record(LogLine(timestamp: started.addingTimeInterval(2), text: "Tapped Buy", source: .stdout, level: .debug))
             _ = await earlier.previousSessions()
@@ -30,7 +30,7 @@
             )
 
             let sut = ConsoleSessionsModel(recorder: ConsoleSessionRecorder(
-                ConsoleSessionPersistence(storage: storage), started: started.addingTimeInterval(60), systemLog: systemLog
+                try ConsoleSessionPersistence(storage: storage), started: started.addingTimeInterval(60), systemLog: systemLog
             ))
             await sut.reload()
             let session = try #require(sut.sessions.first)
@@ -49,7 +49,7 @@
         func sameMillisecond() async throws {
             let storage = FakeConsoleSessionStorage()
             let started = Date(timeIntervalSince1970: 1_800_000_000)
-            let earlier = ConsoleSessionRecorder(ConsoleSessionPersistence(storage: storage), started: started, processIdentifier: 4242)
+            let earlier = ConsoleSessionRecorder(try ConsoleSessionPersistence(storage: storage), started: started, processIdentifier: 4242)
             earlier.record(LogLine(timestamp: started.addingTimeInterval(1), text: "Feed loaded", source: .oslog, level: .info))
             _ = await earlier.previousSessions()
             let systemLog = FakeConsoleSystemLog(.ended([
@@ -58,7 +58,7 @@
             ]))
 
             let sut = ConsoleSessionRecorder(
-                ConsoleSessionPersistence(storage: storage), started: started.addingTimeInterval(60), systemLog: systemLog
+                try ConsoleSessionPersistence(storage: storage), started: started.addingTimeInterval(60), systemLog: systemLog
             )
             let session = try #require(await sut.previousSessions().first)
             let actual = try await sut.log(of: session).lines.map(\.text)
@@ -70,14 +70,14 @@
         func readsFromStart() async throws {
             let storage = FakeConsoleSessionStorage()
             let started = Date(timeIntervalSince1970: 1_800_000_000)
-            let earlier = ConsoleSessionRecorder(ConsoleSessionPersistence(storage: storage), started: started, processIdentifier: 4242)
+            let earlier = ConsoleSessionRecorder(try ConsoleSessionPersistence(storage: storage), started: started, processIdentifier: 4242)
             earlier.record(LogLine(timestamp: started.addingTimeInterval(1), text: "Tapped Buy", source: .stdout, level: .debug))
             _ = await earlier.previousSessions()
             let systemLog = FakeConsoleSystemLog(.ended([]))
             let expected = Array(repeating: FakeConsoleSystemLog.Read(processIdentifier: 4242, since: started.addingTimeInterval(-0.001)), count: 2)
 
             let sut = ConsoleSessionRecorder(
-                ConsoleSessionPersistence(storage: storage), started: started.addingTimeInterval(60), systemLog: systemLog
+                try ConsoleSessionPersistence(storage: storage), started: started.addingTimeInterval(60), systemLog: systemLog
             )
             _ = await sut.previousSessions()
 
@@ -88,7 +88,7 @@
         func ingestFilter() async throws {
             let storage = FakeConsoleSessionStorage()
             let started = Date(timeIntervalSince1970: 1_800_000_000)
-            let earlier = ConsoleSessionRecorder(ConsoleSessionPersistence(storage: storage), started: started, processIdentifier: 4242)
+            let earlier = ConsoleSessionRecorder(try ConsoleSessionPersistence(storage: storage), started: started, processIdentifier: 4242)
             _ = await earlier.previousSessions()
             let systemLog = FakeConsoleSystemLog(.ended([
                 LogLine(
@@ -100,7 +100,7 @@
             ]))
 
             let sut = ConsoleSessionRecorder(
-                ConsoleSessionPersistence(storage: storage), started: started.addingTimeInterval(60), systemLog: systemLog
+                try ConsoleSessionPersistence(storage: storage), started: started.addingTimeInterval(60), systemLog: systemLog
             )
             let session = try #require(await sut.previousSessions().first)
             let actual = try await sut.log(of: session).lines.map(\.text)
@@ -109,14 +109,14 @@
         }
 
         @Test("A session that kept no line, and whose process logged none it missed, is deleted")
-        func deletesEmptySession() async {
+        func deletesEmptySession() async throws {
             let storage = FakeConsoleSessionStorage()
             let started = Date(timeIntervalSince1970: 1_800_000_000)
-            let earlier = ConsoleSessionRecorder(ConsoleSessionPersistence(storage: storage), started: started, processIdentifier: 4242)
+            let earlier = ConsoleSessionRecorder(try ConsoleSessionPersistence(storage: storage), started: started, processIdentifier: 4242)
             _ = await earlier.previousSessions()
 
             let sut = ConsoleSessionRecorder(
-                ConsoleSessionPersistence(storage: storage), started: started.addingTimeInterval(60), systemLog: FakeConsoleSystemLog(.ended([]))
+                try ConsoleSessionPersistence(storage: storage), started: started.addingTimeInterval(60), systemLog: FakeConsoleSystemLog(.ended([]))
             )
             let actual = await sut.previousSessions()
 
@@ -128,12 +128,12 @@
         func processRunning() async throws {
             let storage = FakeConsoleSessionStorage()
             let started = Date(timeIntervalSince1970: 1_800_000_000)
-            let earlier = ConsoleSessionRecorder(ConsoleSessionPersistence(storage: storage), started: started, processIdentifier: 4242)
+            let earlier = ConsoleSessionRecorder(try ConsoleSessionPersistence(storage: storage), started: started, processIdentifier: 4242)
             _ = await earlier.previousSessions()
             let expected = try #require(storage.sessions[earlier.currentName])
 
             let sut = ConsoleSessionRecorder(
-                ConsoleSessionPersistence(storage: storage), started: started.addingTimeInterval(60), systemLog: FakeConsoleSystemLog(.running)
+                try ConsoleSessionPersistence(storage: storage), started: started.addingTimeInterval(60), systemLog: FakeConsoleSystemLog(.running)
             )
             let listed = await sut.previousSessions().map(\.id)
             let actual = storage.sessions[earlier.currentName]
@@ -156,7 +156,7 @@
             ]))
 
             let sut = ConsoleSessionRecorder(
-                ConsoleSessionPersistence(storage: storage), started: Date(timeIntervalSince1970: 1_800_000_060), systemLog: systemLog
+                try ConsoleSessionPersistence(storage: storage), started: Date(timeIntervalSince1970: 1_800_000_060), systemLog: systemLog
             )
             _ = await sut.previousSessions()
             let actual = storage.sessions[name]
@@ -170,7 +170,7 @@
             let storage = FakeConsoleSessionStorage()
 
             let sut = ConsoleSessionRecorder(
-                ConsoleSessionPersistence(storage: storage), started: Date(timeIntervalSince1970: 1_800_000_000), processIdentifier: 4242,
+                try ConsoleSessionPersistence(storage: storage), started: Date(timeIntervalSince1970: 1_800_000_000), processIdentifier: 4242,
                 systemLog: FakeConsoleSystemLog(.ended([]))
             )
             let data = try #require(storage.sessions[sut.currentName])

@@ -45,14 +45,14 @@
                 let sessions = DebugDrawerSessions(maximumDuration: 300)
                 let receiver = DebugDrawerReceiver(directory: store, sessions: sessions)
                 let source = HeldPayloadsSource(held: [ReceivedMetricKitPayload(kind: .diagnostics, json: MetricKitFixtures.crashDiagnosticPayload)])
-                let mirror = MetricKitPayloadsMirror(sessions: sessions, directory: archive, redaction: .standard, capacity: 10, source: source)
+                let mirror = try MetricKitPayloadsMirror(sessions: sessions, directory: archive, redaction: .standard, capacity: 10, source: source)
                 receiver.enable(.model(mirror, id: MetricKitPayloadsMirror.pluginID, scope: .persistent))
                 try receiver.start()
                 receiver.stop()
             }
             let sessions = DebugDrawerSessions(maximumDuration: 300)
             let receiver = DebugDrawerReceiver(directory: store, sessions: sessions)
-            let relaunched = MetricKitPayloadsMirror(
+            let relaunched = try MetricKitPayloadsMirror(
                 sessions: sessions, directory: archive, redaction: .standard, capacity: 10, source: HeldPayloadsSource(held: [])
             )
             receiver.enable(.model(relaunched, id: MetricKitPayloadsMirror.pluginID, scope: .persistent))

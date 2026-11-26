@@ -34,29 +34,42 @@ public extension NetworkStore {
         /// The log's status filter.
         @Published public var filterStatus: StatusFilter = .all
 
-        /// How many requests ``entries`` keeps, 200 unless set; the oldest goes when a new one
-        /// would pass it.
+        /// How many requests ``entries`` keeps, 200 unless ``setCapacity(_:)`` changed it; the
+        /// oldest goes when a new one would pass it.
         public var capacity: Int {
-            get { buffer.maxCount }
-            set {
-                buffer.maxCount = newValue
-                publishBuffer()
-            }
+            buffer.maxCount
         }
 
-        /// How many bytes of bodies ``entries`` keeps, 32 MiB unless set: each request's body and
-        /// its response's, as the log kept them. The oldest requests go when a new one, or a
-        /// response arriving, would pass it.
+        /// How many bytes of bodies ``entries`` keeps, 32 MiB unless ``setByteCapacity(_:)``
+        /// changed it: each request's body and its response's, as the log kept them. The oldest
+        /// requests go when a new one, or a response arriving, would pass it.
         public var byteCapacity: Int {
-            get { buffer.maxByteCount }
-            set {
-                buffer.maxByteCount = newValue
-                publishBuffer()
-            }
+            buffer.maxByteCount
+        }
+
+        /// Keeps at most `capacity` requests from now on; a lower one drops the oldest now.
+        ///
+        /// - Parameter capacity: The most requests kept.
+        /// - Throws: `CaptureBuffer.InvalidLimit.negativeMaxCount` when `capacity` is negative,
+        ///   changing nothing.
+        public func setCapacity(_ capacity: Int) throws(CaptureBuffer<NetworkEntry>.InvalidLimit) {
+            try buffer.setMaxCount(capacity)
+            publishBuffer()
+        }
+
+        /// Keeps requests whose bodies add up to at most `byteCapacity` bytes from now on; a lower
+        /// one drops the oldest now.
+        ///
+        /// - Parameter byteCapacity: The most bytes of bodies kept.
+        /// - Throws: `CaptureBuffer.InvalidLimit.negativeMaxByteCount` when `byteCapacity` is
+        ///   negative, changing nothing.
+        public func setByteCapacity(_ byteCapacity: Int) throws(CaptureBuffer<NetworkEntry>.InvalidLimit) {
+            try buffer.setMaxByteCount(byteCapacity)
+            publishBuffer()
         }
 
         /// The captured requests, oldest first, bounded by ``capacity`` and ``byteCapacity``.
-        private let buffer = CaptureBuffer<NetworkEntry>(maxCount: 200, maxByteCount: 32 * 1_048_576) { $0.capturedByteCount }
+        private let buffer = CaptureBuffer<NetworkEntry>(uncheckedMaxCount: 200, maxByteCount: 32 * 1_048_576) { $0.capturedByteCount }
         /// The buffer's ID after the newest request in ``entries``; the others count down from it.
         private var shownEnd = CaptureBuffer<NetworkEntry>.ElementID(rawValue: 0)
 
@@ -353,44 +366,5 @@ public extension NetworkStore {
                 ignoreIssue = .notSaved
             }
         }
-    }
-#else
-    // The release stand-in: the same members, no URL protocol or swizzling behind them, and no
-    // requests ever.
-
-    /// Release builds capture no requests: this stand-in keeps the debug build's members.
-    @MainActor
-    public final class NetworkStore: ObservableObject {
-        /// The stand-in store.
-        public static let shared = NetworkStore()
-
-        /// Always empty.
-        @Published public private(set) var entries: [NetworkEntry] = []
-        /// Kept, never applied.
-        @Published public var filterText = ""
-        /// Kept, never applied.
-        @Published public var filterStatus: StatusFilter = .all
-
-        /// Kept, never used.
-        public var capacity = 200
-
-        /// Kept, never used.
-        public var byteCapacity = 32 * 1_048_576
-
-        /// Always empty.
-        public var filteredEntries: [NetworkEntry] {
-            []
-        }
-
-        private init() {}
-
-        /// Does nothing: release builds intercept nothing.
-        public func install() {}
-
-        /// Does nothing: release builds intercept nothing.
-        public func uninstall() {}
-
-        /// Does nothing.
-        public func clear() {}
     }
 #endif

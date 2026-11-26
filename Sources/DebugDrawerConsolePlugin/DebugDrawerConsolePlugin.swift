@@ -70,26 +70,41 @@ import OSLogClient
         /// Which lines ``ingest(_:)`` keeps at all; `installConsole(sessions:includeSystemDebugLogs:)` sets it.
         var ingestFilter = ConsoleIngestFilter()
 
-        /// How many lines ``lines`` keeps, 2,000 unless set; the oldest go first.
+        /// How many lines ``lines`` keeps, 2,000 unless ``setCapacity(_:)`` changed it; the oldest
+        /// go first.
         public var capacity: Int {
-            get { buffer.maxCount }
-            set {
-                buffer.maxCount = newValue
-                publishBuffer()
-            }
+            buffer.maxCount
         }
 
-        /// How many bytes of text ``lines`` keeps, 4 MiB unless set; the oldest lines go first.
+        /// How many bytes of text ``lines`` keeps, 4 MiB unless ``setByteCapacity(_:)`` changed it;
+        /// the oldest lines go first.
         public var byteCapacity: Int {
-            get { buffer.maxByteCount }
-            set {
-                buffer.maxByteCount = newValue
-                publishBuffer()
-            }
+            buffer.maxByteCount
+        }
+
+        /// Keeps at most `capacity` lines from now on; a lower one drops the oldest now.
+        ///
+        /// - Parameter capacity: The most lines kept.
+        /// - Throws: `CaptureBuffer.InvalidLimit.negativeMaxCount` when `capacity` is negative,
+        ///   changing nothing.
+        public func setCapacity(_ capacity: Int) throws(CaptureBuffer<LogLine>.InvalidLimit) {
+            try buffer.setMaxCount(capacity)
+            publishBuffer()
+        }
+
+        /// Keeps lines whose text adds up to at most `byteCapacity` bytes from now on; a lower one
+        /// drops the oldest now.
+        ///
+        /// - Parameter byteCapacity: The most bytes of text kept.
+        /// - Throws: `CaptureBuffer.InvalidLimit.negativeMaxByteCount` when `byteCapacity` is
+        ///   negative, changing nothing.
+        public func setByteCapacity(_ byteCapacity: Int) throws(CaptureBuffer<LogLine>.InvalidLimit) {
+            try buffer.setMaxByteCount(byteCapacity)
+            publishBuffer()
         }
 
         /// The captured lines, bounded by ``capacity`` and ``byteCapacity``.
-        private let buffer = CaptureBuffer<LogLine>(maxCount: 2000, maxByteCount: 4 * 1_048_576) { $0.capturedByteCount }
+        private let buffer = CaptureBuffer<LogLine>(uncheckedMaxCount: 2000, maxByteCount: 4 * 1_048_576) { $0.capturedByteCount }
         /// The buffer's ID after the newest line in ``lines``.
         private var shownEnd = CaptureBuffer<LogLine>.ElementID(rawValue: 0)
 

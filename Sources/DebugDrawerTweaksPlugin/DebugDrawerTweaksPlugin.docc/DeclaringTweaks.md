@@ -22,7 +22,7 @@ enum AppTweaks {
     static let timeout = Tweak.stepper("Timeout (s)", key: "timeout", default: 30, in: 5 ... 120, step: 5)
 }
 
-DebugDrawer.shared.installTweaks {
+try DebugDrawer.shared.installTweaks {
     TweakSection("Features") {
         AppTweaks.newCheckout
         AppTweaks.greeting

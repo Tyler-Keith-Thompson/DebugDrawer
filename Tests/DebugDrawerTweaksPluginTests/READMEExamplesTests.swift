@@ -32,8 +32,8 @@
     @Suite("README examples")
     struct READMEExamplesTests {
         @Test("Tweaks")
-        func tweaks() {
-            DebugDrawer.shared.installTweaks {
+        func tweaks() throws {
+            try DebugDrawer.shared.installTweaks {
                 TweakSection("Features") {
                     AppTweaks.newCheckout
                     AppTweaks.greeting

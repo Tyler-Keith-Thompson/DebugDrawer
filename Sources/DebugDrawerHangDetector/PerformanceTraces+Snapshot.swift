@@ -189,10 +189,18 @@ extension PerformanceTraces {
         }
     }
 
+    /// Bounds a recording can't take, which ``Limits/init(stalls:intervals:)`` refuses.
+    public enum InvalidLimits: Error, Equatable, Sendable {
+        /// Fewer than 1 stall would be kept.
+        case noStalls
+        /// Fewer than 1 interval would be kept.
+        case noIntervals
+    }
+
     /// The bounds of one session's recording: past them the oldest go first.
     public struct Limits: Codable, Equatable, Sendable {
         /// The 50 newest stalls and 500 newest intervals.
-        public static let standard = Limits(stalls: 50, intervals: 500)
+        public static let standard = Limits(uncheckedStalls: 50, intervals: 500)
 
         /// The most stalls kept.
         public let stalls: Int
@@ -204,9 +212,16 @@ extension PerformanceTraces {
         /// - Parameters:
         ///   - stalls: The most stalls kept.
         ///   - intervals: The most intervals kept.
-        /// - Precondition: Both are at least 1.
-        public init(stalls: Int, intervals: Int) {
-            precondition(stalls >= 1 && intervals >= 1, "A performance trace keeps at least one stall and one interval")
+        /// - Throws: ``PerformanceTraces/InvalidLimits/noStalls`` when `stalls` is less than 1,
+        ///   and ``PerformanceTraces/InvalidLimits/noIntervals`` when `intervals` is.
+        public init(stalls: Int, intervals: Int) throws(InvalidLimits) {
+            guard stalls >= 1 else { throw .noStalls }
+            guard intervals >= 1 else { throw .noIntervals }
+            self.init(uncheckedStalls: stalls, intervals: intervals)
+        }
+
+        /// Bounds the caller knows are at least 1: ``standard``, a constant no input reaches.
+        private init(uncheckedStalls stalls: Int, intervals: Int) {
             self.stalls = stalls
             self.intervals = intervals
         }

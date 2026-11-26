@@ -117,6 +117,9 @@ public final class MetricKitPayloadsMirror: DebugDrawerPluginModel {
         case deleteAll
     }
 
+    /// A capacity the mirror can't take: below 1.
+    public struct InvalidCapacity: Error, Equatable, Sendable {}
+
     /// The payloads now, while a session is open.
     @Published public private(set) var snapshot = Snapshot(sessionID: nil, payloads: [])
 
@@ -147,7 +150,7 @@ public final class MetricKitPayloadsMirror: DebugDrawerPluginModel {
     ///   - maximumPayloadSize: The most bytes a kept payload's JSON holds.
     ///   - source: Where payloads come from; `nil` keeps none.
     ///   - now: When a payload arrives.
-    /// - Precondition: `capacity` is at least 1.
+    /// - Throws: ``InvalidCapacity`` when `capacity` is below 1, before it subscribes to `source`.
     package init(
         sessions: DebugDrawerSessions,
         directory: URL,
@@ -156,8 +159,8 @@ public final class MetricKitPayloadsMirror: DebugDrawerPluginModel {
         maximumPayloadSize: Int = MetricKitPayloadsMirror.maximumPayloadSize,
         source: (any MetricKitPayloadSource)?,
         now: @escaping () -> Date = { Date() }
-    ) {
-        precondition(capacity > 0, "The MetricKit mirror keeps at least one payload")
+    ) throws(InvalidCapacity) {
+        guard capacity > 0 else { throw InvalidCapacity() }
         self.redaction = redaction
         self.source = source
         self.now = now

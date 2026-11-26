@@ -38,7 +38,7 @@ import os
 /// intervals it wants timed:
 ///
 /// ```swift
-/// let traces = PerformanceTraces(sessions: sessions)
+/// let traces = try PerformanceTraces(sessions: sessions)
 /// receiver.enable(.performanceTraces(traces))
 ///
 /// let interval = traces.beginInterval("Load feed")
@@ -82,6 +82,14 @@ public final class PerformanceTraces: DebugDrawerPluginModel {
     /// The shortest stall recorded as a hang unless the host picks another: a quarter of a second,
     /// the shortest stall Apple counts as a hang.
     public nonisolated static let defaultHangThreshold: Duration = .milliseconds(250)
+
+    /// Thresholds a recorder can't take.
+    public enum InvalidThresholds: Error, Equatable, Sendable {
+        /// The hitch threshold is 0 or less.
+        case hitchThresholdNotPositive
+        /// The hitch threshold is longer than the hang threshold.
+        case hitchThresholdAboveHangThreshold
+    }
 
     /// What a sidecar asks.
     public enum Command: Codable, Equatable, Sendable {
@@ -136,17 +144,19 @@ public final class PerformanceTraces: DebugDrawerPluginModel {
     ///   - hangThreshold: The shortest stall recorded as a hang; ``defaultHangThreshold`` unless
     ///     given.
     ///   - limits: The bounds of one session's recording; ``Limits/standard`` unless given.
-    /// - Precondition: `hitchThreshold` is positive and no longer than `hangThreshold`.
+    /// - Throws: ``InvalidThresholds/hitchThresholdNotPositive`` when `hitchThreshold` is 0 or
+    ///   less, and ``InvalidThresholds/hitchThresholdAboveHangThreshold`` when it is longer than
+    ///   `hangThreshold`.
     public convenience init(
         sessions: DebugDrawerSessions,
         hitchThreshold: Duration = defaultHitchThreshold,
         hangThreshold: Duration = defaultHangThreshold,
         limits: Limits = .standard
-    ) {
+    ) throws(InvalidThresholds) {
         // Dates read from the continuous clock, counted from one wall-clock reading, so an
         // interval's duration doesn't jump when the wall clock is set.
         let origin = (date: Date(), instant: ContinuousClock.now)
-        self.init(sessions: sessions, hitchThreshold: hitchThreshold, hangThreshold: hangThreshold, limits: limits) {
+        try self.init(sessions: sessions, hitchThreshold: hitchThreshold, hangThreshold: hangThreshold, limits: limits) {
             origin.date.addingTimeInterval((ContinuousClock.now - origin.instant).timeInterval)
         } watchedThread: {
             // Asked on the main actor, so the sampler is the main thread's.
@@ -165,6 +175,7 @@ public final class PerformanceTraces: DebugDrawerPluginModel {
     ///   - now: The time an interval begins and ends at, checked against the session's expiry.
     ///   - watchedThread: The run loop to watch and the sampler of its thread, asked as each
     ///     recording starts.
+    /// - Throws: As ``init(sessions:hitchThreshold:hangThreshold:limits:)`` does.
     package init(
         sessions: DebugDrawerSessions,
         hitchThreshold: Duration,
@@ -172,9 +183,9 @@ public final class PerformanceTraces: DebugDrawerPluginModel {
         limits: Limits,
         now: @escaping @Sendable () -> Date,
         watchedThread: @escaping @MainActor () -> (runLoop: CFRunLoop, sampler: any StackSampler)
-    ) {
-        precondition(hitchThreshold > .zero, "The hitch threshold must be positive")
-        precondition(hitchThreshold <= hangThreshold, "The hitch threshold must be no longer than the hang threshold")
+    ) throws(InvalidThresholds) {
+        guard hitchThreshold > .zero else { throw .hitchThresholdNotPositive }
+        guard hitchThreshold <= hangThreshold else { throw .hitchThresholdAboveHangThreshold }
         self.hitchThreshold = hitchThreshold
         self.hangThreshold = hangThreshold
         self.now = now

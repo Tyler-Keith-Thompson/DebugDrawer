@@ -45,7 +45,9 @@
         }
 
         func install(in drawer: DebugDrawer) {
-            drawer.installNetwork(sessions: .off)
+            // The contract's install can't throw; the defaults and .off are valid, so this records
+            // an issue only if that ever changes.
+            #expect(throws: Never.self) { try drawer.installNetwork(sessions: .off) }
         }
 
         func uninstall(from drawer: DebugDrawer) {
@@ -77,8 +79,8 @@
             return AppResult(status: http.statusCode, body: body, probeHeader: http.value(forHTTPHeaderField: "X-Probe"), timesServed: served)
         }
 
-        func limitCapture(to count: Int) {
-            NetworkStore.shared.capacity = count
+        func limitCapture(to count: Int) throws {
+            try NetworkStore.shared.setCapacity(count)
         }
 
         func makeCapturedCall(_ marker: String) async throws {

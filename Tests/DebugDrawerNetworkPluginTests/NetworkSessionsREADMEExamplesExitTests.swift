@@ -11,7 +11,7 @@
     @Suite("README examples, in a child process: Network sessions", .timeLimit(.minutes(1)))
     struct NetworkSessionsREADMEExamplesExitTests {
         @Test("Network sessions: the installed limits apply, and a request is written to the current session as it completes")
-        func networkSessions() async {
+        func networkSessions() async throws {
             // The children get a home folder of their own, so the files they keep in Application Support and
             // Caches stay out of the Mac's, whatever runs the test; each checks the move took.
             let home = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString).path(percentEncoded: false)
@@ -20,8 +20,8 @@
             await #expect(processExitsWith: .success) { [home = home as String] in
                 setenv("CFFIXED_USER_HOME", home, 1)
                 guard URL.applicationSupportDirectory.path(percentEncoded: false).hasPrefix(home) else { exit(EXIT_FAILURE) }
-                await MainActor.run {
-                    DebugDrawer.shared.installNetwork(sessions: NetworkSessionPersistence(maxSessions: 3, maxBytes: 5_000_000))
+                try await MainActor.run {
+                    try DebugDrawer.shared.installNetwork(sessions: try NetworkSessionPersistence(maxSessions: 3, maxBytes: 5_000_000))
                 }
                 // `.invalid` never resolves, so the request fails at once, with or without a
                 // network, and is written as a failure.

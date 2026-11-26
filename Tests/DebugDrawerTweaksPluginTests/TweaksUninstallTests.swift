@@ -16,7 +16,7 @@
             let drawer = DebugDrawer(defaults: defaults)
             let storage = FakeTweakStorage(["tweaks.test.uninstall": .bool(true)])
             let tweak = Tweak.toggle("Uninstall test", key: "tweaks.test.uninstall", default: false)
-            drawer.installTweaks(storage: storage) {
+            try drawer.installTweaks(storage: storage) {
                 TweakSection("Uninstall") { tweak }
             }
 
@@ -34,7 +34,7 @@
             let defaults = try #require(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
             let drawer = DebugDrawer(defaults: defaults)
-            let sut = TweaksPlugin(sections: [TweakSection("Session") { TweakAction("Expire token") {} }])
+            let sut = try TweaksPlugin(sections: [TweakSection("Session") { TweakAction("Expire token") {} }])
             drawer.registerGlobal(sut)
             drawer.unregisterGlobal(id: sut.id)
 

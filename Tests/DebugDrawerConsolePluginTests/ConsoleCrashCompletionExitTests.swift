@@ -27,9 +27,9 @@
             await #expect(processExitsWith: .signal(SIGABRT)) { [home = home as String, path = path as String, expected = expected as String] in
                 setenv("CFFIXED_USER_HOME", home, 1)
                 guard URL.applicationSupportDirectory.path(percentEncoded: false).hasPrefix(home) else { exit(EXIT_SUCCESS) }
-                await MainActor.run {
+                try await MainActor.run {
                     let storage = _ConsoleSessionStorage(directory: URL(filePath: path, directoryHint: .isDirectory))
-                    DebugDrawer.shared.installConsole(sessions: ConsoleSessionPersistence(storage: storage))
+                    DebugDrawer.shared.installConsole(sessions: try ConsoleSessionPersistence(storage: storage))
                 }
                 os.Logger(subsystem: "DebugDrawerConsolePluginTests", category: "Crash").notice("\(expected, privacy: .public)")
                 abort()
@@ -44,7 +44,7 @@
             // past its minute.
             let reading = RetryingSystemLog(expected: expected, deadline: .now.advanced(by: .seconds(30)))
             let next = ConsoleSessionRecorder(
-                ConsoleSessionPersistence(storage: _ConsoleSessionStorage(directory: directory)), systemLog: reading
+                try ConsoleSessionPersistence(storage: _ConsoleSessionStorage(directory: directory)), systemLog: reading
             )
             let sut = ConsoleLogStore(muteStorage: FakeConsoleMuteStorage())
             sut.persist(to: next)

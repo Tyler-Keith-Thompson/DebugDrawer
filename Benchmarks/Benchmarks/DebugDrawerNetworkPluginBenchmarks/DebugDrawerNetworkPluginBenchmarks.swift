@@ -33,7 +33,7 @@ let keystrokes = ["n", "ne", "nee", "need", "needl", "needle"]
 /// matches every one.
 @MainActor func capture200Responses() async throws {
     try await feedServer.start()
-    DebugDrawer.shared.installNetwork(sessions: .off)
+    try DebugDrawer.shared.installNetwork(sessions: .off)
     let captured = URLSession(configuration: .ephemeral)
     for page in 0 ..< 200 {
         var components = URLComponents(url: feedServer.url, resolvingAgainstBaseURL: false)
@@ -87,7 +87,7 @@ let benchmarks: @Sendable () -> Void = {
         "Network: URLSession data task, installed",
         configuration: .init(setup: {
             try await server.start()
-            await MainActor.run { DebugDrawer.shared.installNetwork(sessions: .off) }
+            try await MainActor.run { try DebugDrawer.shared.installNetwork(sessions: .off) }
             guard URLSessionConfiguration.ephemeral.protocolClasses?.first.map(NSStringFromClass)?.hasSuffix("DebugNetworkProtocol") == true else {
                 fatalError("installNetwork() didn't put its URL protocol first in new sessions' configurations")
             }

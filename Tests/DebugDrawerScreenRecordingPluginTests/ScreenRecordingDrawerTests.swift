@@ -48,12 +48,46 @@
             defer { UserDefaults().removePersistentDomain(forName: suite) }
             let drawer = try DebugDrawer(defaults: #require(UserDefaults(suiteName: suite)))
 
-            ScreenRecording.install(capacity: 2, in: drawer)
+            try ScreenRecording.install(capacity: 2, in: drawer)
 
             let plugin = drawer.globalPlugins.first { $0.id == ScreenRecordingPlugin.pluginID }
             #expect(plugin?.hasHUD == true)
             #expect(plugin?.contributesToReport == true)
             #expect(!DebugDrawer.shared.globalPlugins.contains { $0.id == ScreenRecordingPlugin.pluginID })
+        }
+
+        @Test("A capacity of 0 throws InvalidCapacity and adds nothing to the drawer")
+        func zeroCapacity() throws {
+            let suite = temporarySuiteName("ScreenRecordingDrawerTests")
+            defer { UserDefaults().removePersistentDomain(forName: suite) }
+            let drawer = try DebugDrawer(defaults: #require(UserDefaults(suiteName: suite)))
+            let capacity = 0
+
+            #expect(throws: ScreenRecording.InvalidCapacity.self) {
+                try ScreenRecording.install(capacity: capacity, in: drawer)
+            }
+            #expect(!drawer.globalPlugins.contains { $0.id == ScreenRecordingPlugin.pluginID })
+        }
+
+        @Test("A negative capacity throws InvalidCapacity, on the shared drawer too, and adds nothing")
+        func negativeCapacity() {
+            let capacity = -1
+
+            #expect(throws: ScreenRecording.InvalidCapacity.self) {
+                try ScreenRecording.install(capacity: capacity)
+            }
+            #expect(!DebugDrawer.shared.globalPlugins.contains { $0.id == ScreenRecordingPlugin.pluginID })
+        }
+
+        @Test("A capacity of 1 is taken: the edge of the valid range")
+        func oneCapacity() throws {
+            let suite = temporarySuiteName("ScreenRecordingDrawerTests")
+            defer { UserDefaults().removePersistentDomain(forName: suite) }
+            let drawer = try DebugDrawer(defaults: #require(UserDefaults(suiteName: suite)))
+
+            try ScreenRecording.install(capacity: 1, in: drawer)
+
+            #expect(drawer.globalPlugins.contains { $0.id == ScreenRecordingPlugin.pluginID })
         }
     }
 #endif

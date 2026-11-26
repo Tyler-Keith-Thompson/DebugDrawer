@@ -47,8 +47,9 @@ subclass of it is.
 ### Objects that opt in
 
 `trackLifetime(of:maxCount:)` counts an object among the live instances of its class until it
-deallocates. While more than `maxCount` (one by default) are alive, the class is a suspect. It can
-be called from any thread, and before `install()`.
+deallocates. While more than `maxCount` are alive, the class is a suspect; `trackLifetime(of:)`
+allows one. A `maxCount` below 1 throws `LeakDetector.InvalidMaxCount`. It can be called from any
+thread, and before `install()`.
 
 ### In the drawer
 

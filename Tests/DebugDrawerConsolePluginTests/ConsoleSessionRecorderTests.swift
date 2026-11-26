@@ -13,7 +13,7 @@
         @MainActor func previousSessionAfterRelaunch() async throws {
             let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
             defer { try? FileManager.default.removeItem(at: directory) }
-            let persistence = ConsoleSessionPersistence(storage: _ConsoleSessionStorage(directory: directory))
+            let persistence = try ConsoleSessionPersistence(storage: _ConsoleSessionStorage(directory: directory))
             let started = Date(timeIntervalSince1970: 1_800_000_000)
             let first = ConsoleSessionRecorder(persistence, started: started)
             let firstStore = ConsoleLogStore(muteStorage: FakeConsoleMuteStorage())
@@ -50,7 +50,7 @@
             let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
             defer { try? FileManager.default.removeItem(at: directory) }
             let storage = _ConsoleSessionStorage(directory: directory)
-            let persistence = ConsoleSessionPersistence(storage: storage)
+            let persistence = try ConsoleSessionPersistence(storage: storage)
             let first = ConsoleSessionRecorder(persistence, started: Date(timeIntervalSince1970: 1_800_000_000))
             for index in 1 ... 2 {
                 first.record(LogLine(
@@ -72,7 +72,7 @@
         func pruneByCount() async throws {
             let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
             defer { try? FileManager.default.removeItem(at: directory) }
-            let persistence = ConsoleSessionPersistence(maxSessions: 2, storage: _ConsoleSessionStorage(directory: directory))
+            let persistence = try ConsoleSessionPersistence(maxSessions: 2, storage: _ConsoleSessionStorage(directory: directory))
             var names: [String] = []
             for launch in 0 ..< 4 {
                 let recorder = ConsoleSessionRecorder(persistence, started: Date(timeIntervalSince1970: 1_800_000_000 + Double(launch) * 60))
@@ -98,7 +98,7 @@
             let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
             defer { try? FileManager.default.removeItem(at: directory) }
             let storage = _ConsoleSessionStorage(directory: directory)
-            let roomy = ConsoleSessionPersistence(storage: storage)
+            let roomy = try ConsoleSessionPersistence(storage: storage)
             let line = LogLine(timestamp: Date(timeIntervalSince1970: 1_800_000_001), text: "Feed loaded", source: .oslog, level: .info)
             let oldest = ConsoleSessionRecorder(roomy, started: Date(timeIntervalSince1970: 1_800_000_000))
             oldest.record(line)
@@ -113,11 +113,12 @@
             let probeDirectory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
             defer { try? FileManager.default.removeItem(at: probeDirectory) }
             let probeStorage = _ConsoleSessionStorage(directory: probeDirectory)
-            let probe = ConsoleSessionRecorder(ConsoleSessionPersistence(storage: probeStorage), started: Date(timeIntervalSince1970: 1_800_000_120))
+            let probePersistence = try ConsoleSessionPersistence(storage: probeStorage)
+            let probe = ConsoleSessionRecorder(probePersistence, started: Date(timeIntervalSince1970: 1_800_000_120))
             let headerBytes = try #require(probeStorage.sessionFiles().first { $0.name == probe.currentName }?.byteCount)
             // Room for both sessions and the next one's header at launch, and for its line too,
             // as large as either session's, only once one goes.
-            let tight = ConsoleSessionPersistence(maxBytes: oldestBytes + newerBytes + headerBytes + 10, storage: storage)
+            let tight = try ConsoleSessionPersistence(maxBytes: oldestBytes + newerBytes + headerBytes + 10, storage: storage)
 
             let sut = ConsoleSessionRecorder(tight, started: Date(timeIntervalSince1970: 1_800_000_120))
             let atLaunch = await sut.previousSessions().map(\.id)
@@ -139,7 +140,7 @@
             var names: [String] = []
             for launch in 0 ..< 3 {
                 let recorder = ConsoleSessionRecorder(
-                    ConsoleSessionPersistence(storage: storage),
+                    try ConsoleSessionPersistence(storage: storage),
                     started: Date(timeIntervalSince1970: 1_800_000_000 + Double(launch) * 60)
                 )
                 recorder.record(line)
@@ -154,7 +155,7 @@
             let expected = [names[2], names[1]]
 
             let sut = ConsoleSessionRecorder(
-                ConsoleSessionPersistence(maxBytes: maxBytes, storage: storage),
+                try ConsoleSessionPersistence(maxBytes: maxBytes, storage: storage),
                 started: Date(timeIntervalSince1970: 1_800_001_000)
             )
             let actual = await sut.previousSessions().map(\.id)
@@ -171,7 +172,7 @@
             let storage = _ConsoleSessionStorage(directory: directory)
             let maxBytes = 1_000
             let sut = ConsoleSessionRecorder(
-                ConsoleSessionPersistence(maxBytes: maxBytes, storage: storage),
+                try ConsoleSessionPersistence(maxBytes: maxBytes, storage: storage),
                 started: Date(timeIntervalSince1970: 1_800_000_000)
             )
             let recorded = (0 ..< 20).map { index in
@@ -200,7 +201,7 @@
         func oversizedLineSkipped() async throws {
             let storage = FakeConsoleSessionStorage()
             let sut = ConsoleSessionRecorder(
-                ConsoleSessionPersistence(maxBytes: 3_000, storage: storage),
+                try ConsoleSessionPersistence(maxBytes: 3_000, storage: storage),
                 started: Date(timeIntervalSince1970: 1_800_000_000)
             )
             let dump = LogLine(
@@ -227,13 +228,13 @@
             defer { try? FileManager.default.removeItem(at: directory) }
             let storage = _ConsoleSessionStorage(directory: directory)
             let line = LogLine(timestamp: Date(timeIntervalSince1970: 1_800_000_001), text: "Feed loaded", source: .oslog, level: .info)
-            let earlier = ConsoleSessionRecorder(ConsoleSessionPersistence(storage: storage), started: Date(timeIntervalSince1970: 1_800_000_000))
+            let earlier = ConsoleSessionRecorder(try ConsoleSessionPersistence(storage: storage), started: Date(timeIntervalSince1970: 1_800_000_000))
             earlier.record(line)
             _ = await earlier.previousSessions()
             let before = try storage.sessionFiles().count
 
             let sut = ConsoleSessionRecorder(
-                ConsoleSessionPersistence(maxSessions: 0, storage: storage),
+                try ConsoleSessionPersistence(maxSessions: 0, storage: storage),
                 started: Date(timeIntervalSince1970: 1_800_000_060)
             )
             sut.record(line)
@@ -252,7 +253,7 @@
         func concurrentRecords() async throws {
             let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
             defer { try? FileManager.default.removeItem(at: directory) }
-            let persistence = ConsoleSessionPersistence(storage: _ConsoleSessionStorage(directory: directory))
+            let persistence = try ConsoleSessionPersistence(storage: _ConsoleSessionStorage(directory: directory))
             let sut = ConsoleSessionRecorder(persistence, started: Date(timeIntervalSince1970: 1_800_000_000), capacity: 1_000)
             let count = 300
             let expected = Set((0 ..< count).map { "line \($0)" })
@@ -280,7 +281,7 @@
         func boundedWhileWriting() async throws {
             let storage = FakeConsoleSessionStorage()
             let sut = ConsoleSessionRecorder(
-                ConsoleSessionPersistence(storage: storage),
+                try ConsoleSessionPersistence(storage: storage),
                 started: Date(timeIntervalSince1970: 1_800_000_000), capacity: 3
             )
             // Held from after the header, which the recorder writes before it returns.
@@ -309,7 +310,7 @@
         func headerAndLineFormat() async throws {
             let storage = FakeConsoleSessionStorage()
             let started = Date(timeIntervalSince1970: 1_800_000_000)
-            let sut = ConsoleSessionRecorder(ConsoleSessionPersistence(storage: storage), started: started)
+            let sut = ConsoleSessionRecorder(try ConsoleSessionPersistence(storage: storage), started: started)
             let expected = #"{"level":"fault","source":"oslog","text":"[com.shop/cart] Checkout \"failed\"\nretrying","#
                 + #""time":"2027-01-15T08:00:00.250Z"}"#
 
@@ -334,10 +335,10 @@
         func delete() async throws {
             let storage = FakeConsoleSessionStorage()
             let line = LogLine(timestamp: Date(timeIntervalSince1970: 1_800_000_001), text: "Feed loaded", source: .oslog, level: .info)
-            let earlier = ConsoleSessionRecorder(ConsoleSessionPersistence(storage: storage), started: Date(timeIntervalSince1970: 1_800_000_000))
+            let earlier = ConsoleSessionRecorder(try ConsoleSessionPersistence(storage: storage), started: Date(timeIntervalSince1970: 1_800_000_000))
             earlier.record(line)
             _ = await earlier.previousSessions()
-            let sut = ConsoleSessionRecorder(ConsoleSessionPersistence(storage: storage), started: Date(timeIntervalSince1970: 1_800_000_060))
+            let sut = ConsoleSessionRecorder(try ConsoleSessionPersistence(storage: storage), started: Date(timeIntervalSince1970: 1_800_000_060))
             sut.record(line)
 
             await sut.delete([earlier.currentName, sut.currentName])

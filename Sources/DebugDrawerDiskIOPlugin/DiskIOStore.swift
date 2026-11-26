@@ -22,25 +22,40 @@ import Foundation
         /// Whether recording is paused: calls made meanwhile are neither kept nor counted.
         @Published private(set) var isPaused = false
 
-        /// How many calls ``events`` keeps, 500 unless set; the totals count every call regardless.
+        /// How many calls ``events`` keeps, 500 unless ``setCapacity(_:)`` changed it; the totals
+        /// count every call regardless.
         public var capacity: Int {
-            get { recorder.limit }
-            set {
-                recorder.limit = newValue
-                objectWillChange.send()
-                show(recorder.snapshot(from: shownEnd))
-            }
+            recorder.limit
         }
 
-        /// How many bytes of paths ``events`` keeps, 1 MiB unless set; the oldest calls go when a
-        /// new one would pass it, and the totals count every call regardless.
+        /// How many bytes of paths ``events`` keeps, 1 MiB unless ``setByteCapacity(_:)`` changed
+        /// it; the oldest calls go when a new one would pass it, and the totals count every call
+        /// regardless.
         public var byteCapacity: Int {
-            get { recorder.byteLimit }
-            set {
-                recorder.byteLimit = newValue
-                objectWillChange.send()
-                show(recorder.snapshot(from: shownEnd))
-            }
+            recorder.byteLimit
+        }
+
+        /// Keeps at most `capacity` calls from now on; a lower one drops the oldest now.
+        ///
+        /// - Parameter capacity: The most calls kept.
+        /// - Throws: `CaptureBuffer.InvalidLimit.negativeMaxCount` when `capacity` is negative,
+        ///   changing nothing.
+        public func setCapacity(_ capacity: Int) throws(CaptureBuffer<IOEvent>.InvalidLimit) {
+            try recorder.setLimit(capacity)
+            objectWillChange.send()
+            show(recorder.snapshot(from: shownEnd))
+        }
+
+        /// Keeps calls whose paths add up to at most `byteCapacity` bytes from now on; a lower one
+        /// drops the oldest now.
+        ///
+        /// - Parameter byteCapacity: The most bytes of paths kept.
+        /// - Throws: `CaptureBuffer.InvalidLimit.negativeMaxByteCount` when `byteCapacity` is
+        ///   negative, changing nothing.
+        public func setByteCapacity(_ byteCapacity: Int) throws(CaptureBuffer<IOEvent>.InvalidLimit) {
+            try recorder.setByteLimit(byteCapacity)
+            objectWillChange.send()
+            show(recorder.snapshot(from: shownEnd))
         }
 
         private var installed = false
@@ -213,10 +228,28 @@ import Foundation
         @Published public var mainThreadOnly = false
 
         /// Kept, never used.
-        public var capacity = 500
+        public private(set) var capacity = 500
 
         /// Kept, never used.
-        public var byteCapacity = 1_048_576
+        public private(set) var byteCapacity = 1_048_576
+
+        /// Keeps `capacity`, never using it.
+        ///
+        /// - Throws: `CaptureBuffer.InvalidLimit.negativeMaxCount` when `capacity` is negative,
+        ///   changing nothing.
+        public func setCapacity(_ capacity: Int) throws(CaptureBuffer<IOEvent>.InvalidLimit) {
+            guard capacity >= 0 else { throw .negativeMaxCount }
+            self.capacity = capacity
+        }
+
+        /// Keeps `byteCapacity`, never using it.
+        ///
+        /// - Throws: `CaptureBuffer.InvalidLimit.negativeMaxByteCount` when `byteCapacity` is
+        ///   negative, changing nothing.
+        public func setByteCapacity(_ byteCapacity: Int) throws(CaptureBuffer<IOEvent>.InvalidLimit) {
+            guard byteCapacity >= 0 else { throw .negativeMaxByteCount }
+            self.byteCapacity = byteCapacity
+        }
 
         /// Always zero.
         public var totalReads: Int {

@@ -12,6 +12,20 @@ public enum HangDetector {
     /// shortest stall Apple counts as a hang.
     public static let defaultThreshold: Duration = .milliseconds(250)
 
+    /// A threshold the hang detector can't take: 0 or less.
+    public struct NonPositiveThreshold: Error, Equatable, Sendable {}
+
+    /// Adds the Hangs plugin and watches the main thread from now on, with ``defaultThreshold``:
+    /// in debug builds only; in release it does nothing.
+    ///
+    /// As ``install(threshold:)`` does with ``defaultThreshold``.
+    @MainActor
+    public static func install() {
+        #if DEBUG
+            HangDetectorInstallation.install(threshold: defaultThreshold)
+        #endif
+    }
+
     /// Adds the Hangs plugin and watches the main thread from now on: in debug builds only; in
     /// release it does nothing.
     ///
@@ -22,11 +36,13 @@ public enum HangDetector {
     /// starts it over.
     ///
     /// - Parameter threshold: The shortest time the main thread must go without turning its run
-    ///   loop to count as a hang; the drawer can change it while the app runs. Traps in debug
-    ///   builds unless positive.
+    ///   loop to count as a hang; the drawer can change it while the app runs.
+    /// - Throws: ``NonPositiveThreshold`` when `threshold` is 0 or less, installing nothing and
+    ///   keeping the threshold of an earlier call. Release builds start nothing and throw nothing.
     @MainActor
-    public static func install(threshold: Duration = defaultThreshold) {
+    public static func install(threshold: Duration) throws(NonPositiveThreshold) {
         #if DEBUG
+            guard threshold > .zero else { throw NonPositiveThreshold() }
             HangDetectorInstallation.install(threshold: threshold)
         #endif
     }

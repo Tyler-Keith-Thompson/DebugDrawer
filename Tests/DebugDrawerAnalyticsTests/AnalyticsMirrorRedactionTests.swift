@@ -19,8 +19,8 @@
             let directory = FileManager.default.temporaryDirectory.appending(path: "AnalyticsMirrorRedactionTests-\(UUID().uuidString)")
             let sessions = DebugDrawerSessions(maximumDuration: 300)
             let receiver = DebugDrawerReceiver(directory: directory, sessions: sessions)
-            let redaction = AnalyticsRedaction.standard.adding(keys: ["customer_name"], values: [#"\bACCT-\d{6}\b"#])
-            receiver.enable(.analyticsEvents(sessions: sessions, redaction: redaction))
+            let redaction = try AnalyticsRedaction.standard.adding(keys: ["customer_name"], values: [#"\bACCT-\d{6}\b"#])
+            try receiver.enable(.analyticsEvents(sessions: sessions, redaction: redaction))
             try receiver.start()
             defer { receiver.stop() }
             let sidecar = try DebugDrawerAppGroupStoreTransport(directory: AppGroupStoreLayout.appDirectory(inStore: directory))

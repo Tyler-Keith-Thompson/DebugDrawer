@@ -17,8 +17,8 @@
         )
 
         /// An earlier launch's session over `storage` that kept `lines`.
-        private static func earlierSession(in storage: FakeConsoleSessionStorage, keeping lines: [LogLine]) async -> ConsoleSessionRecorder {
-            let earlier = ConsoleSessionRecorder(ConsoleSessionPersistence(storage: storage), started: started, processIdentifier: 4242)
+        private static func earlierSession(in storage: FakeConsoleSessionStorage, keeping lines: [LogLine]) async throws -> ConsoleSessionRecorder {
+            let earlier = ConsoleSessionRecorder(try ConsoleSessionPersistence(storage: storage), started: started, processIdentifier: 4242)
             for line in lines {
                 earlier.record(line)
             }
@@ -29,14 +29,14 @@
         @Test("A line the first read of the system's log drops still ends up in the Previous session")
         @MainActor func firstReadDropsLine() async throws {
             let storage = FakeConsoleSessionStorage()
-            let earlier = await Self.earlierSession(in: storage, keeping: [Self.lastKept])
+            let earlier = try await Self.earlierSession(in: storage, keeping: [Self.lastKept])
             let systemLog = FakeConsoleSystemLog(reads: [
                 .ended([Self.lastKept]),
                 .ended([Self.lastKept, Self.checkoutFailed])
             ])
 
             let sut = ConsoleSessionsModel(recorder: ConsoleSessionRecorder(
-                ConsoleSessionPersistence(storage: storage), started: Self.started.addingTimeInterval(60), systemLog: systemLog
+                try ConsoleSessionPersistence(storage: storage), started: Self.started.addingTimeInterval(60), systemLog: systemLog
             ))
             await sut.reload()
             let session = try #require(sut.sessions.first)
@@ -53,12 +53,12 @@
         @Test("A launch that logged nothing after its session's last line is read twice, and its session is left as it was")
         func loggedNothingMore() async throws {
             let storage = FakeConsoleSessionStorage()
-            let earlier = await Self.earlierSession(in: storage, keeping: [Self.lastKept])
+            let earlier = try await Self.earlierSession(in: storage, keeping: [Self.lastKept])
             let expected = try #require(storage.sessions[earlier.currentName])
             let systemLog = FakeConsoleSystemLog(.ended([Self.lastKept]))
 
             let sut = ConsoleSessionRecorder(
-                ConsoleSessionPersistence(storage: storage), started: Self.started.addingTimeInterval(60), systemLog: systemLog
+                try ConsoleSessionPersistence(storage: storage), started: Self.started.addingTimeInterval(60), systemLog: systemLog
             )
             let listed = await sut.previousSessions().map(\.id)
 
@@ -70,7 +70,7 @@
         @Test("Reads that lack the session's own last os_log line don't settle, though they agree")
         func lastLineMissing() async throws {
             let storage = FakeConsoleSessionStorage()
-            let earlier = await Self.earlierSession(in: storage, keeping: [Self.lastKept])
+            let earlier = try await Self.earlierSession(in: storage, keeping: [Self.lastKept])
             let systemLog = FakeConsoleSystemLog(reads: [
                 .ended([]),
                 .ended([]),
@@ -78,7 +78,7 @@
             ])
 
             let sut = ConsoleSessionRecorder(
-                ConsoleSessionPersistence(storage: storage), started: Self.started.addingTimeInterval(60), systemLog: systemLog
+                try ConsoleSessionPersistence(storage: storage), started: Self.started.addingTimeInterval(60), systemLog: systemLog
             )
             let session = try #require(await sut.previousSessions().first)
             let actual = try await sut.log(of: session).lines.map(\.text)
@@ -91,14 +91,14 @@
         @Test("The system's log is read at most four times, though each read finds a line the ones before it lacked")
         func boundedReads() async throws {
             let storage = FakeConsoleSessionStorage()
-            _ = await Self.earlierSession(in: storage, keeping: [])
+            _ = try await Self.earlierSession(in: storage, keeping: [])
             let lines = (1 ... 6).map {
                 LogLine(timestamp: Self.started.addingTimeInterval(Double($0)), text: "Step \($0)", source: .oslog, level: .info)
             }
             let systemLog = FakeConsoleSystemLog(reads: (1 ... 6).map { .ended(Array(lines.prefix($0))) })
 
             let sut = ConsoleSessionRecorder(
-                ConsoleSessionPersistence(storage: storage), started: Self.started.addingTimeInterval(60), systemLog: systemLog
+                try ConsoleSessionPersistence(storage: storage), started: Self.started.addingTimeInterval(60), systemLog: systemLog
             )
             let session = try #require(await sut.previousSessions().first)
             let actual = try await sut.log(of: session).lines.map(\.text)
@@ -111,12 +111,12 @@
         @Test("A process found running on a later read leaves its session as it was")
         func runningOnLaterRead() async throws {
             let storage = FakeConsoleSessionStorage()
-            let earlier = await Self.earlierSession(in: storage, keeping: [Self.lastKept])
+            let earlier = try await Self.earlierSession(in: storage, keeping: [Self.lastKept])
             let expected = try #require(storage.sessions[earlier.currentName])
             let systemLog = FakeConsoleSystemLog(reads: [.ended([Self.lastKept, Self.checkoutFailed]), .running])
 
             let sut = ConsoleSessionRecorder(
-                ConsoleSessionPersistence(storage: storage), started: Self.started.addingTimeInterval(60), systemLog: systemLog
+                try ConsoleSessionPersistence(storage: storage), started: Self.started.addingTimeInterval(60), systemLog: systemLog
             )
             _ = await sut.previousSessions()
 
@@ -125,13 +125,13 @@
         }
 
         @Test("A system log that can't be read is read once, and a session that kept no line is deleted as before")
-        func unreadable() async {
+        func unreadable() async throws {
             let storage = FakeConsoleSessionStorage()
-            _ = await Self.earlierSession(in: storage, keeping: [])
+            _ = try await Self.earlierSession(in: storage, keeping: [])
             let systemLog = FakeConsoleSystemLog(.unreadable)
 
             let sut = ConsoleSessionRecorder(
-                ConsoleSessionPersistence(storage: storage), started: Self.started.addingTimeInterval(60), systemLog: systemLog
+                try ConsoleSessionPersistence(storage: storage), started: Self.started.addingTimeInterval(60), systemLog: systemLog
             )
             let actual = await sut.previousSessions()
 
@@ -143,11 +143,11 @@
         @Test("A read that fails after one that found a line still adds that line")
         func unreadableAfterLine() async throws {
             let storage = FakeConsoleSessionStorage()
-            _ = await Self.earlierSession(in: storage, keeping: [Self.lastKept])
+            _ = try await Self.earlierSession(in: storage, keeping: [Self.lastKept])
             let systemLog = FakeConsoleSystemLog(reads: [.ended([Self.lastKept, Self.checkoutFailed]), .unreadable])
 
             let sut = ConsoleSessionRecorder(
-                ConsoleSessionPersistence(storage: storage), started: Self.started.addingTimeInterval(60), systemLog: systemLog
+                try ConsoleSessionPersistence(storage: storage), started: Self.started.addingTimeInterval(60), systemLog: systemLog
             )
             let session = try #require(await sut.previousSessions().first)
             let actual = try await sut.log(of: session).lines.map(\.text)

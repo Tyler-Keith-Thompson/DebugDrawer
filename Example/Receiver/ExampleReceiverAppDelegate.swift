@@ -10,7 +10,19 @@ import Foundation
 /// its session. The app registers for remote notifications as it launches.
 @MainActor
 final class ExampleReceiverAppDelegate: NSObject, ObservableObject {
-    let host = ExampleReceiverHost()
+    let host: ExampleReceiverHost
+
+    override init() {
+        do {
+            host = try ExampleReceiverHost()
+        } catch {
+            // The host throws only for its own constants (the app state's field keys, the reset
+            // categories, the capacities and thresholds it passes), which are valid; a change that
+            // broke one should stop the example at launch, where it is seen.
+            fatalError("The example's receiver host refused its own configuration: \(error)")
+        }
+        super.init()
+    }
 }
 
 #if os(macOS)

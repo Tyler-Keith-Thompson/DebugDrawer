@@ -33,6 +33,9 @@ public final class AnalyticsEventsMirror: DebugDrawerPluginModel {
     /// How many events of a session a snapshot keeps unless the host says otherwise.
     public static let defaultCapacity = 1000
 
+    /// A capacity the mirror can't take: below 1.
+    public struct InvalidCapacity: Error, Equatable, Sendable {}
+
     /// One event recorded during the session, as the redaction rules left it.
     public struct Event: Codable, Equatable, Identifiable, Sendable {
         /// Its place in the order the session's events were recorded, from 1.
@@ -112,15 +115,15 @@ public final class AnalyticsEventsMirror: DebugDrawerPluginModel {
     ///   - capacity: The most events a snapshot keeps.
     ///   - inboxes: Where its inbox registers while a session is open.
     ///   - now: The time an event is recorded at; the sessions' clock.
-    /// - Precondition: `capacity` is at least 1.
+    /// - Throws: ``InvalidCapacity`` when `capacity` is below 1.
     init(
         sessions: DebugDrawerSessions,
         redaction: AnalyticsRedaction,
         capacity: Int,
         inboxes: AnalyticsMirrorInboxes = .shared,
         now: @escaping @Sendable () -> Date = { Date() }
-    ) {
-        precondition(capacity > 0, "The analytics mirror keeps at least one event")
+    ) throws(InvalidCapacity) {
+        guard capacity > 0 else { throw InvalidCapacity() }
         inbox = AnalyticsMirrorInbox(redaction: redaction, capacity: capacity, inboxes: inboxes, now: now)
         let wakeUps = inbox.wakeUps
         Task { [weak self] in

@@ -22,8 +22,9 @@
         /// The MetricKit subscriber, made at the first install.
         private static var diagnostics: (any HangDiagnosticSource)?
 
+        /// Installs over `threshold`, which `HangDetector.install(threshold:)` has checked is
+        /// positive.
         static func install(threshold: Duration) {
-            precondition(threshold > .zero, "The hang threshold must be positive")
             let store = installedStore ?? HangStore(threshold: threshold) { monitor?.threshold = $0 }
             installedStore = store
             store.threshold = threshold

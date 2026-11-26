@@ -22,7 +22,7 @@ final class ProductionAnalyticsMirror {
 
     init(container: URL) throws {
         receiver = DebugDrawerReceiver(directory: container.appending(path: "DebugDrawer"), sessions: sessions)
-        receiver.enable(.analyticsEvents(
+        try receiver.enable(.analyticsEvents(
             sessions: sessions,
             redaction: .standard.adding(keys: ["customer_name"], values: [#"\bACCT-\d{6}\b"#])
         ))

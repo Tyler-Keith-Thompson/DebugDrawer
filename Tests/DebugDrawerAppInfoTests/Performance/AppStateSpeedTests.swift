@@ -54,7 +54,7 @@ struct AppStateSpeedTests {
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         let fields = (0 ..< 200).map { index in DebugDrawerAppStateField("value-\(index)") { .number(Double(index)) } }
-        let sut = DebugDrawerAppState(
+        let sut = try DebugDrawerAppState(
             sessions: DebugDrawerSessions(maximumDuration: 60),
             featureFlags: DebugDrawerFeatureFlagOverrides(adapter: ManyFlags(count: 500), defaults: defaults),
             experiments: DebugDrawerExperimentOverrides(adapter: ManyExperiments(count: 500), defaults: defaults),

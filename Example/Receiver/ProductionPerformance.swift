@@ -12,8 +12,8 @@ final class ProductionPerformance: ObservableObject {
     /// What the last Load Report took, as the screen says it.
     @Published private(set) var lastLoad = "Not loaded yet"
 
-    init(sessions: DebugDrawerSessions) {
-        traces = PerformanceTraces(sessions: sessions)
+    init(sessions: DebugDrawerSessions) throws {
+        traces = try PerformanceTraces(sessions: sessions)
     }
 
     /// Keeps the main thread busy for two seconds: a hang on purpose. Busy work rather than a

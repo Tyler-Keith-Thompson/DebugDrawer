@@ -23,7 +23,7 @@ public extension DebugDrawerReceiverCapability {
     /// again, and like every command is refused outside a session.
     ///
     /// ```swift
-    /// let appState = DebugDrawerAppState(sessions: sessions, environments: environments, userID: { account.userID })
+    /// let appState = try DebugDrawerAppState(sessions: sessions, environments: environments, userID: { account.userID })
     /// receiver.enable(.appState(appState))
     /// ```
     ///

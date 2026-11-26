@@ -13,7 +13,7 @@ public extension DebugDrawerReceiverCapability {
     /// session whose grant lists ``AnalyticsEventsMirror/pluginID`` is mirrored events.
     ///
     /// ```swift
-    /// receiver.enable(.analyticsEvents(sessions: sessions, redaction: .standard.adding(keys: ["customer_name"])))
+    /// try receiver.enable(.analyticsEvents(sessions: sessions, redaction: .standard.adding(keys: ["customer_name"])))
     /// ```
     ///
     /// - Parameters:
@@ -22,13 +22,13 @@ public extension DebugDrawerReceiverCapability {
     ///     given.
     ///   - capacity: The most events of a session a snapshot keeps, the newest.
     /// - Returns: The capability, under ``AnalyticsEventsMirror/pluginID``.
-    /// - Precondition: `capacity` is at least 1.
+    /// - Throws: ``AnalyticsEventsMirror/InvalidCapacity`` when `capacity` is below 1.
     static func analyticsEvents(
         sessions: DebugDrawerSessions,
         redaction: AnalyticsRedaction = .standard,
         capacity: Int = AnalyticsEventsMirror.defaultCapacity
-    ) -> Self {
-        let mirror = AnalyticsEventsMirror(sessions: sessions, redaction: redaction, capacity: capacity)
+    ) throws(AnalyticsEventsMirror.InvalidCapacity) -> Self {
+        let mirror = try AnalyticsEventsMirror(sessions: sessions, redaction: redaction, capacity: capacity)
         return .model(mirror, id: AnalyticsEventsMirror.pluginID, scope: .persistent)
     }
 }

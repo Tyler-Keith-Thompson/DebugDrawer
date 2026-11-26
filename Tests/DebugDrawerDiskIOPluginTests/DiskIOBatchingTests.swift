@@ -1,5 +1,6 @@
 #if DEBUG
     import Combine
+    import DebugDrawer
     @testable import DebugDrawerDiskIOPlugin
     import Foundation
     import Testing
@@ -114,11 +115,11 @@
         }
 
         @Test("The store lists the newest calls first, keeps at most its capacity, and totals every call it received")
-        func storeKeepsCapacity() async {
+        func storeKeepsCapacity() async throws {
             let start = Date(timeIntervalSinceReferenceDate: 800_000_000)
             let recorder = DiskIORecorder()
             let sut = DiskIOStore(recorder: recorder)
-            sut.capacity = 2
+            try sut.setCapacity(2)
             var subscription: AnyCancellable?
 
             for path in ["/a", "/b", "/c", "/d", "/e"] {
@@ -136,11 +137,11 @@
         }
 
         @Test("Past byteCapacity the store drops the oldest calls until their paths fit, and its totals still count every call")
-        func storeKeepsByteCapacity() async {
+        func storeKeepsByteCapacity() async throws {
             let start = Date(timeIntervalSinceReferenceDate: 800_000_000)
             let recorder = DiskIORecorder()
             let sut = DiskIOStore(recorder: recorder)
-            sut.byteCapacity = 10
+            try sut.setByteCapacity(10)
             var subscription: AnyCancellable?
 
             for path in ["/aaaa", "/bbbb", "/cccc"] {
@@ -156,7 +157,7 @@
         }
 
         @Test("The store announces a delivery, and a capacity that drops calls, through objectWillChange before its list changes")
-        func storeAnnouncesChanges() async {
+        func storeAnnouncesChanges() async throws {
             let start = Date(timeIntervalSinceReferenceDate: 800_000_000)
             let recorder = DiskIORecorder()
             let sut = DiskIOStore(recorder: recorder)
@@ -171,7 +172,7 @@
             }
             subscription?.cancel()
 
-            sut.capacity = 1
+            try sut.setCapacity(1)
 
             #expect(listsWhenAnnounced == [[], ["/b", "/a"]])
             #expect(sut.events.map(\.path) == ["/b"])
@@ -194,6 +195,28 @@
 
             #expect(sut.events.isEmpty)
             #expect(sut.totals == DiskIOTotals())
+        }
+
+        @Test("A negative capacity throws negativeMaxCount and keeps the capacity")
+        func negativeCapacity() {
+            let sut = DiskIOStore(recorder: DiskIORecorder())
+            let expected = sut.capacity
+
+            #expect(throws: CaptureBuffer<IOEvent>.InvalidLimit.negativeMaxCount) {
+                try sut.setCapacity(-1)
+            }
+            #expect(sut.capacity == expected)
+        }
+
+        @Test("A negative byte capacity throws negativeMaxByteCount and keeps the byte capacity")
+        func negativeByteCapacity() {
+            let sut = DiskIOStore(recorder: DiskIORecorder())
+            let expected = sut.byteCapacity
+
+            #expect(throws: CaptureBuffer<IOEvent>.InvalidLimit.negativeMaxByteCount) {
+                try sut.setByteCapacity(-1)
+            }
+            #expect(sut.byteCapacity == expected)
         }
     }
 #endif

@@ -35,6 +35,10 @@
         ///   - scheduler: The clock playback runs on.
         ///   - simulator: Where each point is delivered.
         init(routes: [Route] = Route.samples, scheduler: any PlaybackScheduler, simulator: any LocationOverride) {
+            // Can't fire: the type and its one caller, LocationModel's init, are internal, and every
+            // model the module makes passes the default, Route.samples, whose two bundled routes a
+            // test pins; no input reaches `routes`. A trap rather than a throw, since no caller could
+            // do anything with the error.
             precondition(!routes.isEmpty, "A route player needs a route to play")
             self.routes = routes
             route = routes[0]

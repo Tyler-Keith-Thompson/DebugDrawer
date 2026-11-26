@@ -27,7 +27,7 @@ By default 5 earlier sessions are kept in at most 20 MB. Both are set at install
 ```swift
 import DebugDrawerConsolePlugin
 
-DebugDrawer.shared.installConsole(sessions: ConsoleSessionPersistence(maxSessions: 3, maxBytes: 5_000_000))
+DebugDrawer.shared.installConsole(sessions: try ConsoleSessionPersistence(maxSessions: 3, maxBytes: 5_000_000))
 ```
 
 At launch the oldest sessions beyond `maxSessions` are deleted, then the oldest ones until the

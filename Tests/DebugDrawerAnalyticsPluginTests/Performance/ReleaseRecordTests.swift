@@ -10,7 +10,7 @@
     struct ReleaseRecordTests {
         @MainActor
         @Test("In release, install and record compile and keep nothing: record doesn't even evaluate its arguments")
-        func recordKeepsNothing() {
+        func recordKeepsNothing() throws {
             var evaluations = 0
             func name() -> String {
                 evaluations += 1
@@ -25,7 +25,7 @@
                 return "Segment"
             }
 
-            AnalyticsEvents.install(capacity: 10)
+            try AnalyticsEvents.install(capacity: 10)
             for _ in 0 ..< 100 {
                 AnalyticsEvents.record(name(), properties: properties(), source: source())
             }

@@ -31,8 +31,10 @@
         /// The page of `log` that `filter` passes, its newest `lineLimit` lines.
         ///
         /// - Complexity: O(*n*) in the session's lines, times the mutes' count and the search.
-        /// - Precondition: `lineLimit` is more than 0.
+        /// - Parameter lineLimit: More than 0.
         init(log: ConsoleSessionLog, filter: ConsoleFilter, lineLimit: Int = Self.lineCount) {
+            // Can't fire: the type is internal, and its callers pass the positive constant
+            // `lineCount` or a page's own limit, which only grows by it; no input reaches it.
             precondition(lineLimit > 0, "ConsoleSessionPage: lineLimit must be more than 0")
             let matching = filter.apply(to: log.lines)
             self.init(

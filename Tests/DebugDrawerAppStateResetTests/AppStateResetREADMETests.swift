@@ -15,7 +15,7 @@
 
         init(container: URL) throws {
             receiver = DebugDrawerReceiver(directory: container.appending(path: "DebugDrawer"), sessions: sessions)
-            receiver.enable(.appStateReset(AppStateResetRequests(
+            try receiver.enable(.appStateReset(AppStateResetRequests(
                 sessions: sessions,
                 allowing: [.userDefaults, .caches, .urlCache, .cookies],
                 launchURL: URL(string: "shop-internal://")

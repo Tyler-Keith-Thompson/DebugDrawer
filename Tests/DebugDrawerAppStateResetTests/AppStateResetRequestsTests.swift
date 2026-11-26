@@ -30,11 +30,11 @@
             defer { withCleanup.remove() }
             let sessions = DebugDrawerSessions(maximumDuration: 300)
 
-            let sut = AppStateResetRequests(
+            let sut = try AppStateResetRequests(
                 sessions: sessions, allowing: .all, allowingKeychain: false, appState: fixture.appState, launchURL: nil,
                 foreground: FakeForeground(), now: Date.init
             )
-            let cleaning = AppStateResetRequests(
+            let cleaning = try AppStateResetRequests(
                 sessions: sessions, allowing: .all, allowingKeychain: false, appState: withCleanup.appState, launchURL: nil,
                 foreground: FakeForeground(), now: Date.init
             )
@@ -49,7 +49,7 @@
             defer { fixture.remove() }
             let sessions = DebugDrawerSessions(maximumDuration: 300)
 
-            let sut = AppStateResetRequests(
+            let sut = try AppStateResetRequests(
                 sessions: sessions, allowing: [.caches], allowingKeychain: true, appState: fixture.appState, launchURL: nil,
                 foreground: FakeForeground(), now: Date.init
             )
@@ -64,7 +64,7 @@
             defer { fixture.remove() }
             let sessions = DebugDrawerSessions(maximumDuration: 300)
             let launchURL = URL(string: "shop-internal://reset")
-            let sut = AppStateResetRequests(
+            let sut = try AppStateResetRequests(
                 sessions: sessions, allowing: [.userDefaults], allowingKeychain: true, appState: fixture.appState, launchURL: launchURL,
                 foreground: FakeForeground(), now: Date.init
             )
@@ -83,7 +83,7 @@
             let fixture = try ResetFixture()
             defer { fixture.remove() }
             let sessions = DebugDrawerSessions(maximumDuration: 300)
-            let sut = AppStateResetRequests(
+            let sut = try AppStateResetRequests(
                 sessions: sessions, allowing: [.userDefaults, .files, .caches, .cookies], allowingKeychain: true,
                 appState: fixture.appState, launchURL: nil, foreground: FakeForeground(), now: Date.init
             )
@@ -114,7 +114,7 @@
         func notAllowedRefused() throws {
             let fixture = try ResetFixture()
             defer { fixture.remove() }
-            let sut = AppStateResetRequests(
+            let sut = try AppStateResetRequests(
                 sessions: DebugDrawerSessions(maximumDuration: 300), allowing: .all, allowingKeychain: false, appState: fixture.appState,
                 launchURL: nil, foreground: FakeForeground(), now: Date.init
             )
@@ -130,7 +130,7 @@
         func malformedResets() throws {
             let fixture = try ResetFixture()
             defer { fixture.remove() }
-            let sut = AppStateResetRequests(
+            let sut = try AppStateResetRequests(
                 sessions: DebugDrawerSessions(maximumDuration: 300), allowing: .all, allowingKeychain: false, appState: fixture.appState,
                 launchURL: nil, foreground: FakeForeground(), now: Date.init
             )
@@ -150,7 +150,7 @@
             let fixture = try ResetFixture()
             defer { fixture.remove() }
             let sessions = DebugDrawerSessions(maximumDuration: 300)
-            let sut = AppStateResetRequests(
+            let sut = try AppStateResetRequests(
                 sessions: sessions, allowing: [.caches], allowingKeychain: false, appState: fixture.appState, launchURL: nil,
                 foreground: FakeForeground(), now: Date.init
             )
@@ -175,7 +175,7 @@
             let sessions = DebugDrawerSessions(maximumDuration: 300)
             let foreground = FakeForeground()
             let requested = Date(timeIntervalSinceReferenceDate: 1000)
-            let sut = AppStateResetRequests(
+            let sut = try AppStateResetRequests(
                 sessions: sessions, allowing: [.userDefaults, .caches, .files, .cookies, .urlCache], allowingKeychain: false,
                 appState: fixture.appState, launchURL: nil, foreground: foreground, now: { requested }
             )
@@ -224,7 +224,7 @@
             let fixture = try ResetFixture()
             defer { fixture.remove() }
             let sessions = DebugDrawerSessions(maximumDuration: 300)
-            let sut = AppStateResetRequests(
+            let sut = try AppStateResetRequests(
                 sessions: sessions, allowing: [.urlCache], allowingKeychain: false, appState: fixture.appState, launchURL: nil,
                 foreground: FakeForeground(isInForeground: true), now: Date.init
             )
@@ -251,7 +251,7 @@
             defer { fixture.remove() }
             let sessions = DebugDrawerSessions(maximumDuration: 300)
             let foreground = FakeForeground()
-            let sut = AppStateResetRequests(
+            let sut = try AppStateResetRequests(
                 sessions: sessions, allowing: [.userDefaults, .caches], allowingKeychain: false, appState: fixture.appState, launchURL: nil,
                 foreground: foreground, now: Date.init
             )
@@ -283,7 +283,7 @@
             let fixture = try ResetFixture()
             defer { fixture.remove() }
             let sessions = DebugDrawerSessions(maximumDuration: 300)
-            let sut = AppStateResetRequests(
+            let sut = try AppStateResetRequests(
                 sessions: sessions, allowing: [.caches, .urlCache], allowingKeychain: false, appState: fixture.appState, launchURL: nil,
                 foreground: FakeForeground(), now: Date.init
             )
@@ -311,7 +311,7 @@
             defer { fixture.remove() }
             let sessions = DebugDrawerSessions(maximumDuration: 300)
             let foreground = FakeForeground()
-            let sut = AppStateResetRequests(
+            let sut = try AppStateResetRequests(
                 sessions: sessions, allowing: [.caches], allowingKeychain: false, appState: fixture.appState, launchURL: nil,
                 foreground: foreground, now: Date.init
             )
@@ -343,7 +343,7 @@
             defer { fixture.remove() }
             let sessions = DebugDrawerSessions(maximumDuration: 300)
             let foreground = FakeForeground()
-            let sut = AppStateResetRequests(
+            let sut = try AppStateResetRequests(
                 sessions: sessions, allowing: [.caches], allowingKeychain: false, appState: fixture.appState, launchURL: nil,
                 foreground: foreground, now: Date.init
             )
@@ -372,7 +372,7 @@
             defer { fixture.remove() }
             fixture.keychain.refusals[Data("api.example.com/alice@example.com".utf8)] = errSecInteractionNotAllowed
             let sessions = DebugDrawerSessions(maximumDuration: 300)
-            let sut = AppStateResetRequests(
+            let sut = try AppStateResetRequests(
                 sessions: sessions, allowing: [], allowingKeychain: true, appState: fixture.appState, launchURL: nil,
                 foreground: FakeForeground(isInForeground: true), now: Date.init
             )

@@ -62,7 +62,7 @@
                     let drawer = DebugDrawer(defaults: defaults)
                     let expected = try implementations()
 
-                    drawer.installNetwork(sessions: .off)
+                    try drawer.installNetwork(sessions: .off)
                     let whileInstalled = try implementations()
                     let configurationListsItWhileInstalled = URLSessionConfiguration.default.protocolClasses?
                         .contains { $0 == DebugNetworkProtocol.self } ?? false
@@ -82,7 +82,7 @@
                     drawer.unregisterGlobal(id: NetworkPlugin().id)
                     let afterSecondUninstall = try implementations()
 
-                    drawer.installNetwork(sessions: .off)
+                    try drawer.installNetwork(sessions: .off)
                     try await send(to: "reinstalled", on: .shared)
                     await waitUntilLogged("reinstalled")
                     let loggedAfterReinstall = Set(NetworkStore.shared.entries.map(\.host))
@@ -140,13 +140,13 @@
                     let defaults = try #require(UserDefaults(suiteName: suite))
                     defer { defaults.removePersistentDomain(forName: suite) }
                     let drawer = DebugDrawer(defaults: defaults)
-                    drawer.installNetwork(sessions: .off)
+                    try drawer.installNetwork(sessions: .off)
                     let expected = try swapOnTop()
 
                     drawer.unregisterGlobal(id: NetworkPlugin().id)
                     let actual = try currentGetter()
                     let listsItWhileLeftInPlace = listsProtocol()
-                    drawer.installNetwork(sessions: .off)
+                    try drawer.installNetwork(sessions: .off)
                     let listsItReinstalled = listsProtocol()
                     let getterReinstalled = try currentGetter()
                     drawer.unregisterGlobal(id: NetworkPlugin().id)

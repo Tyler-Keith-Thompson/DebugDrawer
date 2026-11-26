@@ -112,7 +112,7 @@ final class ExampleReceiverHost: ObservableObject {
     private let apiSession: URLSession
     private var auditLogging: AnyCancellable?
 
-    init() {
+    init() throws {
         let flags = ProductionFlags()
         let experiments = ProductionExperiments()
         let logging = ProductionLogging()
@@ -126,13 +126,13 @@ final class ExampleReceiverHost: ObservableObject {
         // The models, not the adapters, so the app state reads the overrides they keep.
         let flagOverrides = DebugDrawerFeatureFlagOverrides(adapter: flags)
         let experimentOverrides = DebugDrawerExperimentOverrides(adapter: experiments)
-        let snapshot = Self.snapshot(
+        let snapshot = try Self.snapshot(
             sessions: sessions, flagOverrides: flagOverrides, experimentOverrides: experimentOverrides,
             environments: environments.model, signIn: signIn
         )
         let bugReports = Self.bugReports(sessions: sessions, diagnostics: diagnostics, flags: flags, experiments: experiments, snapshot: snapshot)
         let pushRegistration = Self.pushRegistration(sessions: sessions)
-        let appState = ProductionAppState(sessions: sessions)
+        let appState = try ProductionAppState(sessions: sessions)
         self.flags = flags
         self.flagOverrides = flagOverrides
         self.experiments = experiments
@@ -150,10 +150,10 @@ final class ExampleReceiverHost: ObservableObject {
         self.bugReports = bugReports
         self.pushRegistration = pushRegistration
         self.appState = appState
-        performance = ProductionPerformance(sessions: sessions)
+        performance = try ProductionPerformance(sessions: sessions)
         keeper = DebugDrawerBackgroundKeeper(sessions: sessions)
         apiSession = Self.apiSession()
-        enableCapabilities()
+        try enableCapabilities()
         // The audit log goes to the app's own log, as a host would forward it to its own.
         auditLogging = sessions.auditEntries.sink { entry in
             Self.logger.notice("Audit: \(entry.capability, privacy: .public) \(String(describing: entry.event), privacy: .public)")
@@ -168,7 +168,7 @@ final class ExampleReceiverHost: ObservableObject {
     }
 
     /// Enables every capability the library ships on the receiver, before it starts.
-    private func enableCapabilities() {
+    private func enableCapabilities() throws {
         receiver.enable(.featureFlagOverrides(flagOverrides))
         receiver.enable(.experimentOverrides(experimentOverrides))
         receiver.enable(.appState(snapshot))
@@ -176,8 +176,8 @@ final class ExampleReceiverHost: ObservableObject {
         receiver.enable(.tweaks(ProductionTweaks.greeting, ProductionTweaks.diagnostics))
         receiver.enable(.localizationReview())
         receiver.enable(.accessibilityEnvironmentOverrides())
-        receiver.enable(.analyticsEvents(sessions: sessions))
-        receiver.enable(.metricKitPayloads(sessions: sessions))
+        try receiver.enable(.analyticsEvents(sessions: sessions))
+        try receiver.enable(.metricKitPayloads(sessions: sessions))
         receiver.enable(.networkMocking(mocking))
         receiver.enable(.diagnosticsCapture(diagnostics))
         receiver.enable(.bugReports(bugReports))
@@ -262,8 +262,8 @@ final class ExampleReceiverHost: ObservableObject {
         experimentOverrides: DebugDrawerExperimentOverrides,
         environments: DebugDrawerEnvironments,
         signIn: ProductionSignIn
-    ) -> DebugDrawerAppState {
-        DebugDrawerAppState(
+    ) throws(DebugDrawerAppState.InvalidField) -> DebugDrawerAppState {
+        try DebugDrawerAppState(
             sessions: sessions,
             buildMetadata: AppInfoBuildMetadata(gitCommit: "4f9c2e1", gitBranch: "main"),
             featureFlags: flagOverrides,

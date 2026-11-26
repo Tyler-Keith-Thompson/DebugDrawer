@@ -23,7 +23,7 @@ final class ProductionPerformance {
     let receiver: DebugDrawerReceiver
 
     init(container: URL) throws {
-        traces = PerformanceTraces(sessions: sessions)
+        traces = try PerformanceTraces(sessions: sessions)
         receiver = DebugDrawerReceiver(directory: container.appending(path: "DebugDrawer"), sessions: sessions)
         receiver.enable(.performanceTraces(traces))
         try receiver.start()

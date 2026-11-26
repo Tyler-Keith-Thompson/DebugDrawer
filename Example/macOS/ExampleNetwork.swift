@@ -1,6 +1,7 @@
 import DebugDrawer
 import DebugDrawerNetworkPlugin
 import Foundation
+import os
 import SwiftUI
 
 // The iOS example has its own copy of this file: each app is its own module, and the examples
@@ -11,6 +12,8 @@ import SwiftUI
 /// POSTed to the same API, whose resend asks before it is sent, GraphQL queries to the same API,
 /// which the log names by operation, and a burst of analytics events, noise to ignore.
 enum ExampleNetwork {
+    private static let installLogger = Logger(subsystem: "ExampleApp", category: "ExampleNetwork")
+
     /// Launched with this argument, the app adds mocks that answer the greeting, the order, the
     /// GraphQL queries and the analytics events, so mocking can be checked without a hand.
     static let launchArgument = "-SeedNetworkMock"
@@ -90,14 +93,24 @@ enum ExampleNetwork {
     /// sessions kept when launched with their arguments.
     @MainActor
     static func install() {
+        do {
+            try installThrowing()
+        } catch {
+            installLogger.error("The Network plugin refused its configuration: \(String(describing: error), privacy: .public)")
+        }
+    }
+
+    /// What ``install()`` does, throwing what the plugin refuses.
+    @MainActor
+    private static func installThrowing() throws {
         let arguments = ProcessInfo.processInfo.arguments
         let mocks = arguments.contains(launchArgument) ? [greetingMock, orderMock, graphQLMock, analyticsMock] : []
         let conditions = arguments.contains(conditionArgument) ? conditionSeeds : []
         let kept = arguments.firstIndex(of: sessionsArgument)
             .flatMap { arguments.indices.contains($0 + 1) ? Int(arguments[$0 + 1]) : nil }
             .map { max($0, 0) }
-        let sessions = kept.map { NetworkSessionPersistence(maxSessions: $0) } ?? .standard
-        DebugDrawer.shared.installNetwork(mocks: mocks, conditions: conditions, sessions: sessions)
+        let sessions = try kept.map { try NetworkSessionPersistence(maxSessions: $0) } ?? .standard
+        try DebugDrawer.shared.installNetwork(mocks: mocks, conditions: conditions, sessions: sessions)
         if !conditions.isEmpty, !DebugDrawer.shared.hudLayout.pinned.contains(NetworkPlugin().id) {
             DebugDrawer.shared.toggleHUD(forPlugin: NetworkPlugin().id)
         }

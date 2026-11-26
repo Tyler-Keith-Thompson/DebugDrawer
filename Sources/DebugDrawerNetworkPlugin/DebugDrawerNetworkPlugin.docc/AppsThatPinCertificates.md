@@ -41,7 +41,7 @@ To keep a host out of the plugin entirely, bypass it:
 ```swift
 import DebugDrawerNetworkPlugin
 
-DebugDrawer.shared.installNetwork(bypassing: ["api.example.com"])
+try DebugDrawer.shared.installNetwork(bypassing: ["api.example.com"])
 ```
 
 Requests to a bypassed host, and to its subdomains, never reach the plugin's URL protocol. The
@@ -51,5 +51,6 @@ recorded. The app's other traffic is captured as usual.
 
 A host is matched the way an ignored host is (see <doc:IgnoredHostsAndGraphQL>): on whole labels,
 ignoring case, and an IP address matches only itself. Each call replaces the hosts an earlier call
-bypassed. Text that isn't a host traps, so a typo can't leave a pinned host intercepted.
+bypassed. Text that isn't a host throws `NetworkPlugin.InvalidInstallation.bypassedTextNotAHost`
+and installs nothing, so a typo can't leave a pinned host intercepted.
 `ignoring:` only hides requests from the list; `bypassing:` keeps the plugin out of them.

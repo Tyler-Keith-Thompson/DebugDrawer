@@ -48,7 +48,7 @@
                 let recordedBefore = NetworkWebSocketRecorder.shared.connections.count
                 let idBefore = NetworkWebSocketInterception.connectionID(of: before)
 
-                await MainActor.run { DebugDrawer.shared.installNetwork() }
+                try await MainActor.run { try DebugDrawer.shared.installNetwork() }
                 guard let after = try? await talk(to: url) else { exit(EXIT_FAILURE) }
                 let recordedAfter = NetworkWebSocketRecorder.shared.connections
                 let idAfter = NetworkWebSocketInterception.connectionID(of: after)
@@ -131,7 +131,7 @@
                 guard let server, let port = try? await server.start() else { exit(EXIT_FAILURE) }
 
                 let without = await session(on: port)
-                await MainActor.run { DebugDrawer.shared.installNetwork() }
+                try await MainActor.run { try DebugDrawer.shared.installNetwork() }
                 let with = await session(on: port)
 
                 let recorded = NetworkWebSocketRecorder.shared.connections.count

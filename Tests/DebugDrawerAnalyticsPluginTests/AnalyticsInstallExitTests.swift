@@ -75,9 +75,9 @@
                 for index in 0 ..< 5 {
                     AnalyticsEvents.record("event \(index)")
                 }
-                let isExpected = await MainActor.run {
-                    AnalyticsEvents.install(capacity: 10)
-                    AnalyticsEvents.install(capacity: 2)
+                let isExpected = try await MainActor.run {
+                    try AnalyticsEvents.install(capacity: 10)
+                    try AnalyticsEvents.install(capacity: 2)
                     let plugins = DebugDrawer.shared.globalPlugins.count { $0.title == "Analytics" }
                     return plugins == 1
                         && AnalyticsEventLog.shared.events.map(\.name) == ["event 4", "event 3"]
@@ -161,22 +161,6 @@
                 }
                 AnalyticsEvents.record(name(), properties: properties(), source: source())
                 exit(evaluations == 3 && AnalyticsEventLog.shared.events.count == 1 ? EXIT_SUCCESS : EXIT_FAILURE)
-            }
-        }
-
-        @Test("Installing with a capacity below one traps")
-        func zeroCapacityTraps() async {
-            // The children get a home folder of their own, so the files they keep in Application Support and
-            // Caches stay out of the Mac's, whatever runs the test; each checks the move took.
-            let home = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString).path(percentEncoded: false)
-            defer { try? FileManager.default.removeItem(atPath: home) }
-
-            await #expect(processExitsWith: .failure) { [home = home as String] in
-                setenv("CFFIXED_USER_HOME", home, 1)
-                guard URL.applicationSupportDirectory.path(percentEncoded: false).hasPrefix(home) else { exit(EXIT_SUCCESS) }
-                await MainActor.run {
-                    AnalyticsEvents.install(capacity: 0)
-                }
             }
         }
 

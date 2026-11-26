@@ -15,7 +15,7 @@ import Foundation
 /// those under the keys it names, at any depth.
 ///
 /// ```swift
-/// receiver.enable(.metricKitPayloads(sessions: sessions, redaction: .standard.adding(keys: ["virtualMemoryRegionInfo"])))
+/// try receiver.enable(.metricKitPayloads(sessions: sessions, redaction: .standard.adding(keys: ["virtualMemoryRegionInfo"])))
 /// ```
 public struct MetricKitRedaction: Equatable, Sendable {
     /// What a masked value becomes.

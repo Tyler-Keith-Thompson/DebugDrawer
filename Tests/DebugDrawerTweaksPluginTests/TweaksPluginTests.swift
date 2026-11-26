@@ -9,9 +9,9 @@
     @Suite(.timeLimit(.minutes(1)))
     struct TweaksPluginTests {
         @Test("The plugin offers each action to the drawer's search, found by its section's title too")
-        func actions() {
+        func actions() throws {
             let counter = ActionCounter()
-            let sut = TweaksPlugin(sections: [
+            let sut = try TweaksPlugin(sections: [
                 TweakSection("Session") {
                     Tweak.toggle("Signed in", key: "signedIn", default: true)
                     TweakAction("Expire token") { counter.runs += 1 }
@@ -30,8 +30,8 @@
         }
 
         @Test("The plugin is Tweaks, in the App category")
-        func identity() {
-            let sut = TweaksPlugin(sections: [])
+        func identity() throws {
+            let sut = try TweaksPlugin(sections: [])
 
             #expect(sut.title == "Tweaks")
             #expect(sut.category == "App")
@@ -46,12 +46,12 @@
             let drawer = DebugDrawer(defaults: defaults)
             let storage = FakeTweakStorage()
 
-            drawer.installTweaks(storage: storage) {
+            try drawer.installTweaks(storage: storage) {
                 TweakSection("First") {
                     Tweak.toggle("Install test", key: "tweaks.test.install", default: false)
                 }
             }
-            drawer.installTweaks(storage: storage) {
+            try drawer.installTweaks(storage: storage) {
                 TweakSection("Second") {
                     TweakAction("Install test action") {}
                 }
@@ -102,7 +102,7 @@
         func storeOfItsOwn() throws {
             let key = "tweaks.test.own.\(UUID().uuidString)"
             let store = TweakStore(storage: FakeTweakStorage([key: .bool(true)]))
-            let sut = TweaksPlugin(sections: [TweakSection("Own") { Tweak.toggle("Own store", key: key, default: false) }], store: store)
+            let sut = try TweaksPlugin(sections: [TweakSection("Own") { Tweak.toggle("Own store", key: key, default: false) }], store: store)
             var report = DebugDrawerReport()
 
             sut.contribute(to: &report, redaction: .standard)

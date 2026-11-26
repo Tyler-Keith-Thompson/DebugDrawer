@@ -1,4 +1,5 @@
 #if DEBUG
+    import DebugDrawer
     @testable import DebugDrawerNetworkPlugin
     import Foundation
     import Testing
@@ -7,9 +8,9 @@
     @Suite
     struct NetworkCaptureBoundsTests {
         @Test("Past capacity the oldest request goes, and the log lists the rest newest first")
-        func countBound() {
+        func countBound() throws {
             let sut = NetworkStore(ignoreStorage: FakeNetworkIgnoreListStorage())
-            sut.capacity = 2
+            try sut.setCapacity(2)
             let paths = ["/a", "/b", "/c"]
             let expected = ["/c", "/b"]
 
@@ -24,9 +25,9 @@
         }
 
         @Test("Request bodies past byteCapacity drop the oldest requests until the kept bodies fit")
-        func requestBodiesBound() {
+        func requestBodiesBound() throws {
             let sut = NetworkStore(ignoreStorage: FakeNetworkIgnoreListStorage())
-            sut.byteCapacity = 250
+            try sut.setByteCapacity(250)
             let expected = ["/c", "/b"]
 
             for path in ["/a", "/b", "/c"] {
@@ -40,9 +41,9 @@
         }
 
         @Test("A response body arriving past byteCapacity drops the oldest requests, and the completed one keeps its response")
-        func responseBodyBound() {
+        func responseBodyBound() throws {
             let sut = NetworkStore(ignoreStorage: FakeNetworkIgnoreListStorage())
-            sut.byteCapacity = 1000
+            try sut.setByteCapacity(1000)
             var ids: [UUID] = []
             for path in ["/a", "/b", "/c"] {
                 let entry = NetworkEntry(
@@ -63,9 +64,9 @@
         }
 
         @Test("A completion for a request the log no longer keeps changes nothing")
-        func completionOfDroppedRequest() {
+        func completionOfDroppedRequest() throws {
             let sut = NetworkStore(ignoreStorage: FakeNetworkIgnoreListStorage())
-            sut.capacity = 1
+            try sut.setCapacity(1)
             let dropped = NetworkEntry(
                 timestamp: Date(timeIntervalSinceReferenceDate: 800_000_000), method: "GET", url: "https://api.example.com/a",
                 host: "api.example.com", path: "/a", requestHeaders: [:], requestBody: nil, isComplete: false
@@ -98,6 +99,28 @@
             sut.clear()
 
             #expect(sut.entries.isEmpty)
+        }
+
+        @Test("A negative capacity throws negativeMaxCount and keeps the capacity")
+        func negativeCapacity() {
+            let sut = NetworkStore(ignoreStorage: FakeNetworkIgnoreListStorage())
+            let expected = sut.capacity
+
+            #expect(throws: CaptureBuffer<NetworkEntry>.InvalidLimit.negativeMaxCount) {
+                try sut.setCapacity(-1)
+            }
+            #expect(sut.capacity == expected)
+        }
+
+        @Test("A negative byte capacity throws negativeMaxByteCount and keeps the byte capacity")
+        func negativeByteCapacity() {
+            let sut = NetworkStore(ignoreStorage: FakeNetworkIgnoreListStorage())
+            let expected = sut.byteCapacity
+
+            #expect(throws: CaptureBuffer<NetworkEntry>.InvalidLimit.negativeMaxByteCount) {
+                try sut.setByteCapacity(-1)
+            }
+            #expect(sut.byteCapacity == expected)
         }
     }
 #endif

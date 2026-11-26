@@ -21,6 +21,8 @@
         private(set) var observer: CFRunLoopObserver?
 
         func observe(_ onTurnEnd: @escaping @MainActor () -> Void) {
+            // Can't fire: the type is internal, and its one caller, LeakMonitor's init, makes a new
+            // MainRunLoopTurnSource and calls observe on it once; no input reaches it.
             precondition(observer == nil, "A turn source has one observer at a time")
             // About to wait is the end of a turn: the run loop has handled what woke it, and the
             // autorelease pool's own observer drains as it waits. The order among observers doesn't

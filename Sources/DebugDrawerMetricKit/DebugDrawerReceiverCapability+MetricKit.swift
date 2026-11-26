@@ -18,7 +18,7 @@ public extension DebugDrawerReceiverCapability {
     /// exist, nothing arrives.
     ///
     /// ```swift
-    /// receiver.enable(.metricKitPayloads(sessions: sessions))
+    /// try receiver.enable(.metricKitPayloads(sessions: sessions))
     /// ```
     ///
     /// - Parameters:
@@ -29,19 +29,22 @@ public extension DebugDrawerReceiverCapability {
     ///     ``MetricKitRedaction/standard`` unless given.
     ///   - capacity: The most payloads kept, the latest periods.
     /// - Returns: The capability, under ``MetricKitPayloadsMirror/pluginID``.
-    /// - Precondition: `capacity` is at least 1.
+    /// - Throws: ``MetricKitPayloadsMirror/InvalidCapacity`` when `capacity` is below 1, before
+    ///   anything subscribes to MetricKit.
     static func metricKitPayloads(
         sessions: DebugDrawerSessions,
         directory: URL = MetricKitPayloadsMirror.defaultDirectory,
         redaction: MetricKitRedaction = .standard,
         capacity: Int = MetricKitPayloadsMirror.defaultCapacity
-    ) -> Self {
+    ) throws(MetricKitPayloadsMirror.InvalidCapacity) -> Self {
+        // Checked here as well as by the mirror: the source subscribes as it is made.
+        guard capacity > 0 else { throw MetricKitPayloadsMirror.InvalidCapacity() }
         #if canImport(MetricKit)
             let source: (any MetricKitPayloadSource)? = MetricManagerPayloadSource()
         #else
             let source: (any MetricKitPayloadSource)? = nil
         #endif
-        let mirror = MetricKitPayloadsMirror(sessions: sessions, directory: directory, redaction: redaction, capacity: capacity, source: source)
+        let mirror = try MetricKitPayloadsMirror(sessions: sessions, directory: directory, redaction: redaction, capacity: capacity, source: source)
         return .model(mirror, id: MetricKitPayloadsMirror.pluginID, scope: .persistent)
     }
 }

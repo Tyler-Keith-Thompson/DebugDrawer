@@ -10,8 +10,8 @@
     struct ReleaseInstallTests {
         @MainActor
         @Test("In release, installNetwork with a body limit compiles and captures nothing")
-        func installCapturesNothing() {
-            DebugDrawer.shared.installNetwork(sessions: .off, bodyLimit: 16)
+        func installCapturesNothing() throws {
+            try DebugDrawer.shared.installNetwork(sessions: .off, bodyLimit: 16)
 
             let actual = NetworkStore.shared.filteredEntries
 
