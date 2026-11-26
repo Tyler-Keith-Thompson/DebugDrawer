@@ -24,7 +24,7 @@
             let sessions = DebugDrawerSessions(maximumDuration: 15 * 60)
             let receiver = DebugDrawerReceiver(directory: container.appending(path: "DebugDrawer"), sessions: sessions)
 
-            receiver.enable(.tweaks(AppTweaks.backend, AppTweaks.newCheckout))
+            try receiver.enable(.tweaks(AppTweaks.backend, AppTweaks.newCheckout))
 
             try receiver.start()
             defer { receiver.stop() }

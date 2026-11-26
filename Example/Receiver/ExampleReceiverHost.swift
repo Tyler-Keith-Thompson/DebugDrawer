@@ -173,7 +173,7 @@ final class ExampleReceiverHost: ObservableObject {
         receiver.enable(.experimentOverrides(experimentOverrides))
         receiver.enable(.appState(snapshot))
         receiver.enable(.logLevels(logging))
-        receiver.enable(.tweaks(ProductionTweaks.greeting, ProductionTweaks.diagnostics))
+        try receiver.enable(.tweaks(ProductionTweaks.greeting, ProductionTweaks.diagnostics))
         receiver.enable(.localizationReview())
         receiver.enable(.accessibilityEnvironmentOverrides())
         try receiver.enable(.analyticsEvents(sessions: sessions))

@@ -27,7 +27,9 @@
             let store = TweakStore(storage: storage, reading: .offeredProductionSafeTweaks)
             let sessions = DebugDrawerSessions(maximumDuration: 300)
             let receiver = DebugDrawerReceiver(directory: directory, sessions: sessions)
-            receiver.enable(.tweaks([AnyTweak(backend), AnyTweak(verbose), AnyTweak(timeout), AnyTweak(apiToken)], store: store, scope: .persistent))
+            try receiver.enable(
+                .tweaks([AnyTweak(backend), AnyTweak(verbose), AnyTweak(timeout), AnyTweak(apiToken)], store: store, scope: .persistent)
+            )
             try receiver.start()
             defer { receiver.stop() }
             let sidecar = try DebugDrawerAppGroupStoreTransport(directory: AppGroupStoreLayout.appDirectory(inStore: directory))
@@ -65,7 +67,7 @@
             let store = TweakStore(storage: storage, reading: .offeredProductionSafeTweaks)
             let sessions = DebugDrawerSessions(maximumDuration: 300)
             let receiver = DebugDrawerReceiver(directory: directory, sessions: sessions)
-            receiver.enable(.tweaks([AnyTweak(backend), AnyTweak(verbose), AnyTweak(apiToken)], store: store, scope: .persistent))
+            try receiver.enable(.tweaks([AnyTweak(backend), AnyTweak(verbose), AnyTweak(apiToken)], store: store, scope: .persistent))
             try receiver.start()
             defer { receiver.stop() }
             let (arrivals, arrival) = AsyncStream<DebugDrawerAuditEntry>.makeStream()
@@ -118,7 +120,7 @@
             let store = TweakStore(storage: storage, reading: .offeredProductionSafeTweaks)
             let sessions = DebugDrawerSessions(maximumDuration: 300)
             let receiver = DebugDrawerReceiver(directory: directory, sessions: sessions)
-            receiver.enable(.tweaks([AnyTweak(backend), AnyTweak(timeout)], store: store, scope: .persistent))
+            try receiver.enable(.tweaks([AnyTweak(backend), AnyTweak(timeout)], store: store, scope: .persistent))
             sessions.perform(.open(duration: 60))
             try receiver.start()
             defer { receiver.stop() }
@@ -155,7 +157,7 @@
             let firstStore = TweakStore(storage: UserDefaultsTweakStorage(defaults: defaults), reading: .offeredProductionSafeTweaks)
             let firstSessions = DebugDrawerSessions(maximumDuration: 300)
             let firstLaunch = DebugDrawerReceiver(directory: directory, sessions: firstSessions)
-            firstLaunch.enable(.tweaks([AnyTweak(backend), AnyTweak(timeout)], store: firstStore, scope: .persistent))
+            try firstLaunch.enable(.tweaks([AnyTweak(backend), AnyTweak(timeout)], store: firstStore, scope: .persistent))
             try firstLaunch.start()
             let sidecar = try DebugDrawerAppGroupStoreTransport(directory: AppGroupStoreLayout.appDirectory(inStore: directory))
             let session = try await sidecar.connect(
@@ -179,7 +181,7 @@
             let relaunchedDefaults = try #require(UserDefaults(suiteName: suiteName))
             let sut = TweakStore(storage: UserDefaultsTweakStorage(defaults: relaunchedDefaults), reading: .offeredProductionSafeTweaks)
             let relaunch = DebugDrawerReceiver(directory: directory, sessions: DebugDrawerSessions(maximumDuration: 300))
-            relaunch.enable(.tweaks([AnyTweak(backend), AnyTweak(timeout)], store: sut, scope: .persistent))
+            try relaunch.enable(.tweaks([AnyTweak(backend), AnyTweak(timeout)], store: sut, scope: .persistent))
             try relaunch.start()
             defer { relaunch.stop() }
 
@@ -199,7 +201,7 @@
             let store = TweakStore(storage: storage, reading: .offeredProductionSafeTweaks)
             let sessions = DebugDrawerSessions(maximumDuration: 300)
             let receiver = DebugDrawerReceiver(directory: directory, sessions: sessions)
-            receiver.enable(.tweaks([AnyTweak(backend), AnyTweak(verbose)], store: store, scope: .session(revertWith: .resetAll)))
+            try receiver.enable(.tweaks([AnyTweak(backend), AnyTweak(verbose)], store: store, scope: .session(revertWith: .resetAll)))
             sessions.perform(.open(duration: 60))
             try receiver.start()
             defer { receiver.stop() }
@@ -242,7 +244,7 @@
             let killedSessions = DebugDrawerSessions(maximumDuration: 300)
             let killedLaunch = DebugDrawerReceiver(directory: directory, sessions: killedSessions)
             let killedStore = TweakStore(storage: storage, reading: .offeredProductionSafeTweaks)
-            killedLaunch.enable(.tweaks([AnyTweak(backend), AnyTweak(verbose)], store: killedStore, scope: .session(revertWith: .resetAll)))
+            try killedLaunch.enable(.tweaks([AnyTweak(backend), AnyTweak(verbose)], store: killedStore, scope: .session(revertWith: .resetAll)))
             try killedLaunch.start()
             let killedSession = try #require(killedSessions.snapshot.session)
             // Dropped with the session open, as a kill leaves it: nothing ends it.
@@ -254,7 +256,7 @@
             let expectedStored: [String: TweakStoredValue] = ["verbose": .bool(true)]
             let expectedEvents: [DebugDrawerAuditEntry.Event] = [.changeReverted]
 
-            sut.enable(.tweaks([AnyTweak(backend), AnyTweak(verbose)], store: store, scope: .session(revertWith: .resetAll)))
+            try sut.enable(.tweaks([AnyTweak(backend), AnyTweak(verbose)], store: store, scope: .session(revertWith: .resetAll)))
             try sut.start()
             defer { sut.stop() }
 
@@ -285,7 +287,7 @@
             let firstSessions = DebugDrawerSessions(maximumDuration: 300)
             let firstLaunch = DebugDrawerReceiver(directory: directory, sessions: firstSessions)
             let firstStore = TweakStore(storage: storage, reading: .offeredProductionSafeTweaks)
-            firstLaunch.enable(.tweaks([AnyTweak(backend)], store: firstStore, scope: .session(revertWith: .resetAll)))
+            try firstLaunch.enable(.tweaks([AnyTweak(backend)], store: firstStore, scope: .session(revertWith: .resetAll)))
             try firstLaunch.start()
             firstLaunch.stop()
             let revertsInFirst = firstSessions.auditLog.filter { $0.event == .changeReverted }.count
@@ -295,7 +297,7 @@
             let sut = DebugDrawerReceiver(directory: directory, sessions: sessions)
             let store = TweakStore(storage: storage, reading: .offeredProductionSafeTweaks)
 
-            sut.enable(.tweaks([AnyTweak(backend)], store: store, scope: .session(revertWith: .resetAll)))
+            try sut.enable(.tweaks([AnyTweak(backend)], store: store, scope: .session(revertWith: .resetAll)))
             try sut.start()
             defer { sut.stop() }
 

@@ -26,6 +26,19 @@ public final class TweaksModel: DebugDrawerPluginModel {
     /// The ID the receiver serves it under.
     public static let pluginID = "DebugDrawer.Tweaks"
 
+    /// A declaration the tweaks capability and `installTweaks` refuse, rather than serve or show
+    /// a control that can't hold its own default.
+    public enum InvalidTweaks: Error, Equatable, Sendable {
+        /// Two tweaks share a key, so they would share a stored value.
+        case duplicateKey
+        /// A string picker's default isn't one of its options, or it has none.
+        case pickerDefaultNotAnOption
+        /// A stepper's default is outside its range.
+        case stepperDefaultOutOfRange
+        /// A stepper's step is 0 or less.
+        case stepperStepNotPositive
+    }
+
     /// What a sidecar sees.
     public struct Snapshot: Codable, Equatable, Sendable {
         /// The production-safe tweaks, in the order the host listed them.
@@ -91,12 +104,13 @@ public final class TweaksModel: DebugDrawerPluginModel {
     /// A model of `tweaks`' production-safe ones, over `store`.
     ///
     /// - Parameters:
-    ///   - tweaks: The tweaks the host listed; those not marked production-safe are left out, and
-    ///     of two that share a key the first is kept.
+    ///   - tweaks: The tweaks the host listed; those not marked production-safe are left out.
     ///   - store: The values, which it offers to the release build's accessors.
-    package init(tweaks: [AnyTweak], store: TweakStore) {
-        var keys = Set<String>()
-        self.tweaks = tweaks.filter { $0.isProductionSafe && keys.insert($0.key).inserted }
+    /// - Throws: ``InvalidTweaks`` when two of `tweaks` share a key, or one can't hold its own
+    ///   default, before it offers `store` anything.
+    package init(tweaks: [AnyTweak], store: TweakStore) throws(InvalidTweaks) {
+        try AnyTweak.check(tweaks)
+        self.tweaks = tweaks.filter(\.isProductionSafe)
         self.store = store
         snapshot = Snapshot(tweaks: [])
         store.offerProductionSafeTweaks()

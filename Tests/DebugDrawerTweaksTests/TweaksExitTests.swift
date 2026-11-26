@@ -25,9 +25,9 @@
                     let store = TweakStore(storage: UserDefaultsTweakStorage(defaults: defaults), reading: .offeredProductionSafeTweaks)
                     let sessions = DebugDrawerSessions(maximumDuration: 300)
                     let receiver = DebugDrawerReceiver(directory: URL(filePath: path), sessions: sessions)
-                    receiver.enable(.tweaks([AnyTweak(backend)], store: store, scope: .session(revertWith: .resetAll)))
                     let layout = AppGroupStoreLayout(directory: receiver.appDirectory)
-                    guard layout.create(),
+                    guard (try? receiver.enable(.tweaks([AnyTweak(backend)], store: store, scope: .session(revertWith: .resetAll)))) != nil,
+                          layout.create(),
                           let payload = try? TransportMessage.payload(TweaksModel.Command.setValue(key: "backend", value: .string("local"))),
                           let document = try? StoreDocument(TransportMessage(kind: .command, pluginID: TweaksModel.pluginID, payload: payload))
                           .encoded(),
@@ -48,7 +48,7 @@
             let sut = DebugDrawerReceiver(directory: directory, sessions: sessions)
             let expectedEvents: [DebugDrawerAuditEntry.Event] = [.changeReverted]
 
-            sut.enable(.tweaks([AnyTweak(backend)], store: store, scope: .session(revertWith: .resetAll)))
+            try sut.enable(.tweaks([AnyTweak(backend)], store: store, scope: .session(revertWith: .resetAll)))
 
             let actual: Server = store.value(of: backend)
             #expect(leftByKill == "local")

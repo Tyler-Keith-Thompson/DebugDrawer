@@ -18,8 +18,13 @@ enum AppTweaks {
     static let newCheckout = Tweak.toggle("New checkout", key: "newCheckout", default: false)
 }
 
-receiver.enable(.tweaks(AppTweaks.backend, AppTweaks.newCheckout))
+try receiver.enable(.tweaks(AppTweaks.backend, AppTweaks.newCheckout))
 ```
+
+Making the capability throws `TweaksModel.InvalidTweaks`, and changes nothing, when two of the
+tweaks share a key, a picker's default isn't one of its options, or a stepper's default is outside
+its range or its step isn't positive. It checks every tweak listed, production-safe or not, the
+same way `installTweaks` does.
 
 ### Only production-safe tweaks
 

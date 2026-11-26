@@ -8,17 +8,16 @@
     @MainActor
     @Suite(.timeLimit(.minutes(1)))
     struct TweaksModelTests {
-        @Test("The model keeps only production-safe tweaks, the first of two sharing a key, in the order listed")
-        func keepsProductionSafeInOrder() {
+        @Test("The model keeps only production-safe tweaks, in the order listed")
+        func keepsProductionSafeInOrder() throws {
             let timeout = Tweak.stepper("Timeout", key: "timeout", default: 30, in: 5 ... 120).productionSafe()
             let verbose = Tweak.toggle("Verbose logging", key: "verbose", default: false)
             let greeting = Tweak.text("Greeting", key: "greeting", default: "Hi").productionSafe()
-            let duplicate = Tweak.text("Other greeting", key: "greeting", default: "Hello").productionSafe()
             let expectedKeys = ["timeout", "greeting"]
             let expectedTitles = ["Timeout", "Greeting"]
 
-            let sut = TweaksModel(
-                tweaks: [AnyTweak(timeout), AnyTweak(verbose), AnyTweak(greeting), AnyTweak(duplicate)],
+            let sut = try TweaksModel(
+                tweaks: [AnyTweak(timeout), AnyTweak(verbose), AnyTweak(greeting)],
                 store: TweakStore(storage: FakeTweakStorage(), reading: .everyTweak)
             )
 
@@ -26,10 +25,21 @@
             #expect(sut.snapshot.tweaks.map(\.title) == expectedTitles)
         }
 
+        @Test("Two production-safe tweaks sharing a key throw duplicateKey when the model is made")
+        func duplicateKeyThrows() {
+            let store = TweakStore(storage: FakeTweakStorage(), reading: .everyTweak)
+            let greeting = Tweak.text("Greeting", key: "greeting", default: "Hi").productionSafe()
+            let duplicate = Tweak.text("Other greeting", key: "greeting", default: "Hello").productionSafe()
+
+            #expect(throws: TweaksModel.InvalidTweaks.duplicateKey) {
+                _ = try TweaksModel(tweaks: [AnyTweak(greeting), AnyTweak(duplicate)], store: store)
+            }
+        }
+
         @Test("With no production-safe tweak, the snapshot is empty and every key is refused as not exposed")
-        func noneProductionSafe() {
+        func noneProductionSafe() throws {
             let verbose = Tweak.toggle("Verbose logging", key: "verbose", default: false)
-            let sut = TweaksModel(tweaks: [AnyTweak(verbose)], store: TweakStore(storage: FakeTweakStorage(), reading: .everyTweak))
+            let sut = try TweaksModel(tweaks: [AnyTweak(verbose)], store: TweakStore(storage: FakeTweakStorage(), reading: .everyTweak))
 
             #expect(sut.snapshot.tweaks.isEmpty)
             #expect(sut.refusal(of: .setValue(key: "verbose", value: .bool(true))) == .notExposed)
@@ -39,9 +49,9 @@
         }
 
         @Test("A stepper takes its bounds and refuses a value one past them")
-        func stepperBounds() {
+        func stepperBounds() throws {
             let timeout = Tweak.stepper("Timeout", key: "timeout", default: 30, in: 5 ... 120).productionSafe()
-            let sut = TweaksModel(tweaks: [AnyTweak(timeout)], store: TweakStore(storage: FakeTweakStorage(), reading: .everyTweak))
+            let sut = try TweaksModel(tweaks: [AnyTweak(timeout)], store: TweakStore(storage: FakeTweakStorage(), reading: .everyTweak))
 
             #expect(sut.refusal(of: .setValue(key: "timeout", value: .int(5))) == nil)
             #expect(sut.refusal(of: .setValue(key: "timeout", value: .int(120))) == nil)
@@ -50,11 +60,11 @@
         }
 
         @Test("Performed directly, a command to an unmarked tweak changes nothing, while one to a production-safe tweak stores its value")
-        func performGuardsUnmarked() {
+        func performGuardsUnmarked() throws {
             let storage = FakeTweakStorage()
             let greeting = Tweak.text("Greeting", key: "greeting", default: "Hi").productionSafe()
             let verbose = Tweak.toggle("Verbose logging", key: "verbose", default: false)
-            let sut = TweaksModel(tweaks: [AnyTweak(greeting), AnyTweak(verbose)], store: TweakStore(storage: storage, reading: .everyTweak))
+            let sut = try TweaksModel(tweaks: [AnyTweak(greeting), AnyTweak(verbose)], store: TweakStore(storage: storage, reading: .everyTweak))
             let expected: [String: TweakStoredValue] = ["greeting": .string("")]
 
             sut.perform(.setValue(key: "verbose", value: .bool(true)))
@@ -65,10 +75,10 @@
         }
 
         @Test("A change made through the store, as the drawer makes it, shows in the model's snapshot")
-        func followsStore() {
+        func followsStore() throws {
             let greeting = Tweak.text("Greeting", key: "greeting", default: "Hi").productionSafe()
             let store = TweakStore(storage: FakeTweakStorage(), reading: .everyTweak)
-            let sut = TweaksModel(tweaks: [AnyTweak(greeting)], store: store)
+            let sut = try TweaksModel(tweaks: [AnyTweak(greeting)], store: store)
 
             store.set("Welcome", for: greeting)
 

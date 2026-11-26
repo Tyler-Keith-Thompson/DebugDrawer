@@ -17,7 +17,7 @@
                 TweakSection("Two") { Tweak.text("B", key: "shared", default: "") }
             ]
 
-            #expect(throws: TweaksPlugin.InvalidTweaks.duplicateKey) {
+            #expect(throws: TweaksModel.InvalidTweaks.duplicateKey) {
                 _ = try TweaksPlugin(sections: sections)
             }
         }
@@ -26,7 +26,7 @@
         func stepperDefaultOutsideRange() {
             let sections = [TweakSection("Network") { Tweak.stepper("Timeout", key: "timeout", default: 0, in: 1 ... 10) }]
 
-            #expect(throws: TweaksPlugin.InvalidTweaks.stepperDefaultOutOfRange) {
+            #expect(throws: TweaksModel.InvalidTweaks.stepperDefaultOutOfRange) {
                 _ = try TweaksPlugin(sections: sections)
             }
         }
@@ -47,7 +47,7 @@
         func stepperStepZero() {
             let sections = [TweakSection("Network") { Tweak.stepper("Timeout", key: "timeout", default: 5, in: 1 ... 10, step: 0) }]
 
-            #expect(throws: TweaksPlugin.InvalidTweaks.stepperStepNotPositive) {
+            #expect(throws: TweaksModel.InvalidTweaks.stepperStepNotPositive) {
                 _ = try TweaksPlugin(sections: sections)
             }
         }
@@ -56,7 +56,7 @@
         func stepperStepNegative() {
             let sections = [TweakSection("Network") { Tweak.stepper("Timeout", key: "timeout", default: 5, in: 1 ... 10, step: -1) }]
 
-            #expect(throws: TweaksPlugin.InvalidTweaks.stepperStepNotPositive) {
+            #expect(throws: TweaksModel.InvalidTweaks.stepperStepNotPositive) {
                 _ = try TweaksPlugin(sections: sections)
             }
         }
@@ -65,7 +65,7 @@
         func pickerDefaultNotAnOption() {
             let sections = [TweakSection("Region") { Tweak.picker("Region", key: "region", options: ["us", "eu"], default: "apac") }]
 
-            #expect(throws: TweaksPlugin.InvalidTweaks.pickerDefaultNotAnOption) {
+            #expect(throws: TweaksModel.InvalidTweaks.pickerDefaultNotAnOption) {
                 _ = try TweaksPlugin(sections: sections)
             }
         }
@@ -74,7 +74,7 @@
         func pickerNoOptions() {
             let sections = [TweakSection("Region") { Tweak.picker("Region", key: "region", options: [], default: "us") }]
 
-            #expect(throws: TweaksPlugin.InvalidTweaks.pickerDefaultNotAnOption) {
+            #expect(throws: TweaksModel.InvalidTweaks.pickerDefaultNotAnOption) {
                 _ = try TweaksPlugin(sections: sections)
             }
         }
@@ -85,7 +85,7 @@
             defer { UserDefaults().removePersistentDomain(forName: suite) }
             let drawer = try DebugDrawer(defaults: #require(UserDefaults(suiteName: suite)))
 
-            #expect(throws: TweaksPlugin.InvalidTweaks.duplicateKey) {
+            #expect(throws: TweaksModel.InvalidTweaks.duplicateKey) {
                 try drawer.installTweaks {
                     TweakSection("One") {
                         Tweak.toggle("A", key: "shared", default: false)

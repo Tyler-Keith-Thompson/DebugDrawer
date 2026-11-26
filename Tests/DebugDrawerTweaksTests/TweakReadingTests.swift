@@ -25,7 +25,7 @@
         }
 
         @Test("A release build reads every default until the tweaks capability is made, then only the production-safe tweaks' stored values")
-        func releaseReadsOfferedProductionSafeTweaks() {
+        func releaseReadsOfferedProductionSafeTweaks() throws {
             let storage = FakeTweakStorage(["backend": .string("staging"), "verbose": .bool(true)])
             let backend = Tweak.picker("Backend", key: "backend", default: Server.production).productionSafe()
             let verbose = Tweak.toggle("Verbose logging", key: "verbose", default: false)
@@ -33,7 +33,7 @@
             let before: Server = sut.value(of: backend)
             let verboseBefore = sut.value(of: verbose)
 
-            _ = TweaksModel(tweaks: [AnyTweak(backend), AnyTweak(verbose)], store: sut)
+            _ = try TweaksModel(tweaks: [AnyTweak(backend), AnyTweak(verbose)], store: sut)
 
             let after: Server = sut.value(of: backend)
             #expect(before == .production)
@@ -43,12 +43,12 @@
         }
 
         @Test("In a release build, an offered production-safe tweak's publisher follows stored changes, and an unmarked one's sends its default")
-        func releasePublishers() {
+        func releasePublishers() throws {
             let storage = FakeTweakStorage()
             let backend = Tweak.picker("Backend", key: "backend", default: Server.production).productionSafe()
             let verbose = Tweak.toggle("Verbose logging", key: "verbose", default: false)
             let sut = TweakStore(storage: storage, reading: .offeredProductionSafeTweaks)
-            _ = TweaksModel(tweaks: [AnyTweak(backend)], store: sut)
+            _ = try TweaksModel(tweaks: [AnyTweak(backend)], store: sut)
             var backends: [Server] = []
             var verboses: [Bool] = []
             let subscriptions = [

@@ -101,8 +101,8 @@ public extension Tweak where Value == String {
     ///   - key: Identifies the stored value.
     ///   - options: The strings to choose among, in the order shown.
     ///   - defaultValue: The choice until someone picks another; one of `options`, or
-    ///     `installTweaks` throws. A stored string that is no longer one of `options` reads as
-    ///     `defaultValue`.
+    ///     `installTweaks` and the receiver's tweaks capability throw. A stored string that is no
+    ///     longer one of `options` reads as `defaultValue`.
     static func picker(_ title: String, key: String, options: [String], default defaultValue: String) -> Tweak {
         let choices = Set(options)
         return Tweak(
@@ -122,11 +122,12 @@ public extension Tweak where Value == Int {
     /// - Parameters:
     ///   - title: What the drawer shows beside the stepper.
     ///   - key: Identifies the stored value.
-    ///   - defaultValue: The value until someone steps it; within `range`, or `installTweaks`
-    ///     throws.
+    ///   - defaultValue: The value until someone steps it; within `range`, or `installTweaks` and
+    ///     the receiver's tweaks capability throw.
     ///   - range: The values the stepper reaches. A stored value outside it reads as the nearest
     ///     bound.
-    ///   - step: How far one press moves the value; positive, or `installTweaks` throws.
+    ///   - step: How far one press moves the value; positive, or `installTweaks` and the
+    ///     receiver's tweaks capability throw.
     static func stepper(_ title: String, key: String, default defaultValue: Int, in range: ClosedRange<Int>, step: Int = 1) -> Tweak {
         Tweak(
             title: title,

@@ -1,6 +1,6 @@
 // A declaration is a constant, often a `static let`, so it can't throw: the Tweaks plugin checks it
-// as `installTweaks` shows it. Here, that a declaration the plugin would refuse still makes a tweak
-// rather than trapping, and reads as its default.
+// as `installTweaks` shows it, and the receiver's tweaks capability as it is made. Here, that a
+// declaration they would refuse still makes a tweak rather than trapping, and reads as its default.
 @testable import DebugDrawerTweaks
 import Testing
 
