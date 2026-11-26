@@ -31,12 +31,14 @@ import os
 // disconnects, for a keeper told so (core's socket server, through the
 // `init(sessions:socketServer:continuedProcessingIdentifierPrefix:)` core adds, as its server is
 // debug-only): nothing should keep the app running for a sidecar that is gone, and a session nobody
-// drives shouldn't hold its changes until expiry. The continued task reports the session's elapsed
-// time as its progress at each audit entry, each command the sidecar sends, so progress moves with
-// the sidecar's own activity rather than a timer.
+// drives shouldn't hold its changes until expiry. While the continued task runs it reports the
+// session's elapsed seconds of its length as its progress, every second (`ProgressTimer`) and at
+// each audit entry. The system expires a continued processing task whose progress stops moving and
+// shows it as failed, and on an iPhone it did so within a minute when progress moved only with the
+// sidecar's commands: a session the person is reading in the sidecar sends none for a while.
 //
-// Rejected: a timer that reports progress every second (work while nothing happens, and the
-// system expires a task that appears stalled anyway, which an idle sidecar is); queueing the
+// Rejected: progress only from the sidecar's commands (the system expired the idle session's task
+// as stalled); queueing the
 // continued task (`.queue`) when the system can't run it at once (it would keep nothing running
 // now, and could start long after the session ended); claiming a background mode, audio, location
 // or VoIP, to stay alive (charter D10); keeping the request after the sidecar disconnects until
@@ -63,6 +65,9 @@ import os
 @MainActor
 public final class DebugDrawerBackgroundKeeper: ObservableObject {
     private static let logger = Logger(subsystem: "DebugDrawer", category: "DebugDrawerBackgroundKeeper")
+    /// Seconds between progress reports while the continued task runs: the progress counts
+    /// seconds, so each report moves it on.
+    private static let progressInterval: TimeInterval = 1
 
     /// The identifier prefix of the continued processing task unless the host passes another:
     /// the app's bundle identifier and `.DebugDrawerSession`, so the app's Info.plist lists
@@ -82,6 +87,7 @@ public final class DebugDrawerBackgroundKeeper: ObservableObject {
 
     private let execution: any BackgroundExecution
     private let clock: any SessionClock
+    private let progressTimer: any ProgressTimer
     private var shortRequest: (any BackgroundExecutionRequest)?
     private var continued: Continued?
     private var subscriptions: Set<AnyCancellable> = []
@@ -112,22 +118,26 @@ public final class DebugDrawerBackgroundKeeper: ObservableObject {
             sidecarDisconnections: sidecarDisconnections,
             continuedProcessingIdentifierPrefix: continuedProcessingIdentifierPrefix,
             execution: _BackgroundExecution(),
-            clock: _SessionClock()
+            clock: _SessionClock(),
+            progressTimer: RunLoopProgressTimer()
         )
     }
 
-    /// A keeper asking `execution` for its requests, timing progress by `clock`.
+    /// A keeper asking `execution` for its requests, timing progress by `clock` and reporting it
+    /// at each of `progressTimer`'s ticks.
     init(
         sessions: DebugDrawerSessions,
         sidecarDisconnections: AnyPublisher<Void, Never>?,
         continuedProcessingIdentifierPrefix: String?,
         execution: any BackgroundExecution,
-        clock: any SessionClock
+        clock: any SessionClock,
+        progressTimer: any ProgressTimer
     ) {
         self.sessions = sessions
         self.continuedProcessingIdentifierPrefix = continuedProcessingIdentifierPrefix
         self.execution = execution
         self.clock = clock
+        self.progressTimer = progressTimer
         sessions.$snapshot
             .map(\.isActive)
             .removeDuplicates()
@@ -226,6 +236,7 @@ public final class DebugDrawerBackgroundKeeper: ObservableObject {
         shortRequest?.end()
         shortRequest = nil
         reportProgress()
+        progressTimer.start(every: Self.progressInterval) { [weak self] in self?.reportProgress() }
         publish()
     }
 
@@ -241,6 +252,7 @@ public final class DebugDrawerBackgroundKeeper: ObservableObject {
     private func continuedExpired(identifier: String) {
         guard case .running(identifier, _)? = continued else { return }
         Self.logger.notice("The continued processing task ended before the session")
+        progressTimer.stop()
         continued = nil
         publish()
         sessions.end()
@@ -262,6 +274,7 @@ public final class DebugDrawerBackgroundKeeper: ObservableObject {
 
     /// Ends every request.
     private func release() {
+        progressTimer.stop()
         shortRequest?.end()
         shortRequest = nil
         switch continued {
