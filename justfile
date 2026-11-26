@@ -408,7 +408,9 @@ run target="macOS" *args="":
             IPA=$({{BAZEL_DEVICE}} cquery --config=device //Example:ExampleApp_iOS --output=files 2>/dev/null | grep '\.ipa$')
             unzip -qo "$IPA" -d "$RUN_DIR"
             xcrun devicectl device install app --device "$UDID" "$RUN_DIR/Payload/DebugDrawerExample.app"
-            xcrun devicectl device process launch --device "$UDID" com.debugdrawer.example.ios {{args}}
+            # `--` ends devicectl's options, so the app's own (`-RunTestBench all`) reach the app
+            # instead of being read as devicectl's (`-t` is its timeout).
+            xcrun devicectl device process launch --device "$UDID" com.debugdrawer.example.ios -- {{args}}
             ;;
         appkit|AppKit)
             # The AppKit-only Mac example: no SwiftUI root, the test bench in its Debug menu.
