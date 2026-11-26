@@ -41,6 +41,7 @@ tools/                           Bazel rule wrappers (warnings as errors, Swift 
                                  a deleted workspace's, or one idle 7 days
 tools/test_host/                 The app the iOS simulator tests (`TESTED_PLATFORMS["iOS"]`) run inside, whose
                                  entitlements give the Keychain and App State Reset tests a keychain
+tools/ui_test/                   The runner every UI test (`ios_ui_test`) takes, or its pre-action for one's own: it uninstalls the app first
 tools/lint.bzl                   `just lint`: SwiftLint (.swiftlint.yml) and a11y-check over first-party targets
 ```
 
@@ -113,6 +114,15 @@ in beside the project's own: keep one definition, holding the project's rows, an
   `Bundle.module`. Not under `Performance/`, which the target leaves out: the speed-reliant tests
   of a `PERFORMANCE_TESTS` target list theirs under `<X>PerformanceTests`, paths relative to
   `Tests/<X>/Performance`, and read them through `Bundle.module` in debug and release alike.
+- Generate a Swift source at build time (overloads for each arity, tables from a data file): the
+  generator is a Bazel executable that writes the source to standard output, or, given output
+  names, gets their paths before a `--`. List it in `GENERATED_SOURCES` under the module or test
+  target (`{"<Module>": [("<Name>", "//tools/<generator>", [<input labels>], [])]}`), create an
+  empty `Generated/<Name>.swift` in the target's directory, then `just modules` and `just sources`.
+  Bazel compiles the generator's output; SwiftPM compiles the copy under `Generated/`, which
+  `just sources` rewrites and `<Name>_test` fails on while it differs from what the generator
+  writes. Commit the copy, and run `just sources` after a change to the generator or its inputs.
+  `check()` refuses a copy that doesn't exist, and a speed-reliant, iOS or firmware target.
 - Add a command plugin (`swift package <verb>`): a row in `PLUGINS` (name, verb, description, and
   the reason it writes to the package directory, or `None` when it writes nothing there), its
   sources in `Plugins/<name>/` (an `@main` `CommandPlugin`), then `just modules`. Package.swift gets
@@ -162,6 +172,7 @@ Every shell command gets a timeout. macOS has no `timeout`; use
 | `just spm-test`, `just verify` | SwiftPM tests; both build systems. The Mac's run (`just spm-test-mac`) and Catalyst's get a temporary home folder (`CFFIXED_USER_HOME`), as every Bazel `swift_test` does (`tools/swift_rules.bzl`), so no test writes into `~/Library`: files under the home folder move there, and UserDefaults suites named by `temporarySuiteName(_:)` (below) keep theirs in it. SwiftPM builds the `XPerformanceTests` targets in debug but runs none of them, in any stage or in `just test-ios`: `swift test --skip` and `-skip-testing:` from `scripts/modules.py` (`PERFORMANCE_TESTS`); Bazel runs them. To leave a test out of every stage, and out of `just test-ios`, name it in `SKIP_TESTS` (`SKIP_TESTS="Target/Suite/test(),Target/Suite" just spm-test`): entries take xcodebuild's `-skip-testing:` form, a Swift Testing test with its parentheses and argument labels, and `scripts/test_skips.py` writes the `--skip` regexes swift test takes; a `--skip` argument reaches swift test only |
 | `just test-ios` | Every SwiftPM test target on an iOS simulator (the Dynamic Type snapshots) through `xcodebuild test`. Each checkout gets a simulator of its own, an iPad Pro 13-inch (M5) on the newest iOS runtime named `DebugDrawer test-ios: <checkout path>`, made on first use and reused (`scripts/ios_simulator.py`), so two worktrees can run it at once; `IOS_DESTINATION` overrides it, and `SKIP_TESTS` leaves tests out as in `just spm-test`. `just ios-simulator-delete` deletes this checkout's before you remove its worktree, `just ios-simulator-prune` those of checkouts already gone |
 | `just modules` | Regenerate build files from `scripts/modules.py` |
+| `just sources` | Rewrite the checked-in copies of generated sources (`GENERATED_SOURCES`) that SwiftPM compiles |
 | `just resolve` | Re-resolve Bazel's SwiftPM dependencies after editing `PACKAGES` |
 | `just docs` | Combined DocC site into `.build/docs` |
 | `just generate` | Xcode project from the Bazel graph, written to `xcode/DebugDrawer.xcodeproj` (gitignored) and opened; `--no-open` skips opening it. Never at the root: xcodebuild run beside a `.xcodeproj` builds it instead of `Package.swift`, so every SwiftPM recipe that calls xcodebuild would fail |
@@ -317,8 +328,7 @@ dependencies as `"<identity>/<Product>"` (`"swiftprng/Generators"`), as the rows
 | [Afluent](https://github.com/Tyler-Keith-Thompson/Afluent) | Reactive operators over async/await: `DeferredTask` (a unit of work that yields one value) and `AsyncSequence` extensions with Combine's names (`map`, `flatMap`, `catch`, `retry`, `debounce`, `share`, …), plus `AfluentTesting` | Pipelines over async work where Combine would once have been used; a Combine replacement in new code. Products `"afluent/Afluent"` and, for test targets, `"afluent/AfluentTesting"`. |
 | [DebugDrawer](https://github.com/Tyler-Keith-Thompson/DebugDrawer) | A plugin-based debug drawer for SwiftUI apps on iOS and macOS: a slide-in panel attached at the root view (`.debugDrawer()`), opened by `DebugDrawer.shared.toggle()`, with a library per plugin (console, performance, network, UserDefaults, app info, …) and local plugins tied to a view's lifetime (`.debugLocalPlugin(_:)`). It compiles to no-ops in release builds | Any debug-only tool an app needs (a switch, a fake response, a state dump): write a DebugDrawer plugin, installed from the composition root, instead of a one-off debug screen or gesture. Products are per plugin (`"debugdrawer/DebugDrawerConsolePlugin"`, …); the core is `"debugdrawer/DebugDrawer"`. |
 
-Their conventions carry over: value types, typed errors, `checked:` spellings that throw where
-the plain spelling traps, tests with Swift Testing.
+Their conventions carry over: value types, typed errors, tests with Swift Testing.
 
 ## Workflow
 
@@ -334,8 +344,7 @@ have.
 2. **Tests** in `Tests/<Module>Tests`:
    - hand-worked cases;
    - edge cases: empty input, one element, the boundaries of every range;
-   - `checked:` spellings and their errors;
-   - exit tests for every trap;
+   - every error the code throws, each from the input that causes it;
    - a property test against a naive reference (`swift-property-based`).
 3. **A README example**, if the feature changes how the package is introduced, copied verbatim
    into `Tests/DebugDrawerTests`.
@@ -464,7 +473,7 @@ library with none of that can skip this section.
   copied to another file still works. Shared fixture data in `DebugDrawerTestSupport` is tolerated;
   shared assertions are not, except the interception contract's checks
   (`DebugDrawerInterceptionContract`), which every interception plugin must pass alike.
-- Test names state the rule they pin ("The checked spelling throws EmptyName for an empty name").
+- Test names state the rule they pin ("An empty name throws EmptyName").
 - **Sociable.** A test runs the real code under test and its real collaborators wherever they are
   fast and deterministic, and mocks only the seams that reach out (network, disk, clock) or that
   it must steer. Inside `withTestContainer { }`, `Container.x.useProduction()` resolves the real
@@ -521,10 +530,13 @@ library with none of that can skip this section.
 
 ### Errors
 
-- **Plain spellings trap** on a precondition failure, like an `Array` subscript. They are the
-  fast path.
-- **`checked:` spellings throw** a typed, payload-free error (`Greeting(checkedName:)` throws
-  `EmptyName`). There are no nil-returning variants; `try?` gives `nil`.
+- **Everything that can fail throws** a typed, payload-free error from its one spelling
+  (`Greeting(name:)` throws `EmptyName`). There are no second throwing spellings, no nil-returning
+  variants and no traps that can fire at run time; `try?` gives `nil`. Spellings that trap, each
+  with a throwing twin, suit only a benchmarked library whose API runs in its callers' hot loops
+  (graphs, collections, numeric kernels), which the project template renders with
+  `--performance`; its README says when that fits. Anywhere else, and wherever input comes from
+  users, the network or files, keep throwing: a caller can ignore an error, but not a crash.
 - **Invariant-breaking mutations throw on the plain spelling** and change nothing, with one typed
   error per invariant whose cases make a single `catch` exhaustive.
 - **Queries whose failure is the answer return a witness** (`findCycle() -> Cycle?`), not an
@@ -535,15 +547,3 @@ library with none of that can skip this section.
 - Results are dedicated types, not tuples.
 - Lazy views end in `View`; the materialized form drops the suffix.
 - Materializing operations are static factories on a target the caller picks.
-
-### Performance patterns
-
-- Public types are copy-on-write structs, `@frozen`, with `@usableFromInline` internals.
-  Hot generic code is `@inlinable`; parameters are `some` generics, never `any`.
-- Copy-on-write: the uniqueness check is inlined and the reallocation slow path is
-  `@inline(never)`. Bulk mutations check uniqueness once, outside the loop.
-- Traps measured in past projects: nested functions capturing mutable locals (boxed, retained
-  per step); generic iterators stored in arrays (use integer cursors); reading a struct out of a
-  class property (copies and retains); lazy maps capturing `self`.
-- Write overflow guards as comparisons (`x <= Int.max / 4`), not a discarded
-  `multipliedReportingOverflow` result.

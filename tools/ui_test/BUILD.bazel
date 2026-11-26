@@ -1,0 +1,23 @@
+load("@rules_apple//apple/testing/default_runner:ios_xctestrun_runner.bzl", "ios_xctestrun_runner")
+load("@rules_shell//shell:sh_binary.bzl", "sh_binary")
+
+sh_binary(
+    name = "uninstall_apps",
+    srcs = ["uninstall_apps.sh"],
+    tags = ["manual"],
+    visibility = ["//visibility:public"],
+)
+
+# The runner for every ios_ui_test (`runner = "//tools/ui_test:runner"`): rules_apple's default,
+# on the device .bazelrc names, which first uninstalls the test's target app (uninstall_apps.sh says
+# why). Hosted unit tests keep the default: their host, tools/test_host, never changes, and their
+# test bundle is installed fresh on every run. `manual`: since rules_apple 5 the runner needs the
+# Mac tools toolchain, which a Linux `bazel test //...` can't resolve. A UI test that needs a runner
+# of its own (another device_type, a fixed order) gives that runner
+# `pre_action = "//tools/ui_test:uninstall_apps"`.
+ios_xctestrun_runner(
+    name = "runner",
+    pre_action = ":uninstall_apps",
+    tags = ["manual"],
+    visibility = ["//visibility:public"],
+)

@@ -20,7 +20,8 @@ bazel_dep(name = "rules_apple", version = "5.4.0")
 system_sdk = use_extension("@rules_swift//swift:extensions.bzl", "system_sdk")
 system_sdk.configure_sdks(names = ["AppleTVOS", "AppleTVSimulator", "WatchOS", "WatchSimulator", "XROS", "XRSimulator"])
 
-# sh_binary, for //tools:create_simulator (the iOS test runner's simulator).
+# sh_binary, for //tools:create_simulator (the iOS test runner's simulator) and the UI tests' runner
+# (tools/ui_test).
 bazel_dep(name = "rules_shell", version = "0.8.0")
 
 # ── Xcode project generation ─────────────────────────────────────────

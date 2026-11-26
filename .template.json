@@ -1,5 +1,5 @@
 {
-  "commit": "16da3d6d7c7274bbad5e0e11f48852854bb2fcda",
+  "commit": "dbb6a7a935d1e6ac5ebed87636c4fd347fad5f03",
   "name": "DebugDrawer",
   "type": "library",
   "benchmarks": true,
@@ -13,5 +13,6 @@
   "ci": false,
   "trunk": false,
   "views": true,
-  "simulator": true
+  "simulator": true,
+  "performance": false
 }
