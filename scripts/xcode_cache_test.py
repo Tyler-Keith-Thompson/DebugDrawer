@@ -89,6 +89,16 @@ class SettingsTests(unittest.TestCase):
 
         self.assertEqual(actual, expected)
 
+    def test_the_store_is_capped_at_a_size_xcode_parses(self):
+        # Xcode takes a whole number with an uppercase K, M, G or T; anything else fails the build.
+        expected = "20G"
+
+        actual = setting(xcode_cache.settings("/w", "/w/.build/x", tests=False), "COMPILATION_CACHE_LIMIT_SIZE")
+
+        self.assertEqual(actual, expected)
+        self.assertRegex(actual, r"^[1-9][0-9]*[KMGT]$")
+        self.assertFalse(any(line.startswith("COMPILATION_CACHE_LIMIT_PERCENT=") for line in xcode_cache.settings("/w", "/w/.build/x", tests=False)))
+
     def test_swift_and_clang_get_the_same_mappings(self):
         actual = xcode_cache.settings("/w", "/w/.build/x", tests=True)
 

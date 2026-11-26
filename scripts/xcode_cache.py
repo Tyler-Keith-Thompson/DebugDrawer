@@ -10,8 +10,13 @@ Each worktree has a `.build` of its own, so without these a fresh worktree's xco
 each compile's outputs in one content-addressed store shared by every checkout (CAS, under
 ~/Library/Caches), keyed by the compile's inputs rather than by where they sit, and a compile whose
 inputs another checkout already built replays from it. The store takes concurrent builds from many
-processes, as every Xcode on a Mac shares DerivedData's own, and prunes itself to Xcode's default
-size limit.
+processes, as every Xcode on a Mac shares DerivedData's own.
+
+The store is capped at SIZE_LIMIT (COMPILATION_CACHE_LIMIT_SIZE). It keeps its data in
+generations (builtin/v1.N): when a build leaves the newest one past the cap, Xcode starts another,
+copies into it what later builds still use, and deletes every generation but the newest two, so
+the store stays under about twice the cap. Without the setting Xcode's cap is half the disk's free
+space, which let the store grow past 70 GB. A compile dropped from it only compiles again.
 
 For a key to match across checkouts, nothing in it may name the checkout:
 - The paths are prefix-mapped (SWIFT_/CLANG_OTHER_PREFIX_MAPPINGS): the derived data to /^derived,
@@ -36,6 +41,8 @@ import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CAS = os.path.join(os.path.expanduser("~"), "Library", "Caches", "debugdrawer-xcode-cas")
+# The store's size cap, as COMPILATION_CACHE_LIMIT_SIZE takes it: a whole number with K, M, G or T.
+SIZE_LIMIT = "20G"
 # The root package's name in every checkout: its Package.swift `name`, as SwiftPM would derive it
 # from a checkout called DebugDrawer.
 PACKAGE_NAME = "debugdrawer"
@@ -67,6 +74,7 @@ def settings(root, derived_data, tests, cas=CAS):
     return [
         "COMPILATION_CACHE_ENABLE_CACHING=YES",
         f"COMPILATION_CACHE_CAS_PATH={cas}",
+        f"COMPILATION_CACHE_LIMIT_SIZE={SIZE_LIMIT}",
         "COMPILATION_CACHE_ENABLE_DIAGNOSTIC_REMARKS=YES",
         "SWIFT_ENABLE_PREFIX_MAPPING=YES",
         "CLANG_ENABLE_PREFIX_MAPPING=YES",

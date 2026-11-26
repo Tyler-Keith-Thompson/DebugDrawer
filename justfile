@@ -24,7 +24,8 @@ SWIFT := "env -u TOOLCHAINS xcrun --toolchain default swift"
 
 # Every xcodebuild recipe compiles with Xcode's compilation caching, in one store under
 # ~/Library/Caches that every checkout shares (scripts/xcode_cache.py), so a fresh worktree replays
-# what another already compiled instead of building it all again. SwiftPM's own `swift build` has
+# what another already compiled instead of building it all again; its size cap keeps the
+# store under about 40 GB. SwiftPM's own `swift build` has
 # no such setting, so spm-test-mac still compiles everything in a new worktree.
 
 [doc('Build everything (default)')]
@@ -56,7 +57,8 @@ record-snapshots:
 # scripts/modules.py); Bazel runs them, optimized under `just test-release`.
 # Each checkout runs on a simulator of its own (scripts/ios_simulator.py): an iPad Pro 13-inch (M5),
 # the snapshots' model, on the newest iOS runtime, made on first use and reused, so runs from two
-# worktrees don't launch their test hosts over each other. An IOS_DESTINATION given (CI's) wins.
+# worktrees don't launch their test hosts over each other; picking it first deletes the simulators
+# of checkouts that no longer exist. An IOS_DESTINATION given (CI's) wins.
 IOS_DESTINATION := env("IOS_DESTINATION", "")
 
 # Tests to leave out of every SwiftPM test run: spm-test-mac's swift test, spm-platform-test's,

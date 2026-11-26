@@ -2,7 +2,7 @@
 """The iOS simulator `just test-ios` runs on: one per checkout, so two checkouts can test at once.
 
 Usage:
-    python3 scripts/ios_simulator.py udid    # this checkout's simulator, made on first use
+    python3 scripts/ios_simulator.py udid    # this checkout's simulator, made on first use, after a prune
     python3 scripts/ios_simulator.py delete  # delete this checkout's simulator
     python3 scripts/ios_simulator.py prune   # delete the simulators of checkouts that are gone
 
@@ -15,7 +15,8 @@ goes away, the next run deletes it and makes another.
 
 Only simulators whose name starts with NAME_PREFIX are ever deleted, and only through
 `xcrun simctl delete`. `prune` deletes those whose checkout no longer exists, such as a removed
-worktree's.
+worktree's, and `udid` deletes them too before it picks this checkout's, so each `just test-ios`
+clears away the simulators of the worktrees removed since the last one.
 """
 
 import json
@@ -61,8 +62,11 @@ def ours(devices, name):
     return [(runtime, device) for runtime, listed in devices["devices"].items() for device in listed if device["name"] == name]
 
 
-def plan(devices, name, runtime):
-    """(the simulator to reuse or None, the simulators to delete) for this checkout's `name`."""
+def plan(devices, name, runtime, exists=os.path.isdir):
+    """(the simulator to reuse or None, the simulators to delete) for this checkout's `name`.
+
+    The simulators to delete are this checkout's that can't be reused, then every one `gone` names.
+    """
     reuse = None
     stale = []
     for device_runtime, device in ours(devices, name):
@@ -70,7 +74,8 @@ def plan(devices, name, runtime):
             reuse = device["udid"]
         else:
             stale.append(device["udid"])
-    return reuse, stale
+    pruned = [udid for udid in gone(devices, exists) if udid != reuse and udid not in stale]
+    return reuse, stale + pruned
 
 
 def gone(devices, exists=os.path.isdir):

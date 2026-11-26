@@ -71,14 +71,14 @@ class PlanTests(unittest.TestCase):
             ],
         }}
 
-        actual = ios_simulator.plan(devices, self.NAME, "iOS-27-2")
+        actual = ios_simulator.plan(devices, self.NAME, "iOS-27-2", exists=lambda path: True)
 
         self.assertEqual(actual, ("MINE", []))
 
     def test_makes_one_when_this_checkout_has_none(self):
         devices = {"devices": {"iOS-27-2": [device("iPad Pro 13-inch (M5)", "OWNER")]}}
 
-        actual = ios_simulator.plan(devices, self.NAME, "iOS-27-2")
+        actual = ios_simulator.plan(devices, self.NAME, "iOS-27-2", exists=lambda path: True)
 
         self.assertEqual(actual, (None, []))
 
@@ -88,16 +88,32 @@ class PlanTests(unittest.TestCase):
             "iOS-27-2": [device(self.NAME, "BROKEN", available=False)],
         }}
 
-        actual = ios_simulator.plan(devices, self.NAME, "iOS-27-2")
+        actual = ios_simulator.plan(devices, self.NAME, "iOS-27-2", exists=lambda path: True)
 
         self.assertEqual(actual, (None, ["OLDER", "BROKEN"]))
 
     def test_keeps_one_of_two_on_the_runtime(self):
         devices = {"devices": {"iOS-27-2": [device(self.NAME, "FIRST"), device(self.NAME, "SECOND")]}}
 
-        actual = ios_simulator.plan(devices, self.NAME, "iOS-27-2")
+        actual = ios_simulator.plan(devices, self.NAME, "iOS-27-2", exists=lambda path: True)
 
         self.assertEqual(actual, ("FIRST", ["SECOND"]))
+
+    def test_also_deletes_the_simulators_of_checkouts_that_are_gone(self):
+        devices = {"devices": {
+            "iOS-27-2": [
+                device("iPad Pro 13-inch (M5)", "OWNER"),
+                device(self.NAME, "MINE"),
+                device(ios_simulator.device_name("/work/kept"), "KEPT"),
+                device(ios_simulator.device_name("/work/removed"), "REMOVED"),
+            ],
+            "iOS-27-1": [device(self.NAME, "OLDER")],
+        }}
+        kept = {"/work/DebugDrawer", "/work/kept"}
+
+        actual = ios_simulator.plan(devices, self.NAME, "iOS-27-2", exists=lambda path: path in kept)
+
+        self.assertEqual(actual, ("MINE", ["OLDER", "REMOVED"]))
 
 
 class PruneTests(unittest.TestCase):
