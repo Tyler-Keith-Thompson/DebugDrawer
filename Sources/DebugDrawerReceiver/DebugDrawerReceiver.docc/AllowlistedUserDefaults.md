@@ -25,7 +25,7 @@ final class ProductionDefaults {
 
     init(container: URL) throws {
         receiver = DebugDrawerReceiver(directory: container.appending(path: "DebugDrawer"), sessions: sessions)
-        receiver.enable(.userDefaults(
+        try receiver.enable(.userDefaults(
             .choice("plan", title: "Plan", options: ["free", "pro"]),
             .bool("showsTips", title: "Shows Tips"),
             .integer("itemsPerPage", title: "Items per Page", in: 10 ... 100)
@@ -64,9 +64,10 @@ app didn't allowlist is refused as `commandRefused(.notExposed)` and stays as it
 as none). A value of another kind, out of the key's bounds, longer than its maximum or not one of
 its options is refused as `commandRefused(.malformedCommand)`.
 
-These trap: a key listed twice, an empty key, one of DebugDrawer's own (prefixed `DebugDrawer.` or
-`com.debugdrawer.`), a choice without options, and a bound that isn't finite. Write the allowlist in
-the app's source.
+The allowlist throws `DebugDrawerUserDefaults.InvalidKeys` as it is made for a key listed twice, an
+empty key, one of DebugDrawer's own (prefixed `DebugDrawer.` or `com.debugdrawer.`), a string key
+whose maximum length isn't positive, a choice without options or with one repeated, and a bound
+that isn't finite. Write the allowlist in the app's source.
 
 ### Never allowlist a secret
 

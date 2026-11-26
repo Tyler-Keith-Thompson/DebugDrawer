@@ -119,6 +119,10 @@ public final class DebugDrawerAuthActions: DebugDrawerPluginModel {
         case perform(action: String)
     }
 
+    /// Two actions sharing an ID, which the model refuses as it is made: a sidecar asks for an
+    /// action by its ID alone.
+    public struct DuplicateID: Error, Equatable, Sendable {}
+
     /// The actions and their last runs now.
     @Published public private(set) var snapshot: Snapshot
 
@@ -128,20 +132,21 @@ public final class DebugDrawerAuthActions: DebugDrawerPluginModel {
 
     /// The actions `actions`, asked for from a sidecar that opens the app with `launchURL`.
     ///
-    /// Traps when two actions share an ID.
-    ///
     /// - Parameters:
     ///   - actions: The actions a sidecar may ask for, in the order to list them.
     ///   - launchURL: A URL of the app's own scheme that brings it to the foreground (on iOS the
     ///     only way a sidecar can); `nil` when it has none. The receiver doesn't need it: a request
     ///     the sidecar leaves is performed as the app comes to the foreground however it got there.
-    public convenience init(actions: [DebugDrawerAuthAction], launchURL: URL? = nil) {
-        self.init(actions: actions, launchURL: launchURL, now: Date.init)
+    /// - Throws: ``DuplicateID`` when two actions share an ID.
+    public convenience init(actions: [DebugDrawerAuthAction], launchURL: URL? = nil) throws(DuplicateID) {
+        try self.init(actions: actions, launchURL: launchURL, now: Date.init)
     }
 
     /// The actions `actions`, timing runs with `now`.
-    package init(actions: [DebugDrawerAuthAction], launchURL: URL?, now: @escaping () -> Date) {
-        precondition(Set(actions.map(\.id)).count == actions.count, "Two auth actions share an ID")
+    ///
+    /// - Throws: ``DuplicateID`` when two actions share an ID.
+    package init(actions: [DebugDrawerAuthAction], launchURL: URL?, now: @escaping () -> Date) throws(DuplicateID) {
+        guard Set(actions.map(\.id)).count == actions.count else { throw DuplicateID() }
         self.actions = Dictionary(uniqueKeysWithValues: actions.map { ($0.id, $0) })
         self.now = now
         snapshot = Snapshot(

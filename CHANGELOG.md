@@ -62,6 +62,13 @@ the entry becomes the GitHub release's notes.
 - DD-293: `DebugDrawer.installTweaks(storage:_:)` throws `TweaksPlugin.InvalidTweaks`; `Tweak.picker` and `Tweak.stepper` no longer trap on a default the control can't hold.
 - DD-293: `DebugDrawerAppState.init(sessions:buildMetadata:featureFlags:experiments:environments:userID:values:defaults:)` throws `DebugDrawerAppState.InvalidField`; `DebugDrawerAppStateField.init(_:value:)` no longer traps on an empty key.
 - DD-293: `LeakDetector.trackLifetime(of:maxCount:)` throws `LeakDetector.InvalidMaxCount` and has no default; `trackLifetime(of:)` allows one instance.
+- DD-293: `DebugDrawerUserDefaults.init(_:defaults:)` and `DebugDrawerReceiverCapability.userDefaults(_:defaults:scope:)` (over keys) throw `DebugDrawerUserDefaults.InvalidKeys`; `DebugDrawerUserDefaultsKey`'s factories (`string`, `integer`, `double`, `bool`, `choice`) no longer trap: the allowlist checks each key as it is made.
+- DD-293: `DebugDrawerScenarios.init(scenarios:launchURL:)` and `DebugDrawerReceiverCapability.scenarios(_:launchURL:)` throw `DebugDrawerScenarios.InvalidScenarios`; `DebugDrawerScenario.init(_:title:summary:parameters:handler:)` and `DebugDrawerScenarioParameter`'s factories no longer trap: the scenarios check each declaration as they are made.
+- DD-293: `DebugDrawerEnvironments.init(default:allowing:_:adapter:defaults:)` and `DebugDrawerReceiverCapability.environments(default:allowing:_:adapter:)` throw `DebugDrawerEnvironments.InvalidEnvironments`; `DebugDrawerEnvironment.init(_:title:summary:)` no longer traps on an empty ID.
+- DD-293: `DebugDrawerAuthActions.init(actions:launchURL:)` and `DebugDrawerReceiverCapability.authActions(_:launchURL:)` throw `DebugDrawerAuthActions.DuplicateID`.
+- DD-293: `DebugDrawerDiagnosticsRedaction.init(headers:keys:jsonPaths:values:)` and `adding(headers:keys:jsonPaths:values:)` throw `DebugDrawerDiagnosticsRedaction.InvalidPattern`.
+- DD-293: `DebugDrawerDiagnosticsCapture.Limits.init(lines:requests:bodyBytes:totalBytes:)` throws `DebugDrawerDiagnosticsCapture.InvalidLimits`.
+- DD-293: `DebugDrawerBugReports.Limits.init(reports:logLines:stateBytes:screenshotBytes:)` throws `DebugDrawerBugReports.InvalidLimits`.
 
 ### Fixed
 

@@ -41,7 +41,7 @@
                 .appending(path: "DebugDrawer")
             let signIn = FakeSignIn()
             let sessions = DebugDrawerSessions(maximumDuration: 300)
-            let model = DebugDrawerAuthActions(actions: signIn.actions, launchURL: URL(string: "shop-internal://"))
+            let model = try DebugDrawerAuthActions(actions: signIn.actions, launchURL: URL(string: "shop-internal://"))
             let receiver = DebugDrawerReceiver(directory: store, sessions: sessions)
             receiver.identity = AppPresence.Identity(bundleIdentifier: "com.example.shop", displayName: "Shop", version: "2.4", build: "881")
             receiver.enable(.authActions(model))
@@ -99,7 +99,7 @@
 
         @Test("With no action registered, the plugin says so")
         func noActions() throws {
-            let sut = AuthActionsPlugin(transport: .direct(to: DebugDrawerAuthActions(actions: [])))
+            let sut = try AuthActionsPlugin(transport: .direct(to: DebugDrawerAuthActions(actions: [])))
 
             #expect(throws: Never.self) { try sut.body.inspect().find(text: "No Auth Actions") }
         }

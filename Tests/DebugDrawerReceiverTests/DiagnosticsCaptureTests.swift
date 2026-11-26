@@ -38,10 +38,10 @@ struct DiagnosticsCaptureTests {
     private static let now = Date(timeIntervalSinceReferenceDate: 800_000_000)
 
     @Test("Past the line limit the oldest lines go, and each one dropped is counted")
-    func lineLimitKeepsNewest() async {
+    func lineLimitKeepsNewest() async throws {
         let clock = MovableClock(Self.now)
         let sessions = DebugDrawerSessions(maximumDuration: 300, auditCapacity: 10, clock: clock, timer: IdleTimer())
-        let limits = DebugDrawerDiagnosticsCapture.Limits(lines: 2, requests: 2, bodyBytes: 1024, totalBytes: 1 << 20)
+        let limits = try DebugDrawerDiagnosticsCapture.Limits(lines: 2, requests: 2, bodyBytes: 1024, totalBytes: 1 << 20)
         let sut = DebugDrawerDiagnosticsCapture(sessions: sessions, redaction: .none, limits: limits) { clock.now }
         let (published, publish) = AsyncStream<DebugDrawerDiagnosticsCapture.Snapshot>.makeStream()
         let subscription = sut.$snapshot.sink { publish.yield($0) }
@@ -68,7 +68,7 @@ struct DiagnosticsCaptureTests {
     func requestLimitKeepsNewest() async throws {
         let clock = MovableClock(Self.now)
         let sessions = DebugDrawerSessions(maximumDuration: 300, auditCapacity: 10, clock: clock, timer: IdleTimer())
-        let limits = DebugDrawerDiagnosticsCapture.Limits(lines: 10, requests: 1, bodyBytes: 1024, totalBytes: 1 << 20)
+        let limits = try DebugDrawerDiagnosticsCapture.Limits(lines: 10, requests: 1, bodyBytes: 1024, totalBytes: 1 << 20)
         let sut = DebugDrawerDiagnosticsCapture(sessions: sessions, redaction: .none, limits: limits) { clock.now }
         let (published, publish) = AsyncStream<DebugDrawerDiagnosticsCapture.Snapshot>.makeStream()
         let subscription = sut.$snapshot.sink { publish.yield($0) }
@@ -95,7 +95,7 @@ struct DiagnosticsCaptureTests {
         let clock = MovableClock(Self.now)
         let sessions = DebugDrawerSessions(maximumDuration: 300, auditCapacity: 10, clock: clock, timer: IdleTimer())
         // Each line below keeps 10 bytes, the request 3 + 25 = 28 (method and URL).
-        let limits = DebugDrawerDiagnosticsCapture.Limits(lines: 10, requests: 10, bodyBytes: 1024, totalBytes: 40)
+        let limits = try DebugDrawerDiagnosticsCapture.Limits(lines: 10, requests: 10, bodyBytes: 1024, totalBytes: 40)
         let sut = DebugDrawerDiagnosticsCapture(sessions: sessions, redaction: .none, limits: limits) { clock.now }
         let (published, publish) = AsyncStream<DebugDrawerDiagnosticsCapture.Snapshot>.makeStream()
         let subscription = sut.$snapshot.sink { publish.yield($0) }
@@ -124,7 +124,7 @@ struct DiagnosticsCaptureTests {
     func bodiesKeptOnlyWhenJSONWithinLimit() async throws {
         let clock = MovableClock(Self.now)
         let sessions = DebugDrawerSessions(maximumDuration: 300, auditCapacity: 10, clock: clock, timer: IdleTimer())
-        let limits = DebugDrawerDiagnosticsCapture.Limits(lines: 10, requests: 10, bodyBytes: 32, totalBytes: 1 << 20)
+        let limits = try DebugDrawerDiagnosticsCapture.Limits(lines: 10, requests: 10, bodyBytes: 32, totalBytes: 1 << 20)
         let sut = DebugDrawerDiagnosticsCapture(sessions: sessions, redaction: .none, limits: limits) { clock.now }
         let (published, publish) = AsyncStream<DebugDrawerDiagnosticsCapture.Snapshot>.makeStream()
         let subscription = sut.$snapshot.sink { publish.yield($0) }

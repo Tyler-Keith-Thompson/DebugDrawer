@@ -24,7 +24,7 @@
             let store = root.appending(path: "Group/DebugDrawer")
             let sessions = DebugDrawerSessions(maximumDuration: 300)
             let receiver = DebugDrawerReceiver(directory: store, sessions: sessions)
-            let environments = DebugDrawerEnvironments(
+            let environments = try DebugDrawerEnvironments(
                 default: DebugDrawerEnvironment("production", title: "Production"),
                 allowing: DebugDrawerEnvironment("staging", title: "Staging"),
                 adapter: FakeBackend(), defaults: defaults
@@ -187,7 +187,7 @@
             let sessions = DebugDrawerSessions(maximumDuration: 300)
             let sut = DebugDrawerReceiver(directory: directory, sessions: sessions)
             // A receiver with no capability enabled opens no session, so another one is enabled.
-            sut.enable(.environments(DebugDrawerEnvironments(
+            try sut.enable(.environments(DebugDrawerEnvironments(
                 default: DebugDrawerEnvironment("production", title: "Production"),
                 allowing: DebugDrawerEnvironment("staging", title: "Staging"),
                 adapter: FakeBackend(), defaults: defaults

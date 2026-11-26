@@ -70,7 +70,7 @@ struct ScenariosTests {
             .string("name", default: "Jane"),
             .boolean("skipIntro")
         ]) { received.append($0) }
-        let sut = DebugDrawerScenarios(scenarios: [scenario], launchURL: nil, now: { Date(timeIntervalSinceReferenceDate: 0) })
+        let sut = try DebugDrawerScenarios(scenarios: [scenario], launchURL: nil, now: { Date(timeIntervalSinceReferenceDate: 0) })
 
         sut.perform(.run(scenario: "onboarding", arguments: ["step": .integer(3)]))
 
@@ -85,10 +85,10 @@ struct ScenariosTests {
     }
 
     @Test("A scenario with no parameters runs with empty arguments, and any argument is refused malformedCommand")
-    func scenarioWithoutParameters() {
+    func scenarioWithoutParameters() throws {
         var runs = 0
         let scenario = DebugDrawerScenario("paywall", title: "Paywall") { _ in runs += 1 }
-        let sut = DebugDrawerScenarios(scenarios: [scenario], launchURL: nil, now: { Date(timeIntervalSinceReferenceDate: 0) })
+        let sut = try DebugDrawerScenarios(scenarios: [scenario], launchURL: nil, now: { Date(timeIntervalSinceReferenceDate: 0) })
 
         let refusals = [
             sut.refusal(of: .run(scenario: "paywall", arguments: [:])),
@@ -101,10 +101,10 @@ struct ScenariosTests {
     }
 
     @Test("Performing a command the receiver would refuse runs no handler and records no launch")
-    func performIgnoresRefusedCommands() {
+    func performIgnoresRefusedCommands() throws {
         var runs = 0
         let scenario = DebugDrawerScenario("order", title: "Order", parameters: [.integer("id", default: 1, in: 1 ... 9)]) { _ in runs += 1 }
-        let sut = DebugDrawerScenarios(scenarios: [scenario], launchURL: nil, now: { Date(timeIntervalSinceReferenceDate: 0) })
+        let sut = try DebugDrawerScenarios(scenarios: [scenario], launchURL: nil, now: { Date(timeIntervalSinceReferenceDate: 0) })
 
         sut.perform(.run(scenario: "missing", arguments: [:]))
         sut.perform(.run(scenario: "order", arguments: ["id": .integer(10)]))
@@ -114,10 +114,10 @@ struct ScenariosTests {
     }
 
     @Test("Each launch is numbered from 1 and dated by the model's clock")
-    func launchesAreNumbered() {
+    func launchesAreNumbered() throws {
         let date = Date(timeIntervalSinceReferenceDate: 1_000)
         let scenario = DebugDrawerScenario("home", title: "Home") { _ in }
-        let sut = DebugDrawerScenarios(scenarios: [scenario], launchURL: nil, now: { date })
+        let sut = try DebugDrawerScenarios(scenarios: [scenario], launchURL: nil, now: { date })
         let expected = DebugDrawerScenarios.Run(number: 2, scenario: "home", date: date)
 
         sut.perform(.run(scenario: "home", arguments: [:]))
@@ -127,8 +127,8 @@ struct ScenariosTests {
     }
 
     @Test("No scenarios is a valid, empty list")
-    func emptyScenarios() {
-        let sut = DebugDrawerScenarios(scenarios: [])
+    func emptyScenarios() throws {
+        let sut = try DebugDrawerScenarios(scenarios: [])
 
         #expect(sut.snapshot.scenarios.isEmpty)
         #expect(sut.refusal(of: .run(scenario: "home", arguments: [:])) == .notExposed)

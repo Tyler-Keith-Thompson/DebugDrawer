@@ -7,16 +7,18 @@ import Foundation
 // field, number field, toggle, picker). A key is read as its declared kind only: a value of
 // another kind under it reads as none, so a key the host declared as a string never hands a
 // sidecar the data blob something else wrote there. A declaration that contradicts itself (no
-// options, a bound that isn't finite) or names one of the library's own keys is the host's
-// programming error and traps where it is written. Rejected: a validation closure (it would run
-// on received input, and a sidecar couldn't show the bounds), and a key prefix or pattern (an
-// allowlist must name each key: a pattern lets a key the host adds later through, unreviewed).
+// options, a bound that isn't finite) or names one of the library's own keys is refused by the
+// allowlist it is handed to (`DebugDrawerUserDefaults.InvalidKeys`) rather than by each factory,
+// so a list of keys reads without a `try` per key and one `catch` covers the whole allowlist.
+// Rejected: a validation closure (it would run on received input, and a sidecar couldn't show the
+// bounds), and a key prefix or pattern (an allowlist must name each key: a pattern lets a key the
+// host adds later through, unreviewed).
 
 /// A UserDefaults key the host allowlists for a sidecar to read and edit, with the kind of value
 /// it holds and the values a sidecar may write.
 ///
 /// ```swift
-/// receiver.enable(.userDefaults(
+/// try receiver.enable(.userDefaults(
 ///     .choice("plan", title: "Plan", options: ["free", "pro"]),
 ///     .bool("showsTips", title: "Shows Tips"),
 ///     .integer("itemsPerPage", title: "Items per Page", in: 10 ... 100)
@@ -26,7 +28,9 @@ import Foundation
 /// A sidecar reads each key's value as its declared kind; the receiver refuses a value that isn't
 /// of that kind or is outside its bounds as ``DebugDrawerAuditEntry/Refusal/malformedCommand``.
 /// Never allowlist a key holding a secret: its value is shown to the sidecar and written to the
-/// audit log with each edit.
+/// audit log with each edit. The allowlist, ``DebugDrawerUserDefaults``, throws
+/// ``DebugDrawerUserDefaults/InvalidKeys`` as it is made for a key that contradicts itself or is
+/// one of DebugDrawer's own.
 public struct DebugDrawerUserDefaultsKey: Codable, Equatable, Sendable {
     /// The values a key holds.
     public enum Kind: Codable, Equatable, Sendable {
@@ -84,11 +88,6 @@ public struct DebugDrawerUserDefaultsKey: Codable, Equatable, Sendable {
     public let kind: Kind
 
     private init(key: String, title: String?, kind: Kind) {
-        precondition(!key.isEmpty, "An allowlisted UserDefaults key can't be empty")
-        precondition(
-            !key.hasPrefix("DebugDrawer.") && !key.hasPrefix("com.debugdrawer."),
-            "An allowlisted UserDefaults key can't be one of DebugDrawer's own"
-        )
         self.key = key
         self.title = title ?? key
         self.kind = kind
@@ -96,25 +95,22 @@ public struct DebugDrawerUserDefaultsKey: Codable, Equatable, Sendable {
 
     /// A text key.
     ///
-    /// Traps when `key` is empty or one of DebugDrawer's own (prefixed `DebugDrawer.` or
-    /// `com.debugdrawer.`), or `maximumLength` isn't positive.
-    ///
     /// - Parameters:
-    ///   - key: The UserDefaults key.
+    ///   - key: The UserDefaults key; not empty or one of DebugDrawer's own (prefixed
+    ///     `DebugDrawer.` or `com.debugdrawer.`), or the allowlist throws.
     ///   - title: The name a sidecar shows; `key` when `nil`.
-    ///   - maximumLength: The most characters a sidecar may write.
+    ///   - maximumLength: The most characters a sidecar may write; positive, or the allowlist
+    ///     throws.
     /// - Returns: The key.
     public static func string(_ key: String, title: String? = nil, maximumLength: Int = 256) -> Self {
-        precondition(maximumLength > 0, "A string key's maximum length must be positive")
-        return Self(key: key, title: title, kind: .string(maximumLength: maximumLength))
+        Self(key: key, title: title, kind: .string(maximumLength: maximumLength))
     }
 
     /// A whole-number key.
     ///
-    /// Traps when `key` is empty or one of DebugDrawer's own.
-    ///
     /// - Parameters:
-    ///   - key: The UserDefaults key.
+    ///   - key: The UserDefaults key; not empty or one of DebugDrawer's own, or the allowlist
+    ///     throws.
     ///   - title: The name a sidecar shows; `key` when `nil`.
     ///   - range: The values a sidecar may write.
     /// - Returns: The key.
@@ -124,29 +120,25 @@ public struct DebugDrawerUserDefaultsKey: Codable, Equatable, Sendable {
 
     /// A number key.
     ///
-    /// Traps when `key` is empty or one of DebugDrawer's own, or a bound of `range` isn't finite.
-    ///
     /// - Parameters:
-    ///   - key: The UserDefaults key.
+    ///   - key: The UserDefaults key; not empty or one of DebugDrawer's own, or the allowlist
+    ///     throws.
     ///   - title: The name a sidecar shows; `key` when `nil`.
-    ///   - range: The values a sidecar may write; finite numbers only.
+    ///   - range: The values a sidecar may write; finite bounds only, or the allowlist throws.
     /// - Returns: The key.
     public static func double(
         _ key: String,
         title: String? = nil,
         in range: ClosedRange<Double> = -Double.greatestFiniteMagnitude ... Double.greatestFiniteMagnitude
     ) -> Self {
-        // JSON has no infinity, so a bound that isn't finite couldn't reach a sidecar.
-        precondition(range.lowerBound.isFinite && range.upperBound.isFinite, "A number key's bounds must be finite")
-        return Self(key: key, title: title, kind: .double(range: range))
+        Self(key: key, title: title, kind: .double(range: range))
     }
 
     /// An on-or-off key.
     ///
-    /// Traps when `key` is empty or one of DebugDrawer's own.
-    ///
     /// - Parameters:
-    ///   - key: The UserDefaults key.
+    ///   - key: The UserDefaults key; not empty or one of DebugDrawer's own, or the allowlist
+    ///     throws.
     ///   - title: The name a sidecar shows; `key` when `nil`.
     /// - Returns: The key.
     public static func bool(_ key: String, title: String? = nil) -> Self {
@@ -155,17 +147,34 @@ public struct DebugDrawerUserDefaultsKey: Codable, Equatable, Sendable {
 
     /// A key holding one of `options`, stored as a string.
     ///
-    /// Traps when `key` is empty or one of DebugDrawer's own, or `options` is empty or repeats
-    /// an option.
-    ///
     /// - Parameters:
-    ///   - key: The UserDefaults key.
+    ///   - key: The UserDefaults key; not empty or one of DebugDrawer's own, or the allowlist
+    ///     throws.
     ///   - title: The name a sidecar shows; `key` when `nil`.
-    ///   - options: The values a sidecar may write, in the order it lists them.
+    ///   - options: The values a sidecar may write, in the order it lists them; at least one and
+    ///     none repeated, or the allowlist throws.
     /// - Returns: The key.
     public static func choice(_ key: String, title: String? = nil, options: [String]) -> Self {
-        precondition(!options.isEmpty, "A choice key needs at least one option")
-        precondition(Set(options).count == options.count, "A choice key's options repeat")
-        return Self(key: key, title: title, kind: .choice(options: options))
+        Self(key: key, title: title, kind: .choice(options: options))
+    }
+}
+
+extension DebugDrawerUserDefaultsKey {
+    /// Throws when the key is empty or one of DebugDrawer's own, or its kind contradicts itself.
+    func check() throws(DebugDrawerUserDefaults.InvalidKeys) {
+        guard !key.isEmpty else { throw .emptyKey }
+        guard !key.hasPrefix("DebugDrawer."), !key.hasPrefix("com.debugdrawer.") else { throw .reservedKey }
+        switch kind {
+        case let .string(maximumLength):
+            guard maximumLength > 0 else { throw .maximumLengthNotPositive }
+        case let .double(range):
+            // JSON has no infinity, so a bound that isn't finite couldn't reach a sidecar.
+            guard range.lowerBound.isFinite, range.upperBound.isFinite else { throw .boundNotFinite }
+        case let .choice(options):
+            guard !options.isEmpty else { throw .noOptions }
+            guard Set(options).count == options.count else { throw .repeatedOption }
+        case .integer, .bool:
+            return
+        }
     }
 }

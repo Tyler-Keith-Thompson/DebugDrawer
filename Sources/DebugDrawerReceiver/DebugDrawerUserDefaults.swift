@@ -102,6 +102,25 @@ public final class DebugDrawerUserDefaults: DebugDrawerPluginModel {
         case revertAll
     }
 
+    /// An allowlist the model can't serve, which it refuses as it is made.
+    public enum InvalidKeys: Error, Equatable, Sendable {
+        /// A key is empty.
+        case emptyKey
+        /// A key is one of DebugDrawer's own (prefixed `DebugDrawer.` or `com.debugdrawer.`), such
+        /// as the record the model keeps of what it edited.
+        case reservedKey
+        /// A string key's maximum length is 0 or less.
+        case maximumLengthNotPositive
+        /// A number key's bound isn't finite, which JSON couldn't carry to a sidecar.
+        case boundNotFinite
+        /// A choice key has no options.
+        case noOptions
+        /// A choice key lists an option twice.
+        case repeatedOption
+        /// One key is listed twice.
+        case duplicateKey
+    }
+
     /// The allowlisted keys and their values now.
     @Published public private(set) var snapshot: Snapshot
 
@@ -115,21 +134,27 @@ public final class DebugDrawerUserDefaults: DebugDrawerPluginModel {
 
     /// The allowlisted `keys` of `defaults`: all a sidecar may read and edit.
     ///
-    /// Traps when two keys are the same.
-    ///
     /// - Parameters:
     ///   - keys: The keys a sidecar may read and edit, in the order to list them; none lists
     ///     nothing.
     ///   - defaults: The defaults the keys are in, where the model also records what each key it
     ///     edits held before.
-    public convenience init(_ keys: DebugDrawerUserDefaultsKey..., defaults: UserDefaults = .standard) {
-        self.init(keys: keys, defaults: defaults)
+    /// - Throws: ``InvalidKeys`` when a key is empty or one of DebugDrawer's own, a key's kind
+    ///   contradicts itself (a string key's maximum length not positive, a number key's bound not
+    ///   finite, a choice key with no options or a repeated one), or a key is listed twice.
+    public convenience init(_ keys: DebugDrawerUserDefaultsKey..., defaults: UserDefaults = .standard) throws(InvalidKeys) {
+        try self.init(keys: keys, defaults: defaults)
     }
 
     /// The allowlisted keys as a list, for the capability's variadic factory, which can't
     /// forward its own.
-    init(keys: [DebugDrawerUserDefaultsKey], defaults: UserDefaults) {
-        precondition(Set(keys.map(\.key)).count == keys.count, "An allowlisted UserDefaults key is listed twice")
+    ///
+    /// - Throws: As ``init(_:defaults:)`` does.
+    init(keys: [DebugDrawerUserDefaultsKey], defaults: UserDefaults) throws(InvalidKeys) {
+        for key in keys {
+            try key.check()
+        }
+        guard Set(keys.map(\.key)).count == keys.count else { throw .duplicateKey }
         self.keys = keys
         kinds = Dictionary(uniqueKeysWithValues: keys.map { ($0.key, $0.kind) })
         self.defaults = defaults

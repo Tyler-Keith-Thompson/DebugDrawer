@@ -38,7 +38,7 @@
                 .appending(path: "DebugDrawer")
             let backend = FakeBackend()
             let sessions = DebugDrawerSessions(maximumDuration: 300)
-            let model = DebugDrawerEnvironments(default: production, allowing: staging, adapter: backend, defaults: defaults)
+            let model = try DebugDrawerEnvironments(default: production, allowing: staging, adapter: backend, defaults: defaults)
             let receiver = DebugDrawerReceiver(directory: store, sessions: sessions)
             receiver.identity = AppPresence.Identity(bundleIdentifier: "com.example.shop", displayName: "Shop", version: "2.4", build: "881")
             receiver.enable(.environments(model))

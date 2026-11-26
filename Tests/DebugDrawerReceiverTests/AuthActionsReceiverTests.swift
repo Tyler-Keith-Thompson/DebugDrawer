@@ -71,7 +71,7 @@ struct AuthActionsReceiverTests {
             try layout.write(document.encoded(), to: layout.commands.appending(path: "\(index).json"))
         }
         let sessions = DebugDrawerSessions(maximumDuration: 300, auditCapacity: 100, clock: FixedClock(now: Self.now), timer: IdleTimer())
-        let model = DebugDrawerAuthActions(actions: auth.actions, launchURL: nil, now: { Self.now })
+        let model = try DebugDrawerAuthActions(actions: auth.actions, launchURL: nil, now: { Self.now })
         let sut = DebugDrawerReceiver(directory: directory, sessions: sessions)
         sut.enable(.authActions(model))
         let expectedCalls = ["expire", "log out"]
@@ -110,7 +110,7 @@ struct AuthActionsReceiverTests {
             try layout.write(document.encoded(), to: layout.commands.appending(path: "\(index).json"))
         }
         let sessions = DebugDrawerSessions(maximumDuration: 300, auditCapacity: 100, clock: FixedClock(now: Self.now), timer: IdleTimer())
-        let model = DebugDrawerAuthActions(actions: auth.actions, launchURL: nil, now: { Self.now })
+        let model = try DebugDrawerAuthActions(actions: auth.actions, launchURL: nil, now: { Self.now })
         let sut = DebugDrawerReceiver(directory: directory, sessions: sessions)
         sut.enable(.authActions(model))
         let expectedEvents: [DebugDrawerAuditEntry.Event] = [
@@ -135,7 +135,7 @@ struct AuthActionsReceiverTests {
         let document = StoreDocument(TransportMessage(kind: .command, pluginID: actionsID, payload: payload))
         try layout.write(document.encoded(), to: layout.commands.appending(path: "0.json"))
         let sessions = DebugDrawerSessions(maximumDuration: 300, auditCapacity: 100, clock: FixedClock(now: Self.now), timer: IdleTimer())
-        let model = DebugDrawerAuthActions(actions: auth.actions, launchURL: nil, now: { Self.now })
+        let model = try DebugDrawerAuthActions(actions: auth.actions, launchURL: nil, now: { Self.now })
         let sut = DebugDrawerReceiver(directory: directory, sessions: sessions)
         sut.enable(.authActions(model))
         let expectedEvent = DebugDrawerAuditEntry.Event.commandRefused(.noActiveSession)
@@ -198,7 +198,7 @@ struct AuthActionsReceiverTests {
             try layout.write(document.encoded(), to: layout.commands.appending(path: "\(index).json"))
         }
         let sessions = DebugDrawerSessions(maximumDuration: 300, auditCapacity: 100, clock: FixedClock(now: Self.now), timer: IdleTimer())
-        let model = DebugDrawerAuthActions(actions: auth.actions, launchURL: nil, now: { Self.now })
+        let model = try DebugDrawerAuthActions(actions: auth.actions, launchURL: nil, now: { Self.now })
         let sut = DebugDrawerReceiver(directory: directory, sessions: sessions)
         sut.enable(.authActions(model).requiringGrant())
         let expectedEvent = DebugDrawerAuditEntry.Event.commandRefused(.grantMissing)

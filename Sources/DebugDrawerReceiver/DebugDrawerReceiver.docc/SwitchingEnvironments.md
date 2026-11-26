@@ -39,7 +39,7 @@ final class ProductionEnvironments {
             verifier: DebugDrawerSignedGrantVerifier(keys: [.ed25519(grantServerKey)]),
             audience: "com.example.MyApp"
         ))
-        environments = DebugDrawerEnvironments(
+        environments = try DebugDrawerEnvironments(
             default: DebugDrawerEnvironment("production", title: "Production"),
             allowing: DebugDrawerEnvironment("staging", title: "Staging", summary: "Yesterday's server build"),
             DebugDrawerEnvironment("canary", title: "Canary"),
@@ -72,8 +72,9 @@ the worst a leak does is point the app at your own staging.
 ### The allowlist is mandatory and holds no URL
 
 `DebugDrawerEnvironments` and `.environments(default:allowing:_:adapter:)` take the default and at
-least one allowed environment as separate parameters, so an empty allowlist doesn't compile. An
-allowed environment repeating another's ID (the default's included) traps, as does an empty ID.
+least one allowed environment as separate parameters, so an empty allowlist doesn't compile. They
+throw `DebugDrawerEnvironments.InvalidEnvironments` for an allowed environment repeating another's
+ID (the default's included) and for an empty ID.
 Write the list in the app's source, not from remote configuration, which a leak would target next.
 
 A `DebugDrawerEnvironment` has an ID, a title and a summary and nothing else. Base URLs, hosts and

@@ -44,7 +44,7 @@
                 .appending(path: "DebugDrawer")
             let router = FakeRouter()
             let sessions = DebugDrawerSessions(maximumDuration: 300)
-            let model = DebugDrawerScenarios(scenarios: router.scenarios, launchURL: URL(string: "shop-internal://"))
+            let model = try DebugDrawerScenarios(scenarios: router.scenarios, launchURL: URL(string: "shop-internal://"))
             let receiver = DebugDrawerReceiver(directory: store, sessions: sessions)
             receiver.identity = AppPresence.Identity(bundleIdentifier: "com.example.shop", displayName: "Shop", version: "2.4", build: "881")
             receiver.enable(.scenarios(model))
@@ -126,7 +126,7 @@
 
         @Test("With no scenario registered, the plugin says so")
         func noScenarios() throws {
-            let sut = ScenariosPlugin(transport: .direct(to: DebugDrawerScenarios(scenarios: [])))
+            let sut = try ScenariosPlugin(transport: .direct(to: DebugDrawerScenarios(scenarios: [])))
 
             #expect(throws: Never.self) { try sut.body.inspect().find(text: "No Scenarios") }
         }

@@ -97,7 +97,7 @@ struct UserDefaultsReceiverTests {
         #expect(layout.create())
         let sessions = DebugDrawerSessions(maximumDuration: 300, auditCapacity: 100, clock: MovableClock(Self.now), timer: ManualTimer())
         let sut = DebugDrawerReceiver(directory: directory, sessions: sessions)
-        sut.enable(.userDefaults(DebugDrawerUserDefaults(keys: allowlist, defaults: defaults)))
+        try sut.enable(.userDefaults(DebugDrawerUserDefaults(keys: allowlist, defaults: defaults)))
         let snapshotFile = layout.snapshotFile(for: defaultsID)
         let expected = DebugDrawerUserDefaults.Snapshot(
             entries: [
@@ -163,7 +163,7 @@ struct UserDefaultsReceiverTests {
             try layout.write(document.encoded(), to: layout.commands.appending(path: String(format: "%03d.json", index)))
         }
         let sessions = DebugDrawerSessions(maximumDuration: 300, auditCapacity: 100, clock: MovableClock(Self.now), timer: ManualTimer())
-        let model = DebugDrawerUserDefaults(keys: allowlist, defaults: defaults)
+        let model = try DebugDrawerUserDefaults(keys: allowlist, defaults: defaults)
         let sut = DebugDrawerReceiver(directory: directory, sessions: sessions)
         sut.enable(.userDefaults(model))
         let expectedEvents: [DebugDrawerAuditEntry.Event] = [
@@ -233,11 +233,11 @@ struct UserDefaultsReceiverTests {
         // Never enabled.
         try send("never")
         // Enabled, then disabled.
-        sut.enable(.userDefaults(DebugDrawerUserDefaults(keys: allowlist, defaults: defaults)))
+        try sut.enable(.userDefaults(DebugDrawerUserDefaults(keys: allowlist, defaults: defaults)))
         sut.disable(defaultsID)
         try send("disabled")
         // Enabled behind its gate, turned off.
-        sut.enable(.userDefaults(DebugDrawerUserDefaults(keys: allowlist, defaults: defaults))) { gate.isOpen }
+        try sut.enable(.userDefaults(DebugDrawerUserDefaults(keys: allowlist, defaults: defaults))) { gate.isOpen }
         gate.isOpen = false
         try send("gated")
         let expectedOutcomes: [DebugDrawerAuditEntry.Event] =
@@ -275,7 +275,7 @@ struct UserDefaultsReceiverTests {
         }
         let sessions = DebugDrawerSessions(maximumDuration: 300, auditCapacity: 100, clock: MovableClock(Self.now), timer: ManualTimer())
         let sut = DebugDrawerReceiver(directory: directory, sessions: sessions)
-        sut.enable(.userDefaults(DebugDrawerUserDefaults(keys: allowlist, defaults: defaults)))
+        try sut.enable(.userDefaults(DebugDrawerUserDefaults(keys: allowlist, defaults: defaults)))
         try sut.start()
         defer { sut.stop() }
         let session = try #require(sessions.snapshot.session)
@@ -370,7 +370,7 @@ struct UserDefaultsReceiverTests {
         let clock = MovableClock(Self.now)
         let timer = ManualTimer()
         let sessions = DebugDrawerSessions(maximumDuration: 300, auditCapacity: 100, clock: clock, timer: timer)
-        let model = DebugDrawerUserDefaults(keys: allowlist, defaults: defaults)
+        let model = try DebugDrawerUserDefaults(keys: allowlist, defaults: defaults)
         let sut = DebugDrawerReceiver(directory: directory, sessions: sessions)
         sut.enable(.userDefaults(model))
         try sut.start()
@@ -400,7 +400,7 @@ struct UserDefaultsReceiverTests {
         let capabilityGate = Gate()
         let receiverGate = Gate()
         let sut = DebugDrawerReceiver(directory: directory, sessions: sessions) { receiverGate.isOpen }
-        sut.enable(.userDefaults(DebugDrawerUserDefaults(keys: allowlist, defaults: defaults))) { capabilityGate.isOpen }
+        try sut.enable(.userDefaults(DebugDrawerUserDefaults(keys: allowlist, defaults: defaults))) { capabilityGate.isOpen }
         try sut.start()
         defer { sut.stop() }
         sessions.perform(.open(duration: 60))
@@ -451,14 +451,14 @@ struct UserDefaultsReceiverTests {
         }
         let sessions = DebugDrawerSessions(maximumDuration: 300, auditCapacity: 100, clock: MovableClock(Self.now), timer: ManualTimer())
         let killedLaunch = DebugDrawerReceiver(directory: directory, sessions: sessions)
-        killedLaunch.enable(.userDefaults(DebugDrawerUserDefaults(keys: allowlist, defaults: defaults)))
+        try killedLaunch.enable(.userDefaults(DebugDrawerUserDefaults(keys: allowlist, defaults: defaults)))
         sessions.perform(.open(duration: 60))
         try killedLaunch.start()
         // The app is killed with the session open: nothing ends it, so its revert never runs.
         killedLaunch.stop()
         let leftByKill = (defaults.string(forKey: "plan"), defaults.string(forKey: "greeting"))
         // The next launch: a new process, whose model finds the record the edits left.
-        let model = DebugDrawerUserDefaults(keys: allowlist, defaults: defaults)
+        let model = try DebugDrawerUserDefaults(keys: allowlist, defaults: defaults)
         let recordedAtLaunch = model.snapshot.editedKeys
 
         _ = DebugDrawerReceiverCapability.userDefaults(model)
@@ -481,7 +481,7 @@ struct UserDefaultsReceiverTests {
         #expect(layout.create())
         let sessions = DebugDrawerSessions(maximumDuration: 300, auditCapacity: 100, clock: MovableClock(Self.now), timer: ManualTimer())
         let sut = DebugDrawerReceiver(directory: directory, sessions: sessions)
-        sut.enable(.userDefaults(DebugDrawerUserDefaults(keys: allowlist, defaults: defaults), scope: .persistent))
+        try sut.enable(.userDefaults(DebugDrawerUserDefaults(keys: allowlist, defaults: defaults), scope: .persistent))
         try sut.start()
         defer { sut.stop() }
 
@@ -495,7 +495,7 @@ struct UserDefaultsReceiverTests {
         try send(.set(key: "showsTips", value: .bool(true)), "0")
         sessions.end()
         let afterSession = defaults.object(forKey: "showsTips") as? Bool
-        let nextLaunch = DebugDrawerUserDefaults(keys: allowlist, defaults: defaults)
+        let nextLaunch = try DebugDrawerUserDefaults(keys: allowlist, defaults: defaults)
         _ = DebugDrawerReceiverCapability.userDefaults(nextLaunch, scope: .persistent)
         let afterLaunch = (defaults.object(forKey: "showsTips") as? Bool, nextLaunch.snapshot.editedKeys)
         sessions.perform(.open(duration: 60))
@@ -514,7 +514,7 @@ struct UserDefaultsReceiverTests {
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         defaults.register(defaults: ["itemsPerPage": 30])
-        let model = DebugDrawerUserDefaults(keys: allowlist, defaults: defaults)
+        let model = try DebugDrawerUserDefaults(keys: allowlist, defaults: defaults)
         model.perform(.set(key: "itemsPerPage", value: .integer(60)))
         let edited = defaults.integer(forKey: "itemsPerPage")
         defaults.register(defaults: ["itemsPerPage": 40])
@@ -531,7 +531,7 @@ struct UserDefaultsReceiverTests {
         let suite = temporarySuiteName("UserDefaultsReceiverTests")
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
-        let sut = DebugDrawerUserDefaults(keys: allowlist, defaults: defaults)
+        let sut = try DebugDrawerUserDefaults(keys: allowlist, defaults: defaults)
         let expected = DebugDrawerUserDefaultsValue.string("pro")
 
         defaults.set("pro", forKey: "plan")
@@ -559,7 +559,7 @@ struct UserDefaultsReceiverTests {
             maximumDuration: 300, auditCapacity: 100, grantPolicy: policy, clock: MovableClock(Self.now), timer: ManualTimer()
         )
         let sut = DebugDrawerReceiver(directory: directory, sessions: sessions)
-        sut.enable(.userDefaults(DebugDrawerUserDefaults(keys: allowlist, defaults: defaults)))
+        try sut.enable(.userDefaults(DebugDrawerUserDefaults(keys: allowlist, defaults: defaults)))
         let flagSuite = temporarySuiteName("UserDefaultsReceiverTests.flags")
         let flagDefaults = try #require(UserDefaults(suiteName: flagSuite))
         defer { flagDefaults.removePersistentDomain(forName: flagSuite) }

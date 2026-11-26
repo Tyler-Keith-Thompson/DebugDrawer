@@ -109,6 +109,26 @@ public final class DebugDrawerScenarios: DebugDrawerPluginModel {
         case run(scenario: String, arguments: [String: DebugDrawerScenarioValue])
     }
 
+    /// Scenarios the model can't serve, which it refuses as it is made.
+    public enum InvalidScenarios: Error, Equatable, Sendable {
+        /// Two scenarios share an ID.
+        case duplicateScenarioID
+        /// Two parameters of one scenario share a name.
+        case duplicateParameterName
+        /// A string parameter's maximum length is 0 or less.
+        case maximumLengthNotPositive
+        /// A string parameter's default is longer than its maximum length.
+        case defaultTooLong
+        /// An integer parameter's default is outside its range.
+        case defaultOutOfRange
+        /// A choice parameter has no options.
+        case noOptions
+        /// A choice parameter lists an option twice.
+        case repeatedOption
+        /// A choice parameter's default isn't one of its options.
+        case defaultNotAnOption
+    }
+
     /// The scenarios and the last launch now.
     @Published public private(set) var snapshot: Snapshot
 
@@ -117,20 +137,30 @@ public final class DebugDrawerScenarios: DebugDrawerPluginModel {
 
     /// The scenarios `scenarios`, launched from a sidecar that opens the app with `launchURL`.
     ///
-    /// Traps when two scenarios share an ID.
-    ///
     /// - Parameters:
     ///   - scenarios: The scenarios a sidecar may launch, in the order to list them.
     ///   - launchURL: A URL of the app's own scheme that brings it to the foreground (on iOS the
     ///     only way a sidecar can); `nil` when it has none. The receiver doesn't need it: a command
     ///     the sidecar leaves is performed as the app comes to the foreground however it got there.
-    public convenience init(scenarios: [DebugDrawerScenario], launchURL: URL? = nil) {
-        self.init(scenarios: scenarios, launchURL: launchURL, now: Date.init)
+    /// - Throws: ``InvalidScenarios`` when two scenarios share an ID, two parameters of one
+    ///   scenario share a name, or a parameter contradicts itself (a string's maximum length not
+    ///   positive or its default longer, an integer's default outside its range, a choice with no
+    ///   options, a repeated one or a default not among them).
+    public convenience init(scenarios: [DebugDrawerScenario], launchURL: URL? = nil) throws(InvalidScenarios) {
+        try self.init(scenarios: scenarios, launchURL: launchURL, now: Date.init)
     }
 
     /// The scenarios `scenarios`, timing launches with `now`.
-    package init(scenarios: [DebugDrawerScenario], launchURL: URL?, now: @escaping () -> Date) {
-        precondition(Set(scenarios.map(\.id)).count == scenarios.count, "Two scenarios share an ID")
+    ///
+    /// - Throws: As ``init(scenarios:launchURL:)`` does.
+    package init(scenarios: [DebugDrawerScenario], launchURL: URL?, now: @escaping () -> Date) throws(InvalidScenarios) {
+        guard Set(scenarios.map(\.id)).count == scenarios.count else { throw .duplicateScenarioID }
+        for scenario in scenarios {
+            guard Set(scenario.parameters.map(\.name)).count == scenario.parameters.count else { throw .duplicateParameterName }
+            for parameter in scenario.parameters {
+                try parameter.check()
+            }
+        }
         self.scenarios = Dictionary(uniqueKeysWithValues: scenarios.map { ($0.id, $0) })
         self.now = now
         snapshot = Snapshot(

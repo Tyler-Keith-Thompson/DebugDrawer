@@ -24,7 +24,7 @@ extension DebugDrawerReceiverCapability {
     /// reverted as the session ends.
     ///
     /// ```swift
-    /// receiver.enable(.authActions([
+    /// try receiver.enable(.authActions([
     ///     .expireAccessToken { auth.expireAccessToken(); return .succeeded },
     ///     .logOut { await auth.logOut(); return .succeeded }
     /// ], launchURL: URL(string: "shop-internal://")))
@@ -35,8 +35,12 @@ extension DebugDrawerReceiverCapability {
     ///     differ.
     ///   - launchURL: A URL of the app's own scheme that brings it to the foreground, or `nil`.
     /// - Returns: The capability, under ``DebugDrawerAuthActions/pluginID``.
-    public static func authActions(_ actions: [DebugDrawerAuthAction], launchURL: URL? = nil) -> Self {
-        authActions(DebugDrawerAuthActions(actions: actions, launchURL: launchURL))
+    /// - Throws: ``DebugDrawerAuthActions/DuplicateID`` when two actions share an ID.
+    public static func authActions(
+        _ actions: [DebugDrawerAuthAction],
+        launchURL: URL? = nil
+    ) throws(DebugDrawerAuthActions.DuplicateID) -> Self {
+        try authActions(DebugDrawerAuthActions(actions: actions, launchURL: launchURL))
     }
 
     /// Auth actions over a model the host also shows elsewhere, such as in its debug build's

@@ -26,7 +26,7 @@ final class ProductionScenarios {
 
     init(router: ShopRouter, container: URL) throws {
         receiver = DebugDrawerReceiver(directory: container.appending(path: "DebugDrawer"), sessions: sessions)
-        receiver.enable(.scenarios([
+        try receiver.enable(.scenarios([
             DebugDrawerScenario("open-order", title: "Open Order", parameters: [
                 .integer("orderID", title: "Order", default: 123, in: 1 ... 999_999)
             ]) { arguments in

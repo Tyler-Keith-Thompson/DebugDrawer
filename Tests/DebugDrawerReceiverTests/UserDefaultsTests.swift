@@ -111,7 +111,7 @@ struct UserDefaultsTests {
         defer { defaults.removePersistentDomain(forName: suite) }
         defaults.set("pro", forKey: "plan")
 
-        let sut = DebugDrawerUserDefaults(defaults: defaults)
+        let sut = try DebugDrawerUserDefaults(defaults: defaults)
 
         #expect(sut.snapshot == DebugDrawerUserDefaults.Snapshot(entries: [], editedKeys: []))
         #expect(sut.refusal(of: .set(key: "plan", value: .string("free"))) == .notExposed)
@@ -125,7 +125,7 @@ struct UserDefaultsTests {
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         defaults.set(Data([9, 9]), forKey: "greeting")
-        let sut = DebugDrawerUserDefaults(.string("greeting"), defaults: defaults)
+        let sut = try DebugDrawerUserDefaults(.string("greeting"), defaults: defaults)
         sut.perform(.set(key: "greeting", value: .string("Hi")))
         sut.perform(.set(key: "greeting", value: .string("Hello")))
 

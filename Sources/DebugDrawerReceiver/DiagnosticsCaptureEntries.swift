@@ -6,11 +6,24 @@ import Foundation
 // kept, which is what the store writes; they bound the capture, they aren't an exact file size.
 
 extension DebugDrawerDiagnosticsCapture {
+    /// Bounds a capture can't keep within, which ``Limits/init(lines:requests:bodyBytes:totalBytes:)``
+    /// refuses.
+    public enum InvalidLimits: Error, Equatable, Sendable {
+        /// Fewer than 1 log line would be kept.
+        case noLines
+        /// Fewer than 1 request would be kept.
+        case noRequests
+        /// The largest body kept is negative.
+        case negativeBodyBytes
+        /// Fewer than 1 byte would be kept in all.
+        case noTotalBytes
+    }
+
     /// How much one session's capture keeps: when a bound is reached, the oldest entries go first.
     public struct Limits: Codable, Equatable, Sendable {
         /// The bounds the capture keeps unless the host passes others: 1,000 log lines, 200
         /// requests, bodies of up to 64 KiB, 2 MiB in all.
-        public static let standard = Limits(lines: 1000, requests: 200, bodyBytes: 64 << 10, totalBytes: 2 << 20)
+        public static let standard = Limits(uncheckedLines: 1000, requests: 200, bodyBytes: 64 << 10, totalBytes: 2 << 20)
 
         /// The most log lines kept, the newest.
         public let lines: Int
@@ -30,10 +43,22 @@ extension DebugDrawerDiagnosticsCapture {
         ///   - requests: The most requests kept.
         ///   - bodyBytes: The largest body kept, in bytes.
         ///   - totalBytes: The most bytes kept in all.
-        /// - Precondition: `lines`, `requests` and `totalBytes` are at least 1, and `bodyBytes` at
-        ///   least 0.
-        public init(lines: Int, requests: Int, bodyBytes: Int, totalBytes: Int) {
-            precondition(lines > 0 && requests > 0 && totalBytes > 0 && bodyBytes >= 0, "A diagnostics capture keeps at least one of each")
+        /// - Throws: ``DebugDrawerDiagnosticsCapture/InvalidLimits/noLines``,
+        ///   ``DebugDrawerDiagnosticsCapture/InvalidLimits/noRequests`` or
+        ///   ``DebugDrawerDiagnosticsCapture/InvalidLimits/noTotalBytes`` when `lines`, `requests`
+        ///   or `totalBytes` is less than 1, and
+        ///   ``DebugDrawerDiagnosticsCapture/InvalidLimits/negativeBodyBytes`` when `bodyBytes` is
+        ///   less than 0.
+        public init(lines: Int, requests: Int, bodyBytes: Int, totalBytes: Int) throws(InvalidLimits) {
+            guard lines >= 1 else { throw .noLines }
+            guard requests >= 1 else { throw .noRequests }
+            guard bodyBytes >= 0 else { throw .negativeBodyBytes }
+            guard totalBytes >= 1 else { throw .noTotalBytes }
+            self.init(uncheckedLines: lines, requests: requests, bodyBytes: bodyBytes, totalBytes: totalBytes)
+        }
+
+        /// Bounds the caller knows are valid: ``standard``, a constant no input reaches.
+        private init(uncheckedLines lines: Int, requests: Int, bodyBytes: Int, totalBytes: Int) {
             self.lines = lines
             self.requests = requests
             self.bodyBytes = bodyBytes

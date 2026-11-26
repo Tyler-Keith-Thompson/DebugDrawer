@@ -147,7 +147,7 @@
             }
             let sessions = DebugDrawerSessions(maximumDuration: 300)
             let sut = DebugDrawerReceiver(directory: directory, sessions: sessions)
-            sut.enable(.authActions([]))
+            try sut.enable(.authActions([]))
 
             try sut.start()
             defer { sut.stop() }

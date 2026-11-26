@@ -129,7 +129,7 @@ struct AppStateTests {
         )
         let experiments = DebugDrawerExperimentOverrides(adapter: experimentService, defaults: defaults)
         experiments.perform(.setOverride(experiment: "onboarding", variant: "b"))
-        let environments = DebugDrawerEnvironments(
+        let environments = try DebugDrawerEnvironments(
             default: DebugDrawerEnvironment("production", title: "Production"),
             allowing: DebugDrawerEnvironment("staging", title: "Staging"),
             adapter: FakeBackend(), defaults: defaults
@@ -170,7 +170,7 @@ struct AppStateTests {
         defer { defaults.removePersistentDomain(forName: suite) }
         let sessions = DebugDrawerSessions(maximumDuration: 300)
         let flags = DebugDrawerFeatureFlagOverrides(adapter: FakeFlagService(["new-checkout": .bool(false)]), defaults: defaults)
-        let environments = DebugDrawerEnvironments(
+        let environments = try DebugDrawerEnvironments(
             default: DebugDrawerEnvironment("production", title: "Production"),
             allowing: DebugDrawerEnvironment("staging", title: "Staging"),
             adapter: FakeBackend(), defaults: defaults

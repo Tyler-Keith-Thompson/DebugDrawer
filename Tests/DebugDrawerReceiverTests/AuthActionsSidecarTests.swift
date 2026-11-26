@@ -66,7 +66,7 @@
             let sessions = DebugDrawerSessions(maximumDuration: 300)
             let receiver = DebugDrawerReceiver(directory: store, sessions: sessions)
             let signIn = FakeSignIn()
-            receiver.enable(.authActions(signIn.actions, launchURL: URL(string: "shop-internal://")))
+            try receiver.enable(.authActions(signIn.actions, launchURL: URL(string: "shop-internal://")))
             try receiver.start()
             defer { receiver.stop() }
             let sidecar = try DebugDrawerAppGroupStoreTransport(directory: AppGroupStoreLayout.appDirectory(inStore: store))

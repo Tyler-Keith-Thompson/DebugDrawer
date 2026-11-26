@@ -52,7 +52,8 @@ keep there. Give the app a group of its own if that matters.
 
 ### The keychain only when asked for by name
 
-`.all` holds every category but the keychain, and naming `.keychain` in `allowing:` traps. The app
+`.all` holds every category but the keychain, and naming `.keychain` in `allowing:` throws
+`AppStateResetRequests.KeychainAsCategory`. The app
 allows the keychain with `allowingKeychain: true` alone, and then the listing names each item by its
 service or label, never its account.
 

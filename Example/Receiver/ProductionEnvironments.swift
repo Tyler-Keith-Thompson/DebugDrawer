@@ -18,10 +18,12 @@ final class ProductionEnvironments {
     /// left is undone before the app's first request.
     let model: DebugDrawerEnvironments
 
-    init() {
+    /// - Throws: `DebugDrawerEnvironments.InvalidEnvironments` if the IDs above were empty or
+    ///   repeated.
+    init() throws(DebugDrawerEnvironments.InvalidEnvironments) {
         let backend = ProductionBackend()
         self.backend = backend
-        model = DebugDrawerEnvironments(default: Self.production, allowing: Self.staging, Self.canary, adapter: backend)
+        model = try DebugDrawerEnvironments(default: Self.production, allowing: Self.staging, Self.canary, adapter: backend)
     }
 }
 

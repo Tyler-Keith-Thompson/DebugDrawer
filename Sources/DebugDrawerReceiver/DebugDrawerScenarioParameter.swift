@@ -7,8 +7,9 @@ import Foundation
 // picker). Rejected: a free-form JSON value (the handler would parse input the receiver never
 // checked) and a validation closure (it would run on received input before the handler, and a
 // sidecar couldn't show the bounds). A declaration that contradicts itself (a default outside the
-// bounds, no options) is the host's programming error and traps where it is written, as an invalid
-// redaction pattern does, rather than letting a sidecar find it.
+// bounds, no options) is refused by the scenarios it is handed to
+// (`DebugDrawerScenarios.InvalidScenarios`) rather than by each factory, so a scenario's list of
+// parameters reads without a `try` per parameter and one `catch` covers every declaration.
 
 /// A named, typed parameter a ``DebugDrawerScenario`` declares: the only values a sidecar may pass
 /// the scenario.
@@ -49,33 +50,27 @@ public struct DebugDrawerScenarioParameter: Codable, Equatable, Sendable {
 
     /// A text parameter.
     ///
-    /// Traps when `maximumLength` isn't positive or `default` is longer.
-    ///
     /// - Parameters:
     ///   - name: The name the handler reads the value by.
     ///   - title: The name a sidecar shows; `name` when `nil`.
-    ///   - default: The value a sidecar starts at.
-    ///   - maximumLength: The most characters a value may have.
+    ///   - default: The value a sidecar starts at; no longer than `maximumLength`, or the scenarios
+    ///     throw.
+    ///   - maximumLength: The most characters a value may have; positive, or the scenarios throw.
     /// - Returns: The parameter.
     public static func string(_ name: String, title: String? = nil, default: String = "", maximumLength: Int = 256) -> Self {
-        precondition(maximumLength > 0, "A string parameter's maximum length must be positive")
-        precondition(`default`.count <= maximumLength, "A string parameter's default is longer than its maximum length")
-        return Self(name: name, title: title ?? name, kind: .string(maximumLength: maximumLength), defaultValue: .string(`default`))
+        Self(name: name, title: title ?? name, kind: .string(maximumLength: maximumLength), defaultValue: .string(`default`))
     }
 
     /// A whole-number parameter.
     ///
-    /// Traps when `default` is outside `range`.
-    ///
     /// - Parameters:
     ///   - name: The name the handler reads the value by.
     ///   - title: The name a sidecar shows; `name` when `nil`.
-    ///   - default: The value a sidecar starts at.
+    ///   - default: The value a sidecar starts at; within `range`, or the scenarios throw.
     ///   - range: The values it takes.
     /// - Returns: The parameter.
     public static func integer(_ name: String, title: String? = nil, default: Int = 0, in range: ClosedRange<Int> = Int.min ... Int.max) -> Self {
-        precondition(range.contains(`default`), "An integer parameter's default is outside its range")
-        return Self(name: name, title: title ?? name, kind: .integer(range: range), defaultValue: .integer(`default`))
+        Self(name: name, title: title ?? name, kind: .integer(range: range), defaultValue: .integer(`default`))
     }
 
     /// An on-or-off parameter.
@@ -91,19 +86,17 @@ public struct DebugDrawerScenarioParameter: Codable, Equatable, Sendable {
 
     /// A parameter taking one of `options`.
     ///
-    /// Traps when `options` is empty or repeats an option, or `default` isn't one of them.
-    ///
     /// - Parameters:
     ///   - name: The name the handler reads the value by.
     ///   - title: The name a sidecar shows; `name` when `nil`.
-    ///   - options: The values it takes, in the order a sidecar lists them.
-    ///   - default: The value a sidecar starts at; the first option when `nil`.
+    ///   - options: The values it takes, in the order a sidecar lists them; at least one and none
+    ///     repeated, or the scenarios throw.
+    ///   - default: The value a sidecar starts at, one of `options` or the scenarios throw; the
+    ///     first option when `nil`.
     /// - Returns: The parameter.
     public static func choice(_ name: String, title: String? = nil, options: [String], default: String? = nil) -> Self {
-        precondition(!options.isEmpty, "A choice parameter needs at least one option")
-        precondition(Set(options).count == options.count, "A choice parameter's options repeat")
-        let initial = `default` ?? options[0]
-        precondition(options.contains(initial), "A choice parameter's default isn't one of its options")
+        // With no options the default is empty text, which the scenarios refuse as `noOptions`.
+        let initial = `default` ?? options.first ?? ""
         return Self(name: name, title: title ?? name, kind: .choice(options: options), defaultValue: .string(initial))
     }
 
@@ -118,6 +111,27 @@ public struct DebugDrawerScenarioParameter: Codable, Equatable, Sendable {
         case (.boolean, .boolean): true
         case let (.choice(options), .string(option)): options.contains(option)
         default: false
+        }
+    }
+}
+
+extension DebugDrawerScenarioParameter {
+    /// Throws when the declaration contradicts itself: a string's maximum length not positive or
+    /// its default longer, an integer's default outside its range, a choice with no options, a
+    /// repeated one or a default not among them.
+    func check() throws(DebugDrawerScenarios.InvalidScenarios) {
+        switch kind {
+        case let .string(maximumLength):
+            guard maximumLength > 0 else { throw .maximumLengthNotPositive }
+            guard accepts(defaultValue) else { throw .defaultTooLong }
+        case .integer:
+            guard accepts(defaultValue) else { throw .defaultOutOfRange }
+        case let .choice(options):
+            guard !options.isEmpty else { throw .noOptions }
+            guard Set(options).count == options.count else { throw .repeatedOption }
+            guard accepts(defaultValue) else { throw .defaultNotAnOption }
+        case .boolean:
+            return
         }
     }
 }

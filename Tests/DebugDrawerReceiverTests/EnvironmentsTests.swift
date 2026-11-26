@@ -44,7 +44,7 @@ struct EnvironmentsTests {
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         let backend = RecordingBackend(defaults: defaults)
-        let sut = DebugDrawerEnvironments(default: production, allowing: staging, canary, adapter: backend, defaults: defaults)
+        let sut = try DebugDrawerEnvironments(default: production, allowing: staging, canary, adapter: backend, defaults: defaults)
         let expectedTopLevel: Set<String> = ["environments", "defaultEnvironment", "activeEnvironment"]
         let expectedEnvironment: Set<String> = ["id", "title", "summary"]
 
@@ -75,7 +75,9 @@ struct EnvironmentsTests {
         let suite = temporarySuiteName("EnvironmentsTests")
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
-        let sut = DebugDrawerEnvironments(default: production, allowing: staging, adapter: RecordingBackend(defaults: defaults), defaults: defaults)
+        let sut = try DebugDrawerEnvironments(
+            default: production, allowing: staging, adapter: RecordingBackend(defaults: defaults), defaults: defaults
+        )
         let commands: [DebugDrawerEnvironments.Command] = [
             .activate(environment: "production"),
             .activate(environment: "staging"),
@@ -96,7 +98,7 @@ struct EnvironmentsTests {
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         let backend = RecordingBackend(defaults: defaults)
-        let sut = DebugDrawerEnvironments(default: production, allowing: staging, canary, adapter: backend, defaults: defaults)
+        let sut = try DebugDrawerEnvironments(default: production, allowing: staging, canary, adapter: backend, defaults: defaults)
 
         sut.perform(.activate(environment: "staging"))
         sut.perform(.activate(environment: "canary"))
@@ -114,7 +116,7 @@ struct EnvironmentsTests {
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         let backend = RecordingBackend(defaults: defaults)
-        let sut = DebugDrawerEnvironments(default: production, allowing: staging, adapter: backend, defaults: defaults)
+        let sut = try DebugDrawerEnvironments(default: production, allowing: staging, adapter: backend, defaults: defaults)
 
         sut.perform(.reset)
         sut.perform(.activate(environment: "production"))
@@ -132,7 +134,7 @@ struct EnvironmentsTests {
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         let backend = RecordingBackend(defaults: defaults)
-        let sut = DebugDrawerEnvironments(default: production, allowing: staging, adapter: backend, defaults: defaults)
+        let sut = try DebugDrawerEnvironments(default: production, allowing: staging, adapter: backend, defaults: defaults)
 
         sut.perform(.activate(environment: "https://attacker.example"))
 
@@ -148,7 +150,7 @@ struct EnvironmentsTests {
         defer { defaults.removePersistentDomain(forName: suite) }
         defaults.set("retired-qa", forKey: DebugDrawerEnvironments.activeEnvironmentDefaultsKey)
         let backend = RecordingBackend(defaults: defaults)
-        let model = DebugDrawerEnvironments(default: production, allowing: staging, adapter: backend, defaults: defaults)
+        let model = try DebugDrawerEnvironments(default: production, allowing: staging, adapter: backend, defaults: defaults)
 
         let sut = DebugDrawerReceiverCapability.environments(model)
 

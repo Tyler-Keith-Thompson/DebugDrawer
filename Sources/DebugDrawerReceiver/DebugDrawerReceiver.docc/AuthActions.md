@@ -34,7 +34,7 @@ final class ProductionAuthActions {
 
     init(auth: AuthService, container: URL) throws {
         receiver = DebugDrawerReceiver(directory: container.appending(path: "DebugDrawer"), sessions: sessions)
-        receiver.enable(.authActions([
+        try receiver.enable(.authActions([
             .expireAccessToken {
                 auth.expireAccessToken()
                 return .succeeded

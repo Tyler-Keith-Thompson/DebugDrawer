@@ -18,7 +18,7 @@ private final class ProductionDefaults {
 
     init(container: URL) throws {
         receiver = DebugDrawerReceiver(directory: container.appending(path: "DebugDrawer"), sessions: sessions)
-        receiver.enable(.userDefaults(
+        try receiver.enable(.userDefaults(
             .choice("plan", title: "Plan", options: ["free", "pro"]),
             .bool("showsTips", title: "Shows Tips"),
             .integer("itemsPerPage", title: "Items per Page", in: 10 ... 100)

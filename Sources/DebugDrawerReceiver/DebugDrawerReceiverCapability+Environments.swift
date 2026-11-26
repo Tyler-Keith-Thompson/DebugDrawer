@@ -25,15 +25,13 @@ extension DebugDrawerReceiverCapability {
     /// ``DebugDrawerEnvironments/Snapshot/isSwitched``.
     ///
     /// ```swift
-    /// receiver.enable(.environments(
+    /// try receiver.enable(.environments(
     ///     default: DebugDrawerEnvironment("production", title: "Production"),
     ///     allowing: DebugDrawerEnvironment("staging", title: "Staging"),
     ///     DebugDrawerEnvironment("canary", title: "Canary"),
     ///     adapter: backendSwitcher
     /// ))
     /// ```
-    ///
-    /// Traps when two environments, the default included, share an ID.
     ///
     /// - Parameters:
     ///   - defaultEnvironment: The environment the app starts in and returns to as each session
@@ -42,14 +40,16 @@ extension DebugDrawerReceiverCapability {
     ///   - rest: More environments a sidecar may switch the app to, in the order to list them.
     ///   - adapter: The host's adapter, which maps each environment's ID to its own configuration.
     /// - Returns: The capability, under ``DebugDrawerEnvironments/pluginID``.
+    /// - Throws: ``DebugDrawerEnvironments/InvalidEnvironments`` when an environment's ID is empty
+    ///   or two environments, the default included, share an ID.
     public static func environments(
         default defaultEnvironment: DebugDrawerEnvironment,
         allowing first: DebugDrawerEnvironment,
         _ rest: DebugDrawerEnvironment...,
         adapter: some DebugDrawerEnvironmentAdapter
-    ) -> Self {
+    ) throws(DebugDrawerEnvironments.InvalidEnvironments) -> Self {
         // A variadic parameter can't be forwarded to another, so the model is made from the list.
-        environments(DebugDrawerEnvironments(default: defaultEnvironment, allowing: first, rest, adapter: adapter, defaults: .standard))
+        try environments(DebugDrawerEnvironments(default: defaultEnvironment, allowing: first, rest, adapter: adapter, defaults: .standard))
     }
 
     /// Environment switching over a model the host also shows elsewhere, such as in its debug

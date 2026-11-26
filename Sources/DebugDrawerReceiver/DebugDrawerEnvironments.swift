@@ -6,8 +6,10 @@ import os
 // must not be able to point the app at a host of an attacker's, so the allowlist is the only thing
 // a sidecar can pick from and it can't be left out: the initializer takes a default and at least
 // one allowed environment as separate parameters (`allowing first:, _ rest...`), so an empty
-// allowlist doesn't compile, and an allowed environment repeating another's ID (the default's
-// included, which would leave nothing to switch to) traps. A command carries an environment's ID
+// allowlist doesn't compile, and an environment with an empty ID or repeating another's ID (the
+// default's included, which would leave nothing to switch to) throws `InvalidEnvironments`. The
+// check is the model's rather than `DebugDrawerEnvironment`'s, so a list of environments reads
+// without a `try` per value and one `catch` covers the allowlist. A command carries an environment's ID
 // and nothing else; one the host didn't list is refused `notExposed` before the model sees it, and
 // the adapter is handed the host's own value, never a decoded one. Nothing in the model, its
 // snapshot or its commands can hold a URL.
@@ -17,8 +19,8 @@ import os
 // written to the defaults before the adapter is told, so a launch that follows a kill finds it and
 // puts the default back as the capability is made.
 //
-// Rejected: an allowlist as an array (an empty one would be a trap at run time instead of a compile
-// error, and an allowlist built from remote configuration is the very thing a leak would target:
+// Rejected: an allowlist as an array (an empty one would be an error at run time instead of a
+// compile error, and an allowlist built from remote configuration is the very thing a leak would target:
 // it belongs in the app's source); a variant taking an array for config-driven lists, for the same
 // reason; and `requiringGrant()` built in, as network mocking has it (charter D6 keeps grants
 // optional, and with a grant policy every capability already needs a grant listing it, so where a
@@ -75,6 +77,14 @@ public final class DebugDrawerEnvironments: DebugDrawerPluginModel {
         case reset
     }
 
+    /// An allowlist the model can't serve, which it refuses as it is made.
+    public enum InvalidEnvironments: Error, Equatable, Sendable {
+        /// An environment's ID is empty.
+        case emptyID
+        /// Two environments, the default included, share an ID.
+        case duplicateID
+    }
+
     /// The environments and the active one now.
     @Published public private(set) var snapshot: Snapshot
 
@@ -89,8 +99,6 @@ public final class DebugDrawerEnvironments: DebugDrawerPluginModel {
     /// The host's environments: `defaultEnvironment`, the one the app starts in, and those a
     /// sidecar may switch it to, at least one, switched through `adapter`.
     ///
-    /// Traps when two environments, the default included, share an ID.
-    ///
     /// - Parameters:
     ///   - defaultEnvironment: The environment the app starts in and returns to as each session
     ///     ends: usually production.
@@ -99,27 +107,33 @@ public final class DebugDrawerEnvironments: DebugDrawerPluginModel {
     ///   - adapter: The host's adapter, which maps each environment's ID to its own configuration.
     ///   - defaults: Where the model keeps the ID of the environment a session switched to, so a
     ///     launch that follows a kill puts the default back; never anything of the configuration.
+    /// - Throws: ``InvalidEnvironments/emptyID`` when an environment's ID is empty, and
+    ///   ``InvalidEnvironments/duplicateID`` when two environments, the default included, share
+    ///   an ID.
     public convenience init(
         default defaultEnvironment: DebugDrawerEnvironment,
         allowing first: DebugDrawerEnvironment,
         _ rest: DebugDrawerEnvironment...,
         adapter: some DebugDrawerEnvironmentAdapter,
         defaults: UserDefaults = .standard
-    ) {
-        self.init(default: defaultEnvironment, allowing: first, rest, adapter: adapter, defaults: defaults)
+    ) throws(InvalidEnvironments) {
+        try self.init(default: defaultEnvironment, allowing: first, rest, adapter: adapter, defaults: defaults)
     }
 
     /// The host's environments, the allowed ones after `first` as a list, for the capability's
     /// variadic factory, which can't forward its own.
+    ///
+    /// - Throws: As ``init(default:allowing:_:adapter:defaults:)`` does.
     init(
         default defaultEnvironment: DebugDrawerEnvironment,
         allowing first: DebugDrawerEnvironment,
         _ rest: [DebugDrawerEnvironment],
         adapter: any DebugDrawerEnvironmentAdapter,
         defaults: UserDefaults
-    ) {
+    ) throws(InvalidEnvironments) {
         let listed = [defaultEnvironment, first] + rest
-        precondition(Set(listed.map(\.id)).count == listed.count, "Two environments share an ID")
+        guard !listed.contains(where: \.id.isEmpty) else { throw .emptyID }
+        guard Set(listed.map(\.id)).count == listed.count else { throw .duplicateID }
         self.defaultEnvironment = defaultEnvironment
         environments = Dictionary(uniqueKeysWithValues: listed.map { ($0.id, $0) })
         self.adapter = adapter

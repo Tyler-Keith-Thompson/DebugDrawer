@@ -443,7 +443,7 @@ struct BugReportsReceiverTests {
         let clock = MovableClock(Self.now)
         let sessions = DebugDrawerSessions(maximumDuration: 300, auditCapacity: 100, clock: clock, timer: ManualTimer())
         let capture = DebugDrawerDiagnosticsCapture(sessions: sessions, redaction: .standard, limits: .standard) { clock.now }
-        let limits = DebugDrawerBugReports.Limits(reports: 2, logLines: 1, stateBytes: 10, screenshotBytes: 100)
+        let limits = try DebugDrawerBugReports.Limits(reports: 2, logLines: 1, stateBytes: 10, screenshotBytes: 100)
         let window = FakeWindow()
         let reports = DebugDrawerBugReports(
             sessions: sessions, diagnostics: capture, redaction: .standard, limits: limits,

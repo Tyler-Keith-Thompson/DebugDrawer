@@ -70,7 +70,7 @@ struct ScenariosReceiverTests {
         let launchURL = try #require(URL(string: "shop-internal://scenarios"))
         let sessions = DebugDrawerSessions(maximumDuration: 300, auditCapacity: 100, clock: FixedClock(now: Self.now), timer: IdleTimer())
         let sut = DebugDrawerReceiver(directory: directory, sessions: sessions)
-        sut.enable(.scenarios(router.scenarios, launchURL: launchURL))
+        try sut.enable(.scenarios(router.scenarios, launchURL: launchURL))
         let snapshotFile = layout.snapshotFile(for: scenariosID)
         let expected = DebugDrawerScenarios.Snapshot(
             scenarios: [
@@ -130,7 +130,7 @@ struct ScenariosReceiverTests {
             try layout.write(document.encoded(), to: layout.commands.appending(path: "\(index).json"))
         }
         let sessions = DebugDrawerSessions(maximumDuration: 300, auditCapacity: 100, clock: FixedClock(now: Self.now), timer: IdleTimer())
-        let model = DebugDrawerScenarios(scenarios: router.scenarios, launchURL: nil, now: { Self.now })
+        let model = try DebugDrawerScenarios(scenarios: router.scenarios, launchURL: nil, now: { Self.now })
         let sut = DebugDrawerReceiver(directory: directory, sessions: sessions)
         sut.enable(.scenarios(model))
         let expectedVisits = ["order 42 receipt true", "paywall annual promo "]
@@ -174,7 +174,7 @@ struct ScenariosReceiverTests {
             try layout.write(document.encoded(), to: layout.commands.appending(path: String(format: "%03d.json", index)))
         }
         let sessions = DebugDrawerSessions(maximumDuration: 300, auditCapacity: 100, clock: FixedClock(now: Self.now), timer: IdleTimer())
-        let model = DebugDrawerScenarios(scenarios: router.scenarios, launchURL: nil, now: { Self.now })
+        let model = try DebugDrawerScenarios(scenarios: router.scenarios, launchURL: nil, now: { Self.now })
         let sut = DebugDrawerReceiver(directory: directory, sessions: sessions)
         sut.enable(.scenarios(model))
         let expectedEvents: [DebugDrawerAuditEntry.Event] = [.commandRefused(.notExposed)]
@@ -200,7 +200,7 @@ struct ScenariosReceiverTests {
         try layout.write(document.encoded(), to: layout.commands.appending(path: "0.json"))
         let sessions = DebugDrawerSessions(maximumDuration: 300, auditCapacity: 100, clock: FixedClock(now: Self.now), timer: IdleTimer())
         let sut = DebugDrawerReceiver(directory: directory, sessions: sessions)
-        sut.enable(.scenarios(router.scenarios))
+        try sut.enable(.scenarios(router.scenarios))
         let expectedEvent = DebugDrawerAuditEntry.Event.commandRefused(.noActiveSession)
 
         try sut.start()
@@ -262,7 +262,7 @@ struct ScenariosReceiverTests {
         }
         let sessions = DebugDrawerSessions(maximumDuration: 300, auditCapacity: 100, clock: FixedClock(now: Self.now), timer: IdleTimer())
         let sut = DebugDrawerReceiver(directory: directory, sessions: sessions)
-        sut.enable(.scenarios(router.scenarios).requiringGrant())
+        try sut.enable(.scenarios(router.scenarios).requiringGrant())
         let expectedEvent = DebugDrawerAuditEntry.Event.commandRefused(.grantMissing)
 
         try sut.start()

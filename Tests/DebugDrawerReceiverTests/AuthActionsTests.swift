@@ -40,7 +40,7 @@ struct AuthActionsTests {
             launchURL: launchURL
         )
 
-        let sut = DebugDrawerAuthActions(
+        let sut = try DebugDrawerAuthActions(
             actions: [.logOut { .succeeded }, DebugDrawerAuthAction("revoke", title: "Revoke Refresh Token") { .succeeded }],
             launchURL: launchURL
         )
@@ -49,10 +49,10 @@ struct AuthActionsTests {
     }
 
     @Test("A request runs the handler once, the run marked running until the handler returns, then succeeded")
-    func runningThenSucceeded() async {
+    func runningThenSucceeded() async throws {
         let (gate, open) = AsyncStream<Void>.makeStream()
         var calls = 0
-        let sut = DebugDrawerAuthActions(actions: [
+        let sut = try DebugDrawerAuthActions(actions: [
             .expireAccessToken {
                 calls += 1
                 var waiting = gate.makeAsyncIterator()
@@ -78,8 +78,8 @@ struct AuthActionsTests {
     }
 
     @Test("A failure's message reaches the snapshot, cut to the most a sidecar is shown")
-    func failureMessage() async {
-        let sut = DebugDrawerAuthActions(actions: [
+    func failureMessage() async throws {
+        let sut = try DebugDrawerAuthActions(actions: [
             .forceRefresh { .failed("Not signed in") },
             DebugDrawerAuthAction("long", title: "Long") {
                 // A multi-line literal: a StaticString can't be concatenated or built at run time.
@@ -111,10 +111,10 @@ struct AuthActionsTests {
     }
 
     @Test("Runs are numbered across actions; an older run finishing after a newer one started leaves the newer one's status")
-    func olderRunDoesNotOverwriteNewer() async {
+    func olderRunDoesNotOverwriteNewer() async throws {
         let (firstGate, openFirst) = AsyncStream<Void>.makeStream()
         var handlerCalls = 0
-        let sut = DebugDrawerAuthActions(actions: [
+        let sut = try DebugDrawerAuthActions(actions: [
             .logOut { .succeeded },
             .forceRefresh {
                 handlerCalls += 1
@@ -148,9 +148,9 @@ struct AuthActionsTests {
     }
 
     @Test("A request for an action the host didn't register is refused notExposed and, performed anyway, changes nothing")
-    func unregisteredAction() {
+    func unregisteredAction() throws {
         var calls = 0
-        let sut = DebugDrawerAuthActions(actions: [.logOut { calls += 1; return .succeeded }])
+        let sut = try DebugDrawerAuthActions(actions: [.logOut { calls += 1; return .succeeded }])
         let before = sut.snapshot
 
         let refusal = sut.refusal(of: .perform(action: "delete-account"))

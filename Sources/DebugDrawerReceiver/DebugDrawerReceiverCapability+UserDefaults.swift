@@ -25,26 +25,26 @@ extension DebugDrawerReceiverCapability {
     /// sidecar sends ``DebugDrawerUserDefaults/Command/revertAll``.
     ///
     /// ```swift
-    /// receiver.enable(.userDefaults(
+    /// try receiver.enable(.userDefaults(
     ///     .choice("plan", title: "Plan", options: ["free", "pro"]),
     ///     .bool("showsTips", title: "Shows Tips")
     /// ))
     /// ```
-    ///
-    /// Traps when two keys are the same.
     ///
     /// - Parameters:
     ///   - keys: The keys a sidecar may read and edit, in the order to list them.
     ///   - defaults: The defaults the keys are in.
     ///   - scope: What becomes of the edits when the session ends; by default they are reverted.
     /// - Returns: The capability, under ``DebugDrawerUserDefaults/pluginID``.
+    /// - Throws: ``DebugDrawerUserDefaults/InvalidKeys`` when a key is empty or one of
+    ///   DebugDrawer's own, a key's kind contradicts itself, or a key is listed twice.
     public static func userDefaults(
         _ keys: DebugDrawerUserDefaultsKey...,
         defaults: UserDefaults = .standard,
         scope: DebugDrawerChangeScope<DebugDrawerUserDefaults> = .session(revertWith: .revertAll)
-    ) -> Self {
+    ) throws(DebugDrawerUserDefaults.InvalidKeys) -> Self {
         // A variadic parameter can't be forwarded to another, so the model is made from the list.
-        userDefaults(DebugDrawerUserDefaults(keys: keys, defaults: defaults), scope: scope)
+        try userDefaults(DebugDrawerUserDefaults(keys: keys, defaults: defaults), scope: scope)
     }
 
     /// Allowlisted UserDefaults over a model the host also shows elsewhere, such as in its debug

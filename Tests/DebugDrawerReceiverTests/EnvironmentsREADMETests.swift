@@ -32,7 +32,7 @@ private final class ProductionEnvironments {
             verifier: DebugDrawerSignedGrantVerifier(keys: [.ed25519(grantServerKey)]),
             audience: "com.example.MyApp"
         ))
-        environments = DebugDrawerEnvironments(
+        environments = try DebugDrawerEnvironments(
             default: DebugDrawerEnvironment("production", title: "Production"),
             allowing: DebugDrawerEnvironment("staging", title: "Staging", summary: "Yesterday's server build"),
             DebugDrawerEnvironment("canary", title: "Canary"),

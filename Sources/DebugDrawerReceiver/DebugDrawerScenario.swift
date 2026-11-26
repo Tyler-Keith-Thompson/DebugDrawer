@@ -10,7 +10,7 @@ import Foundation
 /// ]) { arguments in
 ///     router.openOrder(arguments.integer("orderID") ?? 123)
 /// }
-/// receiver.enable(.scenarios([openOrder], launchURL: URL(string: "shop-internal://")))
+/// try receiver.enable(.scenarios([openOrder], launchURL: URL(string: "shop-internal://")))
 /// ```
 ///
 /// The handler is the host's code and runs on the main actor. It receives only the parameters the
@@ -75,13 +75,13 @@ public struct DebugDrawerScenario: Identifiable {
 
     /// A scenario.
     ///
-    /// Traps when two parameters share a name.
-    ///
     /// - Parameters:
-    ///   - id: The ID a sidecar launches it by.
+    ///   - id: The ID a sidecar launches it by; it must differ from every other scenario's, or the
+    ///     scenarios throw.
     ///   - title: The name a sidecar lists it under.
     ///   - summary: What it does, shown under the title.
-    ///   - parameters: The parameters it takes; a command may pass these and no others.
+    ///   - parameters: The parameters it takes; a command may pass these and no others. Their names
+    ///     must differ and each declaration must hold its own default, or the scenarios throw.
     ///   - handler: The host's code that puts the app in the scenario's state, given the checked
     ///     values of the declared parameters. It runs on the main actor, once per launch.
     public init(
@@ -91,7 +91,6 @@ public struct DebugDrawerScenario: Identifiable {
         parameters: [DebugDrawerScenarioParameter] = [],
         handler: @escaping @MainActor (Arguments) -> Void
     ) {
-        precondition(Set(parameters.map(\.name)).count == parameters.count, "Two parameters of the scenario \(id) share a name")
         self.id = id
         self.title = title
         self.summary = summary
@@ -104,6 +103,8 @@ public struct DebugDrawerScenario: Identifiable {
     /// doesn't declare, or passes a value its parameter doesn't take. A declared parameter left out
     /// takes its default.
     func arguments(for values: [String: DebugDrawerScenarioValue]) -> Arguments? {
+        // Only `DebugDrawerScenarios` asks, and it refuses a scenario whose parameters share a
+        // name as it is made, so the names here are unique.
         let declared = Dictionary(uniqueKeysWithValues: parameters.map { ($0.name, $0) })
         for (name, value) in values {
             guard let parameter = declared[name], parameter.accepts(value) else { return nil }

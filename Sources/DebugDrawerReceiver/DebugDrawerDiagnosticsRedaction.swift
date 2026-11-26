@@ -27,7 +27,7 @@ import Foundation
 /// line, a metadata value, a header value, a URL or a JSON string.
 ///
 /// ```swift
-/// let redaction = DebugDrawerDiagnosticsRedaction.standard.adding(keys: ["customer"], values: [#"\bACCT-\d{6}\b"#])
+/// let redaction = try DebugDrawerDiagnosticsRedaction.standard.adding(keys: ["customer"], values: [#"\bACCT-\d{6}\b"#])
 /// let capture = DebugDrawerDiagnosticsCapture(sessions: sessions, redaction: redaction)
 /// ```
 ///
@@ -53,6 +53,9 @@ public struct DebugDrawerDiagnosticsRedaction: Equatable, Sendable {
     /// ``valuePatterns``, compiled once.
     private var expressions: [NSRegularExpression]
 
+    /// A value pattern that isn't a regular expression `NSRegularExpression` compiles.
+    public struct InvalidPattern: Error, Equatable, Sendable {}
+
     /// Rules masking the given header names, keys containing the given patterns, the given JSON
     /// paths, and the text the given regular expressions match.
     ///
@@ -61,26 +64,37 @@ public struct DebugDrawerDiagnosticsRedaction: Equatable, Sendable {
     ///   - keys: Substrings of a key, matched ignoring case; an empty one is ignored.
     ///   - jsonPaths: Dot-separated JSON paths, `*` for any key.
     ///   - values: Regular expressions in `NSRegularExpression` syntax, matched ignoring case.
-    /// - Precondition: Each of `values` is a valid regular expression.
+    /// - Throws: ``InvalidPattern`` when one of `values` isn't a valid regular expression: a rule
+    ///   dropped quietly would let through what it was meant to mask.
     public init(
         headers: some Sequence<String> = [String](),
         keys: some Sequence<String> = [String](),
         jsonPaths: some Sequence<String> = [String](),
         values: some Sequence<String> = [String]()
-    ) {
+    ) throws(InvalidPattern) {
+        let patterns = Set(values)
+        var expressions: [NSRegularExpression] = []
+        for pattern in patterns.sorted() {
+            guard let expression = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]) else {
+                throw InvalidPattern()
+            }
+            expressions.append(expression)
+        }
         headerNames = Set(headers.map { $0.lowercased() })
         keyPatterns = Set(keys.map { $0.lowercased() }.filter { !$0.isEmpty })
         self.jsonPaths = Set(jsonPaths)
+        valuePatterns = patterns
+        self.expressions = expressions
+    }
+
+    /// Rules over patterns the caller knows compile: ``standard``'s and ``none``'s constants,
+    /// which no input reaches and a test compiles. A pattern that didn't compile would be left out.
+    private init(uncheckedHeaders headers: [String], keys: [String], values: [String]) {
+        headerNames = Set(headers.map { $0.lowercased() })
+        keyPatterns = Set(keys)
+        jsonPaths = []
         valuePatterns = Set(values)
-        expressions = valuePatterns.sorted().map { pattern in
-            // A pattern is the host's own literal, so a bad one is a programming error found the
-            // first time the app runs, not an input to recover from; and a rule silently dropped
-            // would let what it was meant to mask through.
-            guard let expression = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]) else {
-                preconditionFailure("DebugDrawerDiagnosticsRedaction's value pattern \(pattern) isn't a valid regular expression")
-            }
-            return expression
-        }
+        expressions = valuePatterns.sorted().compactMap { try? NSRegularExpression(pattern: $0, options: [.caseInsensitive]) }
     }
 
     /// Credentials and personal data in their usual places: the `Authorization`,
@@ -89,7 +103,7 @@ public struct DebugDrawerDiagnosticsRedaction: Equatable, Sendable {
     /// that is an email address, a JSON Web Token, a bearer credential (`Bearer …`) or a secret
     /// written as `password=…`, `token: …` and the like.
     public static let standard = DebugDrawerDiagnosticsRedaction(
-        headers: ["Authorization", "Proxy-Authorization", "Cookie", "Set-Cookie"],
+        uncheckedHeaders: ["Authorization", "Proxy-Authorization", "Cookie", "Set-Cookie"],
         keys: ["token", "secret", "password", "session", "auth", "apikey", "api_key", "api-key", "email", "phone"],
         values: [
             // An email address.
@@ -104,7 +118,7 @@ public struct DebugDrawerDiagnosticsRedaction: Equatable, Sendable {
     )
 
     /// No rules: nothing is masked, though a body that isn't JSON is still left out.
-    public static let none = DebugDrawerDiagnosticsRedaction()
+    public static let none = DebugDrawerDiagnosticsRedaction(uncheckedHeaders: [], keys: [], values: [])
 
     /// These rules with more header names, key patterns, JSON paths and value patterns.
     ///
@@ -114,14 +128,14 @@ public struct DebugDrawerDiagnosticsRedaction: Equatable, Sendable {
     ///   - jsonPaths: More JSON paths.
     ///   - values: More regular expressions.
     /// - Returns: The rules with both.
-    /// - Precondition: Each of `values` is a valid regular expression.
+    /// - Throws: ``InvalidPattern`` when one of `values` isn't a valid regular expression.
     public func adding(
         headers: some Sequence<String> = [String](),
         keys: some Sequence<String> = [String](),
         jsonPaths: some Sequence<String> = [String](),
         values: some Sequence<String> = [String]()
-    ) -> DebugDrawerDiagnosticsRedaction {
-        DebugDrawerDiagnosticsRedaction(
+    ) throws(InvalidPattern) -> DebugDrawerDiagnosticsRedaction {
+        try DebugDrawerDiagnosticsRedaction(
             headers: headerNames.union(headers.map { $0.lowercased() }),
             keys: keyPatterns.union(keys.map { $0.lowercased() }),
             jsonPaths: self.jsonPaths.union(jsonPaths),

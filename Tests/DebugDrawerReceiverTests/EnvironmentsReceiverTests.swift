@@ -110,7 +110,9 @@ struct EnvironmentsReceiverTests {
         #expect(layout.create())
         let sessions = DebugDrawerSessions(maximumDuration: 300, auditCapacity: 100, clock: MovableClock(Self.now), timer: ManualTimer())
         let sut = DebugDrawerReceiver(directory: directory, sessions: sessions)
-        sut.enable(.environments(DebugDrawerEnvironments(default: production, allowing: staging, canary, adapter: FakeBackend(), defaults: defaults)))
+        try sut.enable(.environments(
+            DebugDrawerEnvironments(default: production, allowing: staging, canary, adapter: FakeBackend(), defaults: defaults)
+        ))
         let snapshotFile = layout.snapshotFile(for: environmentsID)
         let expected = DebugDrawerEnvironments.Snapshot(
             environments: [production, staging, canary], defaultEnvironment: "production", activeEnvironment: "production"
@@ -158,7 +160,7 @@ struct EnvironmentsReceiverTests {
             try layout.write(document.encoded(), to: layout.commands.appending(path: "\(index).json"))
         }
         let sessions = DebugDrawerSessions(maximumDuration: 300, auditCapacity: 100, clock: MovableClock(Self.now), timer: ManualTimer())
-        let model = DebugDrawerEnvironments(default: production, allowing: staging, canary, adapter: backend, defaults: defaults)
+        let model = try DebugDrawerEnvironments(default: production, allowing: staging, canary, adapter: backend, defaults: defaults)
         let sut = DebugDrawerReceiver(directory: directory, sessions: sessions)
         sut.enable(.environments(model))
         let expectedEvents: [DebugDrawerAuditEntry.Event] = [
@@ -202,7 +204,7 @@ struct EnvironmentsReceiverTests {
             try layout.write(document.encoded(), to: layout.commands.appending(path: "\(index).json"))
         }
         let sessions = DebugDrawerSessions(maximumDuration: 300, auditCapacity: 100, clock: MovableClock(Self.now), timer: ManualTimer())
-        let model = DebugDrawerEnvironments(default: production, allowing: staging, canary, adapter: backend, defaults: defaults)
+        let model = try DebugDrawerEnvironments(default: production, allowing: staging, canary, adapter: backend, defaults: defaults)
         let sut = DebugDrawerReceiver(directory: directory, sessions: sessions)
         sut.enable(.environments(model))
         try sut.start()
@@ -242,7 +244,7 @@ struct EnvironmentsReceiverTests {
         let clock = MovableClock(Self.now)
         let timer = ManualTimer()
         let sessions = DebugDrawerSessions(maximumDuration: 300, auditCapacity: 100, clock: clock, timer: timer)
-        let model = DebugDrawerEnvironments(default: production, allowing: staging, adapter: backend, defaults: defaults)
+        let model = try DebugDrawerEnvironments(default: production, allowing: staging, adapter: backend, defaults: defaults)
         let sut = DebugDrawerReceiver(directory: directory, sessions: sessions)
         sut.enable(.environments(model))
         try sut.start()
@@ -270,7 +272,7 @@ struct EnvironmentsReceiverTests {
         #expect(layout.create())
         let backend = FakeBackend()
         let sessions = DebugDrawerSessions(maximumDuration: 300, auditCapacity: 100, clock: MovableClock(Self.now), timer: ManualTimer())
-        let model = DebugDrawerEnvironments(default: production, allowing: staging, adapter: backend, defaults: defaults)
+        let model = try DebugDrawerEnvironments(default: production, allowing: staging, adapter: backend, defaults: defaults)
         let capabilityGate = Gate()
         let receiverGate = Gate()
         let sut = DebugDrawerReceiver(directory: directory, sessions: sessions) { receiverGate.isOpen }
@@ -323,7 +325,9 @@ struct EnvironmentsReceiverTests {
         let killedBackend = FakeBackend()
         let sessions = DebugDrawerSessions(maximumDuration: 300, auditCapacity: 100, clock: MovableClock(Self.now), timer: ManualTimer())
         let killedLaunch = DebugDrawerReceiver(directory: directory, sessions: sessions)
-        killedLaunch.enable(.environments(DebugDrawerEnvironments(default: production, allowing: canary, adapter: killedBackend, defaults: defaults)))
+        try killedLaunch.enable(.environments(
+            DebugDrawerEnvironments(default: production, allowing: canary, adapter: killedBackend, defaults: defaults)
+        ))
         sessions.perform(.open(duration: 60))
         try killedLaunch.start()
         // The app is killed with the session open: nothing ends it, so its revert never runs.
@@ -331,7 +335,7 @@ struct EnvironmentsReceiverTests {
         let killedSwitch = killedBackend.baseURL
         // The next launch: a new process, whose backend starts wherever the host's own config puts it.
         let nextBackend = FakeBackend()
-        let model = DebugDrawerEnvironments(default: production, allowing: canary, adapter: nextBackend, defaults: defaults)
+        let model = try DebugDrawerEnvironments(default: production, allowing: canary, adapter: nextBackend, defaults: defaults)
         let recordedAtLaunch = model.snapshot.activeEnvironment
 
         _ = DebugDrawerReceiverCapability.environments(model)
@@ -349,7 +353,7 @@ struct EnvironmentsReceiverTests {
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         let backend = FakeBackend()
-        let model = DebugDrawerEnvironments(default: production, allowing: staging, adapter: backend, defaults: defaults)
+        let model = try DebugDrawerEnvironments(default: production, allowing: staging, adapter: backend, defaults: defaults)
 
         _ = DebugDrawerReceiverCapability.environments(model)
 
@@ -405,7 +409,7 @@ struct EnvironmentsReceiverTests {
         let clock = MovableClock(Self.now)
         let sessions = DebugDrawerSessions(maximumDuration: 300, auditCapacity: 100, grantPolicy: policy, clock: clock, timer: ManualTimer())
         let backend = FakeBackend()
-        let model = DebugDrawerEnvironments(default: production, allowing: staging, adapter: backend, defaults: defaults)
+        let model = try DebugDrawerEnvironments(default: production, allowing: staging, adapter: backend, defaults: defaults)
         let sut = DebugDrawerReceiver(directory: directory, sessions: sessions)
         sut.enable(.environments(model))
         let flagSuite = temporarySuiteName("EnvironmentsReceiverTests.flags")
@@ -470,7 +474,7 @@ struct EnvironmentsReceiverTests {
         let backend = FakeBackend()
         let sessions = DebugDrawerSessions(maximumDuration: 300, auditCapacity: 100, clock: MovableClock(Self.now), timer: ManualTimer())
         let sut = DebugDrawerReceiver(directory: directory, sessions: sessions)
-        let model = DebugDrawerEnvironments(default: production, allowing: staging, adapter: backend, defaults: defaults)
+        let model = try DebugDrawerEnvironments(default: production, allowing: staging, adapter: backend, defaults: defaults)
         sut.enable(.environments(model).requiringGrant())
 
         try sut.start()

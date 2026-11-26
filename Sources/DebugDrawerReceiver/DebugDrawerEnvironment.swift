@@ -28,14 +28,12 @@ public struct DebugDrawerEnvironment: Codable, Equatable, Sendable, Identifiable
 
     /// An environment of the host's.
     ///
-    /// Traps when `id` is empty.
-    ///
     /// - Parameters:
-    ///   - id: The ID a sidecar asks for it by; it must differ from every other environment's.
+    ///   - id: The ID a sidecar asks for it by; not empty, and different from every other
+    ///     environment's, or ``DebugDrawerEnvironments`` throws.
     ///   - title: The name a sidecar lists it under.
     ///   - summary: What it is, shown under the title.
     public init(_ id: String, title: String, summary: String = "") {
-        precondition(!id.isEmpty, "An environment's ID is empty")
         self.id = id
         self.title = title
         self.summary = summary

@@ -7,11 +7,24 @@ import Foundation
 // triggered the report, in their own session.
 
 extension DebugDrawerBugReports {
+    /// Bounds bug reports can't keep within, which
+    /// ``Limits/init(reports:logLines:stateBytes:screenshotBytes:)`` refuses.
+    public enum InvalidLimits: Error, Equatable, Sendable {
+        /// Fewer than 1 report would be kept.
+        case noReports
+        /// The most log lines a report copies is negative.
+        case negativeLogLines
+        /// The largest state kept is negative.
+        case negativeStateBytes
+        /// The largest screenshot kept is negative.
+        case negativeScreenshotBytes
+    }
+
     /// How much a report and the reports kept hold.
     public struct Limits: Codable, Equatable, Sendable {
         /// The bounds unless the host passes others: 3 reports, the newest 200 log lines each, a
         /// state of up to 64 KiB of JSON and a screenshot of up to 4 MiB of PNG.
-        public static let standard = Limits(reports: 3, logLines: 200, stateBytes: 64 << 10, screenshotBytes: 4 << 20)
+        public static let standard = Limits(uncheckedReports: 3, logLines: 200, stateBytes: 64 << 10, screenshotBytes: 4 << 20)
 
         /// The most reports kept, the newest; taking another drops the oldest.
         public let reports: Int
@@ -30,9 +43,21 @@ extension DebugDrawerBugReports {
         ///   - logLines: The most log lines a report copies.
         ///   - stateBytes: The largest state kept, in bytes.
         ///   - screenshotBytes: The largest screenshot kept, in bytes.
-        /// - Precondition: `reports` is at least 1, and the others at least 0.
-        public init(reports: Int, logLines: Int, stateBytes: Int, screenshotBytes: Int) {
-            precondition(reports > 0 && logLines >= 0 && stateBytes >= 0 && screenshotBytes >= 0, "Bug reports keep at least one report")
+        /// - Throws: ``DebugDrawerBugReports/InvalidLimits/noReports`` when `reports` is less than
+        ///   1, and ``DebugDrawerBugReports/InvalidLimits/negativeLogLines``,
+        ///   ``DebugDrawerBugReports/InvalidLimits/negativeStateBytes`` or
+        ///   ``DebugDrawerBugReports/InvalidLimits/negativeScreenshotBytes`` when `logLines`,
+        ///   `stateBytes` or `screenshotBytes` is less than 0.
+        public init(reports: Int, logLines: Int, stateBytes: Int, screenshotBytes: Int) throws(InvalidLimits) {
+            guard reports >= 1 else { throw .noReports }
+            guard logLines >= 0 else { throw .negativeLogLines }
+            guard stateBytes >= 0 else { throw .negativeStateBytes }
+            guard screenshotBytes >= 0 else { throw .negativeScreenshotBytes }
+            self.init(uncheckedReports: reports, logLines: logLines, stateBytes: stateBytes, screenshotBytes: screenshotBytes)
+        }
+
+        /// Bounds the caller knows are valid: ``standard``, a constant no input reaches.
+        private init(uncheckedReports reports: Int, logLines: Int, stateBytes: Int, screenshotBytes: Int) {
             self.reports = reports
             self.logLines = logLines
             self.stateBytes = stateBytes

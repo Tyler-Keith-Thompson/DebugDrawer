@@ -25,7 +25,7 @@ extension DebugDrawerReceiverCapability {
     /// reverted as the session ends.
     ///
     /// ```swift
-    /// receiver.enable(.scenarios([openOrder, showPaywall], launchURL: URL(string: "shop-internal://")))
+    /// try receiver.enable(.scenarios([openOrder, showPaywall], launchURL: URL(string: "shop-internal://")))
     /// ```
     ///
     /// - Parameters:
@@ -33,8 +33,13 @@ extension DebugDrawerReceiverCapability {
     ///     differ.
     ///   - launchURL: A URL of the app's own scheme that brings it to the foreground, or `nil`.
     /// - Returns: The capability, under ``DebugDrawerScenarios/pluginID``.
-    public static func scenarios(_ scenarios: [DebugDrawerScenario], launchURL: URL? = nil) -> Self {
-        self.scenarios(DebugDrawerScenarios(scenarios: scenarios, launchURL: launchURL))
+    /// - Throws: ``DebugDrawerScenarios/InvalidScenarios`` when two scenarios share an ID, two
+    ///   parameters of one share a name, or a parameter contradicts itself.
+    public static func scenarios(
+        _ scenarios: [DebugDrawerScenario],
+        launchURL: URL? = nil
+    ) throws(DebugDrawerScenarios.InvalidScenarios) -> Self {
+        try self.scenarios(DebugDrawerScenarios(scenarios: scenarios, launchURL: launchURL))
     }
 
     /// A scenario launcher over a model the host also shows elsewhere, such as in its debug build's

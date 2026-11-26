@@ -18,8 +18,8 @@ struct DiagnosticsRedactionTests {
     }
 
     @Test("Log text has the value of each key=value and key: value pair whose key contains a key pattern masked, before the value patterns run")
-    func keyValuePairsInText() {
-        let sut = DebugDrawerDiagnosticsRedaction.standard.adding(keys: ["customer"])
+    func keyValuePairsInText() throws {
+        let sut = try DebugDrawerDiagnosticsRedaction.standard.adding(keys: ["customer"])
         let text = #"Checkout customer_id=C-77 session: 9f2 phone=555-0100 cart=3 {"refresh_token": "r 1"}"#
         let expected = #"Checkout customer_id=[REDACTED] session: [REDACTED] phone=[REDACTED] cart=3 {"refresh_token": "[REDACTED]"}"#
 
@@ -50,8 +50,8 @@ struct DiagnosticsRedactionTests {
     }
 
     @Test("Listed headers and headers named after a key pattern are masked, ignoring case")
-    func headersMasked() {
-        let sut = DebugDrawerDiagnosticsRedaction.standard.adding(headers: ["X-Customer"])
+    func headersMasked() throws {
+        let sut = try DebugDrawerDiagnosticsRedaction.standard.adding(headers: ["X-Customer"])
         let headers = ["authorization": "Basic Zm9vOmJhcg==", "COOKIE": "a=b", "X-Api-Key": "k", "x-customer": "Jane", "Accept": "application/json"]
         let expected = [
             "authorization": "[REDACTED]", "COOKIE": "[REDACTED]", "X-Api-Key": "[REDACTED]", "x-customer": "[REDACTED]", "Accept": "application/json"
@@ -75,7 +75,7 @@ struct DiagnosticsRedactionTests {
 
     @Test("A JSON body has sensitive keys, JSON paths and value patterns masked at any depth, through arrays, and its other values kept")
     func jsonMasked() throws {
-        let sut = DebugDrawerDiagnosticsRedaction.standard.adding(jsonPaths: ["order.items.sku", "*.note"])
+        let sut = try DebugDrawerDiagnosticsRedaction.standard.adding(jsonPaths: ["order.items.sku", "*.note"])
         let body = Data(
             #"{"order":{"items":[{"sku":"A1","qty":2}],"note":"for jane@example.com"},"refreshToken":"r","count":3,"ok":true,"gift":null}"#.utf8
         )
@@ -107,15 +107,16 @@ struct DiagnosticsRedactionTests {
     }
 
     @Test("Added value patterns mask their matches beside the standard ones; rules compare by their patterns")
-    func addedValuePatterns() {
-        let sut = DebugDrawerDiagnosticsRedaction.standard.adding(keys: ["Customer"], values: [#"\bACCT-\d{6}\b"#])
+    func addedValuePatterns() throws {
+        let sut = try DebugDrawerDiagnosticsRedaction.standard.adding(keys: ["Customer"], values: [#"\bACCT-\d{6}\b"#])
         let expectedKeys = DebugDrawerDiagnosticsRedaction.standard.keyPatterns.union(["customer"])
+        let expectedRules = try DebugDrawerDiagnosticsRedaction.standard.adding(keys: ["customer"], values: [#"\bACCT-\d{6}\b"#])
 
         let actual = sut.redacting(text: "account ACCT-123456 of jane@example.com")
 
         #expect(actual == "account [REDACTED] of [REDACTED]")
         #expect(sut.keyPatterns == expectedKeys)
-        #expect(sut == DebugDrawerDiagnosticsRedaction.standard.adding(keys: ["customer"], values: [#"\bACCT-\d{6}\b"#]))
+        #expect(sut == expectedRules)
         #expect(sut != DebugDrawerDiagnosticsRedaction.standard)
     }
 }

@@ -14,10 +14,12 @@ enum ProductionSettings {
     /// The allowlist a sidecar edits within, made as the app starts, so edits a killed session
     /// left are put back before the screen reads them. The registered defaults are what a removed
     /// key reads, and what a key the app never wrote is put back to.
+    ///
+    /// - Throws: `DebugDrawerUserDefaults.InvalidKeys` if the keys above contradicted themselves.
     @MainActor
-    static func model() -> DebugDrawerUserDefaults {
+    static func model() throws(DebugDrawerUserDefaults.InvalidKeys) -> DebugDrawerUserDefaults {
         UserDefaults.standard.register(defaults: [plan: "free", itemsPerPage: 20])
-        return DebugDrawerUserDefaults(
+        return try DebugDrawerUserDefaults(
             .choice(plan, title: "Plan", options: ["free", "pro", "team"]),
             .bool(showsTips, title: "Shows Tips"),
             .integer(itemsPerPage, title: "Items per Page", in: 10 ... 100)

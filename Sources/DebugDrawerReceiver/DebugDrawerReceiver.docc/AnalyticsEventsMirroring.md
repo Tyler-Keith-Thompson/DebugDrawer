@@ -61,6 +61,6 @@ any depth, and an object or array under such a key whole). It also masks any str
 an email address or a JSON Web Token, and an event name or source that a value pattern matches.
 
 `adding(keys:values:)` adds key substrings and regular expressions (`NSRegularExpression` syntax,
-ignoring case; an invalid one traps), and `AnalyticsRedaction(keys:values:)` starts from none. A
+ignoring case; an invalid one throws `AnalyticsRedaction.InvalidPattern`), and `AnalyticsRedaction(keys:values:)` starts from none. A
 masked value becomes `"[REDACTED]"`. Phone numbers in free text aren't matched by default, so add a
 pattern for the formats your app sends.

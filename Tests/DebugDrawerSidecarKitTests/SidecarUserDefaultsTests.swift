@@ -28,7 +28,7 @@
                 .appending(path: "SidecarUserDefaultsTests-\(UUID().uuidString)")
                 .appending(path: "DebugDrawer")
             let sessions = DebugDrawerSessions(maximumDuration: 300)
-            let model = DebugDrawerUserDefaults(.bool("showsTips", title: "Shows Tips"), defaults: defaults)
+            let model = try DebugDrawerUserDefaults(.bool("showsTips", title: "Shows Tips"), defaults: defaults)
             let receiver = DebugDrawerReceiver(directory: store, sessions: sessions)
             receiver.identity = AppPresence.Identity(bundleIdentifier: "com.example.shop", displayName: "Shop", version: "2.4", build: "881")
             receiver.enable(.userDefaults(model))
