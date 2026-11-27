@@ -31,6 +31,7 @@ import SwiftUI
             ) { transport in
                 PerformanceTracesPlugin(transport: transport)
             }
+            .collectedWhileRunning()
         }
     }
 

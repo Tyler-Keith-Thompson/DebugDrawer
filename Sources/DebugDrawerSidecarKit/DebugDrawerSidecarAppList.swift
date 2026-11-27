@@ -7,7 +7,9 @@ import Foundation
 // and read again each time one of those directories' entries changes: a dispatch source on each
 // store's `apps/` directory, which hears an app's directory made or removed, and one on each app's
 // directory, which hears its presence file written or removed (DirectoryWatcher), so an app that
-// starts serving shows up and one that stops drops off without anything polling. The files are
+// starts serving shows up and one that stops shows as not running without anything polling. An
+// app that never launched has no file and isn't listed: a sidecar preparing its first launch
+// addresses it by bundle ID (`DebugDrawerSidecarApp(..., isRunning: false)`). The files are
 // written by rename, which is an entry change, so a rewrite (new capabilities, a newer last-seen
 // time) is heard too. The `apps/` directory is made if missing, since an app may start serving
 // after the sidecar does and a directory that doesn't exist can't be watched.
@@ -28,8 +30,10 @@ import Foundation
     /// Each app that serves a group's store, a production app's `DebugDrawerReceiver` or a debug
     /// build's `DebugDrawerAppGroupStoreServer`, keeps a presence file in its own directory of
     /// the store while it serves, and the list holds one ``DebugDrawerSidecarApp`` per app, sorted
-    /// by name. An app that stops serving removes its file and leaves the list; one killed while
-    /// serving stays, with the time it was last seen, until it serves again.
+    /// by name. An app that stops serving marks its file not running and stays listed
+    /// (``DebugDrawerSidecarApp/isRunning`` is `false`), so a sidecar can prepare its next launch;
+    /// one killed while serving stays as it was, with the time it was last seen, until it serves
+    /// again. An app that never launched isn't listed.
     ///
     /// Apps of one group can read each other's files: the system doesn't keep them apart within a
     /// group. To keep them apart, give each app a group of its own and list them all with

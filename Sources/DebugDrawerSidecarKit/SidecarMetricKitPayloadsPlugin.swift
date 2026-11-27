@@ -25,6 +25,7 @@ import SwiftUI
             ) { transport in
                 MetricKitPayloadsSidecarPlugin(transport: transport)
             }
+            .collectedWhileRunning()
         }
     }
 

@@ -245,6 +245,11 @@ could act on it:
   events, MetricKit payloads, the push registration and the app state snapshot hold nothing for a
   session whose grant doesn't list them.
 
+After the receiver stops, its presence file stays, marked not running, so a sidecar can prepare
+the next launch. The sidecar kit keeps its own copy of each capability snapshot it read, in the
+sidecar's caches, which only the sidecar can read, so it can show them before the app launches.
+Nothing of a capability stays in the group's store.
+
 While a session is open, any app of the group can read what it reads. So list in an adapter or
 allowlist only what you're content for the group's apps to read during a session, keep sessions
 short, and give an app that shares a group with apps you don't trust a group of its own.

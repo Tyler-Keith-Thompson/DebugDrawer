@@ -34,7 +34,7 @@
     struct SidecarSessionGateTests {
         private static let now = Date(timeIntervalSinceReferenceDate: 800_000_000)
 
-        @Test("No session, or none read yet, lets the sidecar see nothing; a session without a grant, or whose grant lists the plugin, lets it")
+        @Test("No session, or none read, shows nothing unless an open waits for launch; a session without a grant, or one listing it, shows it")
         func readingFromState() {
             let session = DebugDrawerSession(id: UUID(), opened: Self.now, expires: Self.now.addingTimeInterval(60))
             let grant = DebugDrawerGrant(
@@ -42,14 +42,19 @@
                 notBefore: Self.now, expires: Self.now.addingTimeInterval(60)
             )
             let granted = DebugDrawerSession(id: UUID(), opened: Self.now, expires: Self.now.addingTimeInterval(60), grant: grant)
-            let expected: [SidecarSessionReading] = [.noSession, .noSession, .reading, .reading, .notGranted]
+            let expected: [SidecarSessionReading] = [
+                .noSession, .noSession, .reading, .reading, .notGranted, .waitingForLaunch, .waitingForLaunch, .reading
+            ]
 
             let actual = [
                 SidecarSessionReading(state: nil, pluginID: "DebugDrawer.Tweaks"),
                 SidecarSessionReading(state: .inactive, pluginID: "DebugDrawer.Tweaks"),
                 SidecarSessionReading(state: .active(session), pluginID: "DebugDrawer.Tweaks"),
                 SidecarSessionReading(state: .active(granted), pluginID: "DebugDrawer.Tweaks"),
-                SidecarSessionReading(state: .active(granted), pluginID: "DebugDrawer.FeatureFlagOverrides")
+                SidecarSessionReading(state: .active(granted), pluginID: "DebugDrawer.FeatureFlagOverrides"),
+                SidecarSessionReading(state: nil, pluginID: "DebugDrawer.Tweaks", isWaitingForLaunch: true),
+                SidecarSessionReading(state: .inactive, pluginID: "DebugDrawer.Tweaks", isWaitingForLaunch: true),
+                SidecarSessionReading(state: .active(session), pluginID: "DebugDrawer.Tweaks", isWaitingForLaunch: true)
             ]
 
             #expect(actual == expected)
@@ -85,6 +90,44 @@
 
             #expect(throws: Never.self) { try inspected.find(text: "new-checkout") }
             #expect(throws: (any Error).self) { try inspected.find(text: "No Session") }
+        }
+
+        @Test("While an open waits for launch the gate draws the plugin, prepared")
+        func waitingForLaunchDrawsThePlugin() throws {
+            let sut = SidecarSessionGate(reading: .waitingForLaunch, title: "Flags") { Text("new-checkout") }
+
+            let inspected = try sut.inspect()
+
+            #expect(throws: Never.self) { try inspected.find(text: "new-checkout") }
+            #expect(throws: (any Error).self) { try inspected.find(text: "No Session") }
+        }
+
+        @Test("While an open waits for launch the session control says so, naming the app; with no session read it still offers Open Session")
+        func sessionControlWaitsForLaunch() throws {
+            let waiting = SidecarSessionControl(sessions: nil, isWaitingForLaunch: true, appName: "Shop", open: { nil }, end: {})
+            let unread = SidecarSessionControl(sessions: nil, isWaitingForLaunch: false, appName: "Shop", open: { nil }, end: {})
+
+            let inspectedWaiting = try waiting.inspect()
+            let inspectedUnread = try unread.inspect()
+
+            #expect(throws: Never.self) { try inspectedWaiting.find(text: "Waiting for launch: the session opens as Shop starts") }
+            #expect(throws: (any Error).self) { try inspectedWaiting.find(button: "Open Session") }
+            #expect(throws: Never.self) { try inspectedUnread.find(button: "Open Session") }
+        }
+
+        @Test("A plugin prepared for launch is marked so, saying what it shows and when what is sent applies")
+        func preparedNoteSaysWhatItShows() throws {
+            let app = DebugDrawerSidecarApp(
+                bundleIdentifier: "com.example.shop", displayName: "Shop", version: "", build: "", capabilities: [],
+                protocolVersion: 2, lastSeen: Self.now, storeDirectory: FileManager.default.temporaryDirectory, isRunning: false
+            )
+            let sut = SidecarPreparedForLaunchNote(app: app, isWaitingForLaunch: true)
+            let expected = "Shown as Shop was last read. What you change waits, and applies in the session as the app starts."
+
+            let inspected = try sut.inspect()
+
+            #expect(throws: Never.self) { try inspected.find(text: "Prepared for launch") }
+            #expect(throws: Never.self) { try inspected.find(text: expected) }
         }
 
         @Test("A receiver's app is listed as serving only within sessions; a debug store server's isn't")

@@ -188,7 +188,7 @@ struct ReceiverAppScopingTests {
         #expect(flat.messageFiles(in: flat.commands).map(\.lastPathComponent) == ["0.json"])
     }
 
-    @Test("The app registers itself in its own directory: bundle ID, name, version, build, capabilities and protocol version")
+    @Test("The app registers itself in its own directory (bundle ID, name, version, build, capabilities, protocol); stopping marks it not running")
     func presenceInAppDirectory() throws {
         let store = FileManager.default.temporaryDirectory.appending(path: "ReceiverAppScopingTests-\(UUID().uuidString)")
         let sut = DebugDrawerReceiver(directory: store, sessions: DebugDrawerSessions(maximumDuration: 300))
@@ -200,11 +200,17 @@ struct ReceiverAppScopingTests {
         try sut.start()
         let written = try #require(AppPresence.decoded(from: Data(contentsOf: file)))
         sut.stop()
+        let stopped = try #require(AppPresence.decoded(from: Data(contentsOf: file)))
 
         #expect(written.schemaVersion == 2)
         #expect(written.identity == expectedIdentity)
         #expect(written.capabilities == [DebugDrawerSessions.pluginID, "Shop.LogLevel"])
         #expect(written.hello == TransportHello.current)
-        #expect(!FileManager.default.fileExists(atPath: file.path))
+        #expect(written.isRunning == true)
+        #expect(stopped.isRunning == false)
+        #expect(stopped.identity == expectedIdentity)
+        #expect(stopped.capabilities == written.capabilities)
+        #expect(stopped.servesInSessionsOnly == true)
+        #expect(stopped.lastSeen >= written.lastSeen)
     }
 }

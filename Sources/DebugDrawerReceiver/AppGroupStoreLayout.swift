@@ -51,7 +51,11 @@ import Foundation
 //                  command, and leaves no command larger than the byte budget
 //
 // Names order the commands (a viewer names each by the wall clock), so the oldest removed are
-// those the app would have performed first. Cut-off commands aren't removed as the app starts:
+// those the app would have performed first, but for one: the newest command for the sessions
+// (`trimCommands(keepingNewestFor:)`), a session's open a sidecar queued before the app launched,
+// stays, so the commands after it still land in the session it opens (DD-296). Rejected: refusing
+// commands past the budget instead, which would drop the newest, what the tester did last. Cut-off
+// commands aren't removed as the app starts:
 // several viewers write there and one may be mid-write, so the budget bounds them instead.
 // Rejected: a ring file the app appends to (a viewer wants each plugin's newest state, which the
 // plugin's snapshot already holds, bounded; appending would need offsets and compaction two
@@ -157,16 +161,26 @@ package struct AppGroupStoreLayout: Sendable {
     }
 
     /// Removes the oldest files in `commands`, cut-off ones among them, until it holds at most
-    /// ``maximumCommandFiles`` files and ``maximumCommandBytes`` bytes.
+    /// ``maximumCommandFiles`` files and ``maximumCommandBytes`` bytes, keeping the newest
+    /// command for `protectedPluginID`, the sessions' (a queued open), wherever it sits.
     ///
+    /// Complexity: O(*n*) file listings; only when over the budget, also up to *n* reads to find
+    /// the command kept.
+    ///
+    /// - Parameter protectedPluginID: The plugin ID whose newest command stays,
+    ///   `DebugDrawerSessions.pluginID`.
     /// - Returns: How many files were removed.
     @discardableResult
-    package func trimCommands() -> Int {
-        var waiting = Self.files(in: commands)[...]
-        var bytes = waiting.reduce(0) { $0 + $1.size }
+    package func trimCommands(keepingNewestFor protectedPluginID: String) -> Int {
+        let files = Self.files(in: commands)
+        var count = files.count
+        var bytes = files.reduce(0) { $0 + $1.size }
+        guard count > Self.maximumCommandFiles || bytes > Self.maximumCommandBytes else { return 0 }
+        let kept = files.last { Self.isCommand(at: $0.url, for: protectedPluginID) }?.url
         var removed = 0
-        while let oldest = waiting.first, waiting.count > Self.maximumCommandFiles || bytes > Self.maximumCommandBytes {
-            waiting = waiting.dropFirst()
+        for oldest in files where oldest.url != kept {
+            guard count > Self.maximumCommandFiles || bytes > Self.maximumCommandBytes else { break }
+            count -= 1
             bytes -= oldest.size
             // The app may have performed it, or another viewer removed it, since it was
             // listed: either way it no longer counts.
@@ -174,6 +188,12 @@ package struct AppGroupStoreLayout: Sendable {
             removed += 1
         }
         return removed
+    }
+
+    /// Whether the file at `url` holds a command for `pluginID`.
+    private static func isCommand(at url: URL, for pluginID: String) -> Bool {
+        guard isMessageFile(url.lastPathComponent), let data = try? Data(contentsOf: url) else { return false }
+        return StoreDocument.decoded(from: data)?.message.pluginID == pluginID
     }
 
     /// The regular files in `directory`, sorted by name, with their sizes.

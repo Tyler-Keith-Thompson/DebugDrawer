@@ -21,6 +21,7 @@ import SwiftUI
             ) { transport in
                 AnalyticsEventsSidecarPlugin(transport: transport)
             }
+            .collectedWhileRunning()
         }
     }
 

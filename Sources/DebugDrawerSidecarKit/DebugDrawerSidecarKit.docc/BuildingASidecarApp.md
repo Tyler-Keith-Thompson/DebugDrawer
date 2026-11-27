@@ -34,11 +34,13 @@ Each app registers itself with a presence file in its own directory of the store
 (`<store>/apps/<bundle ID>/presence.json`). The file holds its bundle ID, name, version, build, the
 capabilities it serves, and the protocol version it speaks
 (`DebugDrawerSidecarApp.protocolVersion`). The app writes it as it starts, rewrites it when the
-capabilities it serves change and when it comes to the foreground, and removes it as it stops.
-The list watches the store's `apps` folder and each app's folder and updates as the files change,
-without polling. An app that was killed stays listed, with when it was last seen. An app whose
+capabilities it serves change and when it comes to the foreground, and marks it not running as it
+stops. The list watches the store's `apps` folder and each app's folder and updates as the files
+change, without polling. An app that stopped stays listed as "Not running"
+(`DebugDrawerSidecarApp.isRunning` is `false`), with the capabilities it last served. An app that
+was killed couldn't say so: it stays listed as it was, with when it was last seen. An app whose
 host has turned its receiver off (`DebugDrawerReceiver.isAllowed`) stays listed as turned off and
-serves nothing.
+serves nothing. An app that has never launched has no presence file and isn't listed.
 
 ### Several apps, one sidecar
 
@@ -82,6 +84,45 @@ DebugDrawerSidecarView(groupIdentifier: "group.com.example.debug", sessionDurati
     try await GrantService.shared.grant(for: app.bundleIdentifier)
 }
 ```
+
+### Before the app launches
+
+A tester can set things up in the sidecar first, say a flag override, a scenario or a log level,
+and then launch the app, which applies them as it starts. When the app isn't running, or is
+suspended, Open Session leaves the open in the app's store and the session control reads "Waiting
+for launch" (`DebugDrawerSidecarConnection.isWaitingForLaunch`). Each plugin then shows what the
+sidecar last read of it, marked "Prepared for launch", and what you change there waits in the
+store too. As the app starts, its receiver performs the waiting files in the order they were
+left: the open first, then each command, inside the session it just opened. From then on the
+plugins show the app's own state.
+
+What a plugin shows before launch is the snapshot the sidecar last read of it. The connection
+keeps a copy of each in the sidecar's own caches (`DebugDrawer Sidecar Snapshots`, or the
+directory passed to `DebugDrawerSidecarConnection(app:snapshotCacheDirectory:)`), never in the
+group's store, where the receiver removes them on purpose. A capability can be prepared only
+after the sidecar has read it once from the running app (within a session, for a production
+app's receiver). One it has never read shows
+"Can't Be Prepared" until the app serves it, and `prepare(_:)` throws
+`DebugDrawerSidecarConnection.NeverRead` for it. The same goes for plugins that only show what the
+app collects while it runs: Console, Network, captures, events, payloads and reports.
+
+Two things count from the launch, not from when the tester tapped Open Session:
+
+- **Session length.** The session opens when the app performs the open, so its length and expiry
+  count from the launch.
+- **Grant validity.** The receiver checks a signed grant when it performs the open. A grant that
+  has expired by the time the app launches, or isn't valid yet then, is refused, and no session
+  opens. The commands queued after it are then refused too, as they are outside a session. Fetch
+  the grant close to the launch, or with a lifetime that covers the wait.
+
+An app that has never launched isn't listed. To prepare its first launch, address it by bundle ID
+with `DebugDrawerSidecarApp(bundleIdentifier:displayName:version:build:capabilities:protocolVersion:lastSeen:storeDirectory:isRunning:)`,
+`storeDirectory` from `DebugDrawerAppGroupContainer.appDirectory(of:)` and `isRunning: false`.
+The open and the commands then wait in its directory of the store until it first starts.
+
+The store holds at most 256 command files and 16 MiB. Past either it removes the oldest, but
+keeps the newest command for the sessions, so a queued open survives a long list of commands, and
+the newest commands after it are the ones kept.
 
 ### Plugins
 
@@ -143,7 +184,8 @@ For a layout of your own, the pieces are public:
 - `DebugDrawerSidecarAppList`: the apps, as they come and go.
 - `DebugDrawerSidecarConnection`: one app, with its channel, sessions, hosted plugins and
   `createReport(redaction:in:)`. Host `.appState` as the app is reached, to put the app's state in
-  every report.
+  every report. `prepare(_:)` makes a plugin from the snapshot read last, for an app that isn't
+  running, and `preparedForLaunch` lists those the app hasn't served since.
 - `DebugDrawerSidecarApp`: one app, as its presence file describes it.
 
 The kit builds for iOS, iPadOS and macOS, in debug builds. Like the transports it is built on, it
@@ -212,3 +254,11 @@ and ends that one too. It logs each step and the channel that carried it
 (`log show --predicate 'subsystem == "com.debugdrawer.example.sidecar"'`), while the host logs its
 audit entries (`subsystem == "com.debugdrawer.example.receiver"`). The receiver serves the store
 only, so on the Mac too the channel is the store, and each command is performed as its file lands.
+
+Launched with `-PrepareLaunch <bundle ID>`, the sidecar prepares that app's next launch with no one
+at the screen. It prepares the flags from what it read of them before (if it never read them, it
+reads them from the running app in a session, then asks for the app to be stopped and the sidecar
+launched again). It leaves a session's open, with a grant, and an override of `new-checkout` to
+true in the app's store, and logs that both wait for the launch (category `PrepareLaunch`). When
+the app launches, it logs the session the app opened and the override the app then reports, and
+ends the session.

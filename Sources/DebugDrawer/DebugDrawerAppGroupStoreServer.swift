@@ -151,9 +151,10 @@ import os
         }
 
         /// Stops writing snapshots and performing commands. The snapshots written stay in the
-        /// store; the app's presence file goes, so a sidecar no longer lists it.
+        /// store, and so does the app's presence file, marked not running, so a sidecar lists the
+        /// app as stopped.
         public func stop() {
-            presence?.withdraw()
+            presence?.markStopped()
             presence = nil
             if let registryObservation {
                 registry.removeObserver(registryObservation)

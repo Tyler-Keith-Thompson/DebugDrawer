@@ -47,11 +47,19 @@ public struct DebugDrawerSidecarPlugin: Identifiable {
     public let title: String
     /// The plugin's SF Symbol name.
     public let icon: String
-    /// Connects to the model over a transport and makes the plugin over it.
-    let connect: @MainActor (any DebugDrawerTransport) async throws(DebugDrawerTransportError) -> AnyDebugDrawerPlugin
+    /// Connects to the model over a transport and makes the plugin over it, keeping each
+    /// snapshot in the cache, when one is given.
+    let connect: @MainActor (any DebugDrawerTransport, SidecarSnapshotCache?) async throws(DebugDrawerTransportError) -> AnyDebugDrawerPlugin
+    /// Makes the plugin over the sidecar's transport from the snapshot the cache kept, calling
+    /// the closure as the app serves the model again; `nil` when the cache keeps none.
+    let prepare: @MainActor (DebugDrawerSidecarTransport, SidecarSnapshotCache, @escaping @MainActor () -> Void) -> AnyDebugDrawerPlugin?
     /// Whether the sidecar view hosts it as soon as the app is reached rather than when it is
     /// picked, so its report contribution is in every report: the app state's.
     var hostsOnConnect = false
+    /// Whether the sidecar keeps its snapshots, so it can be prepared before the app launches:
+    /// `false` for the plugins that show what the app collects while it runs (logs, requests,
+    /// events, payloads, reports), which hold nothing to prepare and change too often to copy.
+    var preparesForLaunch = true
 
     /// A plugin whose model the app serves under `id`, made over the transport to it.
     ///
@@ -84,9 +92,22 @@ public struct DebugDrawerSidecarPlugin: Identifiable {
         self.id = id
         self.title = title
         self.icon = icon
-        connect = { transport throws(DebugDrawerTransportError) in
+        connect = { transport, cache throws(DebugDrawerTransportError) in
             let connected = try await transport.connect(toPlugin: id, snapshot: snapshot, command: command)
+            cache?.follow(connected, as: id)
             return AnyDebugDrawerPlugin(plugin(connected))
+        }
+        prepare = { transport, cache, live in
+            #if DEBUG
+                guard let initial = cache.snapshot(of: id, as: snapshot),
+                      let prepared = transport.prepare(toPlugin: id, snapshot: snapshot, command: command, from: initial, live: live)
+                else { return nil }
+                cache.follow(prepared, as: id)
+                return AnyDebugDrawerPlugin(plugin(prepared))
+            #else
+                // Release builds connect to nothing, so nothing is prepared.
+                return nil
+            #endif
         }
     }
 
@@ -105,7 +126,15 @@ public struct DebugDrawerSidecarPlugin: Identifiable {
     /// - Throws: What the transport's `connect` throws: `mismatchedTypes` when the model under
     ///   ``id`` has other types, `disconnected` and `cancelled`.
     @MainActor public func plugin(over transport: any DebugDrawerTransport) async throws(DebugDrawerTransportError) -> AnyDebugDrawerPlugin {
-        try await connect(transport)
+        try await connect(transport, nil)
+    }
+
+    /// The plugin, marked as one that shows only what the app collects while it runs, so it is
+    /// never prepared before launch and its snapshots aren't kept.
+    func collectedWhileRunning() -> DebugDrawerSidecarPlugin {
+        var plugin = self
+        plugin.preparesForLaunch = false
+        return plugin
     }
 
     /// The plugins a sidecar shows unless it names its own: Console and Network where they build,
@@ -127,6 +156,7 @@ public struct DebugDrawerSidecarPlugin: Identifiable {
             ) { transport in
                 ConsolePlugin(transport: transport)
             }
+            .collectedWhileRunning()
         }
     #endif
 
@@ -140,6 +170,7 @@ public struct DebugDrawerSidecarPlugin: Identifiable {
             ) { transport in
                 NetworkPlugin(transport: transport)
             }
+            .collectedWhileRunning()
         }
     #endif
 }

@@ -249,9 +249,10 @@ public final class DebugDrawerReceiver {
 
     /// Stops writing snapshots and performing commands. The capabilities' snapshots leave the store
     /// (the sessions' stays), and commands left meanwhile wait for the next start; the app's
-    /// presence file goes, so a sidecar no longer lists it.
+    /// presence file stays, marked not running, so a sidecar lists the app as stopped and can
+    /// leave a session and commands for its next launch.
     public func stop() {
-        presence?.withdraw()
+        presence?.markStopped()
         presence = nil
         if let foregroundObservation {
             notificationCenter.removeObserver(foregroundObservation)

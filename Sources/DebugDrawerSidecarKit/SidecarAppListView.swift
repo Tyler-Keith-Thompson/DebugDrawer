@@ -37,7 +37,7 @@
     }
 
     /// An app in the sidebar: its name, then its version and build, its bundle ID and when it
-    /// was last seen.
+    /// was last seen, or that it isn't running.
     struct SidecarAppRow: View {
         let app: DebugDrawerSidecarApp
 
@@ -51,7 +51,11 @@
                 Text(app.bundleIdentifier)
                     .debugDrawerFont(.code)
                     .foregroundStyle(.secondary)
-                if app.isServing {
+                if !app.isRunning {
+                    Text("Not running, last seen \(app.lastSeen, style: .relative) ago")
+                        .debugDrawerFont(.secondary)
+                        .foregroundStyle(.secondary)
+                } else if app.isServing {
                     Text("Last seen \(app.lastSeen, style: .relative) ago")
                         .debugDrawerFont(.secondary)
                         .foregroundStyle(.secondary)

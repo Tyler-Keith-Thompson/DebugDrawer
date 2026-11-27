@@ -37,7 +37,7 @@
     @MainActor
     @Suite(.timeLimit(.minutes(1)))
     struct SidecarAppListTests {
-        @Test("Two apps running a receiver in the group are both listed, each with its own directory of the store; one that stops drops off")
+        @Test("Two apps running a receiver in the group are both listed, each with its own directory of the store; one that stops stays, not running")
         func listsReceiversAsTheyStartAndStop() async throws {
             let store = FileManager.default.temporaryDirectory
                 .appending(path: "SidecarAppListTests-\(UUID().uuidString)")
@@ -58,7 +58,7 @@
             }
             let listed = sut.apps
             wallet.stop()
-            for await apps in sut.$apps.values where apps.count == 1 {
+            for await apps in sut.$apps.values where apps.last?.isRunning == false {
                 break
             }
             let afterStop = sut.apps
@@ -75,7 +75,11 @@
             #expect(listed.allSatisfy { $0.requiresSession && $0.isServing && $0.protocolVersion == 2 })
             #expect(listed.map(\.storeDirectory) == [shop.appDirectory, wallet.appDirectory])
             #expect(listed.map(\.storeDirectory.lastPathComponent) == ["com.example.shop", "com.example.wallet"])
-            #expect(afterStop.map(\.bundleIdentifier) == ["com.example.shop"])
+            #expect(listed.map(\.isRunning) == [true, true])
+            #expect(afterStop.map(\.bundleIdentifier) == ["com.example.shop", "com.example.wallet"])
+            #expect(afterStop.map(\.isRunning) == [true, false])
+            #expect(afterStop.last?.capabilities == ["DebugDrawer.Sessions", "Wallet.LogLevel"])
+            #expect(afterStop.last?.servesInSessionsOnly == true)
         }
 
         @Test("An app already serving when the sidecar starts is listed at once, and a capability it enables later shows up")
@@ -130,7 +134,7 @@
             #expect(sut.apps.first?.capabilities == ["DebugDrawer.Sessions", "Shop.LogLevel"])
         }
 
-        @Test("A debug build's store server lists its app with the models it serves, and drops off as it stops")
+        @Test("A debug build's store server lists its app with the models it serves, and is listed as not running once it stops")
         func storeServerIsListed() async throws {
             let store = FileManager.default.temporaryDirectory
                 .appending(path: "SidecarAppListTests-\(UUID().uuidString)")
@@ -149,14 +153,35 @@
             }
             let listed = sut.apps
             server.stop()
-            for await apps in sut.$apps.values where apps.isEmpty {
+            for await apps in sut.$apps.values where apps.first?.isRunning == false {
                 break
             }
 
             #expect(listed.map(\.displayName) == ["Shop Debug"])
             #expect(listed.first?.capabilities == ["Shop.LogLevel"])
             #expect(listed.first?.requiresSession == false)
-            #expect(sut.apps.isEmpty)
+            #expect(listed.first?.isRunning == true)
+            #expect(sut.apps.map(\.displayName) == ["Shop Debug"])
+            #expect(sut.apps.first?.capabilities == ["Shop.LogLevel"])
+        }
+
+        @Test("A presence file from a build before the running state, without its key, is listed as running")
+        func presenceWithoutRunningStateReadsAsRunning() throws {
+            let store = FileManager.default.temporaryDirectory
+                .appending(path: "SidecarAppListTests-\(UUID().uuidString)")
+                .appending(path: "DebugDrawer")
+            let directory = AppGroupStoreLayout.appDirectory(of: "com.example.shop", inStore: store)
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            let identity = AppPresence.Identity(bundleIdentifier: "com.example.shop", displayName: "Shop", version: "2.4", build: "881")
+            let lastSeen = Date(timeIntervalSince1970: 1_800_000_000)
+            let older = AppPresence(identity: identity, capabilities: ["Shop.LogLevel"], lastSeen: lastSeen).encoded()
+            try older.write(to: AppPresence.file(inAppDirectory: directory))
+
+            let sut = DebugDrawerSidecarAppList(storeDirectory: store)
+
+            #expect(String(bytes: older, encoding: .utf8)?.contains("isRunning") == false)
+            #expect(sut.apps.map(\.bundleIdentifier) == ["com.example.shop"])
+            #expect(sut.apps.first?.isRunning == true)
         }
 
         @Test("A group with no container lists nothing and says why")

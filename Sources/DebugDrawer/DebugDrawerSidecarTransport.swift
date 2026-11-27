@@ -158,9 +158,54 @@ import os
                 Task { @MainActor in self?.release(token) }
             }
             return DebugDrawerPluginTransport(initial: initial, snapshots: snapshots) { [self] command in
-                guard let payload = try? TransportMessage.payload(command) else { return }
-                send(TransportMessage(kind: .command, pluginID: pluginID, payload: payload, commandID: UUID()))
+                send(command, toPlugin: pluginID)
             }
+        }
+
+        /// A transport to the plugin's model showing `initial`, read before, until the app serves
+        /// the model again, and carrying its commands as ``connect(toPlugin:snapshot:command:)``'s
+        /// do: for commands prepared while the app isn't running, performed as it launches.
+        ///
+        /// - Parameters:
+        ///   - pluginID: The ID the model was registered under.
+        ///   - snapshot: The model's `Snapshot` type.
+        ///   - command: The model's `Command` type.
+        ///   - initial: What to show until the app serves a snapshot.
+        ///   - live: Called once, as the first snapshot the app serves arrives.
+        /// - Returns: The transport, or `nil` once ``close()`` is called.
+        package func prepare<Snapshot: Codable & Equatable & Sendable, Command: Codable & Sendable>(
+            toPlugin pluginID: String,
+            snapshot: Snapshot.Type,
+            command: Command.Type,
+            from initial: Snapshot,
+            live: @escaping @MainActor () -> Void
+        ) -> DebugDrawerPluginTransport<Snapshot, Command>? {
+            guard !isClosed else { return nil }
+            let (snapshots, delivered) = AsyncStream<Snapshot>.makeStream(bufferingPolicy: .bufferingNewest(1))
+            let relay = SidecarPluginRelay<Snapshot, Command>(pluginID: pluginID, delivered: delivered, live: live)
+            let token = UUID()
+            relays[token] = relay
+            relay.attach(to: socket ?? store)
+            delivered.onTermination = { [weak self] _ in
+                Task { @MainActor in self?.release(token) }
+            }
+            return DebugDrawerPluginTransport(initial: initial, snapshots: snapshots) { [self] command in
+                send(command, toPlugin: pluginID)
+            }
+        }
+
+        /// Sends `command` to the plugin's model over the channel in use, without a transport to
+        /// it: a session's open, for an app whose sessions weren't read yet.
+        ///
+        /// - Parameters:
+        ///   - command: What to send.
+        ///   - pluginID: The ID the model was registered under.
+        /// - Returns: The command's file when it was left in the store for the app; `nil` when it
+        ///   went over the socket, or couldn't be sent.
+        @discardableResult
+        package func send<Command: Codable & Sendable>(_ command: Command, toPlugin pluginID: String) -> URL? {
+            guard let payload = try? TransportMessage.payload(command) else { return nil }
+            return send(TransportMessage(kind: .command, pluginID: pluginID, payload: payload, commandID: UUID()))
         }
 
         /// Disconnects from the app: the transports this handed out keep their last snapshot, and
@@ -266,25 +311,33 @@ import os
             reachForSocket()
         }
 
-        /// Sends `message`, a command, over the channel in use.
-        private func send(_ message: TransportMessage) {
-            guard !isClosed else { return }
+        /// Sends `message`, a command, over the channel in use: its file when left in the store.
+        @discardableResult
+        private func send(_ message: TransportMessage) -> URL? {
+            guard !isClosed else { return nil }
             if let socket {
-                if socket.send(command: message) { return }
+                if socket.send(command: message) { return nil }
                 fallBack(from: socket)
             }
-            leaveInStore(message)
+            return leaveInStore(message)
         }
 
-        private func leaveInStore(_ message: TransportMessage) {
-            guard let file = store.leave(message) else { return }
+        @discardableResult
+        private func leaveInStore(_ message: TransportMessage) -> URL? {
+            guard let file = store.leave(message) else { return nil }
             leftInStore.append((file, message))
-            // The store keeps at most this many command files, removing the oldest first, so
-            // older ones of this transport's are gone.
-            let excess = leftInStore.count - AppGroupStoreLayout.maximumCommandFiles
-            if excess > 0 {
-                leftInStore.removeFirst(excess)
+            // The store keeps at most this many command files, removing the oldest first but for
+            // the newest for the sessions, so older ones of this transport's are gone.
+            var excess = leftInStore.count - AppGroupStoreLayout.maximumCommandFiles
+            guard excess > 0 else { return file }
+            let kept = leftInStore.lastIndex { $0.message.pluginID == DebugDrawerSessions.pluginID }
+            leftInStore = leftInStore.enumerated().filter { index, _ in
+                guard excess > 0, index != kept else { return true }
+                excess -= 1
+                return false
             }
+            .map(\.element)
+            return file
         }
 
         private func release(_ token: UUID) {

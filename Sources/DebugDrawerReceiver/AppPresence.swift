@@ -7,16 +7,19 @@ import Foundation
 // (`DirectoryWatcher`) and lists one app per file. The file says who the app is and what it serves,
 // nothing secret: its bundle ID, name, version and build, the IDs it serves, the protocol it speaks
 // (its hello: major version, oldest version, capabilities), whether it serves its capabilities'
-// snapshots only within a session (a receiver's, DD-271) and when it last said so. It is written
-// atomically (`AppGroupStoreLayout`), as the store's other files are, so a reader sees the old file
-// or the new one.
+// snapshots only within a session (a receiver's, DD-271), whether it is running, and when it last
+// said so. It is written atomically (`AppGroupStoreLayout`), as the store's other files are, so a
+// reader sees the old file or the new one.
 //
 //     <store>/apps/<percent-encoded bundle ID>/presence.json
 //
 // The app writes it as it starts serving, again as what it serves changes and as it comes back
-// to the foreground (`lastSeen`), and removes it as it stops, so the list follows each app without
-// either side polling. An app killed while serving can't remove its file: it stays, with the time
-// the app was last seen, until the app serves again and replaces it.
+// to the foreground (`lastSeen`), and rewrites it marked not running as it stops, so the list
+// follows each app without either side polling, and a sidecar still lists an app that stopped, to
+// prepare a session and commands for its next launch (DD-296). An app killed while serving can't
+// mark its file: it stays as it was, with the time the app was last seen, until the app serves
+// again and replaces it. Rejected for the stop: removing the file (the sidecar would forget the
+// app, and what it last served, until it ran again).
 //
 // Rejected: a heartbeat rewritten on a timer (a clock where the app's own events already say when
 // it changes, and writes the suspended app can't make anyway); a lock held on the file while
@@ -50,19 +53,25 @@ package struct AppPresence: Codable, Equatable, Sendable {
     /// build's store server, which serves them at once, and from a receiver of a build before
     /// this field, so either decodes.
     package var servesInSessionsOnly: Bool?
+    /// `false` once the app stopped serving, `true` while it serves; absent (`nil`) from a build
+    /// before this field, which removed the file as it stopped, so a file without it is read as
+    /// running.
+    package var isRunning: Bool?
 
     package init(
         identity: Identity,
         capabilities: [String],
         lastSeen: Date,
         hello: TransportHello = .current,
-        servesInSessionsOnly: Bool? = nil
+        servesInSessionsOnly: Bool? = nil,
+        isRunning: Bool? = nil
     ) {
         self.identity = identity
         self.capabilities = capabilities.sorted()
         self.lastSeen = lastSeen
         self.hello = hello
         self.servesInSessionsOnly = servesInSessionsOnly
+        self.isRunning = isRunning
     }
 
     /// Who an app is, as its bundle says.
@@ -128,7 +137,7 @@ package final class PresenceAnnouncement {
     private var foregroundObservation: (any NSObjectProtocol)?
 
     /// Writes `identity`'s presence, serving `capabilities`, into its directory of the store,
-    /// `directory`, and again each time the app comes to the foreground, until ``withdraw()``.
+    /// `directory`, and again each time the app comes to the foreground, until ``markStopped()``.
     ///
     /// - Parameters:
     ///   - directory: The app's directory of the store.
@@ -153,7 +162,8 @@ package final class PresenceAnnouncement {
         self.center = center
         self.now = now
         presence = AppPresence(
-            identity: identity, capabilities: capabilities, lastSeen: now(), servesInSessionsOnly: servesInSessionsOnly ? true : nil
+            identity: identity, capabilities: capabilities, lastSeen: now(), servesInSessionsOnly: servesInSessionsOnly ? true : nil,
+            isRunning: true
         )
         write()
         // No queue: the system posts it on the main thread.
@@ -171,12 +181,14 @@ package final class PresenceAnnouncement {
         write()
     }
 
-    /// Removes the file: the app no longer serves the store. Later calls do nothing.
-    package func withdraw() {
+    /// Rewrites the file marked not running, as of now, with what the app last served: the app no
+    /// longer serves the store, and a sidecar lists it as stopped. Later calls do nothing.
+    package func markStopped() {
         guard let foregroundObservation else { return }
         center.removeObserver(foregroundObservation)
         self.foregroundObservation = nil
-        try? FileManager.default.removeItem(at: file)
+        presence.isRunning = false
+        write()
     }
 
     private func write() {

@@ -24,9 +24,14 @@ public struct DebugDrawerSidecarApp: Identifiable, Equatable, Sendable {
     /// app one major version apart from its own build; two apart, its transports throw
     /// `DebugDrawerTransportError.incompatibleVersion`.
     public let protocolVersion: Int
-    /// When the app last said it serves: as it started, as what it serves changed, or as it came
-    /// to the foreground. An app that was killed keeps the time it was last seen.
+    /// When the app last said it serves: as it started, as what it serves changed, as it came
+    /// to the foreground, or as it stopped. An app that was killed keeps the time it was last seen.
     public let lastSeen: Date
+    /// Whether the app is running, as far as its presence file says: `false` once it stopped
+    /// serving (its receiver's or store server's `stop()`), when a sidecar can still prepare a
+    /// session and commands for its next launch. An app killed while serving couldn't say so,
+    /// and reads as running, with the time it was last seen.
+    public let isRunning: Bool
     /// The app's own directory of the group's store, `DebugDrawer/apps/<bundle ID>` in the
     /// container, where the app keeps its presence file and snapshots and takes commands.
     public let storeDirectory: URL
@@ -46,6 +51,8 @@ public struct DebugDrawerSidecarApp: Identifiable, Equatable, Sendable {
     ///   - protocolVersion: The major version of the protocol the app speaks.
     ///   - lastSeen: When the app last said it serves.
     ///   - storeDirectory: The app's own directory of the group's store.
+    ///   - isRunning: Whether the app is running; `false` for one addressed by bundle ID before it
+    ///     ever launched, which no ``DebugDrawerSidecarAppList`` lists, as it wrote no presence file.
     public init(
         bundleIdentifier: String,
         displayName: String,
@@ -54,7 +61,8 @@ public struct DebugDrawerSidecarApp: Identifiable, Equatable, Sendable {
         capabilities: [String],
         protocolVersion: Int,
         lastSeen: Date,
-        storeDirectory: URL
+        storeDirectory: URL,
+        isRunning: Bool = true
     ) {
         self.bundleIdentifier = bundleIdentifier
         self.displayName = displayName
@@ -64,6 +72,7 @@ public struct DebugDrawerSidecarApp: Identifiable, Equatable, Sendable {
         self.protocolVersion = protocolVersion
         self.lastSeen = lastSeen
         self.storeDirectory = storeDirectory
+        self.isRunning = isRunning
     }
 
     /// The app's bundle identifier.
@@ -108,7 +117,9 @@ public struct DebugDrawerSidecarApp: Identifiable, Equatable, Sendable {
             capabilities: presence.capabilities,
             protocolVersion: presence.hello.version,
             lastSeen: presence.lastSeen,
-            storeDirectory: storeDirectory
+            storeDirectory: storeDirectory,
+            // A file from before the field was written only while the app ran.
+            isRunning: presence.isRunning != false
         )
         servesInSessionsOnly = presence.servesInSessionsOnly == true
     }

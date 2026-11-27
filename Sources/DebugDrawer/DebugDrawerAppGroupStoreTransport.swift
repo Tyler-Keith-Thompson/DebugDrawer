@@ -7,7 +7,7 @@ import os
 // leaves each command as a file of its own for the app to perform. Command files are named by the
 // wall clock in nanoseconds, then a count, then a UUID, so the app performs one viewer's commands
 // in the order sent, and two viewers' never collide. Leaving one trims the oldest past the store's
-// budget (AppGroupStoreLayout). A file a build this one shares no protocol
+// budget, keeping the newest for the sessions (AppGroupStoreLayout). A file a build this one shares no protocol
 // version with wrote is skipped rather than closing the store, as a stale file can outlive the app
 // that wrote it.
 
@@ -134,7 +134,9 @@ import os
                 logger.error("Couldn't leave a command for \(pluginID, privacy: .public): \(error.localizedDescription, privacy: .public)")
                 return nil
             }
-            let removed = layout.trimCommands()
+            // A session's open the sidecar queued before the app launched stays, so the commands
+            // after it still land in the session.
+            let removed = layout.trimCommands(keepingNewestFor: DebugDrawerSessions.pluginID)
             if removed > 0 {
                 logger.notice("Removed the \(removed, privacy: .public) oldest commands waiting in the store, which was full")
             }

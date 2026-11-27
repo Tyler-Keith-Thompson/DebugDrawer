@@ -11,7 +11,9 @@ import SwiftUI
 // shows. The only thing of the example's own is Mocking's presets, for the host's Fetch Greeting.
 // On the Mac the store is the one `just run sidecar macOS` signed both apps for
 // (ExampleSidecarStore). `-ScriptSession <bundle ID>` opens a session with that app, overrides a
-// flag in it and ends it, unattended (ExampleSessionScript). The device-lab bridge is on: each
+// flag in it and ends it, unattended (ExampleSessionScript); `-PrepareLaunch <bundle ID>` leaves a
+// session's open and a flag override for that app's next launch and follows them into the session
+// it opens (ExamplePrepareScript). The device-lab bridge is on: each
 // app's screen has a Mac Viewer control that shares the open session with a Mac paired by code
 // (the macOS example's Debug > Remote Viewer). `-ShareWithMac` starts sharing as an app is picked,
 // `-RemoteViewersOnLoopback` listens on 127.0.0.1 alone, advertising nothing, and
@@ -22,6 +24,8 @@ struct ExampleSidecarApp: App {
     init() {
         // `-ScriptSession <bundle ID>` drives a session with that app unattended.
         ExampleSessionScript.startIfAsked()
+        // `-PrepareLaunch <bundle ID>` prepares a session and a flag override for its next launch.
+        ExamplePrepareScript.startIfAsked()
     }
 
     var body: some Scene {

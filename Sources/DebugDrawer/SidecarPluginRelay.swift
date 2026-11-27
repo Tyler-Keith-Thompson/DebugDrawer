@@ -4,8 +4,10 @@ import Foundation
 // transport of the channel in use to the plugin, reads its snapshots into the stream the plugin
 // transport reads, and connects again at each switch, holding the channel's plugin transport
 // while it reads, so the channel keeps sending. The first snapshot goes to the connect waiting
-// for it, the later ones to the plugin transport. A channel closing, or a switch cancelling a
-// connect, isn't the plugin's failure: the next channel connects again.
+// for it, the later ones to the plugin transport. A relay for a plugin transport prepared from a
+// snapshot read before (DD-296) has no connect waiting: every snapshot goes to the plugin
+// transport, and the first says the app serves the model again. A channel closing, or a switch
+// cancelling a connect, isn't the plugin's failure: the next channel connects again.
 
 #if DEBUG
     /// One plugin transport a sidecar handed out, fed by a transport of the channel in use.
@@ -28,6 +30,8 @@ import Foundation
         /// The first snapshot, or why there is none, to the connect waiting for it.
         private let firstOutcome: AsyncStream<Result<Snapshot, DebugDrawerTransportError>>.Continuation
         private var hasFirst = false
+        /// Called once, with the first snapshot the app serves, for a prepared plugin transport.
+        private var live: (@MainActor () -> Void)?
         /// The channel's plugin transport, held while read, so the channel keeps sending.
         private var inner: DebugDrawerPluginTransport<Snapshot, Command>?
         private var reading: Task<Void, Never>?
@@ -40,6 +44,18 @@ import Foundation
             self.pluginID = pluginID
             self.delivered = delivered
             self.firstOutcome = firstOutcome
+        }
+
+        /// A relay for a plugin transport made from a snapshot read before: every snapshot goes
+        /// to `delivered`, and `live` is called with the first.
+        init(pluginID: String, delivered: AsyncStream<Snapshot>.Continuation, live: @escaping @MainActor () -> Void) {
+            self.pluginID = pluginID
+            self.delivered = delivered
+            let (_, firstOutcome) = AsyncStream<Result<Snapshot, DebugDrawerTransportError>>.makeStream()
+            firstOutcome.finish()
+            self.firstOutcome = firstOutcome
+            hasFirst = true
+            self.live = live
         }
 
         func attach(to transport: any DebugDrawerTransport) {
@@ -71,6 +87,10 @@ import Foundation
         }
 
         private func receive(_ snapshot: Snapshot) {
+            if let live {
+                self.live = nil
+                live()
+            }
             guard hasFirst else {
                 hasFirst = true
                 firstOutcome.yield(.success(snapshot))

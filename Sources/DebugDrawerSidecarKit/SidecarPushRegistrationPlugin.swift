@@ -26,6 +26,7 @@ import SwiftUI
             ) { transport in
                 PushRegistrationSidecarPlugin(transport: transport)
             }
+            .collectedWhileRunning()
         }
     }
 

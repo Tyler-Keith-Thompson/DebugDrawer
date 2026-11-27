@@ -24,6 +24,7 @@ import SwiftUI
             ) { transport in
                 AppStatePlugin(transport: transport)
             }
+            .collectedWhileRunning()
             plugin.hostsOnConnect = true
             return plugin
         }

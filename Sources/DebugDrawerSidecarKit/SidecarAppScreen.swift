@@ -159,6 +159,8 @@
             if connection.app.requiresSession {
                 SidecarSessionControl(
                     sessions: connection.sessions,
+                    isWaitingForLaunch: connection.isWaitingForLaunch,
+                    appName: connection.app.displayName,
                     open: openSession,
                     end: connection.endSession
                 )

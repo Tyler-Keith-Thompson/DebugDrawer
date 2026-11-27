@@ -30,6 +30,7 @@ import SwiftUI
             ) { transport in
                 BugReportsPlugin(transport: transport, review: BugReportReview())
             }
+            .collectedWhileRunning()
         }
     }
 

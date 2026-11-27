@@ -22,6 +22,7 @@ import SwiftUI
             ) { transport in
                 DiagnosticsCaptureSidecarPlugin(transport: transport)
             }
+            .collectedWhileRunning()
         }
     }
 
