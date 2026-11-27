@@ -4,7 +4,7 @@ DebugDrawer is a plugin-based debug drawer for apps on Apple platforms: a slide-
 debugging tool is its own library, so an app links only the tools it wants. It is for developers
 and internal testers of their own app, on macOS and iOS today, and optimizes for costing nothing in
 what ships to end users: release builds get no-op stand-ins. The board's charter
-(`.kanban/triage.md`) says what is in scope and the rules a change must fit. Swift 6.3 (minimum).
+(`.kanban/triage.md`) says what is in scope and the rules a change must fit. Swift 6.4 (minimum).
 Bazel is the development build; SwiftPM is the published package. `README.md` is the user-facing
 overview.
 

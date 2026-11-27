@@ -6,7 +6,7 @@ to a no-op outside `DEBUG`, so builds that ship to end users carry none of it.
 
 ## Installation
 
-DebugDrawer requires Swift 6.3 and supports macOS 15 and iOS 17 or later, Mac Catalyst included.
+DebugDrawer requires Swift 6.4 and supports macOS 15 and iOS 17 or later, Mac Catalyst included.
 The core also builds for visionOS, tvOS and watchOS, and so do some plugins
 ([Supported Platforms](Sources/DebugDrawer/DebugDrawer.docc/SupportedPlatforms.md)).
 
