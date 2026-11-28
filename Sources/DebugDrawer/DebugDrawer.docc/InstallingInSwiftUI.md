@@ -50,6 +50,42 @@ func scene(_ scene: UIScene, willConnectTo _: UISceneSession, options _: UIScene
 }
 ```
 
+#### When another framework makes the window
+
+An app whose window and scene delegate come from another framework (a game engine, a renderer
+written in another language that opens its own `UIWindow`) has no scene delegate of its own to
+call `attach(to:)` from. Attach every connected `UIWindowScene` once the framework's window
+exists, from a hook the framework calls at that point, and attach each scene that connects later
+as it activates, on `UIScene.didActivateNotification`. The drawer's window sits above the
+framework's view and passes through the touches it doesn't use.
+
+```swift
+@MainActor
+final class DebugDrawerAttacher {
+    static let shared = DebugDrawerAttacher()
+    private var activation: (any NSObjectProtocol)?
+
+    func attachEveryScene() {
+        for case let windowScene as UIWindowScene in UIApplication.shared.connectedScenes {
+            DebugDrawer.shared.attach(to: windowScene)
+        }
+        guard activation == nil else { return }
+        activation = NotificationCenter.default.addObserver(
+            forName: UIScene.didActivateNotification, object: nil, queue: .main
+        ) { notification in
+            guard let windowScene = notification.object as? UIWindowScene else { return }
+            MainActor.assumeIsolated { DebugDrawer.shared.attach(to: windowScene) }
+        }
+    }
+}
+
+// Called on the main thread by the framework's code once its window is open.
+@_cdecl("orders_window_did_open")
+public func ordersWindowDidOpen() {
+    MainActor.assumeIsolated { DebugDrawerAttacher.shared.attachEveryScene() }
+}
+```
+
 On the Mac, attach a window once it exists, such as when its window controller shows it:
 
 ```swift
@@ -124,11 +160,28 @@ override func motionEnded(_ motion: UIEvent.EventSubtype, with event: UIEvent?) 
 // Triple-tap (iOS)
 .onTapGesture(count: 3) { DebugDrawer.shared.toggle() }
 
+// Shake gesture with no responder of the app's own (iOS): the UIApplication subclass
+// that Info.plist's NSPrincipalClass names, here "OrdersApplication"
+@objc(OrdersApplication)
+final class OrdersApplication: UIApplication {
+    override func motionEnded(_ motion: UIEvent.EventSubtype, with event: UIEvent?) {
+        super.motionEnded(motion, with: event)
+        if motion == .motionShake { DebugDrawer.shared.toggle() }
+    }
+}
+
 // Play/Pause on the Siri Remote (tvOS), attached outside .debugDrawer() so it also closes it
 ContentView()
     .debugDrawer()
     .onPlayPauseCommand { DebugDrawer.shared.toggle() }
 ```
+
+A shake goes to the first responder and up the responder chain, so the `motionEnded` override
+belongs on a responder the app owns, such as its window or a view controller. When another
+framework owns every responder, the chain still ends at the application object: subclass
+`UIApplication`, override `motionEnded(_:with:)` there, and name the subclass in Info.plist's
+`NSPrincipalClass`. Under Bazel, mark the library that holds it `alwayslink = True`: only
+Info.plist refers to the class, so the linker would otherwise drop it.
 
 Each window has a drawer of its own, open or closed apart from the others;
 ``DebugDrawer/DebugDrawer/toggle()``, ``DebugDrawer/DebugDrawer/open()``,
